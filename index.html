@@ -1,4 +1,3 @@
-CMH Daily Driver 
 <!DOCTYPE html>
 
 <html lang="en">
@@ -59,17 +58,84 @@ CMH Daily Driver 
 –ff-hd:  ‘Barlow Condensed’,sans-serif;
 
 }
+/* ── CANONICAL SCREEN + NAV RULES ─────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+font-size: 16px;
+-webkit-text-size-adjust: 100%;
+background: var(–bg);
+}
+
+/* body: see canonical rules above */
+
+/* Screens — only .scr.on is visible */
+.scr { display: none !important; padding: 14px; max-width: 1100px; margin: 0 auto; width: 100%; }
+.scr.on { display: block !important; }
+@media (max-width: 600px) { .scr { padding: 10px; } }
+
+/* Nav */
+#nav {
+background: var(–bg2);
+border-bottom: 1px solid var(–bdr);
+display: flex;
+overflow-x: auto;
+scrollbar-width: none;
+padding: 0 4px;
+position: sticky;
+top: 0;
+z-index: 100;
+-webkit-overflow-scrolling: touch;
+}
+#nav::-webkit-scrollbar { display: none; }
+
+.nbtn {
+font-family: var(–ff-ui);
+font-size: 12px;
+font-weight: 600;
+color: var(–txt3);
+background: none;
+border: none;
+border-bottom: 2px solid transparent;
+padding: 10px 11px;
+white-space: nowrap;
+display: flex;
+align-items: center;
+gap: 4px;
+cursor: pointer;
+transition: color .15s, border-color .15s;
+flex-shrink: 0;
+}
+.nbtn:hover { color: var(–txt2); }
+.nbtn.on { color: var(–acc); border-bottom-color: var(–acc); }
+.ni { font-size: 13px; }
+
+/* Topbar */
+#topbar {
+background: var(–bg2);
+border-bottom: 1px solid var(–bdr);
+height: 48px;
+display: flex;
+align-items: center;
+padding: 0 14px;
+gap: 10px;
+position: sticky;
+top: 0;
+z-index: 200;
+}
+#logo {
+font-family: var(–ff-hd);
+font-size: 16px;
+font-weight: 800;
+letter-spacing: .05em;
+color: var(–txt);
+}
+#logo .accent { color: var(–acc); }
 
 /* ── RESET ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 16px; -webkit-text-size-adjust: 100%; }
-body {
-background: var(–bg);
-color: var(–text);
-font-family: var(–font-ui);
-min-height: 100vh;
-overflow-x: hidden;
-}
+/* body: see canonical rules above */
 
 /* ── LAYOUT ────────────────────────────────────────────────────────────── */
 #app { min-height: 100vh; display: flex; flex-direction: column; }
@@ -156,8 +222,6 @@ border-bottom-color: var(–accent);
 .tab-icon { font-size: 14px; }
 
 /* ── SCREENS ───────────────────────────────────────────────────────────── */
-.screen { display: none; padding: 20px; max-width: 1200px; margin: 0 auto; width: 100%; }
-.screen.active { display: block; }
 
 /* ── SECTION CARDS ─────────────────────────────────────────────────────── */
 .card {
@@ -618,7 +682,7 @@ margin-right: 5px;
 
 /* ── MOBILE NAV ────────────────────────────────────────────────────────── */
 @media (max-width: 600px) {
-.screen { padding: 12px; }
+
 .field-row { grid-template-columns: 1fr; }
 #topbar { padding: 0 12px; }
 .board-legend { display: none; }
@@ -860,9 +924,8 @@ input.autofill{background:rgba(22,163,74,.06);border-color:var(–green3);color:
 .shift-pill.closing{background:var(–red3)}
 
 /* ── SCREENS ── */
-.scr{display:none;padding:16px;max-width:1100px;margin:0 auto;width:100%}
-.scr.on{display:block}
-@media(max-width:600px){.scr{padding:10px}}
+
+@media(max-width:600px){}
 
 /* ── CARDS ── */
 .card{background:var(–bg2);border:1px solid var(–bdr);border-radius:8px;padding:16px;margin-bottom:14px}
@@ -1130,7 +1193,7 @@ padding:2px 6px;border-radius:3px;flex-shrink:0;margin-top:2px;
 #topbar, #nav, .wu-master, .legend, .kpi-row,
 .nbtn, #bh-classnotes, .tile-override-btn { display:none !important; }
 body { background:#fff !important; color:#000 !important; }
-.scr { display:block !important; padding:0 !important; max-width:100% !important; }
+.scr.on { display:block !important; padding:0 !important; max-width:100% !important; }
 .scr:not(.on) { display:none !important; }
 .board-wrap { grid-template-columns:repeat(5,1fr) !important; gap:4px !important; }
 .tile { border-radius:4px !important; padding:6px 8px !important; border-width:1px !important; }
@@ -1150,6 +1213,58 @@ body { background:#fff !important; color:#000 !important; }
 .mgr-bar { background:#f8f9fa !important; border-color:#dadce0 !important;
 color:#000 !important; print-color-adjust:exact; }
 .mgr-item-lbl, .mgr-item-val, #bh-cs-hot, #bh-mgrs { color:#000 !important; }
+}
+
+/* ── iPAD / MOBILE FIXES ─────────────────────────────────────── */
+@media (max-width: 768px) {
+/* Larger tap targets */
+.btn { min-height: 40px; }
+.nbtn { padding: 12px 10px; font-size: 11px; }
+.wubtn { padding: 7px 13px; font-size: 12px; }
+.cl-tab { padding: 8px 16px; }
+
+/* Prevent iOS zoom on input focus */
+input, select, textarea {
+font-size: 16px !important;
+}
+
+/* Board tiles — 2 columns on phone, 3 on iPad */
+.board-wrap {
+grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+/* KPI row — 2x2 on mobile */
+.kpi-row {
+grid-template-columns: repeat(2, 1fr);
+}
+
+/* Topbar compact */
+#topbar { height: 44px; padding: 0 10px; }
+#logo { font-size: 14px; }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+/* iPad landscape — board tiles 4 columns */
+.board-wrap {
+grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+}
+}
+
+/* Fix iOS Safari rubber-band scroll on nav */
+#nav { -webkit-overflow-scrolling: touch; }
+
+/* Fix iOS input appearance */
+input, select, textarea, button {
+-webkit-appearance: none;
+appearance: none;
+}
+button { cursor: pointer; }
+
+/* Prevent text selection on buttons */
+.nbtn, .btn, .wubtn, .cl-tab, .ss-tab, .kpi {
+-webkit-user-select: none;
+user-select: none;
+-webkit-tap-highlight-color: transparent;
 }
 
 </style>
@@ -7795,4 +7910,4 @@ Best,
 return { typeLabel:'Closing / End of Night', to, subject, body };
 ```
 
-} 
+}
