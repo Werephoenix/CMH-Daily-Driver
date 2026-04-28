@@ -2404,7 +2404,7 @@ var ROSTER_CXR = [
    notes:'Sun/Mon/Thu/Fri/Sat 5:30a-2:00p. Counter clock starts 6am.'},
 
   {id:'laura',    name:'Laura Gonzalez',          nick:'Laura',   role:'CXR',
-   shiftCode:'varies', shiftStart:5.5, shiftEnd:14.5,
+   shiftCode:'530A-230P/5P-1A', shiftStart:5.5, shiftEnd:14.5,
    daysOn:[0,2,3,4,6],  // Sun/Tue/Wed/Thu/Sat — confirmed ✓ marks
    pref:'counter', exitFairness:0,
    lunchCode:'30min',
@@ -2514,12 +2514,19 @@ var ROSTER_CXR = [
    lunchCode:'1hr',
    notes:'Evening exit agent. Fri confirmed. Schedule varies. Last name TBD.'},
 
-  {id:'sheronda', name:'Sheronda Whitner',         nick:'Sheronda',role:'EXIT',
-   shiftCode:'varies', shiftStart:null, shiftEnd:null,
-   daysOn:null,
+  {id:'zina',     name:'Zina Kellen',            nick:'Zina',    role:'EXIT',
+   shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
+   daysOn:[0,1,4,5,6],  // Thu-Mon (Sun=0,Mon=1,Thu=4,Fri=5,Sat=6) — confirmed Apr 27 2026
    pref:'exit', exitFairness:null,
    lunchCode:'1hr',
-   notes:'EXIT Agent. Part time. Status uncertain — verify still employed.'},
+   notes:'EXIT Agent. Full name: Zina Kellen. Thu-Mon 10A-6:30P. Confirmed Apr 27 2026. No counter rotation.'},
+
+  {id:'sheronda', name:'Sheronda Whitner',         nick:'Sheronda',role:'EXIT',
+   shiftCode:'varies', shiftStart:null, shiftEnd:null,
+   daysOn:[],
+   pref:'exit', exitFairness:null,
+   lunchCode:'1hr',
+   notes:'EXIT Agent. Part time. ⚠ Status uncertain — verify still employed. Days TBD.'},
 ];
 
 // ═══ RETURN AGENTS — Self-managing, roster reference only ═══════════════════
@@ -2748,6 +2755,7 @@ function loadState() {
       s.pasteHourly  = s.pasteHourly  || {};
       s.stationPref  = s.stationPref  || {};
       s.shiftMod     = s.shiftMod     || {};
+      s.customSplits = s.customSplits || {};
       s.closeFields  = s.closeFields  || {};
       return s;
     }
@@ -2756,7 +2764,7 @@ function loadState() {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
-    stationPref:{}, shiftMod:{},
+    stationPref:{}, shiftMod:{}, customSplits:{},
   };
 }
 
@@ -4766,65 +4774,218 @@ function buildSwitchboard() {
     ? `<span style="color:var(--red)">⚠ Exit needs ${exitMin - exitPpl.length} more</span>`
     : `<span style="color:var(--green)">✅ Coverage OK</span>`;
 
-  // Person row renderer
-  function pRow(p, dim) {
-    const isAdj = _adjustPid === p.pid;
-    const altL  = {'full-counter':'Full Ctr','full-exit':'Full Exit','counter-first':'Ctr+30','exit-first':'Exit+30'};
-    const badge = p.altPos !== 'normal'
-      ? `<span style="font-size:9px;background:rgba(217,119,6,.15);color:var(--amber);
-          border:1px solid rgba(217,119,6,.4);border-radius:3px;padding:1px 5px;margin-left:4px">
-          ${altL[p.altPos]||''}</span>` : '';
-    const modBadge = (STATE.shiftMod||{})[p.pid]
-      ? `<span style="font-size:9px;color:var(--amber);margin-left:3px">⏰</span>` : '';
-    const rot = window._lastRotations && window._lastRotations[p.pid];
-    const rotMini = rot ? `<div style="font-size:9px;color:var(--txt3);margin-top:2px;
-      display:flex;gap:4px;align-items:center">
-      <span style="color:${rot.b1&&rot.b1.station==='exit'?'var(--green)':'var(--acc)'}">
-        ${rot.b1&&rot.b1.station==='exit'?'Exit':'Ctr'} ${rot.b1&&rot.b1.hours||4}h
-      </span>
-      <span>→🍽→</span>
-      <span style="color:${rot.b2&&rot.b2.station==='exit'?'var(--green)':'var(--acc)'}">
-        ${rot.b2&&rot.b2.station==='exit'?'Exit':'Ctr'} ${rot.b2&&rot.b2.hours||4}h
-      </span>
-    </div>` : '';
-    return `<div onclick="tapPerson('${p.pid}')" style="display:flex;align-items:center;
-      padding:7px 8px;border-radius:5px;cursor:pointer;margin-bottom:3px;
-      background:${isAdj?'rgba(37,99,235,.1)':'var(--bg3)'};
-      border:1px solid ${isAdj?'var(--acc)':'transparent'};
-      opacity:${dim?0.45:1};transition:all .12s">
-      <div style="flex:1;min-width:0;overflow:hidden">
-        <div style="font-size:13px;font-weight:700;color:var(--txt);
-          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${p.person.nick||p.person.name.split(' ')[0]}${badge}${modBadge}
+  // ── CXR / EXIT inline card ────────────────────────────────────────────────
+  function pRow(p) {
+    const pid       = p.pid;
+    const nick      = p.person.nick || p.person.name.split(' ')[0];
+    const altPos    = (STATE.altSchedule||{})[pid] || 'normal';
+    const shiftMod  = (STATE.shiftMod||{})[pid];
+    const station   = STATE.staffStation[pid] || '';
+    const pref      = (STATE.stationPref||{})[pid] || 'none';
+    const isExit    = p.person.role === 'EXIT';
+    const noLunch   = (STATE.altSchedule||{})[pid+'_nolunch'] === true;
+
+    // Current rotation split (hours)
+    const rot     = window._lastRotations && window._lastRotations[pid];
+    const b1H     = rot ? (rot.b1&&rot.b1.hours||4) : 4;
+    const b2H     = rot ? (rot.b2&&rot.b2.hours||4) : 4;
+    const b1St    = station === 'Exit Booth' ? 'exit' : 'counter';
+    const b2St    = b1St === 'exit' ? 'counter' : 'exit';
+    const b1Color = b1St==='exit' ? 'var(--green)' : 'var(--acc)';
+    const b2Color = b2St==='exit' ? 'var(--green)' : 'var(--acc)';
+
+    // Shift time display
+    const person = p.person;
+    function fmtH(h) {
+      if(h===null||h===undefined) return '—';
+      const hr=Math.floor(h); const mn=Math.round((h-hr)*60);
+      const s=h>=12?'p':'a'; const d=hr>12?hr-12:hr===0?12:hr;
+      return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;
+    }
+    const startH = shiftMod ? shiftMod.start : person.shiftStart;
+    const endH   = shiftMod ? shiftMod.end   : person.shiftEnd;
+    const timeDisp = (startH!==null&&startH!==undefined) ? fmtH(startH)+'–'+fmtH(endH) : p.shift;
+
+    // Split adjuster: show current split
+    const splitDisp = altPos==='normal'
+      ? `${b1H}h ${b1St==='exit'?'Exit':'Ctr'} → 🍽 → ${b2H}h ${b2St==='exit'?'Exit':'Ctr'}`
+      : altPos==='full-counter' ? '8h Counter (full shift)'
+      : altPos==='full-exit'    ? '8h Exit (full shift)'
+      : altPos==='counter-first'? '4.5h Counter → 🍽 → 3.5h Exit'
+      : '3.5h Exit → 🍽 → 4.5h Counter';
+
+    return `<div style="background:var(--bg3);border:1px solid var(--bdr);border-radius:7px;
+      padding:10px;margin-bottom:6px">
+
+      <!-- Row 1: Name + shift + working toggle -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--txt)">${nick}
+            ${pref==='counter'?'<span style="font-size:9px;color:var(--acc)"> 🟦</span>':pref==='exit'?'<span style="font-size:9px;color:var(--green)"> 🟩</span>':''}
+          ${(()=>{const sg=typeof getPatternSuggestion==='function'?getPatternSuggestion(pid):null;return sg&&pref==='none'?`<span style="font-size:8px;background:rgba(217,119,6,.1);color:var(--amber);border-radius:3px;padding:1px 4px;margin-left:3px">~${sg.pref==='exit'?'🟩':'🟦'}</span>`:'';})()}
+          </div>
+          <div style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono)">${timeDisp}</div>
         </div>
-        <div style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono);">
-          ${p.shift}
-        </div>
-        ${rotMini}
+        <button onclick="toggleCallout('${pid}');buildSwitchboard()"
+          style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:4px;
+            border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);
+            cursor:pointer;white-space:nowrap;flex-shrink:0">
+          ✓ Working
+        </button>
       </div>
-      <div style="font-size:12px;color:var(--txt3);margin-left:6px;flex-shrink:0">›</div>
+
+      ${!isExit ? `
+      <!-- Row 2: Station -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px">
+        <button onclick="setStation('${pid}','Counter');buildSwitchboard()"
+          style="padding:6px;border-radius:4px;border:1px solid;font-size:11px;font-weight:700;
+            cursor:pointer;text-align:center;
+            background:${station==='Counter'?'rgba(37,99,235,.15)':'var(--bg2)'};
+            border-color:${station==='Counter'?'var(--acc)':'var(--bdr2)'};
+            color:${station==='Counter'?'var(--acc)':'var(--txt3)'}">
+          🟦 Counter
+        </button>
+        <button onclick="setStation('${pid}','Exit Booth');buildSwitchboard()"
+          style="padding:6px;border-radius:4px;border:1px solid;font-size:11px;font-weight:700;
+            cursor:pointer;text-align:center;
+            background:${station==='Exit Booth'?'rgba(22,163,74,.15)':'var(--bg2)'};
+            border-color:${station==='Exit Booth'?'var(--green)':'var(--bdr2)'};
+            color:${station==='Exit Booth'?'var(--green)':'var(--txt3)'}">
+          🟩 Exit
+        </button>
+      </div>
+
+      <!-- Row 3: Rotation type -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:6px">
+        <button onclick="setAltPosition('${pid}','normal');buildSwitchboard()"
+          style="padding:5px 2px;border-radius:4px;border:1px solid;font-size:10px;font-weight:600;
+            cursor:pointer;text-align:center;
+            background:${altPos==='normal'?'rgba(37,99,235,.1)':'var(--bg2)'};
+            border-color:${altPos==='normal'?'var(--acc)':'var(--bdr2)'};
+            color:${altPos==='normal'?'var(--acc)':'var(--txt3)'}">
+          4hr Split
+        </button>
+        <button onclick="setAltPosition('${pid}','full-counter');buildSwitchboard()"
+          style="padding:5px 2px;border-radius:4px;border:1px solid;font-size:10px;font-weight:600;
+            cursor:pointer;text-align:center;
+            background:${altPos==='full-counter'?'rgba(37,99,235,.1)':'var(--bg2)'};
+            border-color:${altPos==='full-counter'?'var(--acc)':'var(--bdr2)'};
+            color:${altPos==='full-counter'?'var(--acc)':'var(--txt3)'}">
+          Full Ctr
+        </button>
+        <button onclick="setAltPosition('${pid}','full-exit');buildSwitchboard()"
+          style="padding:5px 2px;border-radius:4px;border:1px solid;font-size:10px;font-weight:600;
+            cursor:pointer;text-align:center;
+            background:${altPos==='full-exit'?'rgba(22,163,74,.1)':'var(--bg2)'};
+            border-color:${altPos==='full-exit'?'var(--green)':'var(--bdr2)'};
+            color:${altPos==='full-exit'?'var(--green)':'var(--txt3)'}">
+          Full Exit
+        </button>
+      </div>
+
+      <!-- Row 4: Split adjustment (+/- 30/60 min) -->
+      <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px;
+        font-size:10px;padding:5px 8px;background:var(--bg2);border-radius:4px">
+        <button onclick="adjustSplit('${pid}',-30);buildSwitchboard()"
+          style="width:34px;height:30px;border-radius:4px;border:1px solid var(--bdr2);
+            background:var(--bg3);color:var(--txt2);font-size:16px;font-weight:700;
+            cursor:pointer;line-height:1">−</button>
+        <div style="flex:1;text-align:center;font-size:10px;font-weight:600;
+          color:var(--txt2)">${splitDisp}</div>
+        <button onclick="adjustSplit('${pid}',30);buildSwitchboard()"
+          style="width:34px;height:30px;border-radius:4px;border:1px solid var(--bdr2);
+            background:var(--bg3);color:var(--txt2);font-size:16px;font-weight:700;
+            cursor:pointer;line-height:1">+</button>
+      </div>
+
+      <!-- Row 5: Shift time + No Lunch -->
+      <div style="display:flex;gap:4px;align-items:center">
+        <button onclick="showTimeEditModal('${pid}','${nick}')"
+          style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid;font-size:10px;
+            font-weight:600;cursor:pointer;text-align:left;
+            background:${shiftMod?'rgba(217,119,6,.1)':'var(--bg2)'};
+            border-color:${shiftMod?'var(--amber3)':'var(--bdr2)'};
+            color:${shiftMod?'var(--amber)':'var(--txt3)'}">
+          ⏰ ${shiftMod ? shiftMod.display : 'Edit Shift Time'}
+        </button>
+        <button onclick="toggleNoLunch('${pid}');buildSwitchboard()"
+          style="padding:5px 10px;border-radius:4px;border:1px solid;font-size:10px;
+            font-weight:600;cursor:pointer;
+            background:${noLunch?'rgba(217,119,6,.1)':'var(--bg2)'};
+            border-color:${noLunch?'var(--amber3)':'var(--bdr2)'};
+            color:${noLunch?'var(--amber)':'var(--txt3)'}">
+          🍽 ${noLunch?'No Lunch ✓':'Lunch?'}
+        </button>
+        <button onclick="cycleStationPref('${pid}','${nick}');buildSwitchboard()"
+          style="padding:5px 8px;border-radius:4px;border:1px solid;font-size:10px;
+            font-weight:600;cursor:pointer;
+            background:${pref!=='none'?'rgba(37,99,235,.08)':'var(--bg2)'};
+            border-color:${pref!=='none'?'var(--acc)':'var(--bdr2)'};
+            color:${pref!=='none'?'var(--acc)':'var(--txt3)'}">
+          ★
+        </button>
+      </div>
+      ` : `
+      <!-- EXIT AGENT: no rotation controls -->
+      <div style="font-size:11px;font-weight:700;color:var(--red);
+        padding:5px 8px;background:rgba(220,38,38,.06);border-radius:4px;
+        margin-bottom:6px">🔴 Exit Booth — Full Shift</div>
+      <div style="display:flex;gap:4px">
+        <button onclick="showTimeEditModal('${pid}','${nick}')"
+          style="flex:1;padding:5px 8px;border-radius:4px;border:1px solid;font-size:10px;
+            font-weight:600;cursor:pointer;text-align:left;
+            background:${shiftMod?'rgba(217,119,6,.1)':'var(--bg2)'};
+            border-color:${shiftMod?'var(--amber3)':'var(--bdr2)'};
+            color:${shiftMod?'var(--amber)':'var(--txt3)'}">
+          ⏰ ${shiftMod ? shiftMod.display : 'Edit Shift Time'}
+        </button>
+      </div>
+      `}
     </div>`;
   }
 
+
+  // ── MANAGEMENT inline card ─────────────────────────────────────────────────
   function mgmtRow(p) {
-    const isAdj = _adjustPid === p.pid;
-    return `<div onclick="tapPerson('${p.pid}')" style="display:flex;align-items:center;
-      padding:6px 8px;border-radius:5px;cursor:pointer;margin-bottom:3px;
-      background:${isAdj?'rgba(37,99,235,.1)':'var(--bg3)'};
-      border:1px solid ${isAdj?'var(--acc)':'transparent'};transition:all .12s">
-      <div style="flex:1;min-width:0;overflow:hidden">
-        <div style="font-size:12px;font-weight:700;color:var(--txt);
-          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${p.person.nick||p.person.name.split(' ')[0]}
+    const pid     = p.pid;
+    const nick    = p.person.nick || p.person.name.split(' ')[0];
+    const station = STATE.staffStation[pid] || '';
+    const shiftMod = (STATE.shiftMod||{})[pid];
+    const timeDisp = shiftMod ? shiftMod.display : p.shift;
+    const STATIONS = ['Counter Manager','Emerald Booth','Returns Manager','Floater','Off Site','Custom'];
+
+    return `<div style="background:var(--bg3);border:1px solid var(--bdr);border-radius:7px;
+      padding:10px;margin-bottom:6px">
+
+      <!-- Row 1: Name + shift + working toggle -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--txt)">${nick}</div>
+          <div style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono)">${timeDisp}</div>
         </div>
-        <div style="font-size:10px;color:var(--txt3);white-space:nowrap;
-          overflow:hidden;text-overflow:ellipsis">
-          ${p.shift} · ${STATE.staffStation[p.pid]||'—'}
-        </div>
+        <button onclick="toggleCallout('${pid}');buildSwitchboard()"
+          style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:4px;
+            border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);
+            cursor:pointer;white-space:nowrap;flex-shrink:0">
+          ✓ Working
+        </button>
       </div>
-      <div style="font-size:12px;color:var(--txt3);margin-left:6px;flex-shrink:0">›</div>
+
+      <!-- Station buttons -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+        ${STATIONS.map(s => `<button
+          onclick="${s==='Custom'?`showCustomStationModal('${pid}','${nick}')`:`setStation('${pid}','${s}');buildSwitchboard()`}"
+          style="padding:5px 4px;border-radius:4px;border:1px solid;font-size:10px;font-weight:600;
+            cursor:pointer;text-align:center;
+            background:${station===s?'rgba(37,99,235,.15)':s==='Custom'?'var(--bg3)':'var(--bg2)'};
+            border-color:${station===s?'var(--acc)':s==='Custom'?'var(--bdr2)':'var(--bdr2)'};
+            color:${station===s?'var(--acc)':s==='Custom'?'var(--amber)':'var(--txt3)'}">
+          ${s}
+        </button>`).join('')}
+      </div>
     </div>`;
   }
+
 
   const NONE = (msg, color='var(--txt3)') =>
     `<div style="font-size:11px;color:${color};padding:6px 4px">${msg}</div>`;
@@ -4868,7 +5029,7 @@ function buildSwitchboard() {
 }
 
 // ── Tap-to-adjust slide-up panel ─────────────────────────────────────────────
-function tapPerson(pid) {
+function tapPerson(pid) { return; // Replaced by inline cards
   if (_adjustPid === pid) { closeAdjustPanel(); return; }
   _adjustPid = pid;
 
@@ -4974,83 +5135,27 @@ function autoLoadFromExpected(expectedToday, dow) {
   if (!STATE.staffStation) STATE.staffStation = {};
   if (!STATE.shiftTimes)   STATE.shiftTimes   = {};
   if (!STATE.altSchedule)  STATE.altSchedule  = {};
-
-  // Mark everyone as working
-  Object.entries(expectedToday).forEach(([pid, entry]) => {
-    STATE.staffDuty[pid]   = true;
-    STATE.shiftTimes[pid]  = entry.shift;
-  });
-
-  // Assign Exit Agents first (always to Exit Booth)
-  Object.entries(expectedToday).forEach(([pid, entry]) => {
-    if (entry.person.role === 'EXIT') STATE.staffStation[pid] = 'Exit Booth';
-  });
-
-  // Assign Management stations from shift code
-  Object.entries(expectedToday).forEach(([pid, entry]) => {
-    const role = entry.person.role;
-    if (!['ARM','BRM','ABRM','MT'].includes(role)) return;
-    const shift = entry.shift || '';
-    // Early shifts → EB or Counter manager; closing → closing manager
-    if (shift.startsWith('530') || shift.startsWith('4A') || shift.startsWith('5A') || shift.startsWith('6A') || shift.startsWith('7A') || shift.startsWith('8A')) {
-      STATE.staffStation[pid] = 'Counter Manager';
-    } else if (shift.includes('4P') || shift.includes('C') || shift.includes('close')) {
-      STATE.staffStation[pid] = 'Counter Manager';
-    } else {
-      STATE.staffStation[pid] = 'Counter Manager';
-    }
-  });
-
-  // Distribute CXRs between Counter and Exit rotation
-  const exitAgentCount = Object.entries(expectedToday)
-    .filter(([pid, e]) => e.person.role === 'EXIT' && STATE.staffDuty[pid] === true).length;
-
-  const rules    = (typeof COVERAGE_RULES !== 'undefined' && COVERAGE_RULES[dow]) || {exitMin:1, exitMax:2};
-  const exitMin  = rules.exitMin || 1;
-  const exitMax  = rules.exitMax || 2;
-  const exitCXRNeeded = Math.max(0, exitMin - exitAgentCount);
-  const exitCXRMax    = Math.max(exitCXRNeeded, exitMax - exitAgentCount);
-
-  // Sort CXRs by: explicit exit pref first, then fairness (least exit hours)
-  const cxrWorking = Object.entries(expectedToday)
-    .filter(([pid, e]) => e.person.role === 'CXR')
-    .map(([pid, e]) => ({
-      pid, person: e.person, shift: e.shift,
-      pref: (STATE.stationPref||{})[pid] || e.person.pref || 'none',
-      shiftStart: e.person.shiftStart || 99,
-    }))
-    .sort((a,b) => {
-      // Exit pref first
-      if (a.pref === 'exit' && b.pref !== 'exit') return -1;
-      if (b.pref === 'exit' && a.pref !== 'exit') return 1;
-      // Counter pref last
-      if (a.pref === 'counter' && b.pref !== 'counter') return 1;
-      if (b.pref === 'counter' && a.pref !== 'counter') return -1;
-      // Earlier shifts to counter (more coverage)
-      return a.shiftStart - b.shiftStart;
+  if (!STATE.stationPref)  STATE.stationPref  = {};
+  Object.entries(expectedToday).forEach(([pid,e])=>{ STATE.staffDuty[pid]=true; STATE.shiftTimes[pid]=e.shift; });
+  Object.entries(expectedToday).forEach(([pid,e])=>{ if(e.person.role==='EXIT') STATE.staffStation[pid]='Exit Booth'; });
+  Object.entries(expectedToday).forEach(([pid,e])=>{ if(['ARM','BRM','ABRM','MT'].includes(e.person.role)) STATE.staffStation[pid]='Counter Manager'; });
+  const exitAgentCount = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='EXIT'&&STATE.staffDuty[pid]).length;
+  const rules   = (typeof COVERAGE_RULES!=='undefined'&&COVERAGE_RULES[dow])||{};
+  const exitMin = Math.max(0,(rules.exitMin||1)-exitAgentCount);
+  const exitMax = Math.max(exitMin,(rules.exitMax||2)-exitAgentCount);
+  let pats={};try{pats=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');}catch(err){}
+  const cxrs = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='CXR')
+    .map(([pid,e])=>({pid, pref:STATE.stationPref[pid]||e.person.pref||'none',
+      overridePref:(pats[pid]&&pats[pid].suggestedPref)||null, shiftStart:e.person.shiftStart||99}))
+    .sort((a,b)=>{
+      if(a.pref==='exit'&&b.pref!=='exit')return -1; if(b.pref==='exit'&&a.pref!=='exit')return 1;
+      if(a.pref==='counter'&&b.pref!=='counter')return 1; if(b.pref==='counter'&&a.pref!=='counter')return -1;
+      if(a.overridePref==='exit'&&b.overridePref!=='exit')return -1; if(b.overridePref==='exit'&&a.overridePref!=='exit')return 1;
+      if(a.overridePref==='counter'&&b.overridePref!=='counter')return 1; if(b.overridePref==='counter'&&a.overridePref!=='counter')return -1;
+      return a.shiftStart-b.shiftStart;
     });
-
-  let exitCXRAssigned = 0;
-  cxrWorking.forEach(cxr => {
-    if (STATE.staffStation[cxr.pid]) return; // already set
-    if (cxr.pref === 'exit' && exitCXRAssigned < exitCXRMax) {
-      STATE.staffStation[cxr.pid] = 'Exit Booth';
-      exitCXRAssigned++;
-    } else if (exitCXRAssigned < exitCXRNeeded) {
-      STATE.staffStation[cxr.pid] = 'Exit Booth';
-      exitCXRAssigned++;
-    } else {
-      STATE.staffStation[cxr.pid] = 'Counter';
-    }
-  });
-
-  // Run smart rotation to cache rotation blocks
-  if (typeof buildSmartRotation === 'function') {
-    const rot = buildSmartRotation();
-    window._lastRotations = {};
-    if (rot && rot.rotations) rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
-  }
-
+  cxrs.forEach((cxr,rank)=>{ if(!STATE.staffStation[cxr.pid]) STATE.staffStation[cxr.pid]=rank<exitMax&&(rank<exitMin||cxr.pref!=='counter')?'Exit Booth':'Counter'; });
+  if(typeof buildSmartRotation==='function'){try{const rot=buildSmartRotation();window._lastRotations={};if(rot&&rot.rotations)rot.rotations.forEach(r=>{window._lastRotations[r.pid]=r;});}catch(err){}}
   saveState();
 }
 
@@ -8052,20 +8157,23 @@ function recordDayPattern() {
 }
 
 function getLearnedPref(pid) {
-  const PATTERN_KEY = 'cmh-station-patterns-v1';
-  try {
-    const patterns = JSON.parse(localStorage.getItem(PATTERN_KEY)||'{}');
-    const p = patterns[pid];
-    if (!p || (p.counter + p.exit) < 5) return null; // need at least 5 days
-    const total = p.counter + p.exit;
-    const counterPct = p.counter / total;
-    if (counterPct >= 0.75) return 'counter';
-    if (counterPct <= 0.25) return 'exit';
-    return null; // mixed — no strong preference
-  } catch(e) { return null; }
+  try { const p=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');const d=p[pid];if(!d||(d.counter+d.exit)<5)return null;const r=d.exit/(d.counter+d.exit);return r>=0.75?'exit':r<=0.25?'counter':null; }catch(e){return null;}
 }
-
-
+function recordStationOverride(pid, station) {
+  if(!station||!pid)return;
+  const KEY='cmh-station-patterns-v1';let p={};try{p=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){}
+  if(!p[pid])p[pid]={counter:0,exit:0,days:[],overrides:[],suggestedPref:null};
+  const today=new Date().toISOString().slice(0,10);
+  p[pid].overrides=p[pid].overrides||[];p[pid].overrides.push({date:today,station});
+  if(p[pid].overrides.length>60)p[pid].overrides.shift();
+  const recent=p[pid].overrides.slice(-20);
+  const exitC=recent.filter(o=>o.station==='Exit Booth').length, ctrC=recent.filter(o=>o.station==='Counter').length, total=exitC+ctrC;
+  if(total>=5){const ratio=exitC/total;p[pid].suggestedPref=ratio>=0.70?'exit':ratio<=0.30?'counter':null;p[pid].overrideCount=total;}
+  try{localStorage.setItem(KEY,JSON.stringify(p));}catch(e){}
+}
+function getPatternSuggestion(pid) {
+  try{const p=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');const d=p[pid];if(!d||!d.suggestedPref)return null;return{pref:d.suggestedPref,count:d.overrideCount||0};}catch(e){return null;}
+}
 
 function buildExpectedToday() {
   const today = todayKey();
@@ -8136,6 +8244,182 @@ function toggleEmailDataSection() {
   if (body) body.style.display = _emailDataOpen ? 'block' : 'none';
   if (lbl)  lbl.textContent = _emailDataOpen ? '▲ Collapse' : '▼ Brand totals · Peaks · Greeting';
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// SCHEDULE CARD HELPERS
+// ═══════════════════════════════════════════════════════════════════════
+
+// Adjust split: +/-30 or +/-60 min on Block 1, opposite on Block 2
+function adjustSplit(pid, minutesDelta) {
+  if (!STATE.altSchedule)  STATE.altSchedule  = {};
+  if (!STATE.customSplits) STATE.customSplits = {};
+  const cur = STATE.altSchedule[pid] || 'normal';
+  if (cur === 'full-counter' || cur === 'full-exit') { toast('Switch to 4hr Split first'); return; }
+  const sp = STATE.customSplits[pid] || { b1H:4, b2H:4 };
+  const d  = minutesDelta / 60;
+  const b1H = Math.max(1, Math.min(7, Math.round((sp.b1H + d) * 2) / 2));
+  const b2H = Math.max(1, Math.min(7, Math.round((sp.b2H - d) * 2) / 2));
+  STATE.customSplits[pid] = { b1H, b2H };
+  const b1St = STATE.staffStation[pid] === 'Exit Booth' ? 'exit' : 'counter';
+  if (b1H === 4 && b2H === 4) { delete STATE.altSchedule[pid]; delete STATE.customSplits[pid]; }
+  else STATE.altSchedule[pid] = b1H > b2H ? (b1St==='exit'?'exit-first':'counter-first') : (b1St==='exit'?'counter-first':'exit-first');
+  saveState();
+}
+
+function toggleNoLunch(pid) {
+  if (!STATE.altSchedule) STATE.altSchedule = {};
+  const key = pid + '_nolunch';
+  if (STATE.altSchedule[key]) delete STATE.altSchedule[key];
+  else STATE.altSchedule[key] = true;
+  saveState();
+}
+
+// Show time edit modal (shift start/end entry)
+function showTimeEditModal(pid, personName) {
+  const person = [...ROSTER_CXR, ...ROSTER_MGMT].find(p => p.name.replace(/\s/g,'_') === pid);
+  const mod = STATE.shiftMod && STATE.shiftMod[pid];
+
+  function fmtH(h) {
+    if (h === null || h === undefined) return '';
+    const hr = Math.floor(h); const mn = Math.round((h-hr)*60);
+    const s = h >= 12 ? 'pm' : 'am'; const d = hr > 12 ? hr-12 : hr===0 ? 12 : hr;
+    return d + (mn ? ':' + String(mn).padStart(2,'0') : '') + s;
+  }
+
+  const baseStart = person ? person.shiftStart : null;
+  const baseEnd   = person ? person.shiftEnd   : null;
+  const curStart  = mod ? mod.start : baseStart;
+  const curEnd    = mod ? mod.end   : baseEnd;
+
+  const body = `
+    <p style="font-size:12px;color:var(--txt3);margin-bottom:14px">
+      Enter a custom start and/or end time for ${personName} today only.
+      Leave blank to use the roster default.
+    </p>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--txt3);
+          text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">
+          Start Time
+        </label>
+        <input id="te-start" type="text" placeholder="${fmtH(baseStart)||'e.g. 6am'}"
+          value="${fmtH(curStart)||''}"
+          style="width:100%;padding:9px 10px;background:var(--bg3);border:1px solid var(--bdr2);
+            border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:14px">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--txt3);
+          text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">
+          End Time
+        </label>
+        <input id="te-end" type="text" placeholder="${fmtH(baseEnd)||'e.g. 2pm'}"
+          value="${fmtH(curEnd)||''}"
+          style="width:100%;padding:9px 10px;background:var(--bg3);border:1px solid var(--bdr2);
+            border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:14px">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-g" style="flex:1"
+        onclick="applyTimeEdit('${pid}')">
+        ✓ Apply
+      </button>
+      <button class="btn btn-gh" onclick="clearTimeEdit('${pid}');closeModal()">
+        ↩ Reset to Default
+      </button>
+      <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+    </div>`;
+
+  openModal('⏰ Shift Time — ' + personName, body);
+}
+
+function applyTimeEdit(pid) {
+  const startEl = document.getElementById('te-start');
+  const endEl   = document.getElementById('te-end');
+  if (!startEl || !endEl) { closeModal(); return; }
+
+  function parseTime(str) {
+    if (!str || !str.trim()) return null;
+    str = str.trim().toLowerCase();
+    const m = str.match(/^(\d{1,2})(?::(\d{2}))?\s*(a|p|am|pm)?/);
+    if (!m) return null;
+    let h = parseInt(m[1]);
+    const mn = m[2] ? parseInt(m[2]) : 0;
+    const ampm = m[3] || '';
+    if (ampm.startsWith('p') && h !== 12) h += 12;
+    if (ampm.startsWith('a') && h === 12) h = 0;
+    // Airport heuristic: hours 1-6 with no am/pm = PM
+    if (!ampm && h >= 1 && h <= 6) h += 12;
+    return h + mn / 60;
+  }
+
+  const start = parseTime(startEl.value);
+  const end   = parseTime(endEl.value);
+
+  if (!start && !end) { closeModal(); return; }
+
+  if (!STATE.shiftMod) STATE.shiftMod = {};
+  const person = [...ROSTER_CXR,...ROSTER_MGMT].find(p=>p.name.replace(/\s/g,'_')===pid);
+  const baseStart = person ? person.shiftStart : null;
+  const baseEnd   = person ? person.shiftEnd   : null;
+
+  function fmtDisp(h) {
+    if(h===null||h===undefined) return '?';
+    const hr=Math.floor(h);const mn=Math.round((h-hr)*60);
+    const s=h>=12?'p':'a';const d=hr>12?hr-12:hr===0?12:hr;
+    return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;
+  }
+
+  STATE.shiftMod[pid] = {
+    start: start !== null ? start : baseStart,
+    end:   end   !== null ? end   : baseEnd,
+    reason: 'custom',
+    display: fmtDisp(start||baseStart) + '–' + fmtDisp(end||baseEnd),
+  };
+  saveState();
+  closeModal();
+  buildSwitchboard();
+  toast('Shift time updated ✓');
+}
+
+function clearTimeEdit(pid) {
+  if (STATE.shiftMod) delete STATE.shiftMod[pid];
+  saveState();
+  buildSwitchboard();
+}
+
+// Custom station for management
+function showCustomStationModal(pid, personName) {
+  const current = STATE.staffStation[pid] || '';
+  const isCustom = !['Counter Manager','Emerald Booth','Returns Manager','Floater','Off Site',''].includes(current);
+
+  const body = `
+    <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
+      Enter a custom station or assignment for ${personName} today.
+    </p>
+    <input id="custom-station-input" type="text"
+      placeholder="e.g. Training · Off Property · Event · Coverage"
+      value="${isCustom ? current : ''}"
+      style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--bdr2);
+        border-radius:4px;color:var(--txt);font-size:14px;margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-g" style="flex:1"
+        onclick="applyCustomStation('${pid}')">✓ Set Station</button>
+      <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+    </div>`;
+
+  openModal('⚙ Custom Station — ' + personName, body);
+}
+
+function applyCustomStation(pid) {
+  const el = document.getElementById('custom-station-input');
+  if (!el || !el.value.trim()) { closeModal(); return; }
+  setStation(pid, el.value.trim());
+  closeModal();
+  buildSwitchboard();
+  toast('Custom station set ✓');
+}
+
+
 </script>
 
 </body>
