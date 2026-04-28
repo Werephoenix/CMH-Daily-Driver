@@ -1715,6 +1715,19 @@ cursor:pointer;white-space:nowrap;transition:all .12s;
     <button class="wubtn"      id="wu-closed-b"  onclick="setWU('closed')">🔴 All Closed</button>
   </div>
 
+  <!-- 24hr Booking control -->
+
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+    <span style="font-size:11px;font-weight:700;color:var(--txt3)">📅 24hr Booking:</span>
+    <select id="f-24hr-board" onchange="sf('book24hr',this.value)"
+      style="font-size:11px;padding:5px 10px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt)">
+      <option value="open">Open (default)</option>
+      <option value="restricted">Restricted</option>
+      <option value="closed">Closed</option>
+      <option value="emerald-only">Emerald Only</option>
+    </select>
+  </div>
+
   <!-- Board totals -->
 
   <div class="kpi-row" style="margin-bottom:12px">
@@ -2523,10 +2536,10 @@ var ROSTER_CXR = [
 
   {id:'sheronda', name:'Sheronda Whitner',         nick:'Sheronda',role:'EXIT',
    shiftCode:'varies', shiftStart:null, shiftEnd:null,
-   daysOn:[],
+   active:false, daysOn:[],
    pref:'exit', exitFairness:null,
    lunchCode:'1hr',
-   notes:'EXIT Agent. Part time. ⚠ Status uncertain — verify still employed. Days TBD.'},
+   notes:'EXIT Agent. Part time. ⚠ NOT CURRENTLY WORKING — excluded from scheduling.'},
 ];
 
 // ═══ RETURN AGENTS — Self-managing, roster reference only ═══════════════════
@@ -2614,6 +2627,19 @@ var COVERAGE_RULES = {
 // ═══════════════════════════════════════════════════════════════════════
 var CL_DATA = {
   opening: [
+    {s:'📊 Data Entry', items:[
+      {t:'CS Count', p:false, field:'cs', fieldType:'number', fieldPlaceholder:'e.g. 91'},
+      {t:'HOT Alerts', p:false, field:'hot', fieldType:'number', fieldPlaceholder:'e.g. 1'},
+      {t:'OOS Units — all have claims?', p:false, field:'oos', fieldType:'text', fieldPlaceholder:'e.g. 3 or "All claimed"'},
+      {t:'Sales Leader (yesterday) + print sales report', p:false, field:'salesLeader', fieldType:'text', fieldPlaceholder:'Name'},
+      {t:'Inventory Agent for today', p:false, field:'invAgent', fieldType:'text', fieldPlaceholder:'Name'},
+      {t:'2.0 Reservations (Non-Airport)', p:false, field:'brand20', fieldType:'number', fieldPlaceholder:'e.g. 12'},
+      {t:"FBO's — count & notes", p:false, field:'fboNotes', fieldType:'text', fieldPlaceholder:'11am D. Murray - written & delivered to SIG'},
+      {t:'XXAR Assignment (We Pick)', p:false, field:'xxar', fieldType:'text', fieldPlaceholder:'e.g. FFAR'},
+      {t:'SXAR Assignment (Std Special)', p:false, field:'sxar', fieldType:'text', fieldPlaceholder:'e.g. SFAR'},
+      {t:'PXAR Assignment (Prem Special)', p:false, field:'pxar', fieldType:'text', fieldPlaceholder:'e.g. PFAR'},
+      {t:'Opening email greeting written', p:false, field:'emailGreeting', fieldType:'textarea', fieldPlaceholder:'GOOOD MORNING CMH!!...'},
+    ]},
     {s:'📣 Communications', items:[
       {t:'Morning Email sent (#CMHBoothCSR #NationalColumbusOH)', p:false},
       {t:'Message Center checked', p:false},
@@ -2623,32 +2649,27 @@ var CL_DATA = {
       {t:'Goal Board updated', p:true},
       {t:'All FBOs written & delivered', p:true},
       {t:'Clean Car Audits completed', p:true},
-      {t:'Mid Day Sales Update sent', p:true},
-      {t:'Print previous day sales report', p:false},
     ]},
     {s:'⚙️ Operations', items:[
-      {t:'Lunches scheduled — see Schedule tab', p:false},
-      {t:'Equal CXR rotation to Exit — 4-hour blocks confirmed', p:false},
-      {t:'Inventory Agent confirmed for today', p:false},
-      {t:'XXAR / SXAR / PXAR assignments set in Daily Setup', p:false},
-    ]},
-    {s:'📋 Game Plan Paste', items:[
-      {t:'STEP 1 — Paste Reservations AM into Paste Data tab', p:false},
-      {t:'STEP 2 — Paste Reservations PM', p:false},
-      {t:'STEP 3 — Paste Returns AM', p:false},
-      {t:'STEP 4 — Paste Returns PM', p:false},
-      {t:'Availability Board reviewed & walk-up policy set', p:false},
+      {t:'Brand totals pasted (Paste Data tab)', p:false},
+      {t:'Game Plan car data pasted (all 4 zones)', p:false},
+      {t:'Walk-Up policy set (Availability tab)', p:false},
+      {t:'Lunches scheduled — Schedule tab', p:false},
+      {t:'CXR exit rotation confirmed — 4-hour blocks', p:false},
     ]},
     {s:'🏁 Opening Wrap', items:[
-      {t:'Fill out break room whiteboard', p:false},
-      {t:'Confirm all station assignments are set in Schedule tab', p:false},
+      {t:'Break room whiteboard filled out', p:false},
+      {t:'Station assignments set in Schedule tab', p:false},
     ]},
   ],
   mid: [
+    {s:'📊 Data Update', items:[
+      {t:'OOS current count', p:false, field:'oos', fieldType:'text', fieldPlaceholder:'Current OOS'},
+    ]},
     {s:'📋 Review & Verify', items:[
-      {t:'Claims in OOS reviewed — all have claims?', p:false},
+      {t:'Claims in OOS — all have claims?', p:false},
       {t:'Drop Calls reviewed', p:false},
-      {t:'FBOs written & delivered', p:true},
+      {t:"FBO's written & delivered", p:true},
       {t:'Clean Car Audits completed', p:true},
       {t:'Email follow-up on Claims', p:false},
       {t:'Car Seat Storage checked', p:false},
@@ -2660,12 +2681,21 @@ var CL_DATA = {
     ]},
   ],
   closing: [
+    {s:'📊 Data Entry', items:[
+      {t:'Final OOS count', p:false, field:'oosFinal', fieldType:'text', fieldPlaceholder:'Final count'},
+      {t:"FBO's total count", p:false, field:'fboCount', fieldType:'number', fieldPlaceholder:'e.g. 4'},
+      {t:"FBO detail (time · name · written/delivered)", p:false, field:'fboDetail', fieldType:'textarea', fieldPlaceholder:'11am D. Murray - written & delivered to SIG\n10pm J. Niemann - written M&G'},
+      {t:'Tomorrow Reservations', p:false, field:'closeTmrwRes', fieldType:'number', fieldPlaceholder:'e.g. 681'},
+      {t:'Tomorrow Returns', p:false, field:'closeTmrwRet', fieldType:'number', fieldPlaceholder:'e.g. 739'},
+      {t:'Staff who stayed late', p:false, field:'lateStaff', fieldType:'text', fieldPlaceholder:'Name + reason'},
+      {t:'Closing email greeting written', p:false, field:'closeGreeting', fieldType:'textarea', fieldPlaceholder:'GOOOD EVENING CMH!!...'},
+    ]},
     {s:'📣 Communications', items:[
-      {t:'End of Night Email sent (#CMHBoothCSR #NationalCSR)', p:false},
+      {t:'End of Night Email sent (#CMHBoothCSR #CMHMgmt #NationalColumbusOH)', p:false},
       {t:'Message Center checked', p:false},
     ]},
     {s:'🚪 Booth & Equipment', items:[
-      {t:'FBOs completed', p:false},
+      {t:"FBO's completed", p:false},
       {t:'Return Booth — clean, locked, windows closed', p:false},
       {t:'Return Booth tablets & HH units charging', p:false},
       {t:'Navisnair put away', p:false},
@@ -2680,14 +2710,10 @@ var CL_DATA = {
       {t:'Blockers placed in exits', p:false},
       {t:'Keys to blockers in BRM office', p:false},
     ]},
-    {s:'🤝 Handover Readiness', items:[
-      {t:'Counter area & break room left tidy and ready for next team', p:false},
-      {t:'Break room whiteboard updated — overnight notes & next day overview', p:false},
-    ]},
-    {s:'📄 Documentation', items:[
-      {t:'📷 Audits completed', p:true},
-      {t:'All OOS have claims — count confirmed?', p:false},
-      {t:'VEM Report submitted (MON / TUES / WED only)', p:false},
+    {s:'🤝 Handover', items:[
+      {t:'Counter area & break room tidy for next team', p:false},
+      {t:'Break room whiteboard updated', p:false},
+      {t:'Day saved to History in app', p:false},
     ]},
   ],
 };
@@ -2976,42 +3002,35 @@ function updateWalkUpButtons() {
 // ── PARSE PASTE DATA ────────────────────────────────────────────────────────
 function parsePasteText(text) {
   const counts = {};
-  const hourlyTotals = new Array(24).fill(0); // index 0=12a, 1=1a...11=11a, 12=12p...23=11p
+  const hourlyTotals = new Array(24).fill(0);
   let hasHourly = false;
-
   const lines = text.split(/[\n\r]+/);
   lines.forEach(line => {
-    const parts = line.trim().split(/\s+/);
-    if (parts.length < 2) return;
-    const code = parts[0].toUpperCase();
+    const raw = line.trim();
+    if (!raw) return;
+    const parts = raw.includes('\t') ? raw.split('\t').map(p=>p.trim()).filter(Boolean)
+                                     : raw.split(/\s{2,}|\s+/).filter(Boolean);
+    if (!parts.length) return;
+    const code = parts[0].toUpperCase().trim();
     if (!CODE_MAP || !CODE_MAP[code]) return;
-
-    // Collect all numeric values in the row
     const nums = [];
-    for (let i = 1; i < parts.length; i++) {
-      const n = parseInt(parts[i].replace(/,/g,''));
-      if (!isNaN(n)) nums.push(n);
+    for (let i=1; i<parts.length; i++) {
+      const clean = parts[i].replace(/,/g,'').trim();
+      const n = parseInt(clean);
+      if (!isNaN(n) && (clean===String(n)||clean==='-'+String(Math.abs(n)))) nums.push(n);
     }
     if (!nums.length) return;
-
-    // Use last numeric as the key count (Remaining / Total column)
-    counts[code] = (counts[code] || 0) + nums[nums.length - 1];
-
-    // If we have 25+ numbers, this is a By Hour row (24 hrs + Total + Remaining)
-    // or 26 numbers (24 hrs + Total + Remaining)
-    // Sum hourly columns: nums[0..23] are the hour slots
     if (nums.length >= 24) {
       hasHourly = true;
-      const hourCols = nums.slice(0, 24);
-      hourCols.forEach((v, h) => { hourlyTotals[h] += v; });
+      nums.slice(0,24).forEach((v,h)=>{ hourlyTotals[h]+=v; });
+      counts[code] = (counts[code]||0) + nums[nums.length-1];
+    } else {
+      counts[code] = (counts[code]||0) + nums[0];
     }
   });
-
   return { counts, hourlyTotals: hasHourly ? hourlyTotals : null };
 }
 
-// Convert hourly array to peak label string ("10a:64  11a:37  12p:63...")
-// Only show hours with non-zero values, formatted as "Xp:Y"
 function hourArrayToPeakStr(hourly, topN) {
   if (!hourly) return null;
   topN = topN || 7;
@@ -5143,6 +5162,7 @@ function autoLoadFromExpected(expectedToday, dow) {
   const rules   = (typeof COVERAGE_RULES!=='undefined'&&COVERAGE_RULES[dow])||{};
   const exitMin = Math.max(0,(rules.exitMin||1)-exitAgentCount);
   const exitMax = Math.max(exitMin,(rules.exitMax||2)-exitAgentCount);
+  let lastSt={};try{const h=JSON.parse(localStorage.getItem('cmh-history-v2')||'{}');const dk=Object.keys(h).sort().slice(-1)[0];if(dk&&h[dk]&&h[dk].staffStation)lastSt=h[dk].staffStation;}catch(e){}
   let pats={};try{pats=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');}catch(err){}
   const cxrs = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='CXR')
     .map(([pid,e])=>({pid, pref:STATE.stationPref[pid]||e.person.pref||'none',
@@ -5152,6 +5172,8 @@ function autoLoadFromExpected(expectedToday, dow) {
       if(a.pref==='counter'&&b.pref!=='counter')return 1; if(b.pref==='counter'&&a.pref!=='counter')return -1;
       if(a.overridePref==='exit'&&b.overridePref!=='exit')return -1; if(b.overridePref==='exit'&&a.overridePref!=='exit')return 1;
       if(a.overridePref==='counter'&&b.overridePref!=='counter')return 1; if(b.overridePref==='counter'&&a.overridePref!=='counter')return -1;
+      if(a.lastWasExit&&!b.lastWasExit)return 1;
+      if(b.lastWasExit&&!a.lastWasExit)return -1;
       return a.shiftStart-b.shiftStart;
     });
   cxrs.forEach((cxr,rank)=>{ if(!STATE.staffStation[cxr.pid]) STATE.staffStation[cxr.pid]=rank<exitMax&&(rank<exitMin||cxr.pref!=='counter')?'Exit Booth':'Counter'; });
@@ -5935,34 +5957,41 @@ function updateStatusBand() {
 }
 
 function refreshDash() {
-  if (typeof updateSummary === 'function') updateSummary();
-  if (typeof updateBoardHeader === 'function') updateBoardHeader();
-  updateStatusBand();
-  // Update KPI tiles if on dashboard
-  const f = STATE.fields;
-  const auto = getAutoManagers();
-  const setEl = (id, val) => { const e=document.getElementById(id); if(e) e.textContent=val||'—'; };
-  setEl('kpi-cs',  f.cs);
-  setEl('kpi-hot', f.hot);
-  setEl('kpi-oos', f.oos);
-  setEl('db-openmgr', f.openMgr || auto.open);
-  setEl('db-closemgr',f.closeMgr|| auto.close);
-  setEl('db-sales',   f.salesLeader);
-  // Walk-up status  
-  const pol = STATE.walkUpPolicy;
-  const wlbl = {open:'✅ All Open',core:'🔵 Core Only',noncore:'🔶 Non-Core',closed:'🔴 Closed'};
-  setEl('db-wu', wlbl[pol]);
-  // Paste status
-  const pasteDone = ['res-am','res-pm','ret-am','ret-pm'].filter(k=>STATE.pasteData&&STATE.pasteData[k]).length;
-  setEl('dl-paste', pasteDone+' / 4 done');
-  // Staff on duty
-  const onDuty = Object.values(STATE.staffDuty||{}).filter(v=>v===true).length;
-  setEl('dl-sched', onDuty+' on duty');
-  // Checklist
-  const clO = countCLDone('opening');
-  setEl('dl-check', clO.done+'/'+clO.total+' done');
-}
+  updateSummary(); updateBoardHeader(); updateStatusBand();
+  const f   = STATE.fields;
+  const auto = typeof getAutoManagers==='function' ? getAutoManagers() : {};
+  const clO = typeof countCLDone==='function' ? countCLDone('opening') : {done:0,total:0};
+  const clM = typeof countCLDone==='function' ? countCLDone('mid')     : {done:0,total:0};
+  const clC = typeof countCLDone==='function' ? countCLDone('closing') : {done:0,total:0};
+  const pol = STATE.walkUpPolicy||'open';
+  const wlbls = {open:'All Open',core:'Core Only',noncore:'Non-Core',closed:'Closed'};
+  const working = Object.values(STATE.staffDuty||{}).filter(v=>v===true).length;
 
+  const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v!==undefined&&v!==null&&v!==''?String(v):'—';};
+  const sh=(id,v)=>{const e=document.getElementById(id);if(e)e.innerHTML=v||'—';};
+
+  s('db-openmgr', f.openMgr||auto.open); s('db-closemgr', f.closeMgr||auto.close);
+  s('db-sales', f.salesLeader); s('db-wu', wlbls[pol]);
+  s('sum-cs',  f.cs);  s('sum-hot', f.hot);  s('sum-oos', f.oos||f.oosFinal);
+  s('sum-wu',  wlbls[pol]);
+  s('sum-open', f.openMgr||auto.open); s('sum-close', f.closeMgr||auto.close);
+  s('sum-staffcount', working ? working+' working' : '→ Schedule');
+  s('sum-wu2', wlbls[pol]);
+  s('sum-totalres', f.totalRes||'—');
+  s('sum-brands', [
+    f.brandNational   ? 'Nat '+f.brandNational   : 'Nat —',
+    f.brandAlamo      ? 'Ala '+f.brandAlamo      : 'Ala —',
+    f.brandEnterprise ? 'Ent '+f.brandEnterprise  : 'Ent —',
+    f.brand20         ? '2.0 '+f.brand20         : null,
+  ].filter(Boolean).join(' · '));
+  s('sum-xxar', f.xxar); s('sum-sxar', f.sxar); s('sum-pxar', f.pxar);
+  s('sum-invagent', f.invAgent);
+  s('sum-fbo', f.fboCount||(f.fboNotes?'see notes':'—'));
+  const totalDone=clO.done+clM.done+clC.done, totalItems=clO.total+clM.total+clC.total;
+  s('sum-cl-progress', 'Opening '+clO.done+'/'+clO.total+' · Mid '+clM.done+'/'+clM.total+' · Closing '+clC.done+'/'+clC.total);
+  s('sum-cl-data', totalDone===totalItems&&totalItems>0?'All complete! ✅':'→ Checklist');
+  saveState();
+}
 
 function autoRoute() { if(typeof autoRouteByTime==="function") autoRouteByTime(); }
 
@@ -6381,56 +6410,63 @@ function renderChecklist(mode) {
         '<div class="ci-txt">' + item.t +
           (isDaySpecific ? ' <span style="font-size:9px;color:var(--amber);font-weight:700">' + dayNames[dow] + '</span>' : '') +
         '</div>' +
-        (item.p ? '<div class="ci-photo">📷</div>' : '') +
-        '</div>';
-    });
-  });
+        (item.field ? '<div style="margin:4px 0 2px 28px" onclick="event.stopPropagation()">' +
+          (item.fieldType==='textarea'
+            ? '<textarea id="cl-f-' + item.field + '" rows="2" placeholder="' + (item.fieldPlaceholder||'') + '" oninput="sf(\'' + item.field + '\',this.value)" style="width:100%;padding:5px 8px;font-size:11px;resize:vertical;background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono)">' + (STATE.fields[item.field]||'') + '</textarea>'
 
-  const bd = document.getElementById('cl-body');
-  if (bd) bd.innerHTML = htm;
+```
+        : '<input type="' + (item.fieldType||'text') + '" id="cl-f-' + item.field + '" placeholder="' + (item.fieldPlaceholder||'') + '" value="' + (STATE.fields[item.field]||'') + '" oninput="sf(\'' + item.field + '\',this.value)" style="width:100%;padding:5px 8px;font-size:12px;font-weight:600;background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono)">') +
+      '</div>' : '') +
+    (item.p ? '<div class=""ci-photo">📷</div>' : '') +
+    '</div>';
+});
+```
+
+});
+
+const bd = document.getElementById(‘cl-body’);
+if (bd) bd.innerHTML = htm;
 }
 
 // toggleCI and resetCL use the today-aware data too
 function toggleCI(mode, text) {
-  const key = 'cl-' + mode;
-  if (!STATE.checklist) STATE.checklist = {};
-  if (!STATE.checklist[key]) STATE.checklist[key] = {};
-  STATE.checklist[key][text] = !STATE.checklist[key][text];
-  saveState();
-  renderChecklist(mode);
-  refreshDash();
+const key = ‘cl-’ + mode;
+if (!STATE.checklist) STATE.checklist = {};
+if (!STATE.checklist[key]) STATE.checklist[key] = {};
+STATE.checklist[key][text] = !STATE.checklist[key][text];
+saveState();
+renderChecklist(mode);
+refreshDash();
 }
 
 function resetCL() {
-  const key = 'cl-' + (window._curCLMode || 'opening');
-  if (STATE.checklist) STATE.checklist[key] = {};
-  saveState();
-  renderChecklist(window._curCLMode || 'opening');
-  toast('Checklist reset');
+const key = ‘cl-’ + (window._curCLMode || ‘opening’);
+if (STATE.checklist) STATE.checklist[key] = {};
+saveState();
+renderChecklist(window._curCLMode || ‘opening’);
+toast(‘Checklist reset’);
 }
 
 function showChecklist(mode) {
-  window._curCLMode = mode;
-  ['opening','mid','closing'].forEach(m => {
-    const b = document.getElementById('clt-' + m);
-    if (b) b.className = 'cl-tab' + (m===mode?' on':'');
-  });
-  renderChecklist(mode);
+window._curCLMode = mode;
+[‘opening’,‘mid’,‘closing’].forEach(m => {
+const b = document.getElementById(‘clt-’ + m);
+if (b) b.className = ‘cl-tab’ + (m===mode?’ on’:’’);
+});
+renderChecklist(mode);
 }
 
 // Patch countCLDone to use today-aware data
 function countCLDone(mode) {
-  const sections = getCLDataForToday()[mode] || [];
-  const checks = (STATE.checklist && STATE.checklist['cl-'+mode]) || {};
-  let total = 0, done = 0;
-  sections.forEach(s => s.items.forEach(i => {
-    total++;
-    if (checks[i.t]) done++;
-  }));
-  return {done, total};
+const sections = getCLDataForToday()[mode] || [];
+const checks = (STATE.checklist && STATE.checklist[‘cl-’+mode]) || {};
+let total = 0, done = 0;
+sections.forEach(s => s.items.forEach(i => {
+total++;
+if (checks[i.t]) done++;
+}));
+return {done, total};
 }
-
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // EXCEL FEATURE PARITY AUDIT
@@ -6438,230 +6474,224 @@ function countCLDone(mode) {
 // ═══════════════════════════════════════════════════════════════════════
 
 var FEATURE_AUDIT = [
-  // ── CORE AVAILABILITY ENGINE ────────────────────────────────────────
-  {cat:'📊 Availability Engine', feature:'4-paste Game Plan import', excel:'PASTE_ZONE_Res_AM/PM + Ret_AM/PM', app:'✅ Built — Paste Data tab, 4-step guided flow'},
-  {cat:'📊 Availability Engine', feature:'Code→Group mapping (72+ codes)', excel:'Fleet Codes sheet (CODE_MAP)', app:'✅ Built — CODE_MAP in JS, auto-parsed from paste'},
-  {cat:'📊 Availability Engine', feature:'Net calculation (Ret − Res)', excel:'GROUP_ROLLUP + AVAIL_STATUS', app:'✅ Built — getGroupNetData(), live board'},
-  {cat:'📊 Availability Engine', feature:'3-tier status (WU/UP/NA)', excel:'AVAIL_STATUS thresholds', app:'✅ Built — THRESH constants, getStatus()'},
-  {cat:'📊 Availability Engine', feature:'Walk-up master toggle', excel:'AVAILABILITY_BOARD B6 dropdown', app:'✅ Built — 5-option master toggle on board + opening screen'},
-  {cat:'📊 Availability Engine', feature:'Per-group walk-up override', excel:'AVAIL_STATUS col E + AB col E DV', app:'✅ Built — cycleGroupOverride() on each tile'},
-  {cat:'📊 Availability Engine', feature:'Core Cars filter', excel:'Fleet Codes col F + THRESHOLDS col E', app:'✅ Built — CORE set, core filter on compendium'},
-  {cat:'📊 Availability Engine', feature:'HOURLY_FLOW (24-hr breakdown)', excel:'HOURLY_FLOW sheet', app:'🔶 Partial — net totals calculated, no hourly bar chart yet'},
-  {cat:'📊 Availability Engine', feature:'Group totals summary bar', excel:'HOURLY_FLOW rows 95-99', app:'🔶 Partial — board shows totals, no hourly timeline view'},
-  {cat:'📊 Availability Engine', feature:'Physical inventory input', excel:'PHYSICAL_INVENTORY sheet', app:'✅ Built — Inventory tab, lot count entry with variance vs system data'},
+// ── CORE AVAILABILITY ENGINE ────────────────────────────────────────
+{cat:‘📊 Availability Engine’, feature:‘4-paste Game Plan import’, excel:‘PASTE_ZONE_Res_AM/PM + Ret_AM/PM’, app:‘✅ Built — Paste Data tab, 4-step guided flow’},
+{cat:‘📊 Availability Engine’, feature:‘Code→Group mapping (72+ codes)’, excel:‘Fleet Codes sheet (CODE_MAP)’, app:‘✅ Built — CODE_MAP in JS, auto-parsed from paste’},
+{cat:‘📊 Availability Engine’, feature:‘Net calculation (Ret − Res)’, excel:‘GROUP_ROLLUP + AVAIL_STATUS’, app:‘✅ Built — getGroupNetData(), live board’},
+{cat:‘📊 Availability Engine’, feature:‘3-tier status (WU/UP/NA)’, excel:‘AVAIL_STATUS thresholds’, app:‘✅ Built — THRESH constants, getStatus()’},
+{cat:‘📊 Availability Engine’, feature:‘Walk-up master toggle’, excel:‘AVAILABILITY_BOARD B6 dropdown’, app:‘✅ Built — 5-option master toggle on board + opening screen’},
+{cat:‘📊 Availability Engine’, feature:‘Per-group walk-up override’, excel:‘AVAIL_STATUS col E + AB col E DV’, app:‘✅ Built — cycleGroupOverride() on each tile’},
+{cat:‘📊 Availability Engine’, feature:‘Core Cars filter’, excel:‘Fleet Codes col F + THRESHOLDS col E’, app:‘✅ Built — CORE set, core filter on compendium’},
+{cat:‘📊 Availability Engine’, feature:‘HOURLY_FLOW (24-hr breakdown)’, excel:‘HOURLY_FLOW sheet’, app:‘🔶 Partial — net totals calculated, no hourly bar chart yet’},
+{cat:‘📊 Availability Engine’, feature:‘Group totals summary bar’, excel:‘HOURLY_FLOW rows 95-99’, app:‘🔶 Partial — board shows totals, no hourly timeline view’},
+{cat:‘📊 Availability Engine’, feature:‘Physical inventory input’, excel:‘PHYSICAL_INVENTORY sheet’, app:‘✅ Built — Inventory tab, lot count entry with variance vs system data’},
 
-  // ── SCHEDULE ────────────────────────────────────────────────────────
-  {cat:'👥 Schedule', feature:'Monthly schedule grid paste', excel:'SCHEDULE_PLANNER (grid paste zone)', app:'✅ Built — Load Schedule tab, mgmt + CXR/Exit separate pastes'},
-  {cat:'👥 Schedule', feature:'Auto-detect Opening Manager', excel:'SCHEDULE_ENGINE LET() formula', app:'✅ Built — updateSchedHelper(), getAutoManagers()'},
-  {cat:'👥 Schedule', feature:'Auto-detect Closing Manager', excel:'SCHEDULE_ENGINE -C shift detection', app:'✅ Built — closeMgr detection in updateSchedHelper()'},
-  {cat:'👥 Schedule', feature:'EB Manager detection (≤6am opener)', excel:'SCHEDULE_ENGINE H col start#', app:'✅ Built — startH ≤ 6.5 logic in updateSchedHelper()'},
-  {cat:'👥 Schedule', feature:'Morning briefing + confirm flow', excel:'Not in Excel (manual)', app:'✅ Built — Morning Briefing card with ✅ Confirm button'},
-  {cat:'👥 Schedule', feature:'Callout toggle per person', excel:'Not in Excel', app:'✅ Built — toggleCallout() with immediate coverage recalc'},
-  {cat:'👥 Schedule', feature:'CXR 4-hour rotation blocks', excel:'Not in Excel (manual whiteboard)', app:'✅ Built — buildSmartRotation(), auto Block1→Block2 flip'},
-  {cat:'👥 Schedule', feature:'One-tap Counter/Exit assignment', excel:'Not in Excel', app:'✅ Built — tapStation() buttons on CXR cards'},
-  {cat:'👥 Schedule', feature:'±30min bump suggestions', excel:'Not in Excel', app:'✅ Built — gap suggestions shown, manager decides'},
-  {cat:'👥 Schedule', feature:'Day-of-week coverage rules', excel:'LOGIC_BIBLE only (reference)', app:'✅ Built — COVERAGE_RULES by DOW, Monday/Friday flags'},
-  {cat:'👥 Schedule', feature:'Hourly coverage board', excel:'Not in Excel', app:'✅ Built — hour-by-hour coverage with ✅⚠🔴 status'},
-  {cat:'👥 Schedule', feature:'Management station assignments', excel:'DAILY_OPS management block', app:'✅ Built — mgmt station dropdown, auto-suggest by role'},
-  {cat:'👥 Schedule', feature:'Month view grid (read/edit)', excel:'SCHEDULE_PLANNER', app:'✅ Built — Month View tab with cell-edit'},
-  {cat:'👥 Schedule', feature:'Pre-loaded Apr 12–May 2 schedule', excel:'SCHEDULE_PLANNER grid', app:'✅ Built — PRELOADED_MGMT_SCHEDULE seeded on first open'},
-  {cat:'👥 Schedule', feature:'CXR/Exit schedule separate paste', excel:'Same sheet different section', app:'✅ Built — two paste zones (mgmt + CXR/Exit)'},
-  {cat:'👥 Schedule', feature:'Schedule persistence across days', excel:'Excel file = persistent', app:'✅ Built — SCHED_MGMT_KEY + SCHED_CXR_KEY localStorage'},
-  {cat:'👥 Schedule', feature:'Exit agent preferences stored', excel:'ROSTER pref col', app:'🔶 Partial — role=EXIT locks to exit, individual prefs not configurable in UI yet'},
+// ── SCHEDULE ────────────────────────────────────────────────────────
+{cat:‘👥 Schedule’, feature:‘Monthly schedule grid paste’, excel:‘SCHEDULE_PLANNER (grid paste zone)’, app:‘✅ Built — Load Schedule tab, mgmt + CXR/Exit separate pastes’},
+{cat:‘👥 Schedule’, feature:‘Auto-detect Opening Manager’, excel:‘SCHEDULE_ENGINE LET() formula’, app:‘✅ Built — updateSchedHelper(), getAutoManagers()’},
+{cat:‘👥 Schedule’, feature:‘Auto-detect Closing Manager’, excel:‘SCHEDULE_ENGINE -C shift detection’, app:‘✅ Built — closeMgr detection in updateSchedHelper()’},
+{cat:‘👥 Schedule’, feature:‘EB Manager detection (≤6am opener)’, excel:‘SCHEDULE_ENGINE H col start#’, app:‘✅ Built — startH ≤ 6.5 logic in updateSchedHelper()’},
+{cat:‘👥 Schedule’, feature:‘Morning briefing + confirm flow’, excel:‘Not in Excel (manual)’, app:‘✅ Built — Morning Briefing card with ✅ Confirm button’},
+{cat:‘👥 Schedule’, feature:‘Callout toggle per person’, excel:‘Not in Excel’, app:‘✅ Built — toggleCallout() with immediate coverage recalc’},
+{cat:‘👥 Schedule’, feature:‘CXR 4-hour rotation blocks’, excel:‘Not in Excel (manual whiteboard)’, app:‘✅ Built — buildSmartRotation(), auto Block1→Block2 flip’},
+{cat:‘👥 Schedule’, feature:‘One-tap Counter/Exit assignment’, excel:‘Not in Excel’, app:‘✅ Built — tapStation() buttons on CXR cards’},
+{cat:‘👥 Schedule’, feature:‘±30min bump suggestions’, excel:‘Not in Excel’, app:‘✅ Built — gap suggestions shown, manager decides’},
+{cat:‘👥 Schedule’, feature:‘Day-of-week coverage rules’, excel:‘LOGIC_BIBLE only (reference)’, app:‘✅ Built — COVERAGE_RULES by DOW, Monday/Friday flags’},
+{cat:‘👥 Schedule’, feature:‘Hourly coverage board’, excel:‘Not in Excel’, app:‘✅ Built — hour-by-hour coverage with ✅⚠🔴 status’},
+{cat:‘👥 Schedule’, feature:‘Management station assignments’, excel:‘DAILY_OPS management block’, app:‘✅ Built — mgmt station dropdown, auto-suggest by role’},
+{cat:‘👥 Schedule’, feature:‘Month view grid (read/edit)’, excel:‘SCHEDULE_PLANNER’, app:‘✅ Built — Month View tab with cell-edit’},
+{cat:‘👥 Schedule’, feature:‘Pre-loaded Apr 12–May 2 schedule’, excel:‘SCHEDULE_PLANNER grid’, app:‘✅ Built — PRELOADED_MGMT_SCHEDULE seeded on first open’},
+{cat:‘👥 Schedule’, feature:‘CXR/Exit schedule separate paste’, excel:‘Same sheet different section’, app:‘✅ Built — two paste zones (mgmt + CXR/Exit)’},
+{cat:‘👥 Schedule’, feature:‘Schedule persistence across days’, excel:‘Excel file = persistent’, app:‘✅ Built — SCHED_MGMT_KEY + SCHED_CXR_KEY localStorage’},
+{cat:‘👥 Schedule’, feature:‘Exit agent preferences stored’, excel:‘ROSTER pref col’, app:‘🔶 Partial — role=EXIT locks to exit, individual prefs not configurable in UI yet’},
 
-  // ── DAILY OPS ───────────────────────────────────────────────────────
-  {cat:'📋 Daily Ops', feature:'CS score + HOT alert entry', excel:'DAILY_OPS B7/B8', app:'✅ Built — Daily Setup panel on dashboard'},
-  {cat:'📋 Daily Ops', feature:'XXAR / SXAR / PXAR entry', excel:'DAILY_OPS flexible assignment', app:'✅ Built — Daily Setup, auto-included in team text'},
-  {cat:'📋 Daily Ops', feature:'OOS count', excel:'DAILY_OPS B6', app:'✅ Built — Daily Setup + closing confirmation'},
-  {cat:'📋 Daily Ops', feature:'Sales leader / inventory agent', excel:'DAILY_OPS misc fields', app:'✅ Built — Daily Setup fields'},
-  {cat:'📋 Daily Ops', feature:'24hr Recent Book status', excel:'AVAILABILITY_BOARD D6', app:'✅ Built — 24hr Book select in Daily Setup'},
-  {cat:'📋 Daily Ops', feature:'Class notes / board note', excel:'AVAILABILITY_BOARD E6', app:'✅ Built — Class Notes field in Daily Setup'},
-  {cat:'📋 Daily Ops', feature:'Opening checklist', excel:'DAILY_OPS R50-R70', app:'✅ Built — Checklist tab, day-specific items auto-shown'},
-  {cat:'📋 Daily Ops', feature:'Mid-shift checklist', excel:'DAILY_OPS R107-R121', app:'✅ Built — Checklist → Mid-Shift tab'},
-  {cat:'📋 Daily Ops', feature:'Closing checklist', excel:'DAILY_OPS R123-R157', app:'✅ Built — Checklist → Closing tab'},
-  {cat:'📋 Daily Ops', feature:'Day-of-week specific tasks', excel:'Manual awareness', app:'✅ Built — VEM Mon/Tue/Wed, Monday exit flag, Friday flag'},
+// ── DAILY OPS ───────────────────────────────────────────────────────
+{cat:‘📋 Daily Ops’, feature:‘CS score + HOT alert entry’, excel:‘DAILY_OPS B7/B8’, app:‘✅ Built — Daily Setup panel on dashboard’},
+{cat:‘📋 Daily Ops’, feature:‘XXAR / SXAR / PXAR entry’, excel:‘DAILY_OPS flexible assignment’, app:‘✅ Built — Daily Setup, auto-included in team text’},
+{cat:‘📋 Daily Ops’, feature:‘OOS count’, excel:‘DAILY_OPS B6’, app:‘✅ Built — Daily Setup + closing confirmation’},
+{cat:‘📋 Daily Ops’, feature:‘Sales leader / inventory agent’, excel:‘DAILY_OPS misc fields’, app:‘✅ Built — Daily Setup fields’},
+{cat:‘📋 Daily Ops’, feature:‘24hr Recent Book status’, excel:‘AVAILABILITY_BOARD D6’, app:‘✅ Built — 24hr Book select in Daily Setup’},
+{cat:‘📋 Daily Ops’, feature:‘Class notes / board note’, excel:‘AVAILABILITY_BOARD E6’, app:‘✅ Built — Class Notes field in Daily Setup’},
+{cat:‘📋 Daily Ops’, feature:‘Opening checklist’, excel:‘DAILY_OPS R50-R70’, app:‘✅ Built — Checklist tab, day-specific items auto-shown’},
+{cat:‘📋 Daily Ops’, feature:‘Mid-shift checklist’, excel:‘DAILY_OPS R107-R121’, app:‘✅ Built — Checklist → Mid-Shift tab’},
+{cat:‘📋 Daily Ops’, feature:‘Closing checklist’, excel:‘DAILY_OPS R123-R157’, app:‘✅ Built — Checklist → Closing tab’},
+{cat:‘📋 Daily Ops’, feature:‘Day-of-week specific tasks’, excel:‘Manual awareness’, app:‘✅ Built — VEM Mon/Tue/Wed, Monday exit flag, Friday flag’},
 
-  // ── SHIFT HANDOFF ────────────────────────────────────────────────────
-  {cat:'📱 Shift Handoff', feature:'Auto-generated team text', excel:'SHIFT_HANDOFF sheet', app:'✅ Built — Closing tab, generateTeamText()'},
-  {cat:'📱 Shift Handoff', feature:'Walk-up groups in handoff', excel:'SHIFT_HANDOFF board status', app:'✅ Built — open groups listed in team text'},
-  {cat:'📱 Shift Handoff', feature:'Manager names in handoff', excel:'Auto from SCHEDULE_ENGINE', app:'✅ Built — auto from getAutoManagers()'},
-  {cat:'📱 Shift Handoff', feature:'XXAR/SXAR/PXAR in handoff', excel:'SHIFT_HANDOFF XXAR section', app:'✅ Built — included in team text'},
+// ── SHIFT HANDOFF ────────────────────────────────────────────────────
+{cat:‘📱 Shift Handoff’, feature:‘Auto-generated team text’, excel:‘SHIFT_HANDOFF sheet’, app:‘✅ Built — Closing tab, generateTeamText()’},
+{cat:‘📱 Shift Handoff’, feature:‘Walk-up groups in handoff’, excel:‘SHIFT_HANDOFF board status’, app:‘✅ Built — open groups listed in team text’},
+{cat:‘📱 Shift Handoff’, feature:‘Manager names in handoff’, excel:‘Auto from SCHEDULE_ENGINE’, app:‘✅ Built — auto from getAutoManagers()’},
+{cat:‘📱 Shift Handoff’, feature:‘XXAR/SXAR/PXAR in handoff’, excel:‘SHIFT_HANDOFF XXAR section’, app:‘✅ Built — included in team text’},
 
-  // ── EMAILS & HISTORY ─────────────────────────────────────────────────
-  {cat:'📧 Emails & History', feature:'Opening email', excel:'Not in Excel (manual)', app:'✅ Built — Emails tab, pre-filled opening email'},
-  {cat:'📧 Emails & History', feature:'Closing/EON email', excel:'Not in Excel (manual)', app:'✅ Built — Emails tab, closing email template'},
-  {cat:'📧 Emails & History', feature:'Day summary / log email', excel:'Not in Excel', app:'✅ Built — Day Summary email for history log'},
-  {cat:'📧 Emails & History', feature:'4am auto-save to history', excel:'VERSION_HISTORY (manual)', app:'✅ Built — check4amSave() runs every minute'},
-  {cat:'📧 Emails & History', feature:'30-day history browser', excel:'Not in Excel', app:'✅ Built — History tab, 60-day storage'},
-  {cat:'📧 Emails & History', feature:'Per-day summary expand/copy', excel:'Not in Excel', app:'✅ Built — tap to expand, copy or email any day'},
+// ── EMAILS & HISTORY ─────────────────────────────────────────────────
+{cat:‘📧 Emails & History’, feature:‘Opening email’, excel:‘Not in Excel (manual)’, app:‘✅ Built — Emails tab, pre-filled opening email’},
+{cat:‘📧 Emails & History’, feature:‘Closing/EON email’, excel:‘Not in Excel (manual)’, app:‘✅ Built — Emails tab, closing email template’},
+{cat:‘📧 Emails & History’, feature:‘Day summary / log email’, excel:‘Not in Excel’, app:‘✅ Built — Day Summary email for history log’},
+{cat:‘📧 Emails & History’, feature:‘4am auto-save to history’, excel:‘VERSION_HISTORY (manual)’, app:‘✅ Built — check4amSave() runs every minute’},
+{cat:‘📧 Emails & History’, feature:‘30-day history browser’, excel:‘Not in Excel’, app:‘✅ Built — History tab, 60-day storage’},
+{cat:‘📧 Emails & History’, feature:‘Per-day summary expand/copy’, excel:‘Not in Excel’, app:‘✅ Built — tap to expand, copy or email any day’},
 
-  // ── REFERENCE ───────────────────────────────────────────────────────
-  {cat:'📖 Reference', feature:'Car code compendium (72+ codes)', excel:'Fleet Codes sheet + VEHICLE_MODELS', app:'✅ Built — Car Codes tab, searchable + filterable'},
-  {cat:'📖 Reference', feature:'Loyalty program guide', excel:'PROGRAM_GUIDE sheet', app:'✅ Built — Loyalty tab, all 3 programs with CMH-specific rules'},
-  {cat:'📖 Reference', feature:'CMH operational rules', excel:'LOGIC_BIBLE', app:'❌ Not built — CMH-specific overrides, policies (→ Staff Reference App)'},
-  {cat:'📖 Reference', feature:'Vehicle models reference', excel:'VEHICLE_MODELS sheet', app:'🔶 Partial — descriptions in code compendium, no photo links yet'},
+// ── REFERENCE ───────────────────────────────────────────────────────
+{cat:‘📖 Reference’, feature:‘Car code compendium (72+ codes)’, excel:‘Fleet Codes sheet + VEHICLE_MODELS’, app:‘✅ Built — Car Codes tab, searchable + filterable’},
+{cat:‘📖 Reference’, feature:‘Loyalty program guide’, excel:‘PROGRAM_GUIDE sheet’, app:‘✅ Built — Loyalty tab, all 3 programs with CMH-specific rules’},
+{cat:‘📖 Reference’, feature:‘CMH operational rules’, excel:‘LOGIC_BIBLE’, app:‘❌ Not built — CMH-specific overrides, policies (→ Staff Reference App)’},
+{cat:‘📖 Reference’, feature:‘Vehicle models reference’, excel:‘VEHICLE_MODELS sheet’, app:‘🔶 Partial — descriptions in code compendium, no photo links yet’},
 
-  // ── NOT YET BUILT ────────────────────────────────────────────────────
-  {cat:'🔧 Pending', feature:'Physical lot count / variance', excel:'PHYSICAL_INVENTORY', app:'✅ Built — Inventory tab, physical count + variance vs system'},
-  {cat:'🔧 Pending', feature:'Hourly flow bar chart', excel:'HOURLY_FLOW graph', app:'✅ Built — Hourly tab, visual bar chart + totals by group'},
-  {cat:'🔧 Pending', feature:'Staff Reference App (separate)', excel:'PROGRAM_GUIDE + LOGIC_BIBLE', app:'❌ Planned as separate HTML file for all staff'},
-  {cat:'🔧 Pending', feature:'5 pending codes (PRAR/BFAR/WDAR/UDAR/SPBR)', excel:'Fleet Codes — unverified', app:'⚠ In compendium as pending, awaiting AM confirmation'},
-  {cat:'🔧 Pending', feature:'CXR exit fairness tracker', excel:'Not in Excel', app:'✅ Built — Exit Fairness panel in Schedule tab, weekly hour tracker'},
-  {cat:'🔧 Pending', feature:'Power Automate / SharePoint save', excel:'Manual', app:'❌ Future — email log is interim solution'},
+// ── NOT YET BUILT ────────────────────────────────────────────────────
+{cat:‘🔧 Pending’, feature:‘Physical lot count / variance’, excel:‘PHYSICAL_INVENTORY’, app:‘✅ Built — Inventory tab, physical count + variance vs system’},
+{cat:‘🔧 Pending’, feature:‘Hourly flow bar chart’, excel:‘HOURLY_FLOW graph’, app:‘✅ Built — Hourly tab, visual bar chart + totals by group’},
+{cat:‘🔧 Pending’, feature:‘Staff Reference App (separate)’, excel:‘PROGRAM_GUIDE + LOGIC_BIBLE’, app:‘❌ Planned as separate HTML file for all staff’},
+{cat:‘🔧 Pending’, feature:‘5 pending codes (PRAR/BFAR/WDAR/UDAR/SPBR)’, excel:‘Fleet Codes — unverified’, app:‘⚠ In compendium as pending, awaiting AM confirmation’},
+{cat:‘🔧 Pending’, feature:‘CXR exit fairness tracker’, excel:‘Not in Excel’, app:‘✅ Built — Exit Fairness panel in Schedule tab, weekly hour tracker’},
+{cat:‘🔧 Pending’, feature:‘Power Automate / SharePoint save’, excel:‘Manual’, app:‘❌ Future — email log is interim solution’},
 ];
 
 let featureListOpen = false;
 
 function toggleFeatureList() {
-  featureListOpen = !featureListOpen;
-  const el = document.getElementById('feature-list');
-  const lbl = document.getElementById('feature-toggle-lbl');
-  if (el) el.style.display = featureListOpen ? 'block' : 'none';
-  if (lbl) lbl.textContent = featureListOpen ? '▲ Hide' : '▼ Show';
-  if (featureListOpen) renderFeatureList();
+featureListOpen = !featureListOpen;
+const el = document.getElementById(‘feature-list’);
+const lbl = document.getElementById(‘feature-toggle-lbl’);
+if (el) el.style.display = featureListOpen ? ‘block’ : ‘none’;
+if (lbl) lbl.textContent = featureListOpen ? ‘▲ Hide’ : ‘▼ Show’;
+if (featureListOpen) renderFeatureList();
 }
 
 function renderFeatureList() {
-  const el = document.getElementById('feature-list');
-  const badge = document.getElementById('feature-badge');
-  if (!el) return;
+const el = document.getElementById(‘feature-list’);
+const badge = document.getElementById(‘feature-badge’);
+if (!el) return;
 
-  const built  = FEATURE_AUDIT.filter(f => f.app.startsWith('✅')).length;
-  const partial = FEATURE_AUDIT.filter(f => f.app.startsWith('🔶')).length;
-  const pending = FEATURE_AUDIT.filter(f => f.app.startsWith('❌')).length;
-  const total  = FEATURE_AUDIT.length;
+const built  = FEATURE_AUDIT.filter(f => f.app.startsWith(‘✅’)).length;
+const partial = FEATURE_AUDIT.filter(f => f.app.startsWith(‘🔶’)).length;
+const pending = FEATURE_AUDIT.filter(f => f.app.startsWith(‘❌’)).length;
+const total  = FEATURE_AUDIT.length;
 
-  if (badge) badge.textContent = `${built}/${total} built · ${partial} partial · ${pending} pending`;
+if (badge) badge.textContent = `${built}/${total} built · ${partial} partial · ${pending} pending`;
 
-  // Group by category
-  const bycat = {};
-  FEATURE_AUDIT.forEach(f => {
-    if (!bycat[f.cat]) bycat[f.cat] = [];
-    bycat[f.cat].push(f);
-  });
+// Group by category
+const bycat = {};
+FEATURE_AUDIT.forEach(f => {
+if (!bycat[f.cat]) bycat[f.cat] = [];
+bycat[f.cat].push(f);
+});
 
-  let htm = `<div style="display:flex;gap:12px;margin-bottom:12px;font-size:12px;flex-wrap:wrap">
-    <span style="color:var(--green)">✅ ${built} built</span>
-    <span style="color:var(--amber)">🔶 ${partial} partial</span>
-    <span style="color:var(--red)">❌ ${pending} not built</span>
-    <span style="color:var(--txt3)">${total} total features tracked</span>
+let htm = `<div style="display:flex;gap:12px;margin-bottom:12px;font-size:12px;flex-wrap:wrap">
+<span style="color:var(--green)">✅ ${built} built</span>
+<span style="color:var(--amber)">🔶 ${partial} partial</span>
+<span style="color:var(--red)">❌ ${pending} not built</span>
+<span style="color:var(--txt3)">${total} total features tracked</span>
+
   </div>`;
 
-  Object.entries(bycat).forEach(([cat, features]) => {
-    htm += `<div style="margin-bottom:14px">
-      <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;
-        letter-spacing:.08em;color:var(--txt3);text-transform:uppercase;
-        padding:5px 0;border-bottom:1px solid var(--bdr);margin-bottom:5px">${cat}</div>`;
-    features.forEach(f => {
-      const icon = f.app[0];
-      const color = icon==='✅'?'var(--green)':icon==='🔶'?'var(--amber)':icon==='❌'?'var(--red)':'var(--amber)';
-      htm += `<div style="display:grid;grid-template-columns:180px 1fr;gap:8px;
-        padding:5px 4px;border-bottom:1px solid var(--bdr);font-size:11px;align-items:start">
-        <div style="color:var(--txt2);font-weight:600">${f.feature}</div>
-        <div style="color:${color}">${f.app}</div>
-      </div>`;
-    });
-    htm += `</div>`;
-  });
+Object.entries(bycat).forEach(([cat, features]) => {
+htm += `<div style="margin-bottom:14px"> <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700; letter-spacing:.08em;color:var(--txt3);text-transform:uppercase; padding:5px 0;border-bottom:1px solid var(--bdr);margin-bottom:5px">${cat}</div>`;
+features.forEach(f => {
+const icon = f.app[0];
+const color = icon===‘✅’?‘var(–green)’:icon===‘🔶’?‘var(–amber)’:icon===‘❌’?‘var(–red)’:‘var(–amber)’;
+htm += `<div style="display:grid;grid-template-columns:180px 1fr;gap:8px; padding:5px 4px;border-bottom:1px solid var(--bdr);font-size:11px;align-items:start"> <div style="color:var(--txt2);font-weight:600">${f.feature}</div> <div style="color:${color}">${f.app}</div> </div>`;
+});
+htm += `</div>`;
+});
 
-  el.innerHTML = htm;
+el.innerHTML = htm;
 }
 
 // Init feature badge on load
 setTimeout(() => {
-  const badge = document.getElementById('feature-badge');
-  if (badge) {
-    const built = FEATURE_AUDIT.filter(f => f.app.startsWith('✅')).length;
-    badge.textContent = built + '/' + FEATURE_AUDIT.length + ' built';
-  }
+const badge = document.getElementById(‘feature-badge’);
+if (badge) {
+const built = FEATURE_AUDIT.filter(f => f.app.startsWith(‘✅’)).length;
+badge.textContent = built + ‘/’ + FEATURE_AUDIT.length + ’ built’;
+}
 }, 500);
-
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // PHYSICAL INVENTORY
 // ═══════════════════════════════════════════════════════════════════════
 
 function buildInventoryScreen() {
-  const grid = document.getElementById('inv-grid');
-  if (!grid) return;
+const grid = document.getElementById(‘inv-grid’);
+if (!grid) return;
 
-  const sysData = typeof getGroupNetData === 'function' ? getGroupNetData() : {};
-  const stored  = STATE.physInventory || {};
-  const lastSaved = STATE.physInventoryTime;
+const sysData = typeof getGroupNetData === ‘function’ ? getGroupNetData() : {};
+const stored  = STATE.physInventory || {};
+const lastSaved = STATE.physInventoryTime;
 
-  const lastEl = document.getElementById('inv-last-saved');
-  if (lastEl && lastSaved) lastEl.textContent = 'Last saved: ' + new Date(lastSaved).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+const lastEl = document.getElementById(‘inv-last-saved’);
+if (lastEl && lastSaved) lastEl.textContent = ’Last saved: ’ + new Date(lastSaved).toLocaleTimeString(‘en-US’,{hour:‘numeric’,minute:‘2-digit’});
 
-  let html = '';
-  GROUP_META.forEach(g => {
-    const d     = sysData[g.n];
-    const sysNet = d && d.has ? d.net : null;
-    const sysRes = d && d.has ? d.res : null;
-    const sysRet = d && d.has ? d.ret : null;
-    const physical = stored[g.n] !== undefined ? stored[g.n] : '';
-    const variance = (physical !== '' && sysNet !== null) ? (parseInt(physical) - (sysRet || 0)) : null;
-    const varColor = variance === null ? 'var(--txt3)' : variance > 2 ? 'var(--green)' : variance < 0 ? 'var(--red)' : 'var(--amber)';
-    const isCore  = typeof CORE !== 'undefined' ? CORE.has(g.n) : false;
+let html = ‘’;
+GROUP_META.forEach(g => {
+const d     = sysData[g.n];
+const sysNet = d && d.has ? d.net : null;
+const sysRes = d && d.has ? d.res : null;
+const sysRet = d && d.has ? d.ret : null;
+const physical = stored[g.n] !== undefined ? stored[g.n] : ‘’;
+const variance = (physical !== ‘’ && sysNet !== null) ? (parseInt(physical) - (sysRet || 0)) : null;
+const varColor = variance === null ? ‘var(–txt3)’ : variance > 2 ? ‘var(–green)’ : variance < 0 ? ‘var(–red)’ : ‘var(–amber)’;
+const isCore  = typeof CORE !== ‘undefined’ ? CORE.has(g.n) : false;
 
-    html += `<div style="background:var(--bg2);border:1px solid ${isCore?'rgba(37,99,235,.2)':'var(--bdr)'};
-      border-radius:7px;padding:12px">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
-        <span style="font-size:11px;font-weight:700;color:var(--txt)">${g.n}</span>
-        ${isCore ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(37,99,235,.12);color:var(--acc)">◆ CORE</span>' : ''}
-        ${sysNet !== null ? `<span style="font-size:10px;color:var(--txt3);margin-left:auto">Sys Net: ${sysNet>0?'+':''}${sysNet}</span>` : '<span style="font-size:10px;color:var(--txt3);margin-left:auto">No sys data</span>'}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;font-size:11px;text-align:center">
-        <div style="background:var(--bg3);border-radius:4px;padding:5px">
-          <div style="color:var(--txt3);font-size:9px;margin-bottom:2px">SYS RES</div>
-          <div style="font-family:var(--ff-mono);color:var(--amber)">${sysRes !== null ? sysRes : '—'}</div>
-        </div>
-        <div style="background:var(--bg3);border-radius:4px;padding:5px">
-          <div style="color:var(--txt3);font-size:9px;margin-bottom:2px">SYS RET</div>
-          <div style="font-family:var(--ff-mono);color:var(--green)">${sysRet !== null ? sysRet : '—'}</div>
-        </div>
-        <div style="background:var(--bg3);border-radius:4px;padding:5px">
-          <div style="color:var(--txt3);font-size:9px;margin-bottom:2px">VARIANCE</div>
-          <div style="font-family:var(--ff-mono);color:${varColor}">${variance !== null ? (variance>0?'+':'')+variance : '—'}</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <label style="font-size:11px;color:var(--txt2);font-weight:600;white-space:nowrap">Lot Count:</label>
-        <input type="number" min="0" value="${physical}"
-          data-group="${g.n}" oninput="updatePhysCount(this.dataset.group,this.value)"
-          style="flex:1;font-size:14px;font-family:var(--ff-mono);font-weight:500;
-            padding:6px 10px;text-align:center;
-            background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt)"
-          placeholder="0">
-      </div>
-    </div>`;
-  });
+```
+html += `<div style="background:var(--bg2);border:1px solid ${isCore?'rgba(37,99,235,.2)':'var(--bdr)'};
+  border-radius:7px;padding:12px">
+  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+    <span style="font-size:11px;font-weight:700;color:var(--txt)">${g.n}</span>
+    ${isCore ? '<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:rgba(37,99,235,.12);color:var(--acc)">◆ CORE</span>' : ''}
+    ${sysNet !== null ? `<span style="font-size:10px;color:var(--txt3);margin-left:auto">Sys Net: ${sysNet>0?'+':''}${sysNet}</span>` : '<span style="font-size:10px;color:var(--txt3);margin-left:auto">No sys data</span>'}
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;font-size:11px;text-align:center">
+    <div style="background:var(--bg3);border-radius:4px;padding:5px">
+      <div style="color:var(--txt3);font-size:9px;margin-bottom:2px">SYS RES</div>
+      <div style="font-family:var(--ff-mono);color:var(--amber)">${sysRes !== null ? sysRes : '—'}</div>
+    </div>
+    <div style="background:var(--bg3);border-radius:4px;padding:5px">
+      <div style="color:var(--txt3);font-size:9px;margin-bottom:2px">SYS RET</div>
+      <div style="font-family:var(--ff-mono);color:var(--green)">${sysRet !== null ? sysRet : '—'}</div>
+    </div>
+    <div style="background:var(--bg3);border-radius:4px;padding:5px">
+      <div style="color:var(--txt3);font-size:9px;margin-bottom:2px">VARIANCE</div>
+      <div style="font-family:var(--ff-mono);color:${varColor}">${variance !== null ? (variance>0?'+':'')+variance : '—'}</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <label style="font-size:11px;color:var(--txt2);font-weight:600;white-space:nowrap">Lot Count:</label>
+    <input type="number" min="0" value="${physical}"
+      data-group="${g.n}" oninput="updatePhysCount(this.dataset.group,this.value)"
+      style="flex:1;font-size:14px;font-family:var(--ff-mono);font-weight:500;
+        padding:6px 10px;text-align:center;
+        background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt)"
+      placeholder="0">
+  </div>
+</div>`;
+```
 
-  grid.innerHTML = html;
+});
+
+grid.innerHTML = html;
 }
 
 function updatePhysCount(groupName, val) {
-  if (!STATE.physInventory) STATE.physInventory = {};
-  STATE.physInventory[groupName] = val === '' ? undefined : parseInt(val) || 0;
-  if (STATE.physInventory[groupName] === undefined) delete STATE.physInventory[groupName];
-  // Don't save on every keystroke — wait for explicit save
+if (!STATE.physInventory) STATE.physInventory = {};
+STATE.physInventory[groupName] = val === ‘’ ? undefined : parseInt(val) || 0;
+if (STATE.physInventory[groupName] === undefined) delete STATE.physInventory[groupName];
+// Don’t save on every keystroke — wait for explicit save
 }
 
 function saveInventoryCounts() {
-  STATE.physInventoryTime = Date.now();
-  saveState();
-  buildInventoryScreen();
-  toast('Inventory counts saved ✓');
+STATE.physInventoryTime = Date.now();
+saveState();
+buildInventoryScreen();
+toast(‘Inventory counts saved ✓’);
 }
 
 function clearInventoryCounts() {
-  STATE.physInventory = {};
-  STATE.physInventoryTime = null;
-  saveState();
-  buildInventoryScreen();
-  toast('Inventory cleared');
+STATE.physInventory = {};
+STATE.physInventoryTime = null;
+saveState();
+buildInventoryScreen();
+toast(‘Inventory cleared’);
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // HOURLY FLOW VIEW
@@ -6669,325 +6699,291 @@ function clearInventoryCounts() {
 // ═══════════════════════════════════════════════════════════════════════
 
 function buildHourlyView() {
-  const chartEl  = document.getElementById('hourly-chart');
-  const tableEl  = document.getElementById('hourly-table');
-  const grpEl    = document.getElementById('hourly-group-filter');
-  const typeEl   = document.getElementById('hourly-type-filter');
-  if (!chartEl) return;
+const chartEl  = document.getElementById(‘hourly-chart’);
+const tableEl  = document.getElementById(‘hourly-table’);
+const grpEl    = document.getElementById(‘hourly-group-filter’);
+const typeEl   = document.getElementById(‘hourly-type-filter’);
+if (!chartEl) return;
 
-  // Populate group filter if empty
-  if (grpEl && grpEl.options.length <= 1) {
-    GROUP_META.forEach(g => {
-      const opt = document.createElement('option');
-      opt.value = g.n; opt.textContent = g.n;
-      grpEl.appendChild(opt);
-    });
-  }
-
-  const pd = STATE.pasteData || {};
-  const ph = STATE.pasteHourly || {};
-  const selectedType  = typeEl ? typeEl.value : 'net';
-  const selectedGroup = grpEl  ? grpEl.value  : '';
-
-  const hasGroupData  = Object.keys(pd).length > 0;
-  const hasHourlyData = Object.keys(ph).length > 0;
-
-  // ── If a specific group is selected — show GROUP detail ──────────────────
-  if (selectedGroup && hasGroupData) {
-    const data   = getGroupNetData();
-    const d      = data[selectedGroup];
-    if (!d || !d.has) {
-      chartEl.innerHTML = `<p style="font-size:12px;color:var(--txt3);padding:12px">
-        No data for ${selectedGroup} — paste Game Plan data first.</p>`;
-      if (tableEl) tableEl.innerHTML = '';
-      return;
-    }
-    const thresh = THRESHOLDS[selectedGroup] || [3,2];
-    const st     = typeof getGroupStatus === 'function' ? getGroupStatus(selectedGroup, d.net) : 'na';
-    const stLabel = st==='wu'?'✅ Walk-Up + Upgrade Open':st==='up'?'⬆ Upgrade Only':'🔴 Not Available';
-    const netColor = d.net>0?'var(--green)':d.net<0?'var(--red)':'var(--txt3)';
-
-    chartEl.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
-        <div style="background:var(--bg3);border-radius:6px;padding:12px;text-align:center">
-          <div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Reservations</div>
-          <div style="font-family:var(--ff-mono);font-size:28px;font-weight:700;color:var(--amber)">${d.res}</div>
-        </div>
-        <div style="background:var(--bg3);border-radius:6px;padding:12px;text-align:center">
-          <div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Returns</div>
-          <div style="font-family:var(--ff-mono);font-size:28px;font-weight:700;color:var(--green)">${d.ret}</div>
-        </div>
-        <div style="background:var(--bg3);border-radius:6px;padding:12px;text-align:center">
-          <div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Net</div>
-          <div style="font-family:var(--ff-mono);font-size:28px;font-weight:700;color:${netColor}">${d.net>0?'+':''}${d.net}</div>
-        </div>
-      </div>
-      <div style="background:var(--bg3);border-radius:6px;padding:12px;font-size:13px;font-weight:700;margin-bottom:8px">
-        ${stLabel}
-        <span style="font-size:11px;font-weight:400;color:var(--txt3);margin-left:8px">
-          Walk-Up ≥${thresh[0]}  ·  Upgrade ≥${thresh[1]}
-        </span>
-      </div>
-      <p style="font-size:11px;color:var(--txt3)">
-        Hourly breakdown not available for individual groups — Game Plan By Hour export shows totals per group, not per-group-per-hour.
-        Select "All Groups" for the full 24-hour flow chart.
-      </p>`;
-    if (tableEl) tableEl.innerHTML = '';
-    return;
-  }
-
-  // ── HOUR-BY-HOUR chart (All Groups mode) ─────────────────────────────────
-  if (!hasHourlyData && !hasGroupData) {
-    chartEl.innerHTML = `
-      <div style="text-align:center;padding:32px 16px;color:var(--txt3)">
-        <div style="font-size:32px;margin-bottom:12px">📋</div>
-        <div style="font-size:14px;font-weight:600;color:var(--txt2);margin-bottom:8px">Paste Game Plan data to see hourly flow</div>
-        <div style="font-size:12px">Go to Paste Data tab → paste all 4 Game Plan exports</div>
-        <div style="font-size:11px;margin-top:8px;color:var(--txt3)">
-          Hourly data is captured automatically when Game Plan "By Hour" view is pasted.
-        </div>
-      </div>`;
-    if (tableEl) tableEl.innerHTML = '';
-    return;
-  }
-
-  // Build 24-hour display
-  // If we have hourly data use it; otherwise fall back to group totals display
-  const resHourly = ph.res || null;
-  const retHourly = ph.ret || null;
-
-  if (!resHourly && !retHourly) {
-    // Fall back to group bar chart with note
-    chartEl.innerHTML = `
-      <div style="padding:10px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3);
-        border-radius:6px;margin-bottom:12px;font-size:11px;color:var(--amber)">
-        ⚠ Hourly breakdown not available — hourly columns not detected in paste.
-        Make sure you're pasting the <b>By Hour</b> view from Game Plan (not the summary view).
-        Showing group totals below instead.
-      </div>`;
-    // Add group totals chart as fallback
-    const data = getGroupNetData();
-    let out = '<div style="display:flex;flex-direction:column;gap:4px">';
-    const groups = GROUP_META.filter(g => { const d=data[g.n]; return d&&d.has; });
-    const maxAbs = Math.max(...groups.map(g => Math.abs(data[g.n].net)), 1);
-    groups.forEach(g => {
-      const d = data[g.n];
-      const val = d.net;
-      const pct = Math.min(100, Math.abs(val)/maxAbs*100);
-      const col = val>0?'var(--green)':val<0?'var(--red)':'var(--txt3)';
-      const isCore = CORE_GROUPS.has(g.n);
-      out += `<div style="display:flex;align-items:center;gap:8px">
-        <div style="width:145px;font-size:10px;font-weight:${isCore?700:400};
-          color:${isCore?'var(--acc)':'var(--txt2)'};text-align:right;flex-shrink:0;
-          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.n}</div>
-        <div style="flex:1;height:16px;background:var(--bg3);border-radius:2px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:${col};border-radius:2px"></div>
-        </div>
-        <div style="width:36px;font-family:var(--ff-mono);font-size:11px;font-weight:700;
-          color:${col};text-align:right">${val>0?'+':''}${val}</div>
-      </div>`;
-    });
-    out += '</div>';
-    chartEl.innerHTML += out;
-    if (tableEl) tableEl.innerHTML = '';
-    return;
-  }
-
-  // We have real hourly data — build the proper 24-hour chart
-  function fmtHourLabel(h) {
-    if (h===0)  return '12a';
-    if (h<12)   return h+'a';
-    if (h===12) return '12p';
-    return (h-12)+'p';
-  }
-
-  // For the selected type, get the right array
-  function getHourVal(h) {
-    if (selectedType === 'res') return resHourly ? resHourly[h]||0 : 0;
-    if (selectedType === 'ret') return retHourly ? retHourly[h]||0 : 0;
-    // net = ret - res
-    const ret = retHourly ? retHourly[h]||0 : 0;
-    const res = resHourly ? resHourly[h]||0 : 0;
-    return ret - res;
-  }
-
-  const vals  = Array.from({length:24}, (_,h) => getHourVal(h));
-  const maxV  = Math.max(...vals.map(Math.abs), 1);
-  const isNet = selectedType === 'net';
-
-  // Build chart — vertical bars for each hour
-  // Group into AM (0-11) and PM (12-23) sections
-  function buildHalfChart(start, end, label) {
-    let out = `<div style="margin-bottom:14px">
-      <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;
-        letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);
-        margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--bdr)">
-        ${label}
-      </div>
-      <div style="display:flex;align-items:flex-end;gap:3px;height:100px">`;
-
-    for (let h = start; h <= end; h++) {
-      const v = vals[h];
-      if (v === 0 && !resHourly && !retHourly) continue;
-      const pct = Math.min(100, Math.abs(v)/maxV * 90);
-      const col = isNet
-        ? (v>0?'var(--green)':v<0?'var(--red)':'var(--bg3)')
-        : (selectedType==='res'?'var(--amber)':'var(--green)');
-      const isTop = pct > 60;
-
-      out += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default"
-        title="${fmtHourLabel(h)}: ${v>0?'+':''}${v}">
-        <div style="font-family:var(--ff-mono);font-size:8px;font-weight:700;
-          color:${v!==0?col:'var(--txt3)'};min-height:12px;text-align:center">
-          ${v !== 0 ? (v>0?'+':'')+v : ''}
-        </div>
-        <div style="width:100%;border-radius:2px 2px 0 0;
-          background:${v!==0?col:'var(--bg3)'};
-          height:${pct}px;min-height:${v!==0?2:0}px;
-          transition:height .3s">
-        </div>
-        <div style="font-family:var(--ff-mono);font-size:8px;color:var(--txt3);
-          margin-top:3px;white-space:nowrap">${fmtHourLabel(h)}</div>
-      </div>`;
-    }
-
-    out += '</div></div>';
-    return out;
-  }
-
-  chartEl.innerHTML = buildHalfChart(0, 11, '🌙 Overnight + Morning  (12a – 11a)')
-                    + buildHalfChart(12, 23, '☀ Afternoon + Evening  (12p – 11p)');
-
-  // Summary totals in tableEl
-  const totalRes = resHourly ? resHourly.reduce((a,b)=>a+b,0) : 0;
-  const totalRet = retHourly ? retHourly.reduce((a,b)=>a+b,0) : 0;
-  const peakResHr = resHourly ? resHourly.indexOf(Math.max(...resHourly)) : -1;
-  const peakRetHr = retHourly ? retHourly.indexOf(Math.max(...retHourly)) : -1;
-
-  if (tableEl) {
-    tableEl.innerHTML = `
-      <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 14px;
-        background:var(--bg3);border-radius:6px;font-size:12px;margin-top:4px">
-        <span><b style="color:var(--txt3)">Total Res</b>
-          <span style="font-family:var(--ff-mono);color:var(--amber);margin-left:4px">${totalRes.toLocaleString()}</span></span>
-        <span><b style="color:var(--txt3)">Total Ret</b>
-          <span style="font-family:var(--ff-mono);color:var(--green);margin-left:4px">${totalRet.toLocaleString()}</span></span>
-        <span><b style="color:var(--txt3)">Peak Res Hour</b>
-          <span style="font-family:var(--ff-mono);color:var(--amber);margin-left:4px">${peakResHr>=0?hrLabel(peakResHr)+' ('+resHourly[peakResHr]+')':'—'}</span></span>
-        <span><b style="color:var(--txt3)">Peak Ret Hour</b>
-          <span style="font-family:var(--ff-mono);color:var(--green);margin-left:4px">${peakRetHr>=0?hrLabel(peakRetHr)+' ('+retHourly[peakRetHr]+')':'—'}</span></span>
-        <span style="color:var(--txt3);font-size:10px;margin-left:auto;align-self:center">AM+PM combined</span>
-      </div>`;
-  }
+// Populate group filter if empty
+if (grpEl && grpEl.options.length <= 1) {
+GROUP_META.forEach(g => {
+const opt = document.createElement(‘option’);
+opt.value = g.n; opt.textContent = g.n;
+grpEl.appendChild(opt);
+});
 }
 
+const pd = STATE.pasteData || {};
+const ph = STATE.pasteHourly || {};
+const selectedType  = typeEl ? typeEl.value : ‘net’;
+const selectedGroup = grpEl  ? grpEl.value  : ‘’;
+
+const hasGroupData  = Object.keys(pd).length > 0;
+const hasHourlyData = Object.keys(ph).length > 0;
+
+// ── If a specific group is selected — show GROUP detail ──────────────────
+if (selectedGroup && hasGroupData) {
+const data   = getGroupNetData();
+const d      = data[selectedGroup];
+if (!d || !d.has) {
+chartEl.innerHTML = `<p style="font-size:12px;color:var(--txt3);padding:12px"> No data for ${selectedGroup} — paste Game Plan data first.</p>`;
+if (tableEl) tableEl.innerHTML = ‘’;
+return;
+}
+const thresh = THRESHOLDS[selectedGroup] || [3,2];
+const st     = typeof getGroupStatus === ‘function’ ? getGroupStatus(selectedGroup, d.net) : ‘na’;
+const stLabel = st===‘wu’?‘✅ Walk-Up + Upgrade Open’:st===‘up’?‘⬆ Upgrade Only’:‘🔴 Not Available’;
+const netColor = d.net>0?‘var(–green)’:d.net<0?‘var(–red)’:‘var(–txt3)’;
+
+```
+chartEl.innerHTML = `
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+    <div style="background:var(--bg3);border-radius:6px;padding:12px;text-align:center">
+      <div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Reservations</div>
+      <div style="font-family:var(--ff-mono);font-size:28px;font-weight:700;color:var(--amber)">${d.res}</div>
+    </div>
+    <div style="background:var(--bg3);border-radius:6px;padding:12px;text-align:center">
+      <div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Returns</div>
+      <div style="font-family:var(--ff-mono);font-size:28px;font-weight:700;color:var(--green)">${d.ret}</div>
+    </div>
+    <div style="background:var(--bg3);border-radius:6px;padding:12px;text-align:center">
+      <div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Net</div>
+      <div style="font-family:var(--ff-mono);font-size:28px;font-weight:700;color:${netColor}">${d.net>0?'+':''}${d.net}</div>
+    </div>
+  </div>
+  <div style="background:var(--bg3);border-radius:6px;padding:12px;font-size:13px;font-weight:700;margin-bottom:8px">
+    ${stLabel}
+    <span style="font-size:11px;font-weight:400;color:var(--txt3);margin-left:8px">
+      Walk-Up ≥${thresh[0]}  ·  Upgrade ≥${thresh[1]}
+    </span>
+  </div>
+  <p style="font-size:11px;color:var(--txt3)">
+    Hourly breakdown not available for individual groups — Game Plan By Hour export shows totals per group, not per-group-per-hour.
+    Select "All Groups" for the full 24-hour flow chart.
+  </p>`;
+if (tableEl) tableEl.innerHTML = '';
+return;
+```
+
+}
+
+// ── HOUR-BY-HOUR chart (All Groups mode) ─────────────────────────────────
+if (!hasHourlyData && !hasGroupData) {
+chartEl.innerHTML = ` <div style="text-align:center;padding:32px 16px;color:var(--txt3)"> <div style="font-size:32px;margin-bottom:12px">📋</div> <div style="font-size:14px;font-weight:600;color:var(--txt2);margin-bottom:8px">Paste Game Plan data to see hourly flow</div> <div style="font-size:12px">Go to Paste Data tab → paste all 4 Game Plan exports</div> <div style="font-size:11px;margin-top:8px;color:var(--txt3)"> Hourly data is captured automatically when Game Plan "By Hour" view is pasted. </div> </div>`;
+if (tableEl) tableEl.innerHTML = ‘’;
+return;
+}
+
+// Build 24-hour display
+// If we have hourly data use it; otherwise fall back to group totals display
+const resHourly = ph.res || null;
+const retHourly = ph.ret || null;
+
+if (!resHourly && !retHourly) {
+// Fall back to group bar chart with note
+chartEl.innerHTML = ` <div style="padding:10px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.3); border-radius:6px;margin-bottom:12px;font-size:11px;color:var(--amber)"> ⚠ Hourly breakdown not available — hourly columns not detected in paste. Make sure you're pasting the <b>By Hour</b> view from Game Plan (not the summary view). Showing group totals below instead. </div>`;
+// Add group totals chart as fallback
+const data = getGroupNetData();
+let out = ‘<div style="display:flex;flex-direction:column;gap:4px">’;
+const groups = GROUP_META.filter(g => { const d=data[g.n]; return d&&d.has; });
+const maxAbs = Math.max(…groups.map(g => Math.abs(data[g.n].net)), 1);
+groups.forEach(g => {
+const d = data[g.n];
+const val = d.net;
+const pct = Math.min(100, Math.abs(val)/maxAbs*100);
+const col = val>0?‘var(–green)’:val<0?‘var(–red)’:‘var(–txt3)’;
+const isCore = CORE_GROUPS.has(g.n);
+out += `<div style="display:flex;align-items:center;gap:8px"> <div style="width:145px;font-size:10px;font-weight:${isCore?700:400}; color:${isCore?'var(--acc)':'var(--txt2)'};text-align:right;flex-shrink:0; white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${g.n}</div> <div style="flex:1;height:16px;background:var(--bg3);border-radius:2px;overflow:hidden"> <div style="height:100%;width:${pct}%;background:${col};border-radius:2px"></div> </div> <div style="width:36px;font-family:var(--ff-mono);font-size:11px;font-weight:700; color:${col};text-align:right">${val>0?'+':''}${val}</div> </div>`;
+});
+out += ‘</div>’;
+chartEl.innerHTML += out;
+if (tableEl) tableEl.innerHTML = ‘’;
+return;
+}
+
+// We have real hourly data — build the proper 24-hour chart
+function fmtHourLabel(h) {
+if (h===0)  return ‘12a’;
+if (h<12)   return h+‘a’;
+if (h===12) return ‘12p’;
+return (h-12)+‘p’;
+}
+
+// For the selected type, get the right array
+function getHourVal(h) {
+if (selectedType === ‘res’) return resHourly ? resHourly[h]||0 : 0;
+if (selectedType === ‘ret’) return retHourly ? retHourly[h]||0 : 0;
+// net = ret - res
+const ret = retHourly ? retHourly[h]||0 : 0;
+const res = resHourly ? resHourly[h]||0 : 0;
+return ret - res;
+}
+
+const vals  = Array.from({length:24}, (_,h) => getHourVal(h));
+const maxV  = Math.max(…vals.map(Math.abs), 1);
+const isNet = selectedType === ‘net’;
+
+// Build chart — vertical bars for each hour
+// Group into AM (0-11) and PM (12-23) sections
+function buildHalfChart(start, end, label) {
+let out = `<div style="margin-bottom:14px"> <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700; letter-spacing:.08em;text-transform:uppercase;color:var(--txt3); margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--bdr)"> ${label} </div> <div style="display:flex;align-items:flex-end;gap:3px;height:100px">`;
+
+```
+for (let h = start; h <= end; h++) {
+  const v = vals[h];
+  if (v === 0 && !resHourly && !retHourly) continue;
+  const pct = Math.min(100, Math.abs(v)/maxV * 90);
+  const col = isNet
+    ? (v>0?'var(--green)':v<0?'var(--red)':'var(--bg3)')
+    : (selectedType==='res'?'var(--amber)':'var(--green)');
+  const isTop = pct > 60;
+
+  out += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:default"
+    title="${fmtHourLabel(h)}: ${v>0?'+':''}${v}">
+    <div style="font-family:var(--ff-mono);font-size:8px;font-weight:700;
+      color:${v!==0?col:'var(--txt3)'};min-height:12px;text-align:center">
+      ${v !== 0 ? (v>0?'+':'')+v : ''}
+    </div>
+    <div style="width:100%;border-radius:2px 2px 0 0;
+      background:${v!==0?col:'var(--bg3)'};
+      height:${pct}px;min-height:${v!==0?2:0}px;
+      transition:height .3s">
+    </div>
+    <div style="font-family:var(--ff-mono);font-size:8px;color:var(--txt3);
+      margin-top:3px;white-space:nowrap">${fmtHourLabel(h)}</div>
+  </div>`;
+}
+
+out += '</div></div>';
+return out;
+```
+
+}
+
+chartEl.innerHTML = buildHalfChart(0, 11, ‘🌙 Overnight + Morning  (12a – 11a)’)
++ buildHalfChart(12, 23, ‘☀ Afternoon + Evening  (12p – 11p)’);
+
+// Summary totals in tableEl
+const totalRes = resHourly ? resHourly.reduce((a,b)=>a+b,0) : 0;
+const totalRet = retHourly ? retHourly.reduce((a,b)=>a+b,0) : 0;
+const peakResHr = resHourly ? resHourly.indexOf(Math.max(…resHourly)) : -1;
+const peakRetHr = retHourly ? retHourly.indexOf(Math.max(…retHourly)) : -1;
+
+if (tableEl) {
+tableEl.innerHTML = ` <div style="display:flex;gap:16px;flex-wrap:wrap;padding:10px 14px; background:var(--bg3);border-radius:6px;font-size:12px;margin-top:4px"> <span><b style="color:var(--txt3)">Total Res</b> <span style="font-family:var(--ff-mono);color:var(--amber);margin-left:4px">${totalRes.toLocaleString()}</span></span> <span><b style="color:var(--txt3)">Total Ret</b> <span style="font-family:var(--ff-mono);color:var(--green);margin-left:4px">${totalRet.toLocaleString()}</span></span> <span><b style="color:var(--txt3)">Peak Res Hour</b> <span style="font-family:var(--ff-mono);color:var(--amber);margin-left:4px">${peakResHr>=0?hrLabel(peakResHr)+' ('+resHourly[peakResHr]+')':'—'}</span></span> <span><b style="color:var(--txt3)">Peak Ret Hour</b> <span style="font-family:var(--ff-mono);color:var(--green);margin-left:4px">${peakRetHr>=0?hrLabel(peakRetHr)+' ('+retHourly[peakRetHr]+')':'—'}</span></span> <span style="color:var(--txt3);font-size:10px;margin-left:auto;align-self:center">AM+PM combined</span> </div>`;
+}
+}
 
 function buildLoyaltyGuide() {
-  const el = document.getElementById('loyalty-content');
-  if (!el) return;
+const el = document.getElementById(‘loyalty-content’);
+if (!el) return;
 
-  const programs = [
-    {
-      name: 'National Emerald Club',
-      icon: '💚',
-      color: 'var(--green)',
-      bg: 'rgba(22,163,74,.06)',
-      border: 'rgba(22,163,74,.25)',
-      subtitle: 'National Car Rental — Enterprise Holdings loyalty',
-      cmhRules: [
-        '🔴 CMH does NOT execute 15-min Emerald Checkout hold — keys are in cars in the secured garage. Emerald members go directly to garage.',
-        '🔴 Emerald class restrictions routinely apply at CMH — typically Standard SUV or below due to tight inventory on larger vehicles.',
-        '🔴 Counter staff NEVER adjust Emerald reservations or class selections — members self-serve via garage.',
-        '✅ Emerald Booth is staffed separately — opening manager assigns Emerald Booth Manager each morning.',
-      ],
-      tiers: [
-        {name:'Emerald', desc:'Base tier. Skip-the-counter, go straight to garage. Pick from available cars in designated aisle.'},
-        {name:'Emerald Club Executive', desc:'Higher tier. Broader vehicle selection, bonus points, priority service.'},
-        {name:'Executive Elite', desc:'Top tier. Widest selection, top-tier vehicles, concierge-level service.'},
-      ],
-      keyPolicies: [
-        'Points: 1 point per rental day (members apply themselves via app/web — counter staff NEVER add points at CMH)',
-        'Class upgrades: Available if inventory allows — subject to CMH class restrictions',
-        'Free Day: Earned after threshold of points — redeemable on future rental',
-      ],
-    },
-    {
-      name: 'Enterprise Plus',
-      icon: '🔵',
-      color: 'var(--acc)',
-      bg: 'rgba(37,99,235,.06)',
-      border: 'rgba(37,99,235,.25)',
-      subtitle: 'Enterprise Rent-A-Car loyalty program',
-      cmhRules: [
-        '✅ Counter staff can look up Plus member accounts when assisting with reservations.',
-        '🔴 Points are applied by customers themselves (app / web / Enterprise customer service) — NOT by counter staff at CMH.',
-        '✅ Plus members may be eligible for complimentary upgrades when available — check inventory first.',
-      ],
-      tiers: [
-        {name:'Plus', desc:'Base tier. Points accumulate per rental. Basic benefits.'},
-        {name:'Plus Select', desc:'Mid tier. Faster points accrual, free rental day rewards.'},
-        {name:'Plus Elite', desc:'Top tier. Priority counter service, wider upgrade eligibility.'},
-      ],
-      keyPolicies: [
-        'Points: Awarded per qualifying rental dollar spent',
-        'Free Day reward: Earned at point thresholds',
-        'Upgrades: Complimentary when eligible inventory available',
-      ],
-    },
-    {
-      name: 'Alamo Insiders',
-      icon: '🟠',
-      color: 'var(--orange)',
-      bg: 'rgba(234,88,12,.06)',
-      border: 'rgba(234,88,12,.25)',
-      subtitle: 'Alamo Rent A Car loyalty — Enterprise Holdings',
-      cmhRules: [
-        '✅ Alamo Insiders members may appear in the system on shared Enterprise Holdings rentals.',
-        '🔴 CMH is an Enterprise/National airport location — Alamo-specific processes are minimal here.',
-        '✅ If an Alamo member has questions about their account, direct to Alamo customer service line.',
-      ],
-      tiers: [
-        {name:'Insider', desc:'Base tier. Skip the counter (kiosk or app). Basic rewards.'},
-        {name:'Insider Select', desc:'Mid tier. Broader vehicle selection, faster rewards.'},
-      ],
-      keyPolicies: [
-        'Points: Earned per rental day',
-        'Skip-the-counter: Available via kiosk or app',
-        'Cross-brand: Points/status does not automatically transfer to Enterprise or National',
-      ],
-    },
-  ];
+const programs = [
+{
+name: ‘National Emerald Club’,
+icon: ‘💚’,
+color: ‘var(–green)’,
+bg: ‘rgba(22,163,74,.06)’,
+border: ‘rgba(22,163,74,.25)’,
+subtitle: ‘National Car Rental — Enterprise Holdings loyalty’,
+cmhRules: [
+‘🔴 CMH does NOT execute 15-min Emerald Checkout hold — keys are in cars in the secured garage. Emerald members go directly to garage.’,
+‘🔴 Emerald class restrictions routinely apply at CMH — typically Standard SUV or below due to tight inventory on larger vehicles.’,
+‘🔴 Counter staff NEVER adjust Emerald reservations or class selections — members self-serve via garage.’,
+‘✅ Emerald Booth is staffed separately — opening manager assigns Emerald Booth Manager each morning.’,
+],
+tiers: [
+{name:‘Emerald’, desc:‘Base tier. Skip-the-counter, go straight to garage. Pick from available cars in designated aisle.’},
+{name:‘Emerald Club Executive’, desc:‘Higher tier. Broader vehicle selection, bonus points, priority service.’},
+{name:‘Executive Elite’, desc:‘Top tier. Widest selection, top-tier vehicles, concierge-level service.’},
+],
+keyPolicies: [
+‘Points: 1 point per rental day (members apply themselves via app/web — counter staff NEVER add points at CMH)’,
+‘Class upgrades: Available if inventory allows — subject to CMH class restrictions’,
+‘Free Day: Earned after threshold of points — redeemable on future rental’,
+],
+},
+{
+name: ‘Enterprise Plus’,
+icon: ‘🔵’,
+color: ‘var(–acc)’,
+bg: ‘rgba(37,99,235,.06)’,
+border: ‘rgba(37,99,235,.25)’,
+subtitle: ‘Enterprise Rent-A-Car loyalty program’,
+cmhRules: [
+‘✅ Counter staff can look up Plus member accounts when assisting with reservations.’,
+‘🔴 Points are applied by customers themselves (app / web / Enterprise customer service) — NOT by counter staff at CMH.’,
+‘✅ Plus members may be eligible for complimentary upgrades when available — check inventory first.’,
+],
+tiers: [
+{name:‘Plus’, desc:‘Base tier. Points accumulate per rental. Basic benefits.’},
+{name:‘Plus Select’, desc:‘Mid tier. Faster points accrual, free rental day rewards.’},
+{name:‘Plus Elite’, desc:‘Top tier. Priority counter service, wider upgrade eligibility.’},
+],
+keyPolicies: [
+‘Points: Awarded per qualifying rental dollar spent’,
+‘Free Day reward: Earned at point thresholds’,
+‘Upgrades: Complimentary when eligible inventory available’,
+],
+},
+{
+name: ‘Alamo Insiders’,
+icon: ‘🟠’,
+color: ‘var(–orange)’,
+bg: ‘rgba(234,88,12,.06)’,
+border: ‘rgba(234,88,12,.25)’,
+subtitle: ‘Alamo Rent A Car loyalty — Enterprise Holdings’,
+cmhRules: [
+‘✅ Alamo Insiders members may appear in the system on shared Enterprise Holdings rentals.’,
+‘🔴 CMH is an Enterprise/National airport location — Alamo-specific processes are minimal here.’,
+‘✅ If an Alamo member has questions about their account, direct to Alamo customer service line.’,
+],
+tiers: [
+{name:‘Insider’, desc:‘Base tier. Skip the counter (kiosk or app). Basic rewards.’},
+{name:‘Insider Select’, desc:‘Mid tier. Broader vehicle selection, faster rewards.’},
+],
+keyPolicies: [
+‘Points: Earned per rental day’,
+‘Skip-the-counter: Available via kiosk or app’,
+‘Cross-brand: Points/status does not automatically transfer to Enterprise or National’,
+],
+},
+];
 
-  el.innerHTML = programs.map(prog => `
-    <div style="background:${prog.bg};border:1px solid ${prog.border};border-radius:8px;
-      padding:16px;margin-bottom:14px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-        <span style="font-size:22px">${prog.icon}</span>
-        <div>
-          <div style="font-family:var(--ff-hd);font-size:16px;font-weight:700;color:${prog.color}">${prog.name}</div>
-          <div style="font-size:11px;color:var(--txt3)">${prog.subtitle}</div>
-        </div>
-      </div>
+el.innerHTML = programs.map(prog => `
+<div style="background:${prog.bg};border:1px solid ${prog.border};border-radius:8px;
+padding:16px;margin-bottom:14px">
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+<span style="font-size:22px">${prog.icon}</span>
+<div>
+<div style="font-family:var(--ff-hd);font-size:16px;font-weight:700;color:${prog.color}">${prog.name}</div>
+<div style="font-size:11px;color:var(--txt3)">${prog.subtitle}</div>
+</div>
+</div>
 
-      <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;letter-spacing:.08em;
-        color:${prog.color};text-transform:uppercase;margin-bottom:6px">🏢 CMH-Specific Rules</div>
-      ${prog.cmhRules.map(r => `<div style="font-size:12px;padding:5px 0;border-bottom:1px solid ${prog.border};color:var(--txt2)">${r}</div>`).join('')}
+```
+  <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;letter-spacing:.08em;
+    color:${prog.color};text-transform:uppercase;margin-bottom:6px">🏢 CMH-Specific Rules</div>
+  ${prog.cmhRules.map(r => `<div style="font-size:12px;padding:5px 0;border-bottom:1px solid ${prog.border};color:var(--txt2)">${r}</div>`).join('')}
 
-      <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;letter-spacing:.08em;
-        color:var(--txt3);text-transform:uppercase;margin:10px 0 6px">Tiers</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;margin-bottom:10px">
-        ${prog.tiers.map(t => `<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:5px;padding:8px 10px">
-          <div style="font-weight:700;font-size:12px;color:${prog.color};margin-bottom:3px">${t.name}</div>
-          <div style="font-size:11px;color:var(--txt3);line-height:1.4">${t.desc}</div>
-        </div>`).join('')}
-      </div>
+  <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;letter-spacing:.08em;
+    color:var(--txt3);text-transform:uppercase;margin:10px 0 6px">Tiers</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:6px;margin-bottom:10px">
+    ${prog.tiers.map(t => `<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:5px;padding:8px 10px">
+      <div style="font-weight:700;font-size:12px;color:${prog.color};margin-bottom:3px">${t.name}</div>
+      <div style="font-size:11px;color:var(--txt3);line-height:1.4">${t.desc}</div>
+    </div>`).join('')}
+  </div>
 
-      <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;letter-spacing:.08em;
-        color:var(--txt3);text-transform:uppercase;margin-bottom:6px">Key Policies</div>
-      ${prog.keyPolicies.map(p => `<div style="font-size:11px;color:var(--txt2);padding:3px 0;
-        border-bottom:1px solid ${prog.border}">• ${p}</div>`).join('')}
-    </div>
-  `).join('');
+  <div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;letter-spacing:.08em;
+    color:var(--txt3);text-transform:uppercase;margin-bottom:6px">Key Policies</div>
+  ${prog.keyPolicies.map(p => `<div style="font-size:11px;color:var(--txt2);padding:3px 0;
+    border-bottom:1px solid ${prog.border}">• ${p}</div>`).join('')}
+</div>
+```
+
+`).join(’’);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -6997,78 +6993,68 @@ function buildLoyaltyGuide() {
 // ═══════════════════════════════════════════════════════════════════════
 
 function getExitFairnessData() {
-  // Load from week storage
-  const weekKey = 'cmh-exit-fairness-' + getWeekKey();
-  try {
-    const raw = localStorage.getItem(weekKey);
-    return raw ? JSON.parse(raw) : {};
-  } catch(e) { return {}; }
+// Load from week storage
+const weekKey = ‘cmh-exit-fairness-’ + getWeekKey();
+try {
+const raw = localStorage.getItem(weekKey);
+return raw ? JSON.parse(raw) : {};
+} catch(e) { return {}; }
 }
 
 function getWeekKey() {
-  const d = new Date();
-  const day = d.getDay();
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  return monday.toISOString().slice(0,10);
+const d = new Date();
+const day = d.getDay();
+const monday = new Date(d);
+monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+return monday.toISOString().slice(0,10);
 }
 
 function recordExitTime(personId, hours) {
-  const weekKey = 'cmh-exit-fairness-' + getWeekKey();
-  const data = getExitFairnessData();
-  data[personId] = (data[personId] || 0) + hours;
-  try { localStorage.setItem(weekKey, JSON.stringify(data)); } catch(e) {}
+const weekKey = ‘cmh-exit-fairness-’ + getWeekKey();
+const data = getExitFairnessData();
+data[personId] = (data[personId] || 0) + hours;
+try { localStorage.setItem(weekKey, JSON.stringify(data)); } catch(e) {}
 }
 
 function buildExitFairnessPanel() {
-  // Called from schedule tab — shows weekly exit hours per CXR
-  const data = getExitFairnessData();
-  const workingCXR = ROSTER_CXR.filter(p => p.role === 'CXR' && STATE.staffDuty[p.name.replace(/\s/g,'_')] === true);
-  if (workingCXR.length === 0) return '';
+// Called from schedule tab — shows weekly exit hours per CXR
+const data = getExitFairnessData();
+const workingCXR = ROSTER_CXR.filter(p => p.role === ‘CXR’ && STATE.staffDuty[p.name.replace(/\s/g,’_’)] === true);
+if (workingCXR.length === 0) return ‘’;
 
-  // When today's rotation runs, auto-record exit hours from buildSmartRotation
-  const { rotations } = buildSmartRotation();
-  rotations.forEach(rot => {
-    const exitHours = rot.b1.station === 'exit' ? rot.b1.hours : rot.b2.hours;
-    recordExitTime(rot.pid, exitHours);
-  });
+// When today’s rotation runs, auto-record exit hours from buildSmartRotation
+const { rotations } = buildSmartRotation();
+rotations.forEach(rot => {
+const exitHours = rot.b1.station === ‘exit’ ? rot.b1.hours : rot.b2.hours;
+recordExitTime(rot.pid, exitHours);
+});
 
-  const allData = getExitFairnessData();
-  const allCXR = ROSTER_CXR.filter(p => p.role === 'CXR');
-  const maxHours = Math.max(...allCXR.map(p => allData[p.name.replace(/\s/g,'_')] || 0), 1);
+const allData = getExitFairnessData();
+const allCXR = ROSTER_CXR.filter(p => p.role === ‘CXR’);
+const maxHours = Math.max(…allCXR.map(p => allData[p.name.replace(/\s/g,’_’)] || 0), 1);
 
-  return `<div class="card" style="margin-top:10px">
-    <div class="ch">⚖️ Exit Fairness — This Week <span class="sub">Auto-tracked from rotation blocks</span></div>
-    <p style="font-size:11px;color:var(--txt3);margin-bottom:10px">
-      Goal is equal exit hours per CXR. Lower bar = less exit time this week = prioritize for exit next.
-    </p>
-    <div style="display:flex;flex-direction:column;gap:4px">
-      ${allCXR.sort((a,b) => (allData[a.name.replace(/\s/g,'_')]||0) - (allData[b.name.replace(/\s/g,'_')]||0)).map(p => {
-        const pid = p.name.replace(/\s/g,'_');
-        const hrs = allData[pid] || 0;
-        const pct = Math.min(100, hrs / maxHours * 100);
-        const isWorking = STATE.staffDuty[pid] === true;
-        return `<div style="display:flex;align-items:center;gap:8px;opacity:${isWorking?1:0.5}">
-          <div style="width:90px;font-size:11px;font-weight:${isWorking?'700':'400'};
-            color:${isWorking?'var(--txt)':'var(--txt3)'};text-align:right;flex-shrink:0">${p.nick}</div>
-          <div style="flex:1;height:14px;background:var(--bg3);border-radius:2px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:${hrs<4?'var(--green)':hrs<8?'var(--amber)':'var(--red)'};border-radius:2px"></div>
-          </div>
-          <div style="width:36px;font-family:var(--ff-mono);font-size:11px;color:var(--txt3);text-align:right">${hrs.toFixed(1)}h</div>
-        </div>`;
-      }).join('')}
-    </div>
-    <div style="margin-top:10px;display:flex;gap:8px">
-      <button class="btn btn-ghost btn-sm" onclick="resetExitFairness()">Reset Week</button>
-    </div>
+return `<div class="card" style="margin-top:10px"> <div class="ch">⚖️ Exit Fairness — This Week <span class="sub">Auto-tracked from rotation blocks</span></div> <p style="font-size:11px;color:var(--txt3);margin-bottom:10px"> Goal is equal exit hours per CXR. Lower bar = less exit time this week = prioritize for exit next. </p> <div style="display:flex;flex-direction:column;gap:4px"> ${allCXR.sort((a,b) => (allData[a.name.replace(/\s/g,'_')]||0) - (allData[b.name.replace(/\s/g,'_')]||0)).map(p => { const pid = p.name.replace(/\s/g,'_'); const hrs = allData[pid] || 0; const pct = Math.min(100, hrs / maxHours * 100); const isWorking = STATE.staffDuty[pid] === true; return `<div style="display:flex;align-items:center;gap:8px;opacity:${isWorking?1:0.5}">
+<div style="width:90px;font-size:11px;font-weight:${isWorking?'700':'400'};
+color:${isWorking?'var(--txt)':'var(--txt3)'};text-align:right;flex-shrink:0">${p.nick}</div>
+<div style="flex:1;height:14px;background:var(--bg3);border-radius:2px;overflow:hidden">
+<div style="height:100%;width:${pct}%;background:${hrs<4?'var(--green)':hrs<8?'var(--amber)':'var(--red)'};border-radius:2px"></div>
+</div>
+<div style="width:36px;font-family:var(--ff-mono);font-size:11px;color:var(--txt3);text-align:right">${hrs.toFixed(1)}h</div>
+</div>`;
+}).join(’’)}
+</div>
+<div style="margin-top:10px;display:flex;gap:8px">
+<button class="btn btn-ghost btn-sm" onclick="resetExitFairness()">Reset Week</button>
+</div>
+
   </div>`;
 }
 
 function resetExitFairness() {
-  const weekKey = 'cmh-exit-fairness-' + getWeekKey();
-  try { localStorage.removeItem(weekKey); } catch(e) {}
-  buildScheduleGrids();
-  toast('Exit fairness reset for this week');
+const weekKey = ‘cmh-exit-fairness-’ + getWeekKey();
+try { localStorage.removeItem(weekKey); } catch(e) {}
+buildScheduleGrids();
+toast(‘Exit fairness reset for this week’);
 }
 
 // ── Exit fairness panel is called from showSchedSection ───────────────────────
@@ -7077,141 +7063,139 @@ function injectExitFairnessPanel() { buildSwitchboard(); }
 function buildStaffGrid() { buildSwitchboard(); }
 
 function showRefSection(sec) {
-  ['codes','loyalty','hourly'].forEach(s => {
-    const el = document.getElementById('ref-sec-'+s);
-    if (el) el.style.display = s === sec ? '' : 'none';
-    const btn = document.getElementById('ref-'+s);
-    if (btn) btn.className = 'ss-tab' + (s===sec?' on':'');
-  });
-  if (sec === 'codes')   buildCodeCompendium();
-  if (sec === 'loyalty') buildLoyaltyGuide();
-  if (sec === 'hourly')  buildHourlyView();
+[‘codes’,‘loyalty’,‘hourly’].forEach(s => {
+const el = document.getElementById(‘ref-sec-’+s);
+if (el) el.style.display = s === sec ? ‘’ : ‘none’;
+const btn = document.getElementById(‘ref-’+s);
+if (btn) btn.className = ‘ss-tab’ + (s===sec?’ on’:’’);
+});
+if (sec === ‘codes’)   buildCodeCompendium();
+if (sec === ‘loyalty’) buildLoyaltyGuide();
+if (sec === ‘hourly’)  buildHourlyView();
 }
 
-var _currentEmailType = 'handoff';
+var _currentEmailType = ‘handoff’;
 var _currentEmailData = {};
 
 function showEmailType(type) {
-  _currentEmailType = type;
-  // Update tab button highlight
-  ['handoff','opening','closing','summary'].forEach(t => {
-    const btn = document.getElementById('et-'+t);
-    if (btn) {
-      btn.style.borderColor = t===type ? 'var(--acc)' : '';
-      btn.style.color = t===type ? 'var(--acc)' : '';
-    }
-  });
+_currentEmailType = type;
+// Update tab button highlight
+[‘handoff’,‘opening’,‘closing’,‘summary’].forEach(t => {
+const btn = document.getElementById(‘et-’+t);
+if (btn) {
+btn.style.borderColor = t===type ? ‘var(–acc)’ : ‘’;
+btn.style.color = t===type ? ‘var(–acc)’ : ‘’;
+}
+});
 
-  const out = document.getElementById('team-text-output');
-  const toLn = document.getElementById('email-to-line');
-  const mailBtn = document.getElementById('open-mail-btn');
+const out = document.getElementById(‘team-text-output’);
+const toLn = document.getElementById(‘email-to-line’);
+const mailBtn = document.getElementById(‘open-mail-btn’);
 
-  if (type === 'handoff') {
-    // Build handoff from buildEmailData so it uses the same data
-    const hData = buildEmailData('handoff');
-    if (out) out.textContent = hData.body;
-    if (toLn) toLn.textContent = 'Copy and paste into team group chat';
-    if (mailBtn) mailBtn.style.display = 'none';
-    _currentEmailData = hData;
-    return;
-  }
+if (type === ‘handoff’) {
+// Build handoff from buildEmailData so it uses the same data
+const hData = buildEmailData(‘handoff’);
+if (out) out.textContent = hData.body;
+if (toLn) toLn.textContent = ‘Copy and paste into team group chat’;
+if (mailBtn) mailBtn.style.display = ‘none’;
+_currentEmailData = hData;
+return;
+}
 
-  const data = buildEmailData(type);
-  _currentEmailData = data;
-  if (out) out.textContent = data.subject + '\n\n' + data.body;
-  if (toLn) toLn.textContent = 'To: ' + (data.to || '—');
-  if (mailBtn) mailBtn.style.display = 'inline-flex';
+const data = buildEmailData(type);
+_currentEmailData = data;
+if (out) out.textContent = data.subject + ‘\n\n’ + data.body;
+if (toLn) toLn.textContent = ’To: ’ + (data.to || ‘—’);
+if (mailBtn) mailBtn.style.display = ‘inline-flex’;
 }
 
 function openInMail() {
-  if (!_currentEmailData.subject) return;
-  const to  = encodeURIComponent(_currentEmailData.to || '');
-  const sub = encodeURIComponent(_currentEmailData.subject || '');
-  const body= encodeURIComponent(_currentEmailData.body || '');
-  window.open('mailto:'+to+'?subject='+sub+'&body='+body, '_blank');
-  saveDayToHistory();
-  toast('Email client opened ✓');
+if (!_currentEmailData.subject) return;
+const to  = encodeURIComponent(_currentEmailData.to || ‘’);
+const sub = encodeURIComponent(_currentEmailData.subject || ‘’);
+const body= encodeURIComponent(_currentEmailData.body || ‘’);
+window.open(‘mailto:’+to+’?subject=’+sub+’&body=’+body, ‘_blank’);
+saveDayToHistory();
+toast(‘Email client opened ✓’);
 }
 
 function copyTeamText() {
-  const el = document.getElementById('team-text-output');
-  if (!el) return;
-  const copy = () => { el.style.background='var(--green2)'; setTimeout(()=>el.style.background='',400); toast('Copied ✓'); };
-  if (navigator.clipboard) navigator.clipboard.writeText(el.textContent).then(copy).catch(()=>fallbackCopyStr(el.textContent,copy));
-  else fallbackCopyStr(el.textContent, copy);
+const el = document.getElementById(‘team-text-output’);
+if (!el) return;
+const copy = () => { el.style.background=‘var(–green2)’; setTimeout(()=>el.style.background=’’,400); toast(‘Copied ✓’); };
+if (navigator.clipboard) navigator.clipboard.writeText(el.textContent).then(copy).catch(()=>fallbackCopyStr(el.textContent,copy));
+else fallbackCopyStr(el.textContent, copy);
 }
 
 function fallbackCopyStr(text, cb) {
-  const ta = document.createElement('textarea');
-  ta.value = text; document.body.appendChild(ta); ta.select();
-  document.execCommand('copy'); document.body.removeChild(ta); if(cb) cb();
+const ta = document.createElement(‘textarea’);
+ta.value = text; document.body.appendChild(ta); ta.select();
+document.execCommand(‘copy’); document.body.removeChild(ta); if(cb) cb();
 }
 
 var _emailSettingsOpen = false;
 function toggleEmailSettings() {
-  _emailSettingsOpen = !_emailSettingsOpen;
-  const body = document.getElementById('email-settings-body');
-  const lbl  = document.getElementById('email-settings-toggle');
-  if (body) body.style.display = _emailSettingsOpen ? 'block' : 'none';
-  if (lbl)  lbl.textContent = _emailSettingsOpen ? '▲ Hide' : '▼ Show';
-  if (_emailSettingsOpen) {
-    // Restore saved email addresses
-    ['email-to-morning','email-to-evening','email-to-log'].forEach((id,i) => {
-      const el = document.getElementById(id);
-      const key = ['emailToMorning','emailToEvening','emailToLog'][i];
-      if (el && STATE.fields[key]) el.value = STATE.fields[key];
-    });
-  }
+_emailSettingsOpen = !_emailSettingsOpen;
+const body = document.getElementById(‘email-settings-body’);
+const lbl  = document.getElementById(‘email-settings-toggle’);
+if (body) body.style.display = _emailSettingsOpen ? ‘block’ : ‘none’;
+if (lbl)  lbl.textContent = _emailSettingsOpen ? ‘▲ Hide’ : ‘▼ Show’;
+if (_emailSettingsOpen) {
+// Restore saved email addresses
+[‘email-to-morning’,‘email-to-evening’,‘email-to-log’].forEach((id,i) => {
+const el = document.getElementById(id);
+const key = [‘emailToMorning’,‘emailToEvening’,‘emailToLog’][i];
+if (el && STATE.fields[key]) el.value = STATE.fields[key];
+});
+}
 }
 
 function sf(key, val) {
-  STATE.fields[key] = val;
-  saveState();
-  updateSummary();
-  updateBoardHeader();
+STATE.fields[key] = val;
+saveState();
+updateSummary();
+updateBoardHeader();
 }
 
 function focusField(id) {
-  showTab('opening');
-  setTimeout(() => {
-    const el = document.getElementById(id);
-    if (el) { el.focus(); el.select(); }
-  }, 50);
+showTab(‘opening’);
+setTimeout(() => {
+const el = document.getElementById(id);
+if (el) { el.focus(); el.select(); }
+}, 50);
 }
 
 function genTeamText() {
-  if (typeof generateTeamText === 'function') generateTeamText();
+if (typeof generateTeamText === ‘function’) generateTeamText();
 }
 
 function setWU(v) {
-  if (typeof setWalkUp === 'function') setWalkUp(v);
-  else { STATE.walkUpPolicy = v; saveState(); updateWUBtns(); buildBoardGrid(); }
+if (typeof setWalkUp === ‘function’) setWalkUp(v);
+else { STATE.walkUpPolicy = v; saveState(); updateWUBtns(); buildBoardGrid(); }
 }
 
 function calcBoard() {
-  buildBoardGrid();
-  if (typeof updateBoardTotals === 'function') updateBoardTotals();
-  updateBoardHeader();
+buildBoardGrid();
+if (typeof updateBoardTotals === ‘function’) updateBoardTotals();
+updateBoardHeader();
 }
 
 function clearPaste() { clearAllPaste(); }
 
-
 function updateWUBtns() {
-  if (typeof updateWalkUpButtons === 'function') updateWalkUpButtons();
-  // Update board-screen variants directly
-  const pol = STATE.walkUpPolicy || 'open';
-  const map = {'wu-open':'open','wu-core':'core','wu-noncore':'noncore','wu-closed':'closed',
-               'wu-open-b':'open','wu-core-b':'core','wu-noncore-b':'noncore','wu-closed-b':'closed'};
-  for (const [id,v] of Object.entries(map)) {
-    const el = document.getElementById(id);
-    if (!el) continue;
-    const active = pol === v;
-    const colorCls = v==='open'?'g':v==='closed'?'r':'a';
-    el.className = 'wubtn' + (active ? ' on ' + colorCls : '');
-  }
+if (typeof updateWalkUpButtons === ‘function’) updateWalkUpButtons();
+// Update board-screen variants directly
+const pol = STATE.walkUpPolicy || ‘open’;
+const map = {‘wu-open’:‘open’,‘wu-core’:‘core’,‘wu-noncore’:‘noncore’,‘wu-closed’:‘closed’,
+‘wu-open-b’:‘open’,‘wu-core-b’:‘core’,‘wu-noncore-b’:‘noncore’,‘wu-closed-b’:‘closed’};
+for (const [id,v] of Object.entries(map)) {
+const el = document.getElementById(id);
+if (!el) continue;
+const active = pol === v;
+const colorCls = v===‘open’?‘g’:v===‘closed’?‘r’:‘a’;
+el.className = ‘wubtn’ + (active ? ’ on ’ + colorCls : ‘’);
 }
-
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // PRE-LOADED MANAGEMENT SCHEDULE  (Apr 12 – Apr 30 2026)
@@ -7219,323 +7203,322 @@ function updateWUBtns() {
 // Read directly from spreadsheet 2026-04-26
 // ═══════════════════════════════════════════════════════════════════════
 var PRELOADED_MGMT_SCHEDULE = {
-  startDate: "2026-04-12",
-  endDate:   "2026-04-30",
-  people: {
-  "Vada_Griffith": {
-    "name": "Vada Griffith",
-    "nick": "Vada",
-    "role": "ARM"
-  },
-  "Ami_Lhom": {
-    "name": "Ami Lhom",
-    "nick": "Ami",
-    "role": "BRM"
-  },
-  "Matt_Johnson__BRM_": {
-    "name": "Matt Johnson (BRM)",
-    "nick": "Matt B",
-    "role": "BRM"
-  },
-  "Ty_Lumpkin": {
-    "name": "Ty Lumpkin",
-    "nick": "Ty",
-    "role": "ABRM"
-  },
-  "Carlos_Aviles": {
-    "name": "Carlos Aviles",
-    "nick": "Carlos",
-    "role": "ABRM"
-  },
-  "Caitlin_Kelsey": {
-    "name": "Caitlin Kelsey",
-    "nick": "Caitlin",
-    "role": "ABRM"
-  },
-  "Khala_Shackleford": {
-    "name": "Khala Shackleford",
-    "nick": "Khala",
-    "role": "ABRM"
-  },
-  "Madelyne__Maddy__Shirer": {
-    "name": "Madelyne (Maddy) Shirer",
-    "nick": "Maddy",
-    "role": "ABRM"
-  },
-  "Joshua__Josh__Osei": {
-    "name": "Joshua (Josh) Osei",
-    "nick": "Josh",
-    "role": "MT"
-  },
-  "Brittney_Francis": {
-    "name": "Brittney Francis",
-    "nick": "Brittney",
-    "role": "MT"
-  },
-  "Lauren_Kretschman": {
-    "name": "Lauren Kretschman",
-    "nick": "Lauren",
-    "role": "MT"
-  }
+startDate: “2026-04-12”,
+endDate:   “2026-04-30”,
+people: {
+“Vada_Griffith”: {
+“name”: “Vada Griffith”,
+“nick”: “Vada”,
+“role”: “ARM”
 },
-  grid: {
-  "2026-04-12": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson__BRM_": "OFF",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "12P-10P",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "OFF",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-13": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson__BRM_": "530A-330P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "12P-10P",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "9A-7P",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-14": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "4P-C",
-    "Matt_Johnson__BRM_": "530A-330P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "12P-10P",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-15": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "4P-C",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-16": {
-    "Vada_Griffith": "6A-1P",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "10A-8P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-17": {
-    "Vada_Griffith": "VACA",
-    "Ami_Lhom": "8A-6P",
-    "Matt_Johnson__BRM_": "4A-2P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "12P-10P",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "VACA",
-    "Brittney_Francis": "99 TRAINING",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-18": {
-    "Vada_Griffith": "VACA",
-    "Ami_Lhom": "530A-330P",
-    "Matt_Johnson__BRM_": "VACA",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "9A-7P",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "OFF",
-    "Joshua__Josh__Osei": "VACA",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-19": {
-    "Vada_Griffith": "VACA",
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson__BRM_": "VACA",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "OFF",
-    "Joshua__Josh__Osei": "VACA",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-20": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson__BRM_": "VACA",
-    "Ty_Lumpkin": "12P-10P",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "10A-8P",
-    "Lauren_Kretschman": "12P-10P"
-  },
-  "2026-04-21": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "4P-C",
-    "Matt_Johnson__BRM_": "8A-6P",
-    "Ty_Lumpkin": "12P-10P",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "VACA",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "10A-8P",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-22": {
-    "Vada_Griffith": "STRONGER TOGETHER",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "4P-C",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "530A-330P",
-    "Caitlin_Kelsey": "STRONGER TOGETHER",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "OFF",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-23": {
-    "Vada_Griffith": "6A-4P?",
-    "Ami_Lhom": "6A-4P",
-    "Matt_Johnson__BRM_": "OFF",
-    "Ty_Lumpkin": "12P-10P",
-    "Carlos_Aviles": "530A-330P",
-    "Caitlin_Kelsey": "OFF",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "OFF",
-    "Brittney_Francis": "4P-C",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-24": {
-    "Vada_Griffith": "6A-4P?",
-    "Ami_Lhom": "6A-4P",
-    "Matt_Johnson__BRM_": "4A-2P",
-    "Ty_Lumpkin": "VACA",
-    "Carlos_Aviles": "VACA",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "4P-C",
-    "Lauren_Kretschman": "99 TRAINING"
-  },
-  "2026-04-25": {
-    "Vada_Griffith": "530A-330P",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "530A-330P",
-    "Ty_Lumpkin": "VACA",
-    "Carlos_Aviles": "VACA",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "9A-7P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-26": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "9A-7P",
-    "Ty_Lumpkin": "VACA",
-    "Carlos_Aviles": "VACA",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "10A-8P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-27": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "8A-6P",
-    "Matt_Johnson__BRM_": "9A-7P",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "10A-8P",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "VACA",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-28": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "530A-330P",
-    "Matt_Johnson__BRM_": "4P-C",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "10A-8P",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "OFF",
-    "Joshua__Josh__Osei": "OFF",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-29": {
-    "Vada_Griffith": "TOP20",
-    "Ami_Lhom": "4P-C",
-    "Matt_Johnson__BRM_": "OFF",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "OFF",
-    "Khala_Shackleford": "530A-330P",
-    "Madelyne__Maddy__Shirer": "12P-10P",
-    "Joshua__Josh__Osei": "OFF",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-30": {
-    "Vada_Griffith": "ARMS",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "8A-6P",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Madelyne__Maddy__Shirer": "12P-10P",
-    "Joshua__Josh__Osei": "4P-C",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "10A-8P"
-  }
+“Ami_Lhom”: {
+“name”: “Ami Lhom”,
+“nick”: “Ami”,
+“role”: “BRM”
+},
+“Matt_Johnson__BRM_”: {
+“name”: “Matt Johnson (BRM)”,
+“nick”: “Matt B”,
+“role”: “BRM”
+},
+“Ty_Lumpkin”: {
+“name”: “Ty Lumpkin”,
+“nick”: “Ty”,
+“role”: “ABRM”
+},
+“Carlos_Aviles”: {
+“name”: “Carlos Aviles”,
+“nick”: “Carlos”,
+“role”: “ABRM”
+},
+“Caitlin_Kelsey”: {
+“name”: “Caitlin Kelsey”,
+“nick”: “Caitlin”,
+“role”: “ABRM”
+},
+“Khala_Shackleford”: {
+“name”: “Khala Shackleford”,
+“nick”: “Khala”,
+“role”: “ABRM”
+},
+“Madelyne__Maddy__Shirer”: {
+“name”: “Madelyne (Maddy) Shirer”,
+“nick”: “Maddy”,
+“role”: “ABRM”
+},
+“Joshua__Josh__Osei”: {
+“name”: “Joshua (Josh) Osei”,
+“nick”: “Josh”,
+“role”: “MT”
+},
+“Brittney_Francis”: {
+“name”: “Brittney Francis”,
+“nick”: “Brittney”,
+“role”: “MT”
+},
+“Lauren_Kretschman”: {
+“name”: “Lauren Kretschman”,
+“nick”: “Lauren”,
+“role”: “MT”
+}
+},
+grid: {
+“2026-04-12”: {
+“Vada_Griffith”: “OFF”,
+“Ami_Lhom”: “9A-7P”,
+“Matt_Johnson__BRM_”: “OFF”,
+“Ty_Lumpkin”: “4P-C”,
+“Carlos_Aviles”: “OFF”,
+“Caitlin_Kelsey”: “VACA”,
+“Khala_Shackleford”: “12P-10P”,
+“Madelyne__Maddy__Shirer”: “530A-330P”,
+“Joshua__Josh__Osei”: “OFF”,
+“Brittney_Francis”: “OFF”,
+“Lauren_Kretschman”: “4P-C”
+},
+“2026-04-13”: {
+“Vada_Griffith”: “OFF”,
+“Ami_Lhom”: “9A-7P”,
+“Matt_Johnson__BRM_”: “530A-330P”,
+“Ty_Lumpkin”: “4P-C”,
+“Carlos_Aviles”: “12P-10P”,
+“Caitlin_Kelsey”: “VACA”,
+“Khala_Shackleford”: “10A-8P”,
+“Madelyne__Maddy__Shirer”: “9A-7P”,
+“Joshua__Josh__Osei”: “12P-10P”,
+“Brittney_Francis”: “6A-4P”,
+“Lauren_Kretschman”: “4P-C”
+},
+“2026-04-14”: {
+“Vada_Griffith”: “OFF”,
+“Ami_Lhom”: “4P-C”,
+“Matt_Johnson__BRM_”: “530A-330P”,
+“Ty_Lumpkin”: “4P-C”,
+“Carlos_Aviles”: “12P-10P”,
+“Caitlin_Kelsey”: “VACA”,
+“Khala_Shackleford”: “OFF”,
+“Madelyne__Maddy__Shirer”: “530A-330P”,
+“Joshua__Josh__Osei”: “12P-10P”,
+“Brittney_Francis”: “6A-4P”,
+“Lauren_Kretschman”: “OFF”
+},
+“2026-04-15”: {
+“Vada_Griffith”: “OFF”,
+“Ami_Lhom”: “OFF”,
+“Matt_Johnson__BRM_”: “4P-C”,
+“Ty_Lumpkin”: “OFF”,
+“Carlos_Aviles”: “4P-C”,
+“Caitlin_Kelsey”: “VACA”,
+“Khala_Shackleford”: “10A-8P”,
+“Madelyne__Maddy__Shirer”: “530A-330P”,
+“Joshua__Josh__Osei”: “12P-10P”,
+“Brittney_Francis”: “6A-4P”,
+“Lauren_Kretschman”: “OFF”
+},
+“2026-04-16”: {
+“Vada_Griffith”: “6A-1P”,
+“Ami_Lhom”: “OFF”,
+“Matt_Johnson__BRM_”: “10A-8P”,
+“Ty_Lumpkin”: “4P-C”,
+“Carlos_Aviles”: “OFF”,
+“Caitlin_Kelsey”: “VACA”,
+“Khala_Shackleford”: “10A-8P”,
+“Madelyne__Maddy__Shirer”: “530A-330P”,
+“Joshua__Josh__Osei”: “12P-10P”,
+“Brittney_Francis”: “OFF”,
+“Lauren_Kretschman”: “4P-C”
+},
+“2026-04-17”: {
+“Vada_Griffith”: “VACA”,
+“Ami_Lhom”: “8A-6P”,
+“Matt_Johnson__BRM_”: “4A-2P”,
+“Ty_Lumpkin”: “4P-C”,
+“Carlos_Aviles”: “12P-10P”,
+“Caitlin_Kelsey”: “VACA”,
+“Khala_Shackleford”: “10A-8P”,
+“Madelyne__Maddy__Shirer”: “530A-330P”,
+“Joshua__Josh__Osei”: “VACA”,
+“Brittney_Francis”: “99 TRAINING”,
+“Lauren_Kretschman”: “4P-C”
+},
+“2026-04-18”: {
+“Vada_Griffith”: “VACA”,
+“Ami_Lhom”: “530A-330P”,
+“Matt_Johnson__BRM_”: “VACA”,
+“Ty_Lumpkin”: “OFF”,
+“Carlos_Aviles”: “4P-C”,
+“Caitlin_Kelsey”: “9A-7P”,
+“Khala_Shackleford”: “OFF”,
+“Madelyne__Maddy__Shirer”: “OFF”,
+“Joshua__Josh__Osei”: “VACA”,
+“Brittney_Francis”: “6A-4P”,
+“Lauren_Kretschman”: “4P-C”
+},
+“2026-04-19”: {
+“Vada_Griffith”: “VACA”,
+“Ami_Lhom”: “9A-7P”,
+“Matt_Johnson__BRM_”: “VACA”,
+“Ty_Lumpkin”: “OFF”,
+“Carlos_Aviles”: “4P-C”,
+“Caitlin_Kelsey”: “530A-330P”,
+“Khala_Shackleford”: “OFF”,
+“Madelyne__Maddy__Shirer”: “OFF”,
+“Joshua__Josh__Osei”: “VACA”,
+“Brittney_Francis”: “6A-4P”,
+“Lauren_Kretschman”: “4P-C”
+},
+“2026-04-20”: {
+“Vada_Griffith”: “OFF”,
+“Ami_Lhom”: “9A-7P”,
+“Matt_Johnson__BRM_”: “VACA”,
+“Ty_Lumpkin”: “12P-10P”,
+“Carlos_Aviles”: “4P-C”,
+“Caitlin_Kelsey”: “530A-330P”,
+“Khala_Shackleford”: “10A-8P”,
+“Madelyne__Maddy__Shirer”: “4P-C”,
+“Joshua__Josh__Osei”: “6A-4P”,
+“Brittney_Francis”: “10A-8P”,
+“Lauren_Kretschman”: “12P-10P”
+},
+“2026-04-21”: {
+“Vada_Griffith”: “OFF”,
+“Ami_Lhom”: “4P-C”,
+“Matt_Johnson__BRM_”: “8A-6P”,
+“Ty_Lumpkin”: “12P-10P”,
+“Carlos_Aviles”: “OFF”,
+“Caitlin_Kelsey”: “530A-330P”,
+“Khala_Shackleford”: “VACA”,
+“Madelyne__Maddy__Shirer”: “4P-C”,
+“Joshua__Josh__Osei”: “6A-4P”,
+“Brittney_Francis”: “10A-8P”,
+“Lauren_Kretschman”: “OFF”
+},
+“2026-04-22”: {
+“Vada_Griffith”: “STRONGER TOGETHER”,
+“Ami_Lhom”: “OFF”,
+“Matt_Johnson__BRM_”: “4P-C”,
+“Ty_Lumpkin”: “4P-C”,
+“Carlos_Aviles”: “530A-330P”,
+“Caitlin_Kelsey”: “STRONGER TOGETHER”,
+“Khala_Shackleford”: “10A-8P”,
+“Madelyne__Maddy__Shirer”: “OFF”,
+“Joshua__Josh__Osei”: “6A-4P”,
+“Brittney_Francis”: “OFF”,
+“Lauren_Kretschman”: “10A-8P”
+},
+“2026-04-23”: {
+“Vada_Griffith”: “6A-4P?”,
+“Ami_Lhom”: “6A-4P”,
+“Matt_Johnson__BRM_”: “OFF”,
+“Ty_Lumpkin”: “12P-10P”,
+“Carlos_Aviles”: “530A-330P”,
+“Caitlin_Kelsey”: “OFF”,
+“Khala_Shackleford”: “OFF”,
+“Madelyne__Maddy__Shirer”: “4P-C”,
+“Joshua__Josh__Osei”: “OFF”,
+“Brittney_Francis”: “4P-C”,
+“Lauren_Kretschman”: “10A-8P”
+},
+“2026-04-24”: {
+“Vada_Griffith”: “6A-4P?”,
+“Ami_Lhom”: “6A-4P”,
+“Matt_Johnson__BRM_”: “4A-2P”,
+“Ty_Lumpkin”: “VACA”,
+“Carlos_Aviles”: “VACA”,
+“Caitlin_Kelsey”: “530A-330P”,
+“Khala_Shackleford”: “10A-8P”,
+“Madelyne__Maddy__Shirer”: “4P-C”,
+“Joshua__Josh__Osei”: “6A-4P”,
+“Brittney_Francis”: “4P-C”,
+“Lauren_Kretschman”: “99 TRAINING”
+},
+“2026-04-25”: {
+“Vada_Griffith”: “530A-330P”,
+“Ami_Lhom”: “OFF”,
+“Matt_Johnson__BRM_”: “530A-330P”,
+“Ty_Lumpkin”: “VACA”,
+“Carlos_Aviles”: “VACA”,
+“Caitlin_Kelsey”: “4P-C”,
+“Khala_Shackleford”: “9A-7P”,
+“Madelyne__Maddy__Shirer”: “4P-C”,
+“Joshua__Josh__Osei”: “6A-4P”,
+“Brittney_Francis”: “OFF”,
+“Lauren_Kretschman”: “OFF”
+},
+“2026-04-26”: {
+“Vada_Griffith”: “OFF”,
+“Ami_Lhom”: “OFF”,
+“Matt_Johnson__BRM_”: “9A-7P”,
+“Ty_Lumpkin”: “VACA”,
+“Carlos_Aviles”: “VACA”,
+“Caitlin_Kelsey”: “4P-C”,
+“Khala_Shackleford”: “530A-330P”,
+“Madelyne__Maddy__Shirer”: “4P-C”,
+“Joshua__Josh__Osei”: “10A-8P”,
+“Brittney_Francis”: “OFF”,
+“Lauren_Kretschman”: “OFF”
+},
+“2026-04-27”: {
+“Vada_Griffith”: “OFF”,
+“Ami_Lhom”: “8A-6P”,
+“Matt_Johnson__BRM_”: “9A-7P”,
+“Ty_Lumpkin”: “6A-4P”,
+“Carlos_Aviles”: “10A-8P”,
+“Caitlin_Kelsey”: “4P-C”,
+“Khala_Shackleford”: “530A-330P”,
+“Madelyne__Maddy__Shirer”: “4P-C”,
+“Joshua__Josh__Osei”: “12P-10P”,
+“Brittney_Francis”: “VACA”,
+“Lauren_Kretschman”: “10A-8P”
+},
+“2026-04-28”: {
+“Vada_Griffith”: “OFF”,
+“Ami_Lhom”: “530A-330P”,
+“Matt_Johnson__BRM_”: “4P-C”,
+“Ty_Lumpkin”: “6A-4P”,
+“Carlos_Aviles”: “10A-8P”,
+“Caitlin_Kelsey”: “4P-C”,
+“Khala_Shackleford”: “OFF”,
+“Madelyne__Maddy__Shirer”: “OFF”,
+“Joshua__Josh__Osei”: “OFF”,
+“Brittney_Francis”: “6A-4P”,
+“Lauren_Kretschman”: “10A-8P”
+},
+“2026-04-29”: {
+“Vada_Griffith”: “TOP20”,
+“Ami_Lhom”: “4P-C”,
+“Matt_Johnson__BRM_”: “OFF”,
+“Ty_Lumpkin”: “6A-4P”,
+“Carlos_Aviles”: “4P-C”,
+“Caitlin_Kelsey”: “OFF”,
+“Khala_Shackleford”: “530A-330P”,
+“Madelyne__Maddy__Shirer”: “12P-10P”,
+“Joshua__Josh__Osei”: “OFF”,
+“Brittney_Francis”: “OFF”,
+“Lauren_Kretschman”: “10A-8P”
+},
+“2026-04-30”: {
+“Vada_Griffith”: “ARMS”,
+“Ami_Lhom”: “OFF”,
+“Matt_Johnson__BRM_”: “8A-6P”,
+“Ty_Lumpkin”: “OFF”,
+“Carlos_Aviles”: “OFF”,
+“Caitlin_Kelsey”: “4P-C”,
+“Khala_Shackleford”: “530A-330P”,
+“Madelyne__Maddy__Shirer”: “12P-10P”,
+“Joshua__Josh__Osei”: “4P-C”,
+“Brittney_Francis”: “6A-4P”,
+“Lauren_Kretschman”: “10A-8P”
+}
 }
 };
 
 function initPreloadedSchedule() {
-  const existing = getStoredSection('mgmt');
-  if (existing && Object.keys(existing.grid || {}).length > 0) return;
-  putStoredSection('mgmt', PRELOADED_MGMT_SCHEDULE);
-  console.log('Pre-loaded management schedule seeded: Apr 12–Apr 30 2026');
+const existing = getStoredSection(‘mgmt’);
+if (existing && Object.keys(existing.grid || {}).length > 0) return;
+putStoredSection(‘mgmt’, PRELOADED_MGMT_SCHEDULE);
+console.log(‘Pre-loaded management schedule seeded: Apr 12–Apr 30 2026’);
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // IMPROVEMENT 1: Auto-parse on paste
@@ -7545,107 +7528,68 @@ function initPreloadedSchedule() {
 var _autoParsers = {};
 
 function autoParseOnPaste(n, el) {
-  const text = el.value.trim();
-  if (text.length < 10) return;
-  clearTimeout(_autoParsers[n]);
-  _autoParsers[n] = setTimeout(() => {
-    // Detect car codes in first column of each line
-    const lines = text.split(/[\n\r]+/).filter(l => l.trim());
-    const hasCode = lines.some(l => {
-      const first = l.trim().split(/\s+/)[0].toUpperCase();
-      return CODE_MAP && CODE_MAP[first];
-    });
-    if (hasCode && lines.length > 2) {
-      parseStep(n);
-    }
-  }, 400);
+const text = el.value.trim();
+if (text.length < 10) return;
+clearTimeout(_autoParsers[n]);
+_autoParsers[n] = setTimeout(() => {
+// Detect car codes in first column of each line
+const lines = text.split(/[\n\r]+/).filter(l => l.trim());
+const hasCode = lines.some(l => {
+const first = l.trim().split(/\s+/)[0].toUpperCase();
+return CODE_MAP && CODE_MAP[first];
+});
+if (hasCode && lines.length > 2) {
+parseStep(n);
+}
+}, 400);
 }
 
-
 function tileClick(name) {
-  const data = getGroupNetData();
-  const d = data[name];
-  const thresh = THRESHOLDS[name] || [3,2];
-  const isCore = CORE_GROUPS.has(name);
-  const override = STATE.groupOverrides && STATE.groupOverrides[name];
-  const pol = STATE.walkUpPolicy || 'open';
+const data = getGroupNetData();
+const d = data[name];
+const thresh = THRESHOLDS[name] || [3,2];
+const isCore = CORE_GROUPS.has(name);
+const override = STATE.groupOverrides && STATE.groupOverrides[name];
+const pol = STATE.walkUpPolicy || ‘open’;
 
-  // Status explanation
-  let statusReason = '';
-  let statusLabel = '';
-  if (override === 'close') {
-    statusLabel = '🔴 Forced Closed (manual override)';
-    statusReason = 'Manager override applied. Tap ⚙ on the tile to remove.';
-  } else if (override === 'open') {
-    statusLabel = '✅ Forced Open (manual override)';
-    statusReason = 'Manager override applied. Tap ⚙ on the tile to remove.';
-  } else if (pol === 'closed') {
-    statusLabel = '🔴 Not Available (master policy = Closed)';
-    statusReason = 'Master walk-up policy is set to Closed. Change in Dashboard or at top of board.';
-  } else if (pol === 'core' && !isCore) {
-    statusLabel = '🔴 Not Available (Core Only policy)';
-    statusReason = 'Master policy is set to Core Cars Only. This is a non-core group.';
-  } else if (pol === 'noncore' && isCore) {
-    statusLabel = '🔴 Not Available (Non-Core policy)';
-    statusReason = 'Master policy is set to Non-Core Only. This is a core group.';
-  } else if (!d || !d.has) {
-    statusLabel = '⬜ No Data';
-    statusReason = 'Paste Game Plan data first (Paste Data tab).';
-  } else {
-    const net = d.net;
-    if (net >= thresh[0]) {
-      statusLabel = '✅ Walk-Up + Upgrade Open';
-      statusReason = `Net ${net>0?'+':''}${net} meets walk-up threshold (≥${thresh[0]}).`;
-    } else if (net >= thresh[1]) {
-      statusLabel = '⬆ Upgrade Only';
-      statusReason = `Net ${net>0?'+':''}${net} meets upgrade threshold (≥${thresh[1]}) but below walk-up (≥${thresh[0]}).`;
-    } else {
-      statusLabel = '🔴 Not Available';
-      statusReason = `Net ${net>0?'+':''}${net} is below upgrade threshold (need ≥${thresh[1]}).`;
-    }
-  }
+// Status explanation
+let statusReason = ‘’;
+let statusLabel = ‘’;
+if (override === ‘close’) {
+statusLabel = ‘🔴 Forced Closed (manual override)’;
+statusReason = ‘Manager override applied. Tap ⚙ on the tile to remove.’;
+} else if (override === ‘open’) {
+statusLabel = ‘✅ Forced Open (manual override)’;
+statusReason = ‘Manager override applied. Tap ⚙ on the tile to remove.’;
+} else if (pol === ‘closed’) {
+statusLabel = ‘🔴 Not Available (master policy = Closed)’;
+statusReason = ‘Master walk-up policy is set to Closed. Change in Dashboard or at top of board.’;
+} else if (pol === ‘core’ && !isCore) {
+statusLabel = ‘🔴 Not Available (Core Only policy)’;
+statusReason = ‘Master policy is set to Core Cars Only. This is a non-core group.’;
+} else if (pol === ‘noncore’ && isCore) {
+statusLabel = ‘🔴 Not Available (Non-Core policy)’;
+statusReason = ‘Master policy is set to Non-Core Only. This is a core group.’;
+} else if (!d || !d.has) {
+statusLabel = ‘⬜ No Data’;
+statusReason = ‘Paste Game Plan data first (Paste Data tab).’;
+} else {
+const net = d.net;
+if (net >= thresh[0]) {
+statusLabel = ‘✅ Walk-Up + Upgrade Open’;
+statusReason = `Net ${net>0?'+':''}${net} meets walk-up threshold (≥${thresh[0]}).`;
+} else if (net >= thresh[1]) {
+statusLabel = ‘⬆ Upgrade Only’;
+statusReason = `Net ${net>0?'+':''}${net} meets upgrade threshold (≥${thresh[1]}) but below walk-up (≥${thresh[0]}).`;
+} else {
+statusLabel = ‘🔴 Not Available’;
+statusReason = `Net ${net>0?'+':''}${net} is below upgrade threshold (need ≥${thresh[1]}).`;
+}
+}
 
-  let body = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
-      <div style="background:var(--bg3);border-radius:5px;padding:10px;text-align:center">
-        <div style="font-size:10px;color:var(--txt3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Reservations</div>
-        <div style="font-family:var(--ff-mono);font-size:22px;color:var(--amber)">${d&&d.has ? d.res : '—'}</div>
-      </div>
-      <div style="background:var(--bg3);border-radius:5px;padding:10px;text-align:center">
-        <div style="font-size:10px;color:var(--txt3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Returns</div>
-        <div style="font-family:var(--ff-mono);font-size:22px;color:var(--green)">${d&&d.has ? d.ret : '—'}</div>
-      </div>
-      <div style="background:var(--bg3);border-radius:5px;padding:10px;text-align:center">
-        <div style="font-size:10px;color:var(--txt3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Net</div>
-        <div style="font-family:var(--ff-mono);font-size:22px;color:${d&&d.has?(d.net>0?'var(--green)':d.net<0?'var(--red)':'var(--txt2)'):'var(--txt3)'}">
-          ${d&&d.has ? (d.net>0?'+':'')+d.net : '—'}
-        </div>
-      </div>
-      <div style="background:var(--bg3);border-radius:5px;padding:10px;text-align:center">
-        <div style="font-size:10px;color:var(--txt3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Type</div>
-        <div style="font-size:13px;font-weight:700;color:${isCore?'var(--acc)':'var(--txt2)'}">
-          ${isCore ? '◆ Core' : 'Non-Core'}
-        </div>
-      </div>
-    </div>
-    <div style="background:var(--bg3);border-radius:5px;padding:10px;margin-bottom:10px">
-      <div style="font-size:12px;font-weight:700;margin-bottom:4px">${statusLabel}</div>
-      <div style="font-size:11px;color:var(--txt2);line-height:1.5">${statusReason}</div>
-    </div>
-    <div style="font-size:11px;color:var(--txt3);line-height:1.8">
-      <b>Walk-Up threshold:</b> Net ≥ ${thresh[0]}<br>
-      <b>Upgrade threshold:</b> Net ≥ ${thresh[1]}<br>
-      <b>Master policy:</b> ${pol}<br>
-      ${override ? '<b>Override:</b> ' + override : ''}
-    </div>
-    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-gh btn-sm" onclick="cycleGroupOverride('${name}');closeModal()">
-        ${override === 'close' ? '↩ Remove override' : override === 'open' ? '🔴 Force Closed' : '🔴 Force Closed'}
-      </button>
-      ${override ? '<button class="btn btn-gh btn-sm" onclick="delete STATE.groupOverrides[\''+name+'\'];saveState();buildBoardGrid();closeModal()">↩ Reset to Auto</button>' : ''}
-    </div>`;
+let body = ` <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px"> <div style="background:var(--bg3);border-radius:5px;padding:10px;text-align:center"> <div style="font-size:10px;color:var(--txt3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Reservations</div> <div style="font-family:var(--ff-mono);font-size:22px;color:var(--amber)">${d&&d.has ? d.res : '—'}</div> </div> <div style="background:var(--bg3);border-radius:5px;padding:10px;text-align:center"> <div style="font-size:10px;color:var(--txt3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Returns</div> <div style="font-family:var(--ff-mono);font-size:22px;color:var(--green)">${d&&d.has ? d.ret : '—'}</div> </div> <div style="background:var(--bg3);border-radius:5px;padding:10px;text-align:center"> <div style="font-size:10px;color:var(--txt3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Net</div> <div style="font-family:var(--ff-mono);font-size:22px;color:${d&&d.has?(d.net>0?'var(--green)':d.net<0?'var(--red)':'var(--txt2)'):'var(--txt3)'}"> ${d&&d.has ? (d.net>0?'+':'')+d.net : '—'} </div> </div> <div style="background:var(--bg3);border-radius:5px;padding:10px;text-align:center"> <div style="font-size:10px;color:var(--txt3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">Type</div> <div style="font-size:13px;font-weight:700;color:${isCore?'var(--acc)':'var(--txt2)'}"> ${isCore ? '◆ Core' : 'Non-Core'} </div> </div> </div> <div style="background:var(--bg3);border-radius:5px;padding:10px;margin-bottom:10px"> <div style="font-size:12px;font-weight:700;margin-bottom:4px">${statusLabel}</div> <div style="font-size:11px;color:var(--txt2);line-height:1.5">${statusReason}</div> </div> <div style="font-size:11px;color:var(--txt3);line-height:1.8"> <b>Walk-Up threshold:</b> Net ≥ ${thresh[0]}<br> <b>Upgrade threshold:</b> Net ≥ ${thresh[1]}<br> <b>Master policy:</b> ${pol}<br> ${override ? '<b>Override:</b> ' + override : ''} </div> <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap"> <button class="btn btn-gh btn-sm" onclick="cycleGroupOverride('${name}');closeModal()"> ${override === 'close' ? '↩ Remove override' : override === 'open' ? '🔴 Force Closed' : '🔴 Force Closed'} </button> ${override ? '<button class="btn btn-gh btn-sm" onclick="delete STATE.groupOverrides[\''+name+'\'];saveState();buildBoardGrid();closeModal()">↩ Reset to Auto</button>' : ''} </div>`;
 
-  openModal(name, body);
+openModal(name, body);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -7653,33 +7597,31 @@ function tileClick(name) {
 // Maps shift start hour to suggested lunch window
 // ═══════════════════════════════════════════════════════════════════════
 var LUNCH_TABLE = [
-  {startH:4.0,  window:'~9:00a – 10:00a'},
-  {startH:5.5,  window:'~10:30a – 11:30a'},
-  {startH:6.0,  window:'~10:30a – 11:30a'},
-  {startH:7.0,  window:'~11:00a – 12:00p'},
-  {startH:8.0,  window:'~12:00p – 1:00p'},
-  {startH:8.5,  window:'~12:00p – 1:00p'},
-  {startH:9.0,  window:'~1:00p – 2:00p'},
-  {startH:10.0, window:'~2:00p – 3:00p'},
-  {startH:12.0, window:'~4:00p – 5:00p'},
-  {startH:16.0, window:'~8:15p – 9:15p'},
-  {startH:16.5, window:'~8:30p – 9:30p'},
-  {startH:18.0, window:'~9:30p – 10:30p'},
+{startH:4.0,  window:‘~9:00a – 10:00a’},
+{startH:5.5,  window:‘~10:30a – 11:30a’},
+{startH:6.0,  window:‘~10:30a – 11:30a’},
+{startH:7.0,  window:‘~11:00a – 12:00p’},
+{startH:8.0,  window:‘~12:00p – 1:00p’},
+{startH:8.5,  window:‘~12:00p – 1:00p’},
+{startH:9.0,  window:‘~1:00p – 2:00p’},
+{startH:10.0, window:‘~2:00p – 3:00p’},
+{startH:12.0, window:‘~4:00p – 5:00p’},
+{startH:16.0, window:‘~8:15p – 9:15p’},
+{startH:16.5, window:‘~8:30p – 9:30p’},
+{startH:18.0, window:‘~9:30p – 10:30p’},
 ];
 
 function getSuggestedLunch(shiftStartH) {
-  if (shiftStartH === null || shiftStartH === undefined) return null;
-  // Find closest match
-  let closest = LUNCH_TABLE[0];
-  let minDiff = Math.abs(shiftStartH - LUNCH_TABLE[0].startH);
-  LUNCH_TABLE.forEach(entry => {
-    const diff = Math.abs(shiftStartH - entry.startH);
-    if (diff < minDiff) { minDiff = diff; closest = entry; }
-  });
-  return closest.window;
+if (shiftStartH === null || shiftStartH === undefined) return null;
+// Find closest match
+let closest = LUNCH_TABLE[0];
+let minDiff = Math.abs(shiftStartH - LUNCH_TABLE[0].startH);
+LUNCH_TABLE.forEach(entry => {
+const diff = Math.abs(shiftStartH - entry.startH);
+if (diff < minDiff) { minDiff = diff; closest = entry; }
+});
+return closest.window;
 }
-
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // FLOW CHART — bar chart of Res/Ret/Net by group
@@ -7687,153 +7629,141 @@ function getSuggestedLunch(shiftStartH) {
 // ═══════════════════════════════════════════════════════════════════════
 
 function buildBoardFlow() {
-  const chartEl  = document.getElementById('board-flow-chart');
-  const totalsEl = document.getElementById('board-flow-totals');
-  const typeEl   = document.getElementById('board-flow-type');
-  const coreOnly = document.getElementById('board-flow-core-only');
-  if (!chartEl) return;
+const chartEl  = document.getElementById(‘board-flow-chart’);
+const totalsEl = document.getElementById(‘board-flow-totals’);
+const typeEl   = document.getElementById(‘board-flow-type’);
+const coreOnly = document.getElementById(‘board-flow-core-only’);
+if (!chartEl) return;
 
-  const data    = typeof getGroupNetData === 'function' ? getGroupNetData() : {};
-  const hasData = Object.values(data).some(d => d && d.has);
+const data    = typeof getGroupNetData === ‘function’ ? getGroupNetData() : {};
+const hasData = Object.values(data).some(d => d && d.has);
 
-  if (!hasData) {
-    chartEl.innerHTML = '<p style="font-size:11px;color:var(--txt3);padding:8px 0;text-align:center">Paste Game Plan data to see flow.</p>';
-    if (totalsEl) totalsEl.innerHTML = '';
-    buildDashFlowStrip();
-    return;
-  }
+if (!hasData) {
+chartEl.innerHTML = ‘<p style="font-size:11px;color:var(--txt3);padding:8px 0;text-align:center">Paste Game Plan data to see flow.</p>’;
+if (totalsEl) totalsEl.innerHTML = ‘’;
+buildDashFlowStrip();
+return;
+}
 
-  const type     = typeEl ? typeEl.value : 'net';
-  const coreOnlyChecked = coreOnly ? coreOnly.checked : false;
+const type     = typeEl ? typeEl.value : ‘net’;
+const coreOnlyChecked = coreOnly ? coreOnly.checked : false;
 
-  function getVal(d) {
-    if (!d || !d.has) return null;
-    return type === 'net' ? d.net : type === 'res' ? d.res : d.ret;
-  }
+function getVal(d) {
+if (!d || !d.has) return null;
+return type === ‘net’ ? d.net : type === ‘res’ ? d.res : d.ret;
+}
 
-  // Filter + sort groups
-  const groups = GROUP_META.filter(g => {
-    if (coreOnlyChecked && !CORE_GROUPS.has(g.n)) return false;
-    const d = data[g.n];
-    return d && d.has;
-  }).sort((a, b) => {
-    const va = Math.abs(getVal(data[a.n]) || 0);
-    const vb = Math.abs(getVal(data[b.n]) || 0);
-    return vb - va;
-  });
+// Filter + sort groups
+const groups = GROUP_META.filter(g => {
+if (coreOnlyChecked && !CORE_GROUPS.has(g.n)) return false;
+const d = data[g.n];
+return d && d.has;
+}).sort((a, b) => {
+const va = Math.abs(getVal(data[a.n]) || 0);
+const vb = Math.abs(getVal(data[b.n]) || 0);
+return vb - va;
+});
 
-  // Totals
-  let totalRes = 0, totalRet = 0;
-  GROUP_META.forEach(g => {
-    const d = data[g.n];
-    if (d && d.has) { totalRes += d.res; totalRet += d.ret; }
-  });
-  const netTotal  = totalRet - totalRes;
-  const netColor  = netTotal > 0 ? 'var(--green)' : netTotal < 0 ? 'var(--red)' : 'var(--txt3)';
+// Totals
+let totalRes = 0, totalRet = 0;
+GROUP_META.forEach(g => {
+const d = data[g.n];
+if (d && d.has) { totalRes += d.res; totalRet += d.ret; }
+});
+const netTotal  = totalRet - totalRes;
+const netColor  = netTotal > 0 ? ‘var(–green)’ : netTotal < 0 ? ‘var(–red)’ : ‘var(–txt3)’;
 
-  if (totalsEl) {
-    totalsEl.innerHTML =
-      `<div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Total Res</div>
-        <div style="font-family:var(--ff-mono);font-size:20px;font-weight:700;color:var(--amber)">${totalRes}</div></div>` +
-      `<div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Total Ret</div>
-        <div style="font-family:var(--ff-mono);font-size:20px;font-weight:700;color:var(--green)">${totalRet}</div></div>` +
-      `<div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Net</div>
-        <div style="font-family:var(--ff-mono);font-size:20px;font-weight:700;color:${netColor}">${netTotal>0?'+':''}${netTotal}</div></div>` +
-      `<div style="margin-left:auto;align-self:center;font-size:10px;color:var(--txt3)">AM + PM combined</div>`;
-  }
+if (totalsEl) {
+totalsEl.innerHTML =
+`<div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Total Res</div> <div style="font-family:var(--ff-mono);font-size:20px;font-weight:700;color:var(--amber)">${totalRes}</div></div>` +
+`<div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Total Ret</div> <div style="font-family:var(--ff-mono);font-size:20px;font-weight:700;color:var(--green)">${totalRet}</div></div>` +
+`<div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Net</div> <div style="font-family:var(--ff-mono);font-size:20px;font-weight:700;color:${netColor}">${netTotal>0?'+':''}${netTotal}</div></div>` +
+`<div style="margin-left:auto;align-self:center;font-size:10px;color:var(--txt3)">AM + PM combined</div>`;
+}
 
-  const maxAbs = Math.max(...groups.map(g => Math.abs(getVal(data[g.n]) || 0)), 1);
-  const barColor = type === 'net'
-    ? null  // dynamic per bar
-    : type === 'res' ? 'var(--amber)' : 'var(--green)';
+const maxAbs = Math.max(…groups.map(g => Math.abs(getVal(data[g.n]) || 0)), 1);
+const barColor = type === ‘net’
+? null  // dynamic per bar
+: type === ‘res’ ? ‘var(–amber)’ : ‘var(–green)’;
 
-  let out = '<div style="display:grid;grid-template-columns:148px 1fr 46px;gap:4px 10px;align-items:center">';
-  groups.forEach(g => {
-    const d      = data[g.n];
-    const val    = getVal(d);
-    if (val === null) return;
-    const pct    = Math.min(100, Math.abs(val) / maxAbs * 100);
-    const isCore = CORE_GROUPS.has(g.n);
-    const st     = typeof getGroupStatus === 'function' ? getGroupStatus(g.n, d.net) : 'na';
-    const dynColor = type === 'net'
-      ? (val > 0 ? 'var(--green)' : val < 0 ? 'var(--red)' : 'var(--txt3)')
-      : barColor;
-    const stDot  = st === 'wu' ? '●' : st === 'up' ? '◐' : '○';
-    const dotCol = st === 'wu' ? 'var(--green)' : st === 'up' ? 'var(--amber)' : 'var(--red)';
-    const valStr = (val > 0 ? '+' : '') + val;
+let out = ‘<div style="display:grid;grid-template-columns:148px 1fr 46px;gap:4px 10px;align-items:center">’;
+groups.forEach(g => {
+const d      = data[g.n];
+const val    = getVal(d);
+if (val === null) return;
+const pct    = Math.min(100, Math.abs(val) / maxAbs * 100);
+const isCore = CORE_GROUPS.has(g.n);
+const st     = typeof getGroupStatus === ‘function’ ? getGroupStatus(g.n, d.net) : ‘na’;
+const dynColor = type === ‘net’
+? (val > 0 ? ‘var(–green)’ : val < 0 ? ‘var(–red)’ : ‘var(–txt3)’)
+: barColor;
+const stDot  = st === ‘wu’ ? ‘●’ : st === ‘up’ ? ‘◐’ : ‘○’;
+const dotCol = st === ‘wu’ ? ‘var(–green)’ : st === ‘up’ ? ‘var(–amber)’ : ‘var(–red)’;
+const valStr = (val > 0 ? ‘+’ : ‘’) + val;
 
-    out +=
-      `<div style="font-size:10px;font-weight:${isCore?700:400};
-        color:${isCore?'var(--acc)':'var(--txt2)'};
-        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-        display:flex;align-items:center;gap:5px">
-        <span style="font-size:7px;color:${dotCol}">${stDot}</span>${g.n}
-      </div>
-      <div style="height:15px;background:var(--bg3);border-radius:2px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${dynColor};border-radius:2px;
-          min-width:${val!==0?2:0}px;transition:width .25s"></div>
-      </div>
-      <div style="font-family:var(--ff-mono);font-size:11px;font-weight:700;
-        color:${dynColor};text-align:right">${valStr}</div>`;
-  });
-  out += '</div>';
-  chartEl.innerHTML = out;
+```
+out +=
+  `<div style="font-size:10px;font-weight:${isCore?700:400};
+    color:${isCore?'var(--acc)':'var(--txt2)'};
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    display:flex;align-items:center;gap:5px">
+    <span style="font-size:7px;color:${dotCol}">${stDot}</span>${g.n}
+  </div>
+  <div style="height:15px;background:var(--bg3);border-radius:2px;overflow:hidden">
+    <div style="height:100%;width:${pct}%;background:${dynColor};border-radius:2px;
+      min-width:${val!==0?2:0}px;transition:width .25s"></div>
+  </div>
+  <div style="font-family:var(--ff-mono);font-size:11px;font-weight:700;
+    color:${dynColor};text-align:right">${valStr}</div>`;
+```
 
-  // Also update the dashboard strip
-  buildDashFlowStrip(totalRes, totalRet, netTotal, data);
+});
+out += ‘</div>’;
+chartEl.innerHTML = out;
+
+// Also update the dashboard strip
+buildDashFlowStrip(totalRes, totalRet, netTotal, data);
 }
 
 function buildDashFlowStrip(totalRes, totalRet, netTotal, data) {
-  const stripEl   = document.getElementById('dash-flow-strip');
-  const contentEl = document.getElementById('dash-flow-content');
-  if (!stripEl) return;
+const stripEl   = document.getElementById(‘dash-flow-strip’);
+const contentEl = document.getElementById(‘dash-flow-content’);
+if (!stripEl) return;
 
-  const pd = STATE.pasteData || {};
-  if (!Object.keys(pd).length) { stripEl.style.display = 'none'; return; }
-  stripEl.style.display = 'block';
+const pd = STATE.pasteData || {};
+if (!Object.keys(pd).length) { stripEl.style.display = ‘none’; return; }
+stripEl.style.display = ‘block’;
 
-  // If called without args, compute
-  if (totalRes === undefined) {
-    const d2 = typeof getGroupNetData === 'function' ? getGroupNetData() : {};
-    totalRes = 0; totalRet = 0;
-    GROUP_META.forEach(g => { const d=d2[g.n]; if(d&&d.has){totalRes+=d.res;totalRet+=d.ret;} });
-    netTotal = totalRet - totalRes;
-    data = d2;
-  }
-
-  const netColor = netTotal > 0 ? 'var(--green)' : netTotal < 0 ? 'var(--red)' : 'var(--txt3)';
-
-  // Non-core group chips sorted by activity
-  const chips = GROUP_META
-    .filter(g => !CORE_GROUPS.has(g.n))
-    .map(g => ({ g, d: data[g.n] }))
-    .filter(({d}) => d && d.has)
-    .sort((a,b) => Math.abs(b.d.net) - Math.abs(a.d.net))
-    .slice(0, 8)
-    .map(({g, d}) => {
-      const st  = typeof getGroupStatus === 'function' ? getGroupStatus(g.n, d.net) : 'na';
-      const bg  = st==='wu' ? 'rgba(22,163,74,.15)'  : st==='up' ? 'rgba(217,119,6,.12)' : 'rgba(220,38,38,.1)';
-      const col = st==='wu' ? 'var(--green)' : st==='up' ? 'var(--amber)' : 'var(--red)';
-      const net = (d.net>0?'+':'')+d.net;
-      return `<span style="background:${bg};color:${col};border:1px solid ${col};
-        border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;
-        white-space:nowrap;font-family:var(--ff-mono)">${g.n} ${net}</span>`;
-    }).join('');
-
-  if (!contentEl) return;
-  contentEl.innerHTML =
-    `<div style="display:flex;gap:20px;margin-bottom:10px">
-      <div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">Reservations</div>
-        <div style="font-family:var(--ff-mono);font-size:24px;font-weight:700;color:var(--amber)">${totalRes}</div></div>
-      <div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">Returns</div>
-        <div style="font-family:var(--ff-mono);font-size:24px;font-weight:700;color:var(--green)">${totalRet}</div></div>
-      <div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">Net</div>
-        <div style="font-family:var(--ff-mono);font-size:24px;font-weight:700;color:${netColor}">${netTotal>0?'+':''}${netTotal}</div></div>
-    </div>
-    ${chips ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>` : ''}`;
+// If called without args, compute
+if (totalRes === undefined) {
+const d2 = typeof getGroupNetData === ‘function’ ? getGroupNetData() : {};
+totalRes = 0; totalRet = 0;
+GROUP_META.forEach(g => { const d=d2[g.n]; if(d&&d.has){totalRes+=d.res;totalRet+=d.ret;} });
+netTotal = totalRet - totalRes;
+data = d2;
 }
 
+const netColor = netTotal > 0 ? ‘var(–green)’ : netTotal < 0 ? ‘var(–red)’ : ‘var(–txt3)’;
 
+// Non-core group chips sorted by activity
+const chips = GROUP_META
+.filter(g => !CORE_GROUPS.has(g.n))
+.map(g => ({ g, d: data[g.n] }))
+.filter(({d}) => d && d.has)
+.sort((a,b) => Math.abs(b.d.net) - Math.abs(a.d.net))
+.slice(0, 8)
+.map(({g, d}) => {
+const st  = typeof getGroupStatus === ‘function’ ? getGroupStatus(g.n, d.net) : ‘na’;
+const bg  = st===‘wu’ ? ‘rgba(22,163,74,.15)’  : st===‘up’ ? ‘rgba(217,119,6,.12)’ : ‘rgba(220,38,38,.1)’;
+const col = st===‘wu’ ? ‘var(–green)’ : st===‘up’ ? ‘var(–amber)’ : ‘var(–red)’;
+const net = (d.net>0?’+’:’’)+d.net;
+return `<span style="background:${bg};color:${col};border:1px solid ${col}; border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700; white-space:nowrap;font-family:var(--ff-mono)">${g.n} ${net}</span>`;
+}).join(’’);
+
+if (!contentEl) return;
+contentEl.innerHTML =
+`<div style="display:flex;gap:20px;margin-bottom:10px"> <div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">Reservations</div> <div style="font-family:var(--ff-mono);font-size:24px;font-weight:700;color:var(--amber)">${totalRes}</div></div> <div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">Returns</div> <div style="font-family:var(--ff-mono);font-size:24px;font-weight:700;color:var(--green)">${totalRet}</div></div> <div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">Net</div> <div style="font-family:var(--ff-mono);font-size:24px;font-weight:700;color:${netColor}">${netTotal>0?'+':''}${netTotal}</div></div> </div> ${chips ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>` : ''}`;
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // BRAND TOTALS PASTE PARSER
@@ -7845,71 +7775,71 @@ function buildDashFlowStrip(totalRes, totalRet, netTotal, data) {
 //   Total: 489  (or Grand Total: 607)
 // ═══════════════════════════════════════════════════════════════════════
 function parseBrandPaste(text) {
-  if (!text || !text.trim()) return;
-  const lines = text.split(/[\n\r]+/).map(l => l.trim()).filter(Boolean);
-  let updated = false;
+if (!text||!text.trim()) { updateBrandStatus(’’); return; }
+const lines = text.split(/[\n\r]+/).map(l=>l.trim()).filter(Boolean);
+let nat=0, ala=0, ent=0, two=0, totalRes=0;
+let updated = false;
+lines.forEach(line => {
+const parts = line.includes(’\t’) ? line.split(’\t’).map(p=>p.trim()).filter(Boolean)
+: line.split(/\s{2,}|\s+/).filter(Boolean);
+if (!parts.length) return;
+const brand = parts[0].toUpperCase().replace(/[^A-Z0-9.]/g,’’);
+const nums  = parts.slice(1).map(p=>parseInt(p.replace(/,/g,’’))).filter(n=>!isNaN(n));
+if (!nums.length) {
+// Try “Label: Value” format
+const m = line.match(/(\d[\d,]*)/g);
+if (!m) return;
+const val = parseInt(m[m.length-1].replace(/,/g,’’));
+const lo  = line.toLowerCase();
+if (lo.includes(‘national’))   { nat=val; updated=true; }
+else if (lo.includes(‘alamo’)) { ala=val; updated=true; }
+else if (lo.includes(‘enterprise’)){ ent=val; updated=true; }
+else if (lo.includes(‘2.0’)||lo.includes(‘non-airport’)){ two=val; updated=true; }
+else if (lo.includes(‘total’)){ totalRes=val; updated=true; }
+return;
+}
+const res = nums[0];
+if (brand===‘NATIONAL’||brand===‘NAT’)  { nat=res; updated=true; }
+else if (brand===‘ALAMO’||brand===‘ALMO’){ ala=res; updated=true; }
+else if (brand===‘ENTERPRISE’||brand===‘ENT’){ ent=res; updated=true; }
+else if (brand===‘2.0’||brand===‘20’||brand===‘TWOPOINT’){ two=res; updated=true; }
+else if (brand===‘TOTAL’||brand===‘GRANDTOTAL’){ totalRes=res; updated=true; }
+});
+if (!updated) { updateBrandStatus(‘No brand data detected’); return; }
+if (!totalRes && (nat||ala||ent)) totalRes = nat+ala+ent+two;
+const setF=(id,sk,v)=>{ if(!v) return; STATE.fields[sk]=String(v); const e=document.getElementById(id); if(e) e.value=v; };
+setF(‘f-brand-nat’,‘brandNational’,nat); setF(‘f-brand-ala’,‘brandAlamo’,ala);
+setF(‘f-brand-ent’,‘brandEnterprise’,ent); setF(‘f-brand-20’,‘brand20’,two);
+if (totalRes){ STATE.fields.totalRes=String(totalRes); const e=document.getElementById(‘f-total-res’); if(e) e.value=totalRes; }
+updateBrandStatus(’Parsed: Nat ‘+nat+’ Ala ‘+ala+’ Ent ‘+ent+’ 2.0 ‘+two+’ Total ’+totalRes);
+saveState(); updateSummary();
+}
 
-  lines.forEach(line => {
-    const lower = line.toLowerCase();
-    // Extract the numeric value from the line
-    const numMatch = line.match(/[\d,]+/g);
-    const val = numMatch ? parseInt(numMatch[numMatch.length-1].replace(/,/g,'')) : null;
-    if (val === null) return;
-
-    const setField = (elId, stateKey) => {
-      STATE.fields[stateKey] = String(val);
-      const el = document.getElementById(elId);
-      if (el) el.value = val;
-      updated = true;
-    };
-
-    if (lower.includes('national'))   setField('f-brand-nat', 'brandNational');
-    else if (lower.includes('alamo')) setField('f-brand-ala', 'brandAlamo');
-    else if (lower.includes('enterprise')) setField('f-brand-ent', 'brandEnterprise');
-    else if (lower.includes('2.0') || lower.includes('non-airport') || lower.includes('nonairport'))
-      setField('f-brand-20', 'brand20');
-    else if (lower.includes('grand total') || lower.includes('total for'))
-      setField('f-total-res', 'totalRes');
-  });
-
-  // Auto-calculate grand total if we have all brand numbers and no total
-  if (!STATE.fields.totalRes) {
-    const nat = parseInt(STATE.fields.brandNational||0);
-    const ala = parseInt(STATE.fields.brandAlamo||0);
-    const ent = parseInt(STATE.fields.brandEnterprise||0);
-    const two = parseInt(STATE.fields.brand20||0);
-    if (nat || ala || ent) {
-      const total = nat + ala + ent + two;
-      STATE.fields.totalRes = String(total);
-      const el = document.getElementById('f-total-res');
-      if (el) el.value = total;
-      updated = true;
-    }
-  }
-
-  if (updated) {
-    saveState();
-    updateSummary();
-    toast('Brand totals parsed ✓');
-  }
+function updateBrandTotal() {
+const nat=parseInt(STATE.fields.brandNational||0)||0, ala=parseInt(STATE.fields.brandAlamo||0)||0;
+const ent=parseInt(STATE.fields.brandEnterprise||0)||0, two=parseInt(STATE.fields.brand20||0)||0;
+if(nat||ala||ent){const t=nat+ala+ent+two;STATE.fields.totalRes=String(t);const e=document.getElementById(‘f-total-res’);if(e)e.value=t;}
+saveState();updateSummary();
+}
+function updateBrandStatus(msg) {
+const el=document.getElementById(‘brand-parse-status’);
+if(el){el.textContent=msg;el.style.color=msg&&msg.startsWith(‘Parsed’)?‘var(–green)’:‘var(–txt3)’;}
 }
 
 function clearBrandPaste() {
-  const el = document.getElementById('f-brand-paste');
-  if (el) el.value = '';
-  ['f-brand-nat','f-brand-ala','f-brand-ent','f-brand-20','f-total-res'].forEach(id => {
-    const el2 = document.getElementById(id);
-    if (el2) el2.value = '';
-  });
-  ['brandNational','brandAlamo','brandEnterprise','brand20','totalRes'].forEach(k => {
-    delete STATE.fields[k];
-  });
-  saveState();
-  updateSummary();
-  toast('Brand totals cleared');
+const el = document.getElementById(‘f-brand-paste’);
+if (el) el.value = ‘’;
+[‘f-brand-nat’,‘f-brand-ala’,‘f-brand-ent’,‘f-brand-20’,‘f-total-res’].forEach(id => {
+const el2 = document.getElementById(id);
+if (el2) el2.value = ‘’;
+});
+[‘brandNational’,‘brandAlamo’,‘brandEnterprise’,‘brand20’,‘totalRes’].forEach(k => {
+delete STATE.fields[k];
+});
+saveState();
+updateSummary();
+toast(‘Brand totals cleared’);
 }
-
-
 
 // ═══════════════════════════════════════════════════════════════════════
 // ALT SCHEDULE TODAY
@@ -7918,163 +7848,132 @@ function clearBrandPaste() {
 // ═══════════════════════════════════════════════════════════════════════
 
 var ALT_POSITIONS = [
-  {key:'normal',        label:'Normal Rotation', icon:'🔄', desc:'4hr Counter + 4hr Exit (standard)'},
-  {key:'full-counter',  label:'Full Counter',     icon:'🟦', desc:'Full shift at counter (8hr) — no exit'},
-  {key:'full-exit',     label:'Full Exit',        icon:'🟩', desc:'Full shift at exit (8hr) — no counter'},
-  {key:'counter-first', label:'Counter+30',       icon:'🟦+', desc:'Counter 4.5hr → Exit 3.5hr'},
-  {key:'exit-first',    label:'Exit+30',          icon:'🟩+', desc:'Exit 4.5hr → Counter 3.5hr'},
+{key:‘normal’,        label:‘Normal Rotation’, icon:‘🔄’, desc:‘4hr Counter + 4hr Exit (standard)’},
+{key:‘full-counter’,  label:‘Full Counter’,     icon:‘🟦’, desc:‘Full shift at counter (8hr) — no exit’},
+{key:‘full-exit’,     label:‘Full Exit’,        icon:‘🟩’, desc:‘Full shift at exit (8hr) — no counter’},
+{key:‘counter-first’, label:‘Counter+30’,       icon:‘🟦+’, desc:‘Counter 4.5hr → Exit 3.5hr’},
+{key:‘exit-first’,    label:‘Exit+30’,          icon:‘🟩+’, desc:‘Exit 4.5hr → Counter 3.5hr’},
 ];
 
 function getAltPosition(pid) {
-  return (STATE.altSchedule && STATE.altSchedule[pid]) || 'normal';
+return (STATE.altSchedule && STATE.altSchedule[pid]) || ‘normal’;
 }
 
 function setAltPosition(pid, posKey) {
-  if (!STATE.altSchedule) STATE.altSchedule = {};
-  if (posKey === 'normal') delete STATE.altSchedule[pid];
-  else STATE.altSchedule[pid] = posKey;
-  saveState();
-  buildStaffGrid();
-  buildCoverageUI();
-  toast(posKey === 'normal' ? 'Rotation reset to normal' : 'Alt schedule set ✓');
+if (!STATE.altSchedule) STATE.altSchedule = {};
+if (posKey === ‘normal’) delete STATE.altSchedule[pid];
+else STATE.altSchedule[pid] = posKey;
+saveState();
+buildStaffGrid();
+buildCoverageUI();
+toast(posKey === ‘normal’ ? ‘Rotation reset to normal’ : ‘Alt schedule set ✓’);
 }
 
 function showAltScheduleModal(pid, personName) {
-  const current = getAltPosition(pid);
-  const person  = ROSTER_CXR.find(p => p.name.replace(/\s/g,'_') === pid);
-  if (!person || person.role === 'EXIT') {
-    toast('Exit agents stay at exit — no rotation to modify');
-    return;
-  }
+const current = getAltPosition(pid);
+const person  = ROSTER_CXR.find(p => p.name.replace(/\s/g,’_’) === pid);
+if (!person || person.role === ‘EXIT’) {
+toast(‘Exit agents stay at exit — no rotation to modify’);
+return;
+}
 
-  const shift = person.shiftStart;
-  const lunchLookup = typeof getSuggestedLunch === 'function' ? getSuggestedLunch(shift) : null;
+const shift = person.shiftStart;
+const lunchLookup = typeof getSuggestedLunch === ‘function’ ? getSuggestedLunch(shift) : null;
 
-  const optionsHtml = ALT_POSITIONS.map(pos => {
-    const isActive = current === pos.key;
-    return `<div onclick="setAltPosition('${pid}','${pos.key}');closeModal()"
-      style="display:flex;align-items:center;gap:12px;padding:11px 14px;
-        border-radius:6px;cursor:pointer;margin-bottom:6px;
-        background:${isActive ? 'rgba(37,99,235,.12)' : 'var(--bg3)'};
-        border:1px solid ${isActive ? 'var(--acc)' : 'var(--bdr2)'};
-        transition:all .15s">
-      <span style="font-size:20px;flex-shrink:0">${pos.icon}</span>
-      <div style="flex:1">
-        <div style="font-weight:700;font-size:13px;color:${isActive?'var(--acc)':'var(--txt)'}">${pos.label}</div>
-        <div style="font-size:11px;color:var(--txt3);margin-top:1px">${pos.desc}</div>
-      </div>
-      ${isActive ? '<span style="color:var(--acc);font-weight:700;font-size:12px">✓ Active</span>' : ''}
-    </div>`;
-  }).join('');
+const optionsHtml = ALT_POSITIONS.map(pos => {
+const isActive = current === pos.key;
+return `<div onclick="setAltPosition('${pid}','${pos.key}');closeModal()" style="display:flex;align-items:center;gap:12px;padding:11px 14px; border-radius:6px;cursor:pointer;margin-bottom:6px; background:${isActive ? 'rgba(37,99,235,.12)' : 'var(--bg3)'}; border:1px solid ${isActive ? 'var(--acc)' : 'var(--bdr2)'}; transition:all .15s"> <span style="font-size:20px;flex-shrink:0">${pos.icon}</span> <div style="flex:1"> <div style="font-weight:700;font-size:13px;color:${isActive?'var(--acc)':'var(--txt)'}">${pos.label}</div> <div style="font-size:11px;color:var(--txt3);margin-top:1px">${pos.desc}</div> </div> ${isActive ? '<span style="color:var(--acc);font-weight:700;font-size:12px">✓ Active</span>' : ''} </div>`;
+}).join(’’);
 
-  const note = `<div style="font-size:11px;color:var(--txt3);padding:10px 14px;
-    background:var(--bg3);border-radius:5px;margin-top:4px;line-height:1.5">
-    💡 Alt schedule applies <b>today only</b> and resets tomorrow.<br>
-    ${lunchLookup ? '🍽 Suggested lunch: ' + lunchLookup : ''}
-    <br>Injury / sick / coverage situations — manager approves.
+const note = `<div style="font-size:11px;color:var(--txt3);padding:10px 14px;
+background:var(--bg3);border-radius:5px;margin-top:4px;line-height:1.5">
+💡 Alt schedule applies <b>today only</b> and resets tomorrow.<br>
+${lunchLookup ? ’🍽 Suggested lunch: ’ + lunchLookup : ‘’}
+<br>Injury / sick / coverage situations — manager approves.
+
   </div>`;
 
-  openModal('Alt Schedule — ' + personName, optionsHtml + note);
+openModal(’Alt Schedule — ’ + personName, optionsHtml + note);
 }
 
 // Wire into staff card — add Alt Sched button
 // This patches the buildStaffSection output to add the button
-const _origBuildStaffSection = typeof buildStaffSection === 'function' ? buildStaffSection : null;
-
-
+const _origBuildStaffSection = typeof buildStaffSection === ‘function’ ? buildStaffSection : null;
 
 // ═══════════════════════════════════════════════════════════════════════
 // SHIFT MODIFICATION — early/late arrival, early/late departure
 // ═══════════════════════════════════════════════════════════════════════
 
 function showShiftModModal(pid, personName) {
-  const person   = ROSTER_CXR.find(p => p.name.replace(/\s/g,'_') === pid);
-  const baseStart = person ? person.shiftStart : null;
-  const baseEnd   = person ? person.shiftEnd   : null;
-  const currentMod = STATE.shiftMod && STATE.shiftMod[pid];
+const person   = ROSTER_CXR.find(p => p.name.replace(/\s/g,’_’) === pid);
+const baseStart = person ? person.shiftStart : null;
+const baseEnd   = person ? person.shiftEnd   : null;
+const currentMod = STATE.shiftMod && STATE.shiftMod[pid];
 
-  function fmtH(h) {
-    if (h === null || h === undefined) return '—';
-    const hr = Math.floor(h);
-    const mn = Math.round((h - hr) * 60);
-    const suffix = h >= 12 ? 'p' : 'a';
-    const dispHr = hr > 12 ? hr-12 : hr === 0 ? 12 : hr;
-    return dispHr + (mn ? ':'+String(mn).padStart(2,'0') : '') + suffix;
-  }
+function fmtH(h) {
+if (h === null || h === undefined) return ‘—’;
+const hr = Math.floor(h);
+const mn = Math.round((h - hr) * 60);
+const suffix = h >= 12 ? ‘p’ : ‘a’;
+const dispHr = hr > 12 ? hr-12 : hr === 0 ? 12 : hr;
+return dispHr + (mn ? ‘:’+String(mn).padStart(2,‘0’) : ‘’) + suffix;
+}
 
-  const presets = [
-    {label:'Normal Shift',        start: baseStart,        end: baseEnd,       reason:'normal'},
-    {label:'Late Start +30min',   start: baseStart?baseStart+0.5:null, end: baseEnd, reason:'Late arrival +30'},
-    {label:'Late Start +1hr',     start: baseStart?baseStart+1:null,   end: baseEnd, reason:'Late arrival +1hr'},
-    {label:'Late Start +2hr',     start: baseStart?baseStart+2:null,   end: baseEnd, reason:'Late arrival +2hr'},
-    {label:'Early Out −30min',    start: baseStart, end: baseEnd?baseEnd-0.5:null,   reason:'Early departure −30'},
-    {label:'Early Out −1hr',      start: baseStart, end: baseEnd?baseEnd-1:null,     reason:'Early departure −1hr'},
-    {label:'Early Start −30min',  start: baseStart?baseStart-0.5:null, end: baseEnd, reason:'Early arrival −30'},
-    {label:'Early Start −1hr',    start: baseStart?baseStart-1:null,   end: baseEnd, reason:'Early arrival −1hr'},
-  ];
+const presets = [
+{label:‘Normal Shift’,        start: baseStart,        end: baseEnd,       reason:‘normal’},
+{label:‘Late Start +30min’,   start: baseStart?baseStart+0.5:null, end: baseEnd, reason:‘Late arrival +30’},
+{label:‘Late Start +1hr’,     start: baseStart?baseStart+1:null,   end: baseEnd, reason:‘Late arrival +1hr’},
+{label:‘Late Start +2hr’,     start: baseStart?baseStart+2:null,   end: baseEnd, reason:‘Late arrival +2hr’},
+{label:‘Early Out −30min’,    start: baseStart, end: baseEnd?baseEnd-0.5:null,   reason:‘Early departure −30’},
+{label:‘Early Out −1hr’,      start: baseStart, end: baseEnd?baseEnd-1:null,     reason:‘Early departure −1hr’},
+{label:‘Early Start −30min’,  start: baseStart?baseStart-0.5:null, end: baseEnd, reason:‘Early arrival −30’},
+{label:‘Early Start −1hr’,    start: baseStart?baseStart-1:null,   end: baseEnd, reason:‘Early arrival −1hr’},
+];
 
-  const optHtml = presets.map(p => {
-    const isActive = currentMod ? currentMod.reason === p.reason : p.reason === 'normal';
-    const timeStr  = p.start !== null ? fmtH(p.start) + '–' + fmtH(p.end) : '—';
-    const idx = presets.indexOf(p);
-    return `<div onclick="applyShiftMod('${pid}',${idx})"
-      style="display:flex;align-items:center;justify-content:space-between;
-        padding:10px 14px;border-radius:6px;cursor:pointer;margin-bottom:5px;
-        background:${isActive?'rgba(37,99,235,.12)':'var(--bg3)'};
-        border:1px solid ${isActive?'var(--acc)':'var(--bdr2)'};transition:all .15s">
-      <div>
-        <div style="font-weight:700;font-size:13px;color:${isActive?'var(--acc)':'var(--txt)'}">${p.label}</div>
-        <div style="font-size:11px;color:var(--txt3);margin-top:2px">${timeStr}</div>
-      </div>
-      ${isActive ? '<span style="color:var(--acc);font-weight:700">✓</span>' : ''}
-    </div>`;
-  }).join('');
+const optHtml = presets.map(p => {
+const isActive = currentMod ? currentMod.reason === p.reason : p.reason === ‘normal’;
+const timeStr  = p.start !== null ? fmtH(p.start) + ‘–’ + fmtH(p.end) : ‘—’;
+const idx = presets.indexOf(p);
+return `<div onclick="applyShiftMod('${pid}',${idx})" style="display:flex;align-items:center;justify-content:space-between; padding:10px 14px;border-radius:6px;cursor:pointer;margin-bottom:5px; background:${isActive?'rgba(37,99,235,.12)':'var(--bg3)'}; border:1px solid ${isActive?'var(--acc)':'var(--bdr2)'};transition:all .15s"> <div> <div style="font-weight:700;font-size:13px;color:${isActive?'var(--acc)':'var(--txt)'}">${p.label}</div> <div style="font-size:11px;color:var(--txt3);margin-top:2px">${timeStr}</div> </div> ${isActive ? '<span style="color:var(--acc);font-weight:700">✓</span>' : ''} </div>`;
+}).join(’’);
 
-  const body = `
-    <p style="font-size:12px;color:var(--txt3);margin-bottom:14px">
-      Select a time modification for ${personName} today only. 
-      Resets at start of next day. Also affects their rotation block timing.
-    </p>
-    ${optHtml}
-    <div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:5px;font-size:11px;color:var(--txt3)">
-      💡 Custom time? Use the Schedule → Load Schedule paste zone to update the stored schedule.
-    </div>`;
+const body = ` <p style="font-size:12px;color:var(--txt3);margin-bottom:14px"> Select a time modification for ${personName} today only.  Resets at start of next day. Also affects their rotation block timing. </p> ${optHtml} <div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:5px;font-size:11px;color:var(--txt3)"> 💡 Custom time? Use the Schedule → Load Schedule paste zone to update the stored schedule. </div>`;
 
-  openModal('⏰ Adjust Shift — ' + personName, body);
+openModal(’⏰ Adjust Shift — ’ + personName, body);
 }
 
 function applyShiftMod(pid, presetIdx) {
-  if (!STATE.shiftMod) STATE.shiftMod = {};
-  // Rebuild presets for this person to get the right one
-  const person = ROSTER_CXR.find(p => p.name.replace(/\s/g,'_') === pid);
-  const bs = person ? person.shiftStart : null;
-  const be = person ? person.shiftEnd   : null;
-  const presets = [
-    {reason:'normal',              start:bs,         end:be},
-    {reason:'Late arrival +30',    start:bs?bs+0.5:null, end:be, label:'Late Start +30min'},
-    {reason:'Late arrival +1hr',   start:bs?bs+1:null,   end:be, label:'Late Start +1hr'},
-    {reason:'Late arrival +2hr',   start:bs?bs+2:null,   end:be, label:'Late Start +2hr'},
-    {reason:'Early departure −30', start:bs, end:be?be-0.5:null, label:'Early Out −30min'},
-    {reason:'Early departure −1hr',start:bs, end:be?be-1:null,   label:'Early Out −1hr'},
-    {reason:'Early arrival −30',   start:bs?bs-0.5:null, end:be, label:'Early Start −30min'},
-    {reason:'Early arrival −1hr',  start:bs?bs-1:null,   end:be, label:'Early Start −1hr'},
-  ];
-  const p = presets[presetIdx] || presets[0];
-  if (p.reason === 'normal') {
-    delete STATE.shiftMod[pid];
-  } else {
-    STATE.shiftMod[pid] = {
-      start:   p.start,
-      end:     p.end,
-      reason:  p.reason,
-      display: p.label || p.reason,
-    };
-  }
-  saveState();
-  closeModal();
-  buildStaffGrid();
-  buildCoverageUI();
-  toast('Shift modified ✓');
+if (!STATE.shiftMod) STATE.shiftMod = {};
+// Rebuild presets for this person to get the right one
+const person = ROSTER_CXR.find(p => p.name.replace(/\s/g,’_’) === pid);
+const bs = person ? person.shiftStart : null;
+const be = person ? person.shiftEnd   : null;
+const presets = [
+{reason:‘normal’,              start:bs,         end:be},
+{reason:‘Late arrival +30’,    start:bs?bs+0.5:null, end:be, label:‘Late Start +30min’},
+{reason:‘Late arrival +1hr’,   start:bs?bs+1:null,   end:be, label:‘Late Start +1hr’},
+{reason:‘Late arrival +2hr’,   start:bs?bs+2:null,   end:be, label:‘Late Start +2hr’},
+{reason:‘Early departure −30’, start:bs, end:be?be-0.5:null, label:‘Early Out −30min’},
+{reason:‘Early departure −1hr’,start:bs, end:be?be-1:null,   label:‘Early Out −1hr’},
+{reason:‘Early arrival −30’,   start:bs?bs-0.5:null, end:be, label:‘Early Start −30min’},
+{reason:‘Early arrival −1hr’,  start:bs?bs-1:null,   end:be, label:‘Early Start −1hr’},
+];
+const p = presets[presetIdx] || presets[0];
+if (p.reason === ‘normal’) {
+delete STATE.shiftMod[pid];
+} else {
+STATE.shiftMod[pid] = {
+start:   p.start,
+end:     p.end,
+reason:  p.reason,
+display: p.label || p.reason,
+};
+}
+saveState();
+closeModal();
+buildStaffGrid();
+buildCoverageUI();
+toast(‘Shift modified ✓’);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -8082,17 +7981,17 @@ function applyShiftMod(pid, presetIdx) {
 // ═══════════════════════════════════════════════════════════════════════
 
 function cycleStationPref(pid, personName) {
-  if (!STATE.stationPref) STATE.stationPref = {};
-  const current = STATE.stationPref[pid] || 'none';
-  const next = current === 'none' ? 'counter'
-             : current === 'counter' ? 'exit'
-             : 'none';
-  if (next === 'none') delete STATE.stationPref[pid];
-  else STATE.stationPref[pid] = next;
-  saveState();
-  buildStaffGrid();
-  const labels = {none:'No preference set', counter:'Prefers Counter saved ✓', exit:'Prefers Exit saved ✓'};
-  toast(labels[next]);
+if (!STATE.stationPref) STATE.stationPref = {};
+const current = STATE.stationPref[pid] || ‘none’;
+const next = current === ‘none’ ? ‘counter’
+: current === ‘counter’ ? ‘exit’
+: ‘none’;
+if (next === ‘none’) delete STATE.stationPref[pid];
+else STATE.stationPref[pid] = next;
+saveState();
+buildStaffGrid();
+const labels = {none:‘No preference set’, counter:‘Prefers Counter saved ✓’, exit:‘Prefers Exit saved ✓’};
+toast(labels[next]);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -8102,29 +8001,29 @@ function cycleStationPref(pid, personName) {
 // ═══════════════════════════════════════════════════════════════════════
 
 function autoSuggestRotation() {
-  const rotation = buildSmartRotation();
-  if (!rotation || !rotation.rotations) return;
+const rotation = buildSmartRotation();
+if (!rotation || !rotation.rotations) return;
 
-  // Store suggested assignments — don't override manual ones
-  rotation.rotations.forEach(rot => {
-    const pid = rot.pid;
-    // Only auto-assign if no manual station set yet
-    if (!STATE.staffStation[pid]) {
-      const b1 = rot.b1Station;
-      STATE.staffStation[pid] = b1 === 'exit' ? 'Exit Booth' : 'Counter';
-    }
-  });
+// Store suggested assignments — don’t override manual ones
+rotation.rotations.forEach(rot => {
+const pid = rot.pid;
+// Only auto-assign if no manual station set yet
+if (!STATE.staffStation[pid]) {
+const b1 = rot.b1Station;
+STATE.staffStation[pid] = b1 === ‘exit’ ? ‘Exit Booth’ : ‘Counter’;
+}
+});
 
-  // Store rotation data for mini display on cards
-  window._lastRotations = {};
-  rotation.rotations.forEach(rot => {
-    window._lastRotations[rot.pid] = rot;
-  });
+// Store rotation data for mini display on cards
+window._lastRotations = {};
+rotation.rotations.forEach(rot => {
+window._lastRotations[rot.pid] = rot;
+});
 
-  saveState();
-  buildStaffGrid();
-  buildCoverageUI();
-  toast('Rotation suggested — review and confirm each person ✓');
+saveState();
+buildStaffGrid();
+buildCoverageUI();
+toast(‘Rotation suggested — review and confirm each person ✓’);
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -8134,115 +8033,116 @@ function autoSuggestRotation() {
 // ═══════════════════════════════════════════════════════════════════════
 
 function recordDayPattern() {
-  const today = new Date().toISOString().slice(0,10);
-  const PATTERN_KEY = 'cmh-station-patterns-v1';
-  let patterns = {};
-  try { patterns = JSON.parse(localStorage.getItem(PATTERN_KEY)||'{}'); } catch(e) {}
+const today = new Date().toISOString().slice(0,10);
+const PATTERN_KEY = ‘cmh-station-patterns-v1’;
+let patterns = {};
+try { patterns = JSON.parse(localStorage.getItem(PATTERN_KEY)||’{}’); } catch(e) {}
 
-  // Record each CXR's station today
-  ROSTER_CXR.forEach(p => {
-    const pid = p.name.replace(/\s/g,'_');
-    if (STATE.staffDuty[pid] !== true) return;
-    const station = STATE.staffStation[pid];
-    if (!station) return;
-    if (!patterns[pid]) patterns[pid] = {counter:0, exit:0, days:[]};
-    if (station === 'Counter') patterns[pid].counter++;
-    else if (station === 'Exit Booth') patterns[pid].exit++;
-    patterns[pid].days.push({date:today, station});
-    // Keep only last 30 days
-    if (patterns[pid].days.length > 30) patterns[pid].days.shift();
-  });
+// Record each CXR’s station today
+ROSTER_CXR.forEach(p => {
+const pid = p.name.replace(/\s/g,’_’);
+if (STATE.staffDuty[pid] !== true) return;
+const station = STATE.staffStation[pid];
+if (!station) return;
+if (!patterns[pid]) patterns[pid] = {counter:0, exit:0, days:[]};
+if (station === ‘Counter’) patterns[pid].counter++;
+else if (station === ‘Exit Booth’) patterns[pid].exit++;
+patterns[pid].days.push({date:today, station});
+// Keep only last 30 days
+if (patterns[pid].days.length > 30) patterns[pid].days.shift();
+});
 
-  try { localStorage.setItem(PATTERN_KEY, JSON.stringify(patterns)); } catch(e) {}
+try { localStorage.setItem(PATTERN_KEY, JSON.stringify(patterns)); } catch(e) {}
 }
 
 function getLearnedPref(pid) {
-  try { const p=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');const d=p[pid];if(!d||(d.counter+d.exit)<5)return null;const r=d.exit/(d.counter+d.exit);return r>=0.75?'exit':r<=0.25?'counter':null; }catch(e){return null;}
+try { const p=JSON.parse(localStorage.getItem(‘cmh-station-patterns-v1’)||’{}’);const d=p[pid];if(!d||(d.counter+d.exit)<5)return null;const r=d.exit/(d.counter+d.exit);return r>=0.75?‘exit’:r<=0.25?‘counter’:null; }catch(e){return null;}
 }
 function recordStationOverride(pid, station) {
-  if(!station||!pid)return;
-  const KEY='cmh-station-patterns-v1';let p={};try{p=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){}
-  if(!p[pid])p[pid]={counter:0,exit:0,days:[],overrides:[],suggestedPref:null};
-  const today=new Date().toISOString().slice(0,10);
-  p[pid].overrides=p[pid].overrides||[];p[pid].overrides.push({date:today,station});
-  if(p[pid].overrides.length>60)p[pid].overrides.shift();
-  const recent=p[pid].overrides.slice(-20);
-  const exitC=recent.filter(o=>o.station==='Exit Booth').length, ctrC=recent.filter(o=>o.station==='Counter').length, total=exitC+ctrC;
-  if(total>=5){const ratio=exitC/total;p[pid].suggestedPref=ratio>=0.70?'exit':ratio<=0.30?'counter':null;p[pid].overrideCount=total;}
-  try{localStorage.setItem(KEY,JSON.stringify(p));}catch(e){}
+if(!station||!pid)return;
+const KEY=‘cmh-station-patterns-v1’;let p={};try{p=JSON.parse(localStorage.getItem(KEY)||’{}’);}catch(e){}
+if(!p[pid])p[pid]={counter:0,exit:0,days:[],overrides:[],suggestedPref:null};
+const today=new Date().toISOString().slice(0,10);
+p[pid].overrides=p[pid].overrides||[];p[pid].overrides.push({date:today,station});
+if(p[pid].overrides.length>60)p[pid].overrides.shift();
+const recent=p[pid].overrides.slice(-20);
+const exitC=recent.filter(o=>o.station===‘Exit Booth’).length, ctrC=recent.filter(o=>o.station===‘Counter’).length, total=exitC+ctrC;
+if(total>=5){const ratio=exitC/total;p[pid].suggestedPref=ratio>=0.70?‘exit’:ratio<=0.30?‘counter’:null;p[pid].overrideCount=total;}
+try{localStorage.setItem(KEY,JSON.stringify(p));}catch(e){}
 }
 function getPatternSuggestion(pid) {
-  try{const p=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');const d=p[pid];if(!d||!d.suggestedPref)return null;return{pref:d.suggestedPref,count:d.overrideCount||0};}catch(e){return null;}
+try{const p=JSON.parse(localStorage.getItem(‘cmh-station-patterns-v1’)||’{}’);const d=p[pid];if(!d||!d.suggestedPref)return null;return{pref:d.suggestedPref,count:d.overrideCount||0};}catch(e){return null;}
 }
 
 function buildExpectedToday() {
-  const today = todayKey();
-  const now   = new Date();
-  const dow   = now.getDay();
-  const allRoster = [...ROSTER_CXR, ...ROSTER_MGMT];
-  const expected  = {};
+const today = todayKey();
+const now   = new Date();
+const dow   = now.getDay();
+const allRoster = […ROSTER_CXR, …ROSTER_MGMT];
+const expected  = {};
 
-  // Helper: normalize name to pid
-  function normPid(name) { return name.replace(/\s/g,'_'); }
-  // Helper: all variations of a name that might appear as stored pid
-  function namePidVariants(name) {
-    const base = name.replace(/\s/g,'_');
-    return [
-      base,                                         // exact spaces→underscore
-      base.replace(/[^A-Za-z0-9_]/g,'_').replace(/__+/g,'_').replace(/_$/,''), // strip parens to __
-      base.replace(/\(.*?\)/g,'_').replace(/__+/g,'_').replace(/_$/,''),     // strip (Nick) → single _
-      name.replace(/[^A-Za-z0-9]/g,'_').replace(/__+/g,'_').replace(/_$/,''), // all special → single _
-      // Also try first word match for short names
-      name.split(' ')[0]+'_'+name.split(' ').slice(-1)[0],  // First_Last only
-    ];
-  }
+// Helper: normalize name to pid
+function normPid(name) { return name.replace(/\s/g,’*’); }
+// Helper: all variations of a name that might appear as stored pid
+function namePidVariants(name) {
+const base = name.replace(/\s/g,’*’);
+return [
+base,                                         // exact spaces→underscore
+base.replace(/[^A-Za-z0-9_]/g,’*’).replace(/__+/g,’*’).replace(/*$/,’’), // strip parens to __
+base.replace(/(.*?)/g,’*’).replace(/**+/g,’*’).replace(/*$/,’’),     // strip (Nick) → single _
+name.replace(/[^A-Za-z0-9]/g,’_’).replace(/**+/g,’*’).replace(/*$/,’’), // all special → single _
+// Also try first word match for short names
+name.split(’ ‘)[0]+’_’+name.split(’ ’).slice(-1)[0],  // First_Last only
+];
+}
 
-  // 1. Pull management from stored schedule (most reliable)
-  const mgmtSched = getStoredSection('mgmt');
-  if (mgmtSched && mgmtSched.grid && mgmtSched.grid[today]) {
-    Object.entries(mgmtSched.grid[today]).forEach(([pid, shift]) => {
-      if (!shift || shift === 'OFF' || shift.toUpperCase().includes('VACA')) return;
-      // Find person: try all pid variants of each roster name
-      const person = allRoster.find(p => namePidVariants(p.name).includes(pid) ||
-        namePidVariants(p.name).some(v => pid.startsWith(v.slice(0,8)) || v.startsWith(pid.slice(0,8))));
-      if (person) {
-        const epid = normPid(person.name);
-        expected[epid] = { person, shift, source:'schedule' };
-      }
-    });
-  }
+// 1. Pull management from stored schedule (most reliable)
+const mgmtSched = getStoredSection(‘mgmt’);
+if (mgmtSched && mgmtSched.grid && mgmtSched.grid[today]) {
+Object.entries(mgmtSched.grid[today]).forEach(([pid, shift]) => {
+if (!shift || shift === ‘OFF’ || shift.toUpperCase().includes(‘VACA’)) return;
+// Find person: try all pid variants of each roster name
+const person = allRoster.find(p => namePidVariants(p.name).includes(pid) ||
+namePidVariants(p.name).some(v => pid.startsWith(v.slice(0,8)) || v.startsWith(pid.slice(0,8))));
+if (person) {
+const epid = normPid(person.name);
+expected[epid] = { person, shift, source:‘schedule’ };
+}
+});
+}
 
-  // 2. Pull CXR/Exit from stored CXR schedule
-  const cxrSched = getStoredSection('cxr');
-  if (cxrSched && cxrSched.grid && cxrSched.grid[today]) {
-    Object.entries(cxrSched.grid[today]).forEach(([pid, shift]) => {
-      if (!shift || shift === 'OFF' || shift.toUpperCase().includes('VACA')) return;
-      const person = allRoster.find(p => normPid(p.name) === pid);
-      if (person) expected[normPid(person.name)] = { person, shift, source:'schedule' };
-    });
-  }
+// 2. Pull CXR/Exit from stored CXR schedule
+const cxrSched = getStoredSection(‘cxr’);
+if (cxrSched && cxrSched.grid && cxrSched.grid[today]) {
+Object.entries(cxrSched.grid[today]).forEach(([pid, shift]) => {
+if (!shift || shift === ‘OFF’ || shift.toUpperCase().includes(‘VACA’)) return;
+const person = allRoster.find(p => normPid(p.name) === pid);
+if (person) expected[normPid(person.name)] = { person, shift, source:‘schedule’ };
+});
+}
 
-  // 3. Fill remaining from roster daysOn (CXR + Exit only — mgmt always from stored sched)
-  allRoster.forEach(person => {
-    const pid = normPid(person.name);
-    if (expected[pid]) return;
-    // Skip mgmt if not in stored schedule
-    if (['ARM','BRM','ABRM','MT'].includes(person.role)) return;
-    if (!person.daysOn || !Array.isArray(person.daysOn)) return;
-    if (!person.daysOn.includes(dow)) return;
-    if (!person.shiftStart && !person.shiftCode) return;
-    expected[pid] = { person, shift: person.shiftCode || 'varies', source:'roster' };
-  });
+// 3. Fill remaining from roster daysOn (CXR + Exit only — mgmt always from stored sched)
+allRoster.forEach(person => {
+const pid = normPid(person.name);
+if (expected[pid]) return;
+// Skip mgmt if not in stored schedule
+if ([‘ARM’,‘BRM’,‘ABRM’,‘MT’].includes(person.role)) return;
+if (person.active === false) return;
+if (!person.daysOn || !Array.isArray(person.daysOn)) return;
+if (!person.daysOn.includes(dow)) return;
+if (!person.shiftStart && !person.shiftCode) return;
+expected[pid] = { person, shift: person.shiftCode || ‘varies’, source:‘roster’ };
+});
 
-  return expected;
+return expected;
 }
 
 function toggleEmailDataSection() {
-  _emailDataOpen = !_emailDataOpen;
-  const body = document.getElementById('email-data-body');
-  const lbl  = document.getElementById('email-data-toggle-lbl');
-  if (body) body.style.display = _emailDataOpen ? 'block' : 'none';
-  if (lbl)  lbl.textContent = _emailDataOpen ? '▲ Collapse' : '▼ Brand totals · Peaks · Greeting';
+_emailDataOpen = !_emailDataOpen;
+const body = document.getElementById(‘email-data-body’);
+const lbl  = document.getElementById(‘email-data-toggle-lbl’);
+if (body) body.style.display = _emailDataOpen ? ‘block’ : ‘none’;
+if (lbl)  lbl.textContent = _emailDataOpen ? ‘▲ Collapse’ : ‘▼ Brand totals · Peaks · Greeting’;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -8251,177 +8151,126 @@ function toggleEmailDataSection() {
 
 // Adjust split: +/-30 or +/-60 min on Block 1, opposite on Block 2
 function adjustSplit(pid, minutesDelta) {
-  if (!STATE.altSchedule)  STATE.altSchedule  = {};
-  if (!STATE.customSplits) STATE.customSplits = {};
-  const cur = STATE.altSchedule[pid] || 'normal';
-  if (cur === 'full-counter' || cur === 'full-exit') { toast('Switch to 4hr Split first'); return; }
-  const sp = STATE.customSplits[pid] || { b1H:4, b2H:4 };
-  const d  = minutesDelta / 60;
-  const b1H = Math.max(1, Math.min(7, Math.round((sp.b1H + d) * 2) / 2));
-  const b2H = Math.max(1, Math.min(7, Math.round((sp.b2H - d) * 2) / 2));
-  STATE.customSplits[pid] = { b1H, b2H };
-  const b1St = STATE.staffStation[pid] === 'Exit Booth' ? 'exit' : 'counter';
-  if (b1H === 4 && b2H === 4) { delete STATE.altSchedule[pid]; delete STATE.customSplits[pid]; }
-  else STATE.altSchedule[pid] = b1H > b2H ? (b1St==='exit'?'exit-first':'counter-first') : (b1St==='exit'?'counter-first':'exit-first');
-  saveState();
+if (!STATE.altSchedule)  STATE.altSchedule  = {};
+if (!STATE.customSplits) STATE.customSplits = {};
+const cur = STATE.altSchedule[pid] || ‘normal’;
+if (cur === ‘full-counter’ || cur === ‘full-exit’) { toast(‘Switch to 4hr Split first’); return; }
+const sp = STATE.customSplits[pid] || { b1H:4, b2H:4 };
+const d  = minutesDelta / 60;
+const b1H = Math.max(1, Math.min(7, Math.round((sp.b1H + d) * 2) / 2));
+const b2H = Math.max(1, Math.min(7, Math.round((sp.b2H - d) * 2) / 2));
+STATE.customSplits[pid] = { b1H, b2H };
+const b1St = STATE.staffStation[pid] === ‘Exit Booth’ ? ‘exit’ : ‘counter’;
+if (b1H === 4 && b2H === 4) { delete STATE.altSchedule[pid]; delete STATE.customSplits[pid]; }
+else STATE.altSchedule[pid] = b1H > b2H ? (b1St===‘exit’?‘exit-first’:‘counter-first’) : (b1St===‘exit’?‘counter-first’:‘exit-first’);
+saveState();
 }
 
 function toggleNoLunch(pid) {
-  if (!STATE.altSchedule) STATE.altSchedule = {};
-  const key = pid + '_nolunch';
-  if (STATE.altSchedule[key]) delete STATE.altSchedule[key];
-  else STATE.altSchedule[key] = true;
-  saveState();
+if (!STATE.altSchedule) STATE.altSchedule = {};
+const key = pid + ‘_nolunch’;
+if (STATE.altSchedule[key]) delete STATE.altSchedule[key];
+else STATE.altSchedule[key] = true;
+saveState();
 }
 
 // Show time edit modal (shift start/end entry)
 function showTimeEditModal(pid, personName) {
-  const person = [...ROSTER_CXR, ...ROSTER_MGMT].find(p => p.name.replace(/\s/g,'_') === pid);
-  const mod = STATE.shiftMod && STATE.shiftMod[pid];
+const person = […ROSTER_CXR, …ROSTER_MGMT].find(p => p.name.replace(/\s/g,’_’) === pid);
+const mod = STATE.shiftMod && STATE.shiftMod[pid];
 
-  function fmtH(h) {
-    if (h === null || h === undefined) return '';
-    const hr = Math.floor(h); const mn = Math.round((h-hr)*60);
-    const s = h >= 12 ? 'pm' : 'am'; const d = hr > 12 ? hr-12 : hr===0 ? 12 : hr;
-    return d + (mn ? ':' + String(mn).padStart(2,'0') : '') + s;
-  }
+function fmtH(h) {
+if (h === null || h === undefined) return ‘’;
+const hr = Math.floor(h); const mn = Math.round((h-hr)*60);
+const s = h >= 12 ? ‘pm’ : ‘am’; const d = hr > 12 ? hr-12 : hr===0 ? 12 : hr;
+return d + (mn ? ‘:’ + String(mn).padStart(2,‘0’) : ‘’) + s;
+}
 
-  const baseStart = person ? person.shiftStart : null;
-  const baseEnd   = person ? person.shiftEnd   : null;
-  const curStart  = mod ? mod.start : baseStart;
-  const curEnd    = mod ? mod.end   : baseEnd;
+const baseStart = person ? person.shiftStart : null;
+const baseEnd   = person ? person.shiftEnd   : null;
+const curStart  = mod ? mod.start : baseStart;
+const curEnd    = mod ? mod.end   : baseEnd;
 
-  const body = `
-    <p style="font-size:12px;color:var(--txt3);margin-bottom:14px">
-      Enter a custom start and/or end time for ${personName} today only.
-      Leave blank to use the roster default.
-    </p>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-      <div>
-        <label style="font-size:11px;font-weight:700;color:var(--txt3);
-          text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">
-          Start Time
-        </label>
-        <input id="te-start" type="text" placeholder="${fmtH(baseStart)||'e.g. 6am'}"
-          value="${fmtH(curStart)||''}"
-          style="width:100%;padding:9px 10px;background:var(--bg3);border:1px solid var(--bdr2);
-            border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:14px">
-      </div>
-      <div>
-        <label style="font-size:11px;font-weight:700;color:var(--txt3);
-          text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px">
-          End Time
-        </label>
-        <input id="te-end" type="text" placeholder="${fmtH(baseEnd)||'e.g. 2pm'}"
-          value="${fmtH(curEnd)||''}"
-          style="width:100%;padding:9px 10px;background:var(--bg3);border:1px solid var(--bdr2);
-            border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:14px">
-      </div>
-    </div>
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-g" style="flex:1"
-        onclick="applyTimeEdit('${pid}')">
-        ✓ Apply
-      </button>
-      <button class="btn btn-gh" onclick="clearTimeEdit('${pid}');closeModal()">
-        ↩ Reset to Default
-      </button>
-      <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
-    </div>`;
+const body = ` <p style="font-size:12px;color:var(--txt3);margin-bottom:14px"> Enter a custom start and/or end time for ${personName} today only. Leave blank to use the roster default. </p> <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px"> <div> <label style="font-size:11px;font-weight:700;color:var(--txt3); text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px"> Start Time </label> <input id="te-start" type="text" placeholder="${fmtH(baseStart)||'e.g. 6am'}" value="${fmtH(curStart)||''}" style="width:100%;padding:9px 10px;background:var(--bg3);border:1px solid var(--bdr2); border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:14px"> </div> <div> <label style="font-size:11px;font-weight:700;color:var(--txt3); text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:4px"> End Time </label> <input id="te-end" type="text" placeholder="${fmtH(baseEnd)||'e.g. 2pm'}" value="${fmtH(curEnd)||''}" style="width:100%;padding:9px 10px;background:var(--bg3);border:1px solid var(--bdr2); border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:14px"> </div> </div> <div style="display:flex;gap:8px"> <button class="btn btn-g" style="flex:1" onclick="applyTimeEdit('${pid}')"> ✓ Apply </button> <button class="btn btn-gh" onclick="clearTimeEdit('${pid}');closeModal()"> ↩ Reset to Default </button> <button class="btn btn-gh" onclick="closeModal()">Cancel</button> </div>`;
 
-  openModal('⏰ Shift Time — ' + personName, body);
+openModal(’⏰ Shift Time — ’ + personName, body);
 }
 
 function applyTimeEdit(pid) {
-  const startEl = document.getElementById('te-start');
-  const endEl   = document.getElementById('te-end');
-  if (!startEl || !endEl) { closeModal(); return; }
+const startEl = document.getElementById(‘te-start’);
+const endEl   = document.getElementById(‘te-end’);
+if (!startEl || !endEl) { closeModal(); return; }
 
-  function parseTime(str) {
-    if (!str || !str.trim()) return null;
-    str = str.trim().toLowerCase();
-    const m = str.match(/^(\d{1,2})(?::(\d{2}))?\s*(a|p|am|pm)?/);
-    if (!m) return null;
-    let h = parseInt(m[1]);
-    const mn = m[2] ? parseInt(m[2]) : 0;
-    const ampm = m[3] || '';
-    if (ampm.startsWith('p') && h !== 12) h += 12;
-    if (ampm.startsWith('a') && h === 12) h = 0;
-    // Airport heuristic: hours 1-6 with no am/pm = PM
-    if (!ampm && h >= 1 && h <= 6) h += 12;
-    return h + mn / 60;
-  }
+function parseTime(str) {
+if (!str || !str.trim()) return null;
+str = str.trim().toLowerCase();
+const m = str.match(/^(\d{1,2})(?::(\d{2}))?\s*(a|p|am|pm)?/);
+if (!m) return null;
+let h = parseInt(m[1]);
+const mn = m[2] ? parseInt(m[2]) : 0;
+const ampm = m[3] || ‘’;
+if (ampm.startsWith(‘p’) && h !== 12) h += 12;
+if (ampm.startsWith(‘a’) && h === 12) h = 0;
+// Airport heuristic: hours 1-6 with no am/pm = PM
+if (!ampm && h >= 1 && h <= 6) h += 12;
+return h + mn / 60;
+}
 
-  const start = parseTime(startEl.value);
-  const end   = parseTime(endEl.value);
+const start = parseTime(startEl.value);
+const end   = parseTime(endEl.value);
 
-  if (!start && !end) { closeModal(); return; }
+if (!start && !end) { closeModal(); return; }
 
-  if (!STATE.shiftMod) STATE.shiftMod = {};
-  const person = [...ROSTER_CXR,...ROSTER_MGMT].find(p=>p.name.replace(/\s/g,'_')===pid);
-  const baseStart = person ? person.shiftStart : null;
-  const baseEnd   = person ? person.shiftEnd   : null;
+if (!STATE.shiftMod) STATE.shiftMod = {};
+const person = […ROSTER_CXR,…ROSTER_MGMT].find(p=>p.name.replace(/\s/g,’_’)===pid);
+const baseStart = person ? person.shiftStart : null;
+const baseEnd   = person ? person.shiftEnd   : null;
 
-  function fmtDisp(h) {
-    if(h===null||h===undefined) return '?';
-    const hr=Math.floor(h);const mn=Math.round((h-hr)*60);
-    const s=h>=12?'p':'a';const d=hr>12?hr-12:hr===0?12:hr;
-    return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;
-  }
+function fmtDisp(h) {
+if(h===null||h===undefined) return ‘?’;
+const hr=Math.floor(h);const mn=Math.round((h-hr)*60);
+const s=h>=12?‘p’:‘a’;const d=hr>12?hr-12:hr===0?12:hr;
+return d+(mn?’:’+String(mn).padStart(2,‘0’):’’)+s;
+}
 
-  STATE.shiftMod[pid] = {
-    start: start !== null ? start : baseStart,
-    end:   end   !== null ? end   : baseEnd,
-    reason: 'custom',
-    display: fmtDisp(start||baseStart) + '–' + fmtDisp(end||baseEnd),
-  };
-  saveState();
-  closeModal();
-  buildSwitchboard();
-  toast('Shift time updated ✓');
+STATE.shiftMod[pid] = {
+start: start !== null ? start : baseStart,
+end:   end   !== null ? end   : baseEnd,
+reason: ‘custom’,
+display: fmtDisp(start||baseStart) + ‘–’ + fmtDisp(end||baseEnd),
+};
+saveState();
+closeModal();
+buildSwitchboard();
+toast(‘Shift time updated ✓’);
 }
 
 function clearTimeEdit(pid) {
-  if (STATE.shiftMod) delete STATE.shiftMod[pid];
-  saveState();
-  buildSwitchboard();
+if (STATE.shiftMod) delete STATE.shiftMod[pid];
+saveState();
+buildSwitchboard();
 }
 
 // Custom station for management
 function showCustomStationModal(pid, personName) {
-  const current = STATE.staffStation[pid] || '';
-  const isCustom = !['Counter Manager','Emerald Booth','Returns Manager','Floater','Off Site',''].includes(current);
+const current = STATE.staffStation[pid] || ‘’;
+const isCustom = ![‘Counter Manager’,‘Emerald Booth’,‘Returns Manager’,‘Floater’,‘Off Site’,’’].includes(current);
 
-  const body = `
-    <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
-      Enter a custom station or assignment for ${personName} today.
-    </p>
-    <input id="custom-station-input" type="text"
-      placeholder="e.g. Training · Off Property · Event · Coverage"
-      value="${isCustom ? current : ''}"
-      style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--bdr2);
-        border-radius:4px;color:var(--txt);font-size:14px;margin-bottom:12px">
-    <div style="display:flex;gap:8px">
-      <button class="btn btn-g" style="flex:1"
-        onclick="applyCustomStation('${pid}')">✓ Set Station</button>
-      <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
-    </div>`;
+const body = ` <p style="font-size:12px;color:var(--txt3);margin-bottom:12px"> Enter a custom station or assignment for ${personName} today. </p> <input id="custom-station-input" type="text" placeholder="e.g. Training · Off Property · Event · Coverage" value="${isCustom ? current : ''}" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--bdr2); border-radius:4px;color:var(--txt);font-size:14px;margin-bottom:12px"> <div style="display:flex;gap:8px"> <button class="btn btn-g" style="flex:1" onclick="applyCustomStation('${pid}')">✓ Set Station</button> <button class="btn btn-gh" onclick="closeModal()">Cancel</button> </div>`;
 
-  openModal('⚙ Custom Station — ' + personName, body);
+openModal(’⚙ Custom Station — ’ + personName, body);
 }
 
 function applyCustomStation(pid) {
-  const el = document.getElementById('custom-station-input');
-  if (!el || !el.value.trim()) { closeModal(); return; }
-  setStation(pid, el.value.trim());
-  closeModal();
-  buildSwitchboard();
-  toast('Custom station set ✓');
+const el = document.getElementById(‘custom-station-input’);
+if (!el || !el.value.trim()) { closeModal(); return; }
+setStation(pid, el.value.trim());
+closeModal();
+buildSwitchboard();
+toast(‘Custom station set ✓’);
 }
 
-
 </script>
-
 </body>
 </html>  // ─── CLOSING / END OF NIGHT ─────────────────────────────────────────────────
   if (type === 'closing') {
