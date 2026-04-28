@@ -1267,6 +1267,77 @@ user-select: none;
 -webkit-tap-highlight-color: transparent;
 }
 
+/* ── STAFF CARD REDESIGN ─────────────────────────────────────── */
+.staff-card { background:var(–bg3);border:1px solid var(–bdr);border-radius:8px;
+padding:12px;transition:all .15s;margin-bottom:0 }
+.staff-card.working { border-color:var(–bdr2) }
+.staff-card.off { opacity:.4 }
+.staff-card.has-alt { border-color:var(–amber3) }
+.exit-card.working { border-color:rgba(220,38,38,.3) }
+.cxr-card.working { border-color:rgba(37,99,235,.2) }
+
+.sc-top { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px }
+.sc-name { font-weight:700;font-size:14px;color:var(–txt);margin-bottom:2px }
+.sc-role { font-size:11px;color:var(–txt3);font-family:var(–ff-mono) }
+.exit-role { color:var(–red) }
+
+.duty-btn { font-size:10px;font-weight:700;padding:5px 10px;border-radius:4px;
+border:1px solid var(–bdr2);background:var(–bg2);color:var(–txt3);cursor:pointer;
+transition:all .15s;white-space:nowrap }
+.duty-btn.on { background:rgba(22,163,74,.12);border-color:var(–green3);color:var(–green) }
+.duty-btn.off { background:rgba(220,38,38,.08);border-color:var(–red3);color:var(–red) }
+
+/* Station buttons — primary action, prominent */
+.station-row { display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px }
+.station-btn { padding:8px 4px;border-radius:5px;border:1px solid var(–bdr2);
+background:var(–bg2);color:var(–txt3);font-size:11px;font-weight:600;
+cursor:pointer;transition:all .15s;text-align:center }
+.station-btn:hover { border-color:var(–bdr2);color:var(–txt) }
+.station-btn.active-counter { background:rgba(37,99,235,.15);border-color:var(–acc);
+color:var(–acc);font-weight:700 }
+.station-btn.active-exit { background:rgba(22,163,74,.15);border-color:var(–green);
+color:var(–green);font-weight:700 }
+.station-btn.active-auto { background:rgba(217,119,6,.12);border-color:var(–amber3);
+color:var(–amber);font-weight:700 }
+
+.station-locked { font-size:11px;font-weight:700;color:var(–red);
+padding:6px 8px;background:rgba(220,38,38,.08);border-radius:4px;
+margin-bottom:6px;border:1px solid var(–red3) }
+
+/* Rotation mini display */
+.rotation-mini { display:flex;align-items:center;gap:4px;margin-bottom:8px;flex-wrap:wrap }
+.rot-block { font-size:10px;font-weight:700;padding:3px 8px;border-radius:3px;border:1px solid }
+.rot-counter { background:rgba(37,99,235,.12);border-color:rgba(37,99,235,.4);color:var(–acc) }
+.rot-exit    { background:rgba(22,163,74,.12);border-color:rgba(22,163,74,.4);color:var(–green) }
+.rot-lunch   { background:var(–bg2);border-color:var(–bdr2);color:var(–txt3) }
+.rot-sep     { color:var(–txt3);font-size:10px }
+
+/* Action buttons row */
+.sc-actions { display:flex;gap:5px;flex-wrap:wrap }
+.sc-action-btn { font-size:10px;font-weight:600;padding:5px 9px;border-radius:4px;
+border:1px solid var(–bdr2);background:var(–bg2);color:var(–txt3);
+cursor:pointer;transition:all .15s;white-space:nowrap }
+.sc-action-btn:hover { color:var(–txt);border-color:var(–bdr2) }
+.sc-action-btn.alt-active { background:rgba(217,119,6,.12);border-color:var(–amber3);color:var(–amber) }
+.sc-action-btn.mod-active { background:rgba(217,119,6,.12);border-color:var(–amber3);color:var(–amber) }
+.sc-action-btn.pref-btn { margin-left:auto }
+
+.station-select { width:100%;font-size:12px;padding:6px 8px;margin-top:4px;
+background:var(–bg2);border:1px solid var(–bdr2);border-radius:4px;color:var(–txt) }
+
+/* ── SWITCHBOARD ───────────────────────────── */
+.adj-btn {
+font-size:11px;font-weight:600;padding:7px 12px;border-radius:5px;
+border:1px solid var(–bdr2);background:var(–bg3);color:var(–txt2);
+cursor:pointer;white-space:nowrap;transition:all .12s;
+-webkit-tap-highlight-color:transparent;
+}
+.adj-btn:active { opacity:.8 }
+.adj-btn.adj-blue  { background:rgba(37,99,235,.15);border-color:var(–acc);color:var(–acc);font-weight:700 }
+.adj-btn.adj-green { background:rgba(22,163,74,.15);border-color:var(–green);color:var(–green);font-weight:700 }
+.adj-btn.adj-amber { background:rgba(217,119,6,.15);border-color:rgba(217,119,6,.5);color:var(–amber);font-weight:700 }
+.adj-btn.adj-red   { background:rgba(220,38,38,.12);border-color:rgba(220,38,38,.4);color:var(–red);font-weight:700 }
+
 </style>
 </head>
 <body>
@@ -1420,6 +1491,14 @@ user-select: none;
 
 <div class="divider"></div>
 
+<!-- Email Data — collapsible -->
+<div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px;cursor:pointer"
+  onclick="toggleEmailDataSection()">
+  <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">📧 Email Data</span>
+  <span id="email-data-toggle-lbl" style="font-size:10px;color:var(--txt3)">▼ Brand totals · Peaks · Greeting</span>
+</div>
+<div id="email-data-body" style="display:none">
+
 <!-- Row 2b: Brand totals — paste from GL or type manually -->
 <div style="margin-bottom:8px">
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
@@ -1462,6 +1541,8 @@ user-select: none;
     <input type="text" id="f-fbo-count" placeholder="e.g. 4" oninput="sf('fboCount',this.value)">
   </div>
 </div>
+
+</div><!-- /email-data-body -->
 
 <div class="divider"></div>
 
@@ -1688,64 +1769,83 @@ user-select: none;
   <div class="sched-section-tabs">
     <button class="ss-tab on" id="ss-today"  onclick="showSchedSection('today')">📅 Today</button>
     <button class="ss-tab"    id="ss-month"  onclick="showSchedSection('month')">🗓 Month</button>
-    <button class="ss-tab"    id="ss-paste"  onclick="showSchedSection('paste')">📋 Load Schedule</button>
+    <button class="ss-tab"    id="ss-paste"  onclick="showSchedSection('paste')">📋 Paste Schedule</button>
   </div>
 
-  <!-- TODAY -->
+  <!-- TODAY — unified switchboard -->
 
   <div id="ss-sec-today">
 
 ```
-<!-- Morning briefing -->
-<div class="briefing-card" id="morning-briefing">
-  <div class="briefing-date" id="briefing-date">Loading...</div>
-  <div class="briefing-sub" id="briefing-sub">Loading today's schedule...</div>
-  <div class="briefing-grid" id="briefing-grid"></div>
-  <div class="confirm-bar" id="confirm-bar">
-    <span class="confirm-count" id="confirm-count">—</span>
-    <button class="btn btn-gh btn-sm" onclick="markAllCallout()">Reset callouts</button>
-    <button class="btn btn-g" onclick="confirmToday()">✅ Confirm Today</button>
+<!-- Header bar -->
+<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;
+  margin-bottom:10px;flex-wrap:wrap">
+  <div>
+    <div id="sched-date-lbl" style="font-family:var(--ff-hd);font-size:15px;
+      font-weight:800;color:var(--txt)">Loading...</div>
+    <div id="sched-count-lbl" style="font-size:11px;color:var(--txt3);margin-top:2px"></div>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+    <button class="btn btn-gh btn-sm" onclick="resetSchedDay()">↺ Reset</button>
+    <button class="btn btn-g" onclick="confirmToday()">✅ Confirm</button>
   </div>
 </div>
 
-<!-- Schedule helper -->
-<div class="card" id="sched-helper-box" style="background:rgba(37,99,235,.04);border-color:rgba(37,99,235,.2)">
-  <div class="ch" style="color:var(--acc)">🧠 Schedule Assistant</div>
-  <div id="sched-helper-inner" style="font-size:12px;color:var(--txt2);line-height:2">
-    Confirm today's schedule above to see auto-detected assignments.
+<!-- Coverage snapshot -->
+<div style="display:flex;gap:14px;padding:8px 14px;background:var(--bg3);
+  border-radius:6px;margin-bottom:10px;font-size:12px;font-weight:600;flex-wrap:wrap">
+  <span id="snap-counter" style="color:var(--acc)">🟦 Counter: —</span>
+  <span id="snap-exit"    style="color:var(--green)">🟩 Exit: —</span>
+  <span id="snap-off"     style="color:var(--txt3)">❌ Off: 0</span>
+  <span id="snap-gap"     style="margin-left:auto"></span>
+</div>
+
+<!-- Two-column switchboard -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+  <!-- LEFT: Counter -->
+  <div>
+    <div style="font-size:10px;font-weight:800;letter-spacing:.1em;
+      text-transform:uppercase;color:var(--acc);padding:5px 2px;
+      border-bottom:2px solid var(--acc);margin-bottom:6px">🟦 Counter</div>
+    <div id="col-counter"></div>
+  </div>
+
+  <!-- RIGHT: Exit + Management -->
+  <div>
+    <div style="font-size:10px;font-weight:800;letter-spacing:.1em;
+      text-transform:uppercase;color:var(--green);padding:5px 2px;
+      border-bottom:2px solid var(--green);margin-bottom:6px">🟩 Exit</div>
+    <div id="col-exit"></div>
+
+    <div style="font-size:10px;font-weight:800;letter-spacing:.1em;
+      text-transform:uppercase;color:var(--txt3);padding:5px 2px;
+      border-bottom:1px solid var(--bdr);margin:12px 0 6px">🎯 Management</div>
+    <div id="col-mgmt"></div>
   </div>
 </div>
 
-<!-- Coverage & rotation -->
-<div class="card">
-  <div class="ch">🕐 Coverage &amp; Rotation</div>
-  <div id="coverage-alerts"></div>
-  <div id="rotation-plan"></div>
-  <div id="coverage-board"></div>
-</div>
+<!-- Unassigned + callouts -->
+<div id="col-unassigned" style="margin-top:10px"></div>
 
-<!-- CXR staff -->
-<div class="card">
-  <div class="ch">🏃 CXR &amp; Exit Staff
-    <span class="badge">Tap status · one-tap station</span>
+<!-- Slide-up adjust panel -->
+<div id="adjust-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;
+  background:var(--bg2);border-top:2px solid var(--acc);padding:14px 16px;
+  z-index:500;box-shadow:0 -4px 24px rgba(0,0,0,.5)">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+    <span id="adjust-name" style="font-weight:800;font-size:15px;color:var(--txt)"></span>
+    <span id="adjust-shift" style="font-size:11px;color:var(--txt3);
+      font-family:var(--ff-mono)"></span>
+    <button onclick="closeAdjustPanel()" style="margin-left:auto;font-size:20px;
+      line-height:1;color:var(--txt3);background:none;border:none;cursor:pointer">×</button>
   </div>
-  <div id="staff-grid-cxr" class="sched-grid"></div>
+  <div id="adjust-actions" style="display:flex;gap:6px;flex-wrap:wrap"></div>
 </div>
-
-<!-- Management -->
-<div class="card" style="margin-top:12px">
-  <div class="ch">🎯 Management — Today</div>
-  <div id="staff-grid-mgmt" class="sched-grid"></div>
-</div>
-
-<!-- Exit fairness (injected here) -->
-<div id="exit-fairness-panel"></div>
 ```
 
   </div>
-
   <!-- MONTH VIEW -->
-
   <div id="ss-sec-month" style="display:none">
     <div class="card">
       <div class="ch">🗓 Stored Schedule <span class="badge" id="sched-range-badge">No schedule loaded</span></div>
@@ -2646,6 +2746,8 @@ function loadState() {
       s.physInventory = s.physInventory || {};
       s.altSchedule  = s.altSchedule  || {};
       s.pasteHourly  = s.pasteHourly  || {};
+      s.stationPref  = s.stationPref  || {};
+      s.shiftMod     = s.shiftMod     || {};
       s.closeFields  = s.closeFields  || {};
       return s;
     }
@@ -2654,6 +2756,7 @@ function loadState() {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
+    stationPref:{}, shiftMod:{},
   };
 }
 
@@ -2748,18 +2851,47 @@ function showTab(id) {
 function restoreFields() {
   const f = STATE.fields;
   const map = {
-    'f-cs':'cs','f-hot':'hot','f-openmgr':'openMgr','f-closemgr':'closeMgr',
-    'f-sales':'salesLeader','f-oos':'oos','f-inv':'invAgent',
+    'f-cs':'cs','f-hot':'hot','f-oos':'oos',
+    'f-openmgr':'openMgr','f-closemgr':'closeMgr',
+    'f-sales':'salesLeader','f-invagent':'invAgent',
+    'f-classnotes':'classNotes',
     'f-xxar':'xxar','f-sxar':'sxar','f-pxar':'pxar','f-auth':'auth',
-    'f-classnotes':'classNotes'
+    'f-total-res':'totalRes',
+    'f-brand-nat':'brandNational','f-brand-ala':'brandAlamo',
+    'f-brand-ent':'brandEnterprise','f-brand-20':'brand20',
+    'f-fbo-count':'fboCount','f-fbo-notes':'fboNotes',
+    'f-peak-res':'peakRes','f-peak-ret':'peakRet',
+    'f-email-greeting':'emailGreeting',
+    'f-close-greeting':'closeGreeting',
+    'f-close-today-ret':'closeTodayRet',
+    'f-close-tmrw-res':'closeTmrwRes',
+    'f-close-tmrw-ret':'closeTmrwRet',
+    'f-fbo-detail':'fboDetail',
+    'f-oos-final':'oosFinal',
+    'f-latestaff':'lateStaff',
+    'f-closenotes':'closeNotes',
+    'email-to-morning':'emailToMorning',
+    'email-to-evening':'emailToEvening',
+    'email-to-log':'emailToLog',
   };
   for (const [id, key] of Object.entries(map)) {
     const el = document.getElementById(id);
-    if (el && f[key] !== undefined) el.value = f[key];
+    if (!el || f[key] === undefined || f[key] === null) continue;
+    el.value = f[key];
   }
+  if (typeof updateWUBtns === 'function') updateWUBtns();
   const book24 = document.getElementById('f-24hr');
   if (book24 && f.book24hr) book24.value = f.book24hr;
-  updateSummary();
+  // Restore brand paste display
+  if ((f.brandNational || f.brandAlamo) && !document.getElementById('f-brand-paste')?.value) {
+    const el = document.getElementById('f-brand-paste');
+    if (el) el.value = [
+      f.brandNational   ? 'National: '   + f.brandNational   : '',
+      f.brandAlamo      ? 'Alamo: '      + f.brandAlamo      : '',
+      f.brandEnterprise ? 'Enterprise: ' + f.brandEnterprise  : '',
+      f.brand20         ? '2.0: '        + f.brand20         : '',
+    ].filter(Boolean).join('\n');
+  }
 }
 
 function restoreClosingFields() {
@@ -3176,137 +3308,7 @@ function updateBoardHeader() {
 
 // ── STAFF SCHEDULE ───────────────────────────────────────────────────────────
 
-function buildStaffSection(containerId, roster, isMgmt) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  let out = '';
-
-  roster.forEach(person => {
-    const key     = person.name.replace(/\s/g,'_');
-    const duty    = STATE.staffDuty[key];
-    const station = STATE.staffStation[key] || (isMgmt ? (person.default || person.defaultStation || '') : '');
-    const shift   = STATE.shiftTimes ? (STATE.shiftTimes[key] || person.shiftCode || '—') : (person.shiftCode || '—');
-    const isWorking = duty === true;
-    const isOff     = duty === false;
-
-    // Auto-set Exit Agents to Exit Booth
-    if (person.role === 'EXIT' && isWorking && !STATE.staffStation[key]) {
-      STATE.staffStation[key] = 'Exit Booth';
-    }
-
-    const dutyBtn = `<button style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:4px;
-      border:1px solid ${isWorking?'var(--green3)':isOff?'var(--red3)':'var(--bdr2)'};
-      background:${isWorking?'rgba(22,163,74,.12)':isOff?'rgba(220,38,38,.08)':'var(--bg2)'};
-      color:${isWorking?'var(--green)':isOff?'var(--red)':'var(--txt3)'};cursor:pointer"
-      onclick="event.stopPropagation();cycleDuty('${key}')">
-      ${isWorking?'✅ Working':isOff?'❌ Off':'Set status'}
-    </button>`;
-
-    // ── EXIT AGENT: locked to exit, no toggle ───────────────────────────────
-    if (!isMgmt && person.role === 'EXIT') {
-      out += `<div class="staff-card ${isWorking?'working':isOff?'off':''}" style="position:relative">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">
-          <div>
-            <div class="sc-name">${person.nick||person.name.split(' ')[0]}</div>
-            <div class="sc-role" style="color:var(--red)">EXIT AGENT · ${shift}</div>
-          </div>
-          ${dutyBtn}
-        </div>
-        ${isWorking ? `<div style="padding:6px 8px;background:rgba(220,38,38,.1);border:1px solid var(--red3);
-          border-radius:4px;font-size:11px;font-weight:700;color:var(--red);text-align:center">
-          🔴 Exit Booth — Full Shift (never rotates)
-        </div>` : ''}
-      </div>`;
-      return;
-    }
-
-    // ── CXR: one-tap Counter / Exit for Block 1 ─────────────────────────────
-    if (!isMgmt && person.role === 'CXR') {
-      const isExit = station === 'Exit Booth';
-      const block2 = isExit ? 'Counter' : 'Exit Booth';
-      out += `<div class="staff-card ${isWorking?'working':isOff?'off':''}" style="position:relative">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px">
-          <div>
-            <div class="sc-name">${person.nick||person.name.split(' ')[0]}</div>
-            <div class="sc-role">CXR · ${shift}</div>
-          </div>
-          ${dutyBtn}
-        </div>
-        ${isWorking ? `
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:5px">
-          <button onclick="event.stopPropagation();tapStation('${key}','Counter')"
-            style="padding:8px 4px;border-radius:4px;border:1px solid;font-size:11px;
-            font-weight:700;cursor:pointer;text-align:center;
-            background:${!isExit?'rgba(37,99,235,.2)':'transparent'};
-            border-color:${!isExit?'var(--acc)':'var(--bdr2)'};
-            color:${!isExit?'var(--acc)':'var(--txt3)'}">
-            🟢 Counter${!isExit?' ✓':''}
-          </button>
-          <button onclick="event.stopPropagation();tapStation('${key}','Exit Booth')"
-            style="padding:8px 4px;border-radius:4px;border:1px solid;font-size:11px;
-            font-weight:700;cursor:pointer;text-align:center;
-            background:${isExit?'rgba(220,38,38,.15)':'transparent'};
-            border-color:${isExit?'var(--red)':'var(--bdr2)'};
-            color:${isExit?'var(--red)':'var(--txt3)'}">
-            🔴 Exit${isExit?' ✓':''}
-          </button>
-        </div>
-        <div style="font-size:10px;color:var(--txt3)">
-          Block 1 → <b style="color:${isExit?'var(--red)':'var(--acc)'}">
-          ${isExit?'Exit':'Counter'}</b> · 
-          Block 2 → <b style="color:${isExit?'var(--acc)':'var(--red)'}">
-          ${block2.replace(' Booth','')}</b> · Lunch auto-calculated
-        </div>` : ''}
-      </div>`;
-      return;
-    }
-
-    // ── MANAGEMENT: dropdown station assign ──────────────────────────────────
-    const MGMT_ST = ['Emerald Booth Manager','Counter Manager','Returns Manager',
-      'Floater','Opening Manager','Closing Manager','At 99 (Training Center)',
-      'Outfield','Roundtable','Stronger Together Event','On Call','Off Site'];
-    const stSelect = `<select onchange="setStation('${key}',this.value)"
-      onclick="event.stopPropagation()"
-      style="font-size:10px;padding:4px 6px;margin-top:6px;width:100%;
-             background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt)">
-      <option value="">— assign station —</option>
-      ${MGMT_ST.map(s=>`<option value="${s}" ${station===s?'selected':''}>${s}</option>`).join('')}
-    </select>`;
-
-    out += `<div class="staff-card ${isWorking?'working':isOff?'off':''}"
-      onclick="toggleDuty('${key}')">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-        <div>
-          <div class="sc-name">${person.nick||person.name.split(' ')[0]}</div>
-          <div class="sc-role">${person.role} · ${shift}</div>
-        </div>
-        ${dutyBtn}
-      </div>
-      ${isWorking ? stSelect : ''}
-      ${isWorking && station ? `<div style="margin-top:4px;font-size:10px;font-weight:600;
-        color:var(--acc)">📍 ${station}</div>` : ''}
-      ${isWorking && !isMgmt && person.role !== 'EXIT' ? (() => {
-        const altPos = typeof getAltPosition === 'function' ? getAltPosition(key) : 'normal';
-        const isAlt  = altPos !== 'normal';
-        const altDef = typeof ALT_POSITIONS !== 'undefined' ? ALT_POSITIONS.find(a=>a.key===altPos) : null;
-        return `<button onclick="event.stopPropagation();showAltScheduleModal('${key}','${person.nick||person.name.split(' ')[0]}')"
-          style="margin-top:6px;width:100%;font-size:10px;padding:4px 8px;
-            border-radius:4px;border:1px solid ${isAlt?'var(--amber)':'var(--bdr2)'};
-            background:${isAlt?'rgba(217,119,6,.12)':'var(--bg3)'};
-            color:${isAlt?'var(--amber)':'var(--txt3)'};cursor:pointer;text-align:left;
-            display:flex;align-items:center;gap:5px">
-          ${isAlt ? '⚠ ' + (altDef ? altDef.label : altPos) : '⚙ Alt Schedule Today'}
-        </button>`;
-      })() : ''}
-    </div>`;
-  });
-
-  el.innerHTML = out;
-}
-
-
-
-
+function buildStaffSection(containerId, roster, isMgmt) { buildSwitchboard(); }
 
 function toggleCheck(mode, text) {
   const key = `cl-${mode}`;
@@ -3569,21 +3571,6 @@ function applyParsedSchedule(parsed) {
 
 let currentEmailType = 'opening';
 let currentEmailData = {};
-
-function showEmail(type) {
-  currentEmailType = type;
-  const data = buildEmailData(type);
-  currentEmailData = data;
-
-  document.getElementById('email-preview-card').style.display = 'block';
-  document.getElementById('email-type-label').textContent = data.typeLabel;
-  document.getElementById('email-to-preview').textContent = data.to;
-  document.getElementById('email-subject-preview').textContent = data.subject;
-  document.getElementById('email-body-preview').textContent = data.body;
-
-  // Scroll to preview
-  document.getElementById('email-preview-card').scrollIntoView({behavior:'smooth',block:'start'});
-}
 
 function buildEmailData(type) {
   const f    = STATE.fields;
@@ -3936,6 +3923,7 @@ function loadHistory() {
 }
 
 function saveDayToHistory() {
+  recordDayPattern();
   const hist = loadHistory();
   const today = new Date().toISOString().slice(0,10);
   // Remove existing entry for today if present
@@ -4419,142 +4407,8 @@ function fmtHr(h) {
 }
 
 // ── BUILD COVERAGE UI ─────────────────────────────────────────────────────────
-function buildCoverageUI() {
-  const { rotations, workingExit, coverage, rules, exitGap, dow } = buildSmartRotation();
-  const today = new Date();
-  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function buildCoverageUI() { buildSwitchboard(); }
 
-  // ── ALERTS ─────────────────────────────────────────────────────────────────
-  const alertsEl = document.getElementById('coverage-alerts');
-  if (alertsEl) {
-    const alerts = [];
-
-    if (rotations.length === 0 && workingExit.length === 0) {
-      alerts.push({cls:'warn', msg:'Mark staff as working and confirm schedule to see coverage plan'});
-    } else {
-      // Day-of-week note
-      alerts.push({cls:'ok', msg:`📅 ${dayNames[dow]} — Min exit: ${rules.exitMin} · Min counter: ${rules.counterMin} · ${rules.notes}`});
-
-      // Exit coverage check
-      const exitTotal = workingExit.length;
-      if (exitTotal === 0 && rotations.length > 0) {
-        alerts.push({cls:'bad', msg:`🚨 NO exit agents on duty — ${rules.exitMin} needed. CXRs must cover exit gaps. See rotation plan.`});
-      } else if (exitTotal < rules.exitMin) {
-        alerts.push({cls:'warn', msg:`⚠ Only ${exitTotal} exit agent${exitTotal!==1?'s':''} · ${rules.exitMin} needed today. ${exitGap > 0 ? `${exitGap} CXR starting at exit to compensate.` : ''}`});
-      } else {
-        alerts.push({cls:'ok', msg:`✅ Exit coverage: ${exitTotal} agent${exitTotal!==1?'s':''} (minimum ${rules.exitMin})`});
-      }
-
-      // Check any rotation warnings
-      const warns = rotations.filter(r => r.warnExceedsLimit);
-      if (warns.length > 0) {
-        warns.forEach(w => alerts.push({cls:'warn', msg:`⚠ ${w.nick}: ${w.bumpNeeded}`}));
-      }
-    }
-
-    alertsEl.innerHTML = alerts.map(a =>
-      `<div class="gap-alert ${a.cls}">${a.msg}</div>`
-    ).join('');
-  }
-
-  // ── ROTATION PLAN ───────────────────────────────────────────────────────────
-  const rotEl = document.getElementById('rotation-plan');
-  if (rotEl) {
-    let rhtml = '';
-
-    // Exit Agents
-    if (workingExit.length > 0) {
-      rhtml += `<div class="cov-section-hdr">🔴 Exit Agents — Full Shift at Exit</div>`;
-      workingExit.forEach(ea => {
-        rhtml += `<div class="rotation-card">
-          <div class="rc-name">${ea.nick}
-            <span style="font-size:10px;color:var(--txt3);font-weight:400">
-              ${ea.shift.code} · ${fmtHr(ea.shift.start)}–${fmtHr(ea.shift.end)}
-            </span>
-          </div>
-          <div class="rc-blocks">
-            <span class="rc-block rc-exit">🔴 Exit ${fmtHr(ea.shift.start)}–${fmtHr(ea.shift.end)}</span>
-            <span style="font-size:10px;color:var(--txt3);margin-left:6px">Lunch: floating</span>
-          </div>
-        </div>`;
-      });
-    }
-
-    // CXR Rotations
-    if (rotations.length > 0) {
-      rhtml += `<div class="cov-section-hdr" style="margin-top:10px">🔄 CXR Rotation — 4-Hour Blocks</div>`;
-      rotations.forEach(rot => {
-        const b1Cls = rot.b1.station === 'exit' ? 'rc-exit' : 'rc-counter';
-        const b2Cls = rot.b2.station === 'exit' ? 'rc-exit' : 'rc-counter';
-        const b1Lbl = rot.b1.station === 'exit' ? '🔴 Exit' : '🟢 Counter';
-        const b2Lbl = rot.b2.station === 'exit' ? '🔴 Exit' : '🟢 Counter';
-        rhtml += `<div class="rotation-card ${rot.warnExceedsLimit?'':''}">
-          <div class="rc-name">${rot.nick}
-            <span style="font-size:10px;color:var(--txt3);font-weight:400">
-              ${rot.shiftCode} · ${fmtHr(rot.shiftStart)}–${fmtHr(rot.shiftEnd)}
-            </span>
-            ${rot.warnExceedsLimit ? '<span style="font-size:10px;color:var(--amber)">⚠ review</span>' : ''}
-          </div>
-          <div class="rc-blocks">
-            <span class="rc-block ${b1Cls}">${b1Lbl} ${fmtHr(rot.b1.from)}–${fmtHr(rot.b1.to)}</span>
-            <span class="rc-block rc-lunch">🍽 ${fmtHr(rot.lunch.from)}–${fmtHr(rot.lunch.to)}</span>
-            <span class="rc-block ${b2Cls}">${b2Lbl} ${fmtHr(rot.b2.from)}–${fmtHr(rot.b2.to)}</span>
-          </div>
-          ${rot.bumpNeeded ? `<div style="font-size:10px;color:var(--amber);margin-top:4px">${rot.bumpNeeded}</div>` : ''}
-        </div>`;
-      });
-    } else if (workingExit.length === 0) {
-      rhtml = `<p style="font-size:12px;color:var(--txt3)">Confirm today's schedule to see rotation plan.</p>`;
-    }
-
-    // ±30min bump suggestions if gap exists
-    if (exitGap > 0 && rotations.length > 0) {
-      rhtml += `<div class="suggestion-card">
-        <div class="sug-title">💡 Gap Coverage Suggestion</div>
-        <div class="sug-row">Exit short by ${exitGap} agent${exitGap>1?'s':''}. Options (manager decides):</div>`;
-      rotations.filter(r => r.b1.station === 'counter').slice(0,2).forEach(r => {
-        rhtml += `<div class="sug-row"><strong>${r.nick}</strong> — could shift exit block by +30min: ${fmtHr(r.b2.from-0.5)}–${fmtHr(r.b2.to+0.5)} · adds 30min exit coverage at overlap</div>`;
-      });
-      rhtml += `</div>`;
-    }
-
-    rotEl.innerHTML = rhtml;
-  }
-
-  // ── HOURLY BOARD ─────────────────────────────────────────────────────────────
-  const boardEl = document.getElementById('coverage-board');
-  if (boardEl && (rotations.length > 0 || workingExit.length > 0)) {
-    let bhtml = `<div class="cov-section-hdr" style="margin-top:14px">📋 Hourly Coverage</div>
-      <div class="coverage-board">`;
-
-    Object.entries(coverage).forEach(([h, c]) => {
-      const hNum = parseInt(h);
-      if (c.all.length === 0) return;
-      const exitOk = c.exit.length >= rules.exitMin;
-      const counterOk = c.counter.length >= rules.counterMin;
-      const icon = !exitOk ? '🔴' : !counterOk ? '⚠️' : '✅';
-
-      let slotHtml = c.all.map(p => {
-        const cls = p.station === 'exit' ? 'exit' : 'counter';
-        const lbl = p.station === 'exit' ? '🔴' : '🟢';
-        return `<span class="cov-slot ${cls}">${p.nick} ${lbl}</span>`;
-      }).join('');
-
-      bhtml += `<div class="cov-hour-row">
-        <div class="cov-hour-label">${fmtHr(hNum)}</div>
-        <div class="cov-slots">${slotHtml}</div>
-        <div class="cov-row-status">${icon}</div>
-      </div>`;
-    });
-
-    bhtml += `</div>`;
-    boardEl.innerHTML = bhtml;
-  } else if (boardEl) {
-    boardEl.innerHTML = '';
-  }
-}
-
-// ── One-tap station assignment: toggle Counter ↔ Exit for CXRs ──────────────
 function tapStationToggle(pid) {
   const person = ROSTER_CXR.find(p => p.name.replace(/\s/g,'_') === pid);
   if (!person) return;
@@ -4848,90 +4702,358 @@ function parseSimpleFormat(text, rosterFilter) {
 }
 
 // ── Briefing: show mgmt + CXR/Exit as separate groups ────────────────────────
-function buildMorningBriefing() {
-  const mgmtSched = getStoredSection('mgmt');
-  const cxrSched  = getStoredSection('cxr');
-  const today     = todayKey();
-  const now       = new Date();
+// ═══════════════════════════════════════════════════════════════════════
+// UNIFIED SCHEDULE SWITCHBOARD — single source of truth for schedule tab
+// ═══════════════════════════════════════════════════════════════════════
+var _adjustPid = null;
+
+function setEl(id, content) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (typeof content === 'string' && content.includes('<')) el.innerHTML = content;
+  else if (el) el.textContent = content !== undefined ? String(content) : '';
+}
+
+function buildSwitchboard() {
+  const now   = new Date();
+  const dow   = now.getDay();
   const dateLabel = now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  // Auto-load if nothing set yet
+  if (!STATE.staffDuty || Object.keys(STATE.staffDuty).length === 0) {
+    const exp = buildExpectedToday();
+    if (Object.keys(exp).length > 0) autoLoadFromExpected(exp, dow);
+  }
+
+  setEl('sched-date-lbl', dateLabel);
+
   const allRoster = [...ROSTER_CXR, ...ROSTER_MGMT];
-
-  const dateEl = document.getElementById('briefing-date');
-  const subEl  = document.getElementById('briefing-sub');
-  const gridEl = document.getElementById('briefing-grid');
-  const barEl  = document.getElementById('confirm-bar');
-  if (!dateEl) return;
-  dateEl.textContent = dateLabel;
-
-  const hasMgmt = mgmtSched && mgmtSched.grid[today];
-  const hasCXR  = cxrSched  && cxrSched.grid[today];
-
-  if (!hasMgmt && !hasCXR) {
-    subEl.textContent = 'No schedule loaded for today — use the "Load Schedule" tab to paste.';
-    gridEl.innerHTML  = `<button class="btn btn-ghost" onclick="showSchedSection(\'paste\')" style="width:100%">
-      📋 Go to Load Schedule →</button>`;
-    if (barEl) barEl.style.display = 'none';
+  const exp = buildExpectedToday();
+  if (!Object.keys(exp).length) {
+    setEl('sched-count-lbl', 'No roster data for today');
     return;
   }
 
-  const loaded = [hasMgmt?'Management':'',hasCXR?'CXR/Exit':''].filter(Boolean).join(' + ');
-  subEl.textContent = `${loaded} schedule loaded — review and confirm:`;
-  if (barEl) barEl.style.display = 'flex';
+  // Build people list with full state
+  const people = Object.entries(exp).map(([pid, entry]) => {
+    const { person, shift } = entry;
+    const isCallout = (STATE.todayOverrides||{})[pid] === 'callout';
+    const station   = STATE.staffStation[pid] || '';
+    const altPos    = (STATE.altSchedule||{})[pid] || 'normal';
+    const shiftMod  = (STATE.shiftMod||{})[pid];
+    const shiftDisp = shiftMod ? shiftMod.display : (shift || person.shiftCode || '—');
+    return { pid, person, shift: shiftDisp, isWorking: !isCallout, isCallout, station, altPos };
+  });
 
-  const todayOverrides = STATE.todayOverrides || {};
-  let html = '';
-  let totalWorking = 0;
+  const counterPpl = people.filter(p => p.isWorking && p.person.role === 'CXR' && p.station === 'Counter');
+  const exitPpl    = people.filter(p => p.isWorking &&
+    (p.person.role === 'EXIT' || (p.person.role === 'CXR' && p.station === 'Exit Booth')));
+  const mgmtPpl    = people.filter(p => p.isWorking && ['ARM','BRM','ABRM','MT'].includes(p.person.role));
+  const unsetPpl   = people.filter(p => p.isWorking && p.person.role === 'CXR' && !p.station);
+  const callouts   = people.filter(p => p.isCallout);
 
-  function renderGroup(schedObj, roster, groupLabel, groupIcon) {
-    if (!schedObj || !schedObj.grid[today]) return '';
-    const shifts = schedObj.grid[today];
+  const rules    = (typeof COVERAGE_RULES!=='undefined' && COVERAGE_RULES[dow]) || {exitMin:1};
+  const exitMin  = rules.exitMin || 1;
+  const exitGap  = exitPpl.length < exitMin;
 
-    // Sort: same order as master roster
-    const people = roster.filter(p => shifts[p.name.replace(/\s/g,'_')]);
-    if (!people.length) return '';
+  setEl('sched-count-lbl', `${people.filter(p=>p.isWorking).length} working · ${callouts.length} off`);
+  setEl('snap-counter', `🟦 Counter: ${counterPpl.length + unsetPpl.length}`);
+  setEl('snap-exit',    `🟩 Exit: ${exitPpl.length}`);
+  setEl('snap-off',     `❌ Off: ${callouts.length}`);
 
-    let out = `<div style="grid-column:1/-1;font-family:var(--ff-hd);font-size:11px;
-      font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);
-      padding:4px 0 2px;border-bottom:1px solid var(--bdr);margin-bottom:4px;
-      width:100%">${groupIcon} ${groupLabel}</div>`;
+  const snapGap = document.getElementById('snap-gap');
+  if (snapGap) snapGap.innerHTML = exitGap
+    ? `<span style="color:var(--red)">⚠ Exit needs ${exitMin - exitPpl.length} more</span>`
+    : `<span style="color:var(--green)">✅ Coverage OK</span>`;
 
-    people.forEach(person => {
-      const pid    = person.name.replace(/\s/g,'_');
-      const shift  = shifts[pid] || 'OFF';
-      const isOff  = shift==='OFF'||shift.includes('VACA')||shift.includes('TRAINING')||
-                     shift.includes('ARMS')||shift.includes('TOP20')||shift.includes('STRONGER');
-      const override   = todayOverrides[pid];
-      const isCallout  = override === 'callout';
-      const isConfirmed= override === 'confirmed';
-      if (!isOff) totalWorking++;
-
-      const station = STATE.staffStation[pid] || suggestStation(person, shift);
-      const stCls   = stationClass(station);
-      const shiftCls = shiftDisplayCls(shift);
-      const cardCls  = isCallout?'callout':isConfirmed?'confirmed':isOff?'off':'';
-
-      out += `<div class="briefing-person ${cardCls}" id="bp-${pid}">
-        <div class="bp-name">${person.nick||person.name.split(' ')[0]}</div>
-        <div class="bp-shift ${shiftCls}">${shift}</div>
-        ${!isOff&&!isCallout ? `<span class="bp-station ${stCls}">${station}</span>` : ''}
-        <div class="bp-status">${isCallout?'❌ Called off':isConfirmed?'✅ Confirmed':isOff?'—':person.role}</div>
-        ${!isOff ? `<button class="callout-btn ${isCallout?'undo':''}"
-          onclick="toggleCallout('${pid}')">${isCallout?'↩ Undo':'Called off?'}</button>` : ''}
-      </div>`;
-    });
-    return out;
+  // Person row renderer
+  function pRow(p, dim) {
+    const isAdj = _adjustPid === p.pid;
+    const altL  = {'full-counter':'Full Ctr','full-exit':'Full Exit','counter-first':'Ctr+30','exit-first':'Exit+30'};
+    const badge = p.altPos !== 'normal'
+      ? `<span style="font-size:9px;background:rgba(217,119,6,.15);color:var(--amber);
+          border:1px solid rgba(217,119,6,.4);border-radius:3px;padding:1px 5px;margin-left:4px">
+          ${altL[p.altPos]||''}</span>` : '';
+    const modBadge = (STATE.shiftMod||{})[p.pid]
+      ? `<span style="font-size:9px;color:var(--amber);margin-left:3px">⏰</span>` : '';
+    const rot = window._lastRotations && window._lastRotations[p.pid];
+    const rotMini = rot ? `<div style="font-size:9px;color:var(--txt3);margin-top:2px;
+      display:flex;gap:4px;align-items:center">
+      <span style="color:${rot.b1&&rot.b1.station==='exit'?'var(--green)':'var(--acc)'}">
+        ${rot.b1&&rot.b1.station==='exit'?'Exit':'Ctr'} ${rot.b1&&rot.b1.hours||4}h
+      </span>
+      <span>→🍽→</span>
+      <span style="color:${rot.b2&&rot.b2.station==='exit'?'var(--green)':'var(--acc)'}">
+        ${rot.b2&&rot.b2.station==='exit'?'Exit':'Ctr'} ${rot.b2&&rot.b2.hours||4}h
+      </span>
+    </div>` : '';
+    return `<div onclick="tapPerson('${p.pid}')" style="display:flex;align-items:center;
+      padding:7px 8px;border-radius:5px;cursor:pointer;margin-bottom:3px;
+      background:${isAdj?'rgba(37,99,235,.1)':'var(--bg3)'};
+      border:1px solid ${isAdj?'var(--acc)':'transparent'};
+      opacity:${dim?0.45:1};transition:all .12s">
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div style="font-size:13px;font-weight:700;color:var(--txt);
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${p.person.nick||p.person.name.split(' ')[0]}${badge}${modBadge}
+        </div>
+        <div style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono);">
+          ${p.shift}
+        </div>
+        ${rotMini}
+      </div>
+      <div style="font-size:12px;color:var(--txt3);margin-left:6px;flex-shrink:0">›</div>
+    </div>`;
   }
 
-  html += renderGroup(mgmtSched, ROSTER_MGMT, 'Management', '🎯');
-  html += renderGroup(cxrSched,  ROSTER_CXR,  'CXR & Exit', '🏃');
+  function mgmtRow(p) {
+    const isAdj = _adjustPid === p.pid;
+    return `<div onclick="tapPerson('${p.pid}')" style="display:flex;align-items:center;
+      padding:6px 8px;border-radius:5px;cursor:pointer;margin-bottom:3px;
+      background:${isAdj?'rgba(37,99,235,.1)':'var(--bg3)'};
+      border:1px solid ${isAdj?'var(--acc)':'transparent'};transition:all .12s">
+      <div style="flex:1;min-width:0;overflow:hidden">
+        <div style="font-size:12px;font-weight:700;color:var(--txt);
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${p.person.nick||p.person.name.split(' ')[0]}
+        </div>
+        <div style="font-size:10px;color:var(--txt3);white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis">
+          ${p.shift} · ${STATE.staffStation[p.pid]||'—'}
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--txt3);margin-left:6px;flex-shrink:0">›</div>
+    </div>`;
+  }
 
-  gridEl.innerHTML = html;
+  const NONE = (msg, color='var(--txt3)') =>
+    `<div style="font-size:11px;color:${color};padding:6px 4px">${msg}</div>`;
 
-  const countEl = document.getElementById('confirm-count');
-  if (countEl) countEl.textContent = `${totalWorking} scheduled working today`;
+  const colC = document.getElementById('col-counter');
+  const colE = document.getElementById('col-exit');
+  const colM = document.getElementById('col-mgmt');
+  const colU = document.getElementById('col-unassigned');
+
+  if (colC) colC.innerHTML = counterPpl.map(p=>pRow(p)).join('') ||
+    NONE('None assigned yet');
+  if (colE) colE.innerHTML = exitPpl.map(p=>pRow(p)).join('') ||
+    NONE(exitGap ? '⚠ No exit coverage' : 'None', exitGap?'var(--red)':'var(--txt3)');
+  if (colM) colM.innerHTML = mgmtPpl.map(mgmtRow).join('') ||
+    NONE('No mgmt on duty');
+
+  let uHtml = '';
+  if (unsetPpl.length) {
+    uHtml += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.08em;color:var(--amber);margin-bottom:4px">
+      ⚠ Unassigned (${unsetPpl.length}) — tap to assign</div>
+      ${unsetPpl.map(p=>pRow(p)).join('')}`;
+  }
+  if (callouts.length) {
+    uHtml += `<div style="font-size:10px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.08em;color:var(--red);margin:${unsetPpl.length?'10px':0} 0 4px">
+      ❌ Called Off (${callouts.length})</div>
+      ${callouts.map(p=>`<div onclick="tapPerson('${p.pid}')" style="display:flex;
+        align-items:center;padding:6px 8px;border-radius:5px;cursor:pointer;
+        margin-bottom:3px;background:rgba(220,38,38,.06);
+        border:1px solid rgba(220,38,38,.2)">
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:600;color:var(--red);text-decoration:line-through">
+            ${p.person.nick||p.person.name.split(' ')[0]}</div>
+          <div style="font-size:10px;color:var(--txt3)">${p.shift}</div>
+        </div>
+        <div style="font-size:11px;color:var(--txt3)">›</div>
+      </div>`).join('')}`;
+  }
+  if (colU) colU.innerHTML = uHtml;
 }
 
-// ── initScheduleEngine — call updateStoredStatus on load ─────────────────────
+// ── Tap-to-adjust slide-up panel ─────────────────────────────────────────────
+function tapPerson(pid) {
+  if (_adjustPid === pid) { closeAdjustPanel(); return; }
+  _adjustPid = pid;
+
+  const allRoster = [...ROSTER_CXR, ...ROSTER_MGMT];
+  const person = allRoster.find(p => {
+    const epid = p.name.replace(/[^A-Za-z0-9]/g,'_').replace(/__+/g,'_');
+    const npid  = pid.replace(/__+/g,'_');
+    return epid === npid || p.name.replace(/\s/g,'_') === pid;
+  });
+  if (!person) return;
+
+  const nick     = person.nick || person.name.split(' ')[0];
+  const shiftMod = (STATE.shiftMod||{})[pid];
+  const shift    = shiftMod ? shiftMod.display : (person.shiftCode || '—');
+  const station  = STATE.staffStation[pid] || '';
+  const altPos   = (STATE.altSchedule||{})[pid] || 'normal';
+  const isCallout= (STATE.todayOverrides||{})[pid] === 'callout';
+  const isCXR    = person.role === 'CXR';
+  const isExit   = person.role === 'EXIT';
+  const isMgmt   = ['ARM','BRM','ABRM','MT'].includes(person.role);
+  const pref     = (STATE.stationPref||{})[pid] || 'none';
+
+  setEl('adjust-name', nick);
+  setEl('adjust-shift', shift);
+
+  let actions = '';
+
+  // ── Callout toggle ──────────────────────────────────────────────────────
+  actions += btn(isCallout?'↩ Unmark Callout':'❌ Mark Called Off',
+    `toggleCallout('${pid}');buildSwitchboard()`, isCallout?'red':'');
+
+  if (!isCallout) {
+    // ── Station (CXR only) ────────────────────────────────────────────────
+    if (isCXR) {
+      actions += btn('🟦 Counter',    `setStation('${pid}','Counter');buildSwitchboard()`,    station==='Counter'?'blue':'');
+      actions += btn('🟩 Exit Booth', `setStation('${pid}','Exit Booth');buildSwitchboard()`, station==='Exit Booth'?'green':'');
+    }
+    // ── Management station ────────────────────────────────────────────────
+    if (isMgmt) {
+      ['Counter Manager','Emerald Booth Manager','Returns Manager','Floater','Off Site'].forEach(s => {
+        actions += btn(s, `setStation('${pid}','${s}');buildSwitchboard()`, station===s?'blue':'');
+      });
+    }
+    // ── Rotation (CXR only) ──────────────────────────────────────────────
+    if (isCXR) {
+      const altOpts = [['Normal','normal'],['Full Counter','full-counter'],
+                       ['Full Exit','full-exit'],['Ctr+30','counter-first'],['Exit+30','exit-first']];
+      altOpts.forEach(([lbl,key]) => {
+        actions += btn(lbl, `setAltPosition('${pid}','${key}');buildSwitchboard()`, altPos===key?'amber':'');
+      });
+    }
+    // ── Time mod ─────────────────────────────────────────────────────────
+    if (!isMgmt) {
+      [['Normal Time',0],['Late +30',1],['Late +1hr',2],['Late +2hr',3],
+       ['Early Out −30',4],['Early Out −1hr',5],['Early In −30',6],['Early In −1hr',7]
+      ].forEach(([lbl,idx]) => {
+        const isActive = idx===0 ? !shiftMod : shiftMod&&shiftMod.display===lbl;
+        actions += btn('⏰ '+lbl, `applyShiftMod('${pid}',${idx});buildSwitchboard()`, isActive?'amber':'');
+      });
+    }
+    // ── Preference ───────────────────────────────────────────────────────
+    if (isCXR) {
+      actions += btn(`☐ Pref: ${pref==='counter'?'🟦 Counter':pref==='exit'?'🟩 Exit':'None'}`,
+        `cycleStationPref('${pid}','${nick}');buildSwitchboard()`, pref!=='none'?'amber':'');
+    }
+  }
+
+  const actEl = document.getElementById('adjust-actions');
+  if (actEl) actEl.innerHTML = actions;
+  const panel = document.getElementById('adjust-panel');
+  if (panel) panel.style.display = 'block';
+  buildSwitchboard(); // re-render to show active state on row
+}
+
+function btn(label, onclick, color) {
+  const cls = color ? ' adj-'+color : '';
+  return `<button class="adj-btn${cls}" onclick="${onclick}">${label}</button>`;
+}
+
+function closeAdjustPanel() {
+  _adjustPid = null;
+  const panel = document.getElementById('adjust-panel');
+  if (panel) panel.style.display = 'none';
+  buildSwitchboard();
+}
+
+function resetSchedDay() {
+  STATE.staffDuty = {}; STATE.staffStation = {};
+  STATE.altSchedule = {}; STATE.shiftMod = {};
+  STATE.todayOverrides = {};
+  _adjustPid = null;
+  const panel = document.getElementById('adjust-panel');
+  if (panel) panel.style.display = 'none';
+  saveState(); buildSwitchboard();
+  toast('Day reset');
+}
+
+
+function buildMorningBriefing() { buildSwitchboard(); }
+
+function autoLoadFromExpected(expectedToday, dow) {
+  if (!STATE.staffDuty)    STATE.staffDuty    = {};
+  if (!STATE.staffStation) STATE.staffStation = {};
+  if (!STATE.shiftTimes)   STATE.shiftTimes   = {};
+  if (!STATE.altSchedule)  STATE.altSchedule  = {};
+
+  // Mark everyone as working
+  Object.entries(expectedToday).forEach(([pid, entry]) => {
+    STATE.staffDuty[pid]   = true;
+    STATE.shiftTimes[pid]  = entry.shift;
+  });
+
+  // Assign Exit Agents first (always to Exit Booth)
+  Object.entries(expectedToday).forEach(([pid, entry]) => {
+    if (entry.person.role === 'EXIT') STATE.staffStation[pid] = 'Exit Booth';
+  });
+
+  // Assign Management stations from shift code
+  Object.entries(expectedToday).forEach(([pid, entry]) => {
+    const role = entry.person.role;
+    if (!['ARM','BRM','ABRM','MT'].includes(role)) return;
+    const shift = entry.shift || '';
+    // Early shifts → EB or Counter manager; closing → closing manager
+    if (shift.startsWith('530') || shift.startsWith('4A') || shift.startsWith('5A') || shift.startsWith('6A') || shift.startsWith('7A') || shift.startsWith('8A')) {
+      STATE.staffStation[pid] = 'Counter Manager';
+    } else if (shift.includes('4P') || shift.includes('C') || shift.includes('close')) {
+      STATE.staffStation[pid] = 'Counter Manager';
+    } else {
+      STATE.staffStation[pid] = 'Counter Manager';
+    }
+  });
+
+  // Distribute CXRs between Counter and Exit rotation
+  const exitAgentCount = Object.entries(expectedToday)
+    .filter(([pid, e]) => e.person.role === 'EXIT' && STATE.staffDuty[pid] === true).length;
+
+  const rules    = (typeof COVERAGE_RULES !== 'undefined' && COVERAGE_RULES[dow]) || {exitMin:1, exitMax:2};
+  const exitMin  = rules.exitMin || 1;
+  const exitMax  = rules.exitMax || 2;
+  const exitCXRNeeded = Math.max(0, exitMin - exitAgentCount);
+  const exitCXRMax    = Math.max(exitCXRNeeded, exitMax - exitAgentCount);
+
+  // Sort CXRs by: explicit exit pref first, then fairness (least exit hours)
+  const cxrWorking = Object.entries(expectedToday)
+    .filter(([pid, e]) => e.person.role === 'CXR')
+    .map(([pid, e]) => ({
+      pid, person: e.person, shift: e.shift,
+      pref: (STATE.stationPref||{})[pid] || e.person.pref || 'none',
+      shiftStart: e.person.shiftStart || 99,
+    }))
+    .sort((a,b) => {
+      // Exit pref first
+      if (a.pref === 'exit' && b.pref !== 'exit') return -1;
+      if (b.pref === 'exit' && a.pref !== 'exit') return 1;
+      // Counter pref last
+      if (a.pref === 'counter' && b.pref !== 'counter') return 1;
+      if (b.pref === 'counter' && a.pref !== 'counter') return -1;
+      // Earlier shifts to counter (more coverage)
+      return a.shiftStart - b.shiftStart;
+    });
+
+  let exitCXRAssigned = 0;
+  cxrWorking.forEach(cxr => {
+    if (STATE.staffStation[cxr.pid]) return; // already set
+    if (cxr.pref === 'exit' && exitCXRAssigned < exitCXRMax) {
+      STATE.staffStation[cxr.pid] = 'Exit Booth';
+      exitCXRAssigned++;
+    } else if (exitCXRAssigned < exitCXRNeeded) {
+      STATE.staffStation[cxr.pid] = 'Exit Booth';
+      exitCXRAssigned++;
+    } else {
+      STATE.staffStation[cxr.pid] = 'Counter';
+    }
+  });
+
+  // Run smart rotation to cache rotation blocks
+  if (typeof buildSmartRotation === 'function') {
+    const rot = buildSmartRotation();
+    window._lastRotations = {};
+    if (rot && rot.rotations) rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
+  }
+
+  saveState();
+}
+
 function initScheduleEngine() {
   initPreloadedSchedule();
   updateStoredStatus();
@@ -5049,12 +5171,18 @@ function markAllCallout() {
 }
 
 function confirmToday() {
-  const sched = getStoredSchedule();
-  if (!sched) return;
   const today = todayKey();
-  const todayShifts = sched.grid[today] || {};
+  const now = new Date();
+  const dow = now.getDay();
   const todayOverrides = STATE.todayOverrides || {};
   const allRoster = [...ROSTER_CXR, ...ROSTER_MGMT];
+
+  // Build expected staff from schedule + roster
+  const expectedToday = buildExpectedToday();
+
+  // Simulate todayShifts for backward compat
+  const todayShifts = {};
+  Object.entries(expectedToday).forEach(([pid, e]) => { todayShifts[pid] = e.shift; });
 
   // Apply schedule to STATE.staffDuty and STATE.staffStation
   Object.entries(todayShifts).forEach(([pid, shift]) => {
@@ -5068,7 +5196,11 @@ function confirmToday() {
 
     // Auto-assign station if not already set
     if (STATE.staffDuty[pid] && !STATE.staffStation[pid]) {
-      const person = allRoster.find(p => p.name.replace(/\s/g,'_') === pid);
+      const person = allRoster.find(p => {
+    const epid = p.name.replace(/[^A-Za-z0-9]/g,'_').replace(/__+/g,'_');
+    const npid  = pid.replace(/__+/g,'_');
+    return epid === npid || p.name.replace(/\s/g,'_') === pid;
+  });
       if (person) STATE.staffStation[pid] = suggestStation(person, shift);
     }
   });
@@ -5102,7 +5234,11 @@ function detectManagersFromSchedule(todayShifts, allRoster) {
   let earliestStart = 99;
 
   Object.entries(todayShifts).forEach(([pid, shift]) => {
-    const person = allRoster.find(p => p.name.replace(/\s/g,'_') === pid);
+    const person = allRoster.find(p => {
+    const epid = p.name.replace(/[^A-Za-z0-9]/g,'_').replace(/__+/g,'_');
+    const npid  = pid.replace(/__+/g,'_');
+    return epid === npid || p.name.replace(/\s/g,'_') === pid;
+  });
     if (!person || !['ARM','BRM','ABRM'].includes(person.role)) return;
     const isOff = shift === 'OFF' || shift.includes('VACA');
     if (isOff) return;
@@ -5195,7 +5331,18 @@ function showSchedSection(sec) {
     if (btn) btn.className = 'ss-tab' + (s===sec?' on':'');
   });
   if (sec === 'month') buildMonthGrid();
-  if (sec === 'today') { buildMorningBriefing(); injectExitFairnessPanel(); }
+  if (sec === 'today') {
+    // Auto-load on first visit if nothing set yet
+    if (Object.keys(STATE.staffDuty||{}).length === 0) {
+      const now = new Date();
+      const expectedToday = buildExpectedToday();
+      if (Object.keys(expectedToday).length > 0) {
+        autoLoadFromExpected(expectedToday, now.getDay());
+      }
+    }
+    buildMorningBriefing();
+    injectExitFairnessPanel();
+  }
 }
 
 // ── Initialize ───────────────────────────────────────────────────────────────
@@ -5584,73 +5731,7 @@ function cycleDuty(key) {
   refreshDash();
 }
 
-function updateSchedHelper() {
-  // Auto-detect opening/closing managers from working management staff
-  const workingMgmt = ROSTER_MGMT.filter(p => {
-    const key = p.name.replace(/\s/g,'_');
-    return STATE.staffDuty[key] === true;
-  });
-
-  let openMgr = null, closeMgr = null, ebMgr = null;
-  let earliestStart = 99;
-
-  workingMgmt.forEach(p => {
-    const key = p.name.replace(/\s/g,'_');
-    const shiftCode = (STATE.shiftTimes && STATE.shiftTimes[key]) || p.shiftCode || '';
-    const isClose = shiftCode.toUpperCase().includes('-C');
-    const parsed = parseShiftTime(shiftCode);
-    const startH = parsed ? parsed.start : 99;
-
-    if (isClose && !closeMgr) closeMgr = p;
-    if (!isClose && startH < earliestStart) { earliestStart = startH; openMgr = p; }
-    if (!isClose && startH <= 6.5 && !ebMgr) ebMgr = p;
-  });
-  if (!ebMgr && openMgr) ebMgr = openMgr;
-
-  // Auto-fill manager fields if not manually overridden
-  const openName  = openMgr  ? (openMgr.nick  || openMgr.name.split(' ')[0])  : null;
-  const closeName = closeMgr ? (closeMgr.nick || closeMgr.name.split(' ')[0]) : null;
-
-  if (openName && !STATE.fields.openMgr) {
-    STATE.fields.openMgr = openName;
-    const el = document.getElementById('f-openmgr');
-    if (el) el.value = openName;
-  }
-  if (closeName && !STATE.fields.closeMgr) {
-    STATE.fields.closeMgr = closeName;
-    const el = document.getElementById('f-closemgr');
-    if (el) el.value = closeName;
-  }
-
-  // Count working CXR/Exit
-  const workingCXR  = ROSTER_CXR.filter(p => STATE.staffDuty[p.name.replace(/\s/g,'_')] === true && p.role === 'CXR');
-  const workingExit = ROSTER_CXR.filter(p => STATE.staffDuty[p.name.replace(/\s/g,'_')] === true && p.role === 'EXIT');
-
-  // Update helper panel
-  const helperEl = document.getElementById('sched-helper-inner');
-  if (helperEl) {
-    helperEl.innerHTML = `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:12px">
-        <div><b style="color:var(--txt2)">Opening Manager</b><br>
-          <span style="color:var(--green);font-weight:700">${openName || '—'}</span>
-          ${openName ? ' <span style="font-size:10px;color:var(--txt3)">(auto)</span>' : ''}
-        </div>
-        <div><b style="color:var(--txt2)">Closing Manager</b><br>
-          <span style="color:var(--red);font-weight:700">${closeName || '—'}</span>
-        </div>
-        <div><b style="color:var(--txt2)">EB Manager (AM)</b><br>
-          <span style="color:var(--purple);font-weight:700">${ebMgr ? (ebMgr.nick||ebMgr.name.split(' ')[0]) : '—'}</span>
-        </div>
-        <div><b style="color:var(--txt2)">Staffing</b><br>
-          <span style="color:var(--txt)">${workingMgmt.length} mgmt · ${workingCXR.length} CXR · ${workingExit.length} Exit</span>
-        </div>
-      </div>`;
-  }
-
-  // Update dashboard manager bar
-  refreshDash();
-  saveState();
-}
+function updateSchedHelper() { buildSwitchboard(); }
 
 function setStation(key, val) {
   STATE.staffStation[key] = val;
@@ -6886,32 +6967,9 @@ function resetExitFairness() {
 }
 
 // ── Exit fairness panel is called from showSchedSection ───────────────────────
-function injectExitFairnessPanel() {
-  const container = document.getElementById('ss-sec-today');
-  if (!container) return;
-  let panel = document.getElementById('exit-fairness-panel');
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = 'exit-fairness-panel';
-    container.appendChild(panel);
-  }
-  panel.innerHTML = buildExitFairnessPanel();
-}
+function injectExitFairnessPanel() { buildSwitchboard(); }
 
-// ═══════════════════════════════════════════════════════════════════════
-// UPDATE FEATURE AUDIT to reflect new builds
-// ═══════════════════════════════════════════════════════════════════════
-// Physical inventory, hourly flow, loyalty, fairness tracker all now built
-// Update happens at render time in renderFeatureList()
-
-
-
-function buildStaffGrid() {
-  buildStaffSection('staff-grid-cxr', ROSTER_CXR, false);
-  buildStaffSection('staff-grid-mgmt', ROSTER_MGMT, true);
-  updateSchedHelper();
-  injectExitFairnessPanel();
-}
+function buildStaffGrid() { buildSwitchboard(); }
 
 function showRefSection(sec) {
   ['codes','loyalty','hourly'].forEach(s => {
@@ -7819,6 +7877,265 @@ function showAltScheduleModal(pid, personName) {
 const _origBuildStaffSection = typeof buildStaffSection === 'function' ? buildStaffSection : null;
 
 
+
+// ═══════════════════════════════════════════════════════════════════════
+// SHIFT MODIFICATION — early/late arrival, early/late departure
+// ═══════════════════════════════════════════════════════════════════════
+
+function showShiftModModal(pid, personName) {
+  const person   = ROSTER_CXR.find(p => p.name.replace(/\s/g,'_') === pid);
+  const baseStart = person ? person.shiftStart : null;
+  const baseEnd   = person ? person.shiftEnd   : null;
+  const currentMod = STATE.shiftMod && STATE.shiftMod[pid];
+
+  function fmtH(h) {
+    if (h === null || h === undefined) return '—';
+    const hr = Math.floor(h);
+    const mn = Math.round((h - hr) * 60);
+    const suffix = h >= 12 ? 'p' : 'a';
+    const dispHr = hr > 12 ? hr-12 : hr === 0 ? 12 : hr;
+    return dispHr + (mn ? ':'+String(mn).padStart(2,'0') : '') + suffix;
+  }
+
+  const presets = [
+    {label:'Normal Shift',        start: baseStart,        end: baseEnd,       reason:'normal'},
+    {label:'Late Start +30min',   start: baseStart?baseStart+0.5:null, end: baseEnd, reason:'Late arrival +30'},
+    {label:'Late Start +1hr',     start: baseStart?baseStart+1:null,   end: baseEnd, reason:'Late arrival +1hr'},
+    {label:'Late Start +2hr',     start: baseStart?baseStart+2:null,   end: baseEnd, reason:'Late arrival +2hr'},
+    {label:'Early Out −30min',    start: baseStart, end: baseEnd?baseEnd-0.5:null,   reason:'Early departure −30'},
+    {label:'Early Out −1hr',      start: baseStart, end: baseEnd?baseEnd-1:null,     reason:'Early departure −1hr'},
+    {label:'Early Start −30min',  start: baseStart?baseStart-0.5:null, end: baseEnd, reason:'Early arrival −30'},
+    {label:'Early Start −1hr',    start: baseStart?baseStart-1:null,   end: baseEnd, reason:'Early arrival −1hr'},
+  ];
+
+  const optHtml = presets.map(p => {
+    const isActive = currentMod ? currentMod.reason === p.reason : p.reason === 'normal';
+    const timeStr  = p.start !== null ? fmtH(p.start) + '–' + fmtH(p.end) : '—';
+    const idx = presets.indexOf(p);
+    return `<div onclick="applyShiftMod('${pid}',${idx})"
+      style="display:flex;align-items:center;justify-content:space-between;
+        padding:10px 14px;border-radius:6px;cursor:pointer;margin-bottom:5px;
+        background:${isActive?'rgba(37,99,235,.12)':'var(--bg3)'};
+        border:1px solid ${isActive?'var(--acc)':'var(--bdr2)'};transition:all .15s">
+      <div>
+        <div style="font-weight:700;font-size:13px;color:${isActive?'var(--acc)':'var(--txt)'}">${p.label}</div>
+        <div style="font-size:11px;color:var(--txt3);margin-top:2px">${timeStr}</div>
+      </div>
+      ${isActive ? '<span style="color:var(--acc);font-weight:700">✓</span>' : ''}
+    </div>`;
+  }).join('');
+
+  const body = `
+    <p style="font-size:12px;color:var(--txt3);margin-bottom:14px">
+      Select a time modification for ${personName} today only. 
+      Resets at start of next day. Also affects their rotation block timing.
+    </p>
+    ${optHtml}
+    <div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:5px;font-size:11px;color:var(--txt3)">
+      💡 Custom time? Use the Schedule → Load Schedule paste zone to update the stored schedule.
+    </div>`;
+
+  openModal('⏰ Adjust Shift — ' + personName, body);
+}
+
+function applyShiftMod(pid, presetIdx) {
+  if (!STATE.shiftMod) STATE.shiftMod = {};
+  // Rebuild presets for this person to get the right one
+  const person = ROSTER_CXR.find(p => p.name.replace(/\s/g,'_') === pid);
+  const bs = person ? person.shiftStart : null;
+  const be = person ? person.shiftEnd   : null;
+  const presets = [
+    {reason:'normal',              start:bs,         end:be},
+    {reason:'Late arrival +30',    start:bs?bs+0.5:null, end:be, label:'Late Start +30min'},
+    {reason:'Late arrival +1hr',   start:bs?bs+1:null,   end:be, label:'Late Start +1hr'},
+    {reason:'Late arrival +2hr',   start:bs?bs+2:null,   end:be, label:'Late Start +2hr'},
+    {reason:'Early departure −30', start:bs, end:be?be-0.5:null, label:'Early Out −30min'},
+    {reason:'Early departure −1hr',start:bs, end:be?be-1:null,   label:'Early Out −1hr'},
+    {reason:'Early arrival −30',   start:bs?bs-0.5:null, end:be, label:'Early Start −30min'},
+    {reason:'Early arrival −1hr',  start:bs?bs-1:null,   end:be, label:'Early Start −1hr'},
+  ];
+  const p = presets[presetIdx] || presets[0];
+  if (p.reason === 'normal') {
+    delete STATE.shiftMod[pid];
+  } else {
+    STATE.shiftMod[pid] = {
+      start:   p.start,
+      end:     p.end,
+      reason:  p.reason,
+      display: p.label || p.reason,
+    };
+  }
+  saveState();
+  closeModal();
+  buildStaffGrid();
+  buildCoverageUI();
+  toast('Shift modified ✓');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// STATION PREFERENCE — persistent per-person setting
+// ═══════════════════════════════════════════════════════════════════════
+
+function cycleStationPref(pid, personName) {
+  if (!STATE.stationPref) STATE.stationPref = {};
+  const current = STATE.stationPref[pid] || 'none';
+  const next = current === 'none' ? 'counter'
+             : current === 'counter' ? 'exit'
+             : 'none';
+  if (next === 'none') delete STATE.stationPref[pid];
+  else STATE.stationPref[pid] = next;
+  saveState();
+  buildStaffGrid();
+  const labels = {none:'No preference set', counter:'Prefers Counter saved ✓', exit:'Prefers Exit saved ✓'};
+  toast(labels[next]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// AUTO-SUGGEST ROTATION with confirm flow
+// Runs when confirmToday() is called — pre-assigns all CXRs
+// Manager can then adjust individual stations before final confirm
+// ═══════════════════════════════════════════════════════════════════════
+
+function autoSuggestRotation() {
+  const rotation = buildSmartRotation();
+  if (!rotation || !rotation.rotations) return;
+
+  // Store suggested assignments — don't override manual ones
+  rotation.rotations.forEach(rot => {
+    const pid = rot.pid;
+    // Only auto-assign if no manual station set yet
+    if (!STATE.staffStation[pid]) {
+      const b1 = rot.b1Station;
+      STATE.staffStation[pid] = b1 === 'exit' ? 'Exit Booth' : 'Counter';
+    }
+  });
+
+  // Store rotation data for mini display on cards
+  window._lastRotations = {};
+  rotation.rotations.forEach(rot => {
+    window._lastRotations[rot.pid] = rot;
+  });
+
+  saveState();
+  buildStaffGrid();
+  buildCoverageUI();
+  toast('Rotation suggested — review and confirm each person ✓');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// PATTERN LEARNING
+// After each day, record who was at which station
+// Surface as preference suggestion after enough data
+// ═══════════════════════════════════════════════════════════════════════
+
+function recordDayPattern() {
+  const today = new Date().toISOString().slice(0,10);
+  const PATTERN_KEY = 'cmh-station-patterns-v1';
+  let patterns = {};
+  try { patterns = JSON.parse(localStorage.getItem(PATTERN_KEY)||'{}'); } catch(e) {}
+
+  // Record each CXR's station today
+  ROSTER_CXR.forEach(p => {
+    const pid = p.name.replace(/\s/g,'_');
+    if (STATE.staffDuty[pid] !== true) return;
+    const station = STATE.staffStation[pid];
+    if (!station) return;
+    if (!patterns[pid]) patterns[pid] = {counter:0, exit:0, days:[]};
+    if (station === 'Counter') patterns[pid].counter++;
+    else if (station === 'Exit Booth') patterns[pid].exit++;
+    patterns[pid].days.push({date:today, station});
+    // Keep only last 30 days
+    if (patterns[pid].days.length > 30) patterns[pid].days.shift();
+  });
+
+  try { localStorage.setItem(PATTERN_KEY, JSON.stringify(patterns)); } catch(e) {}
+}
+
+function getLearnedPref(pid) {
+  const PATTERN_KEY = 'cmh-station-patterns-v1';
+  try {
+    const patterns = JSON.parse(localStorage.getItem(PATTERN_KEY)||'{}');
+    const p = patterns[pid];
+    if (!p || (p.counter + p.exit) < 5) return null; // need at least 5 days
+    const total = p.counter + p.exit;
+    const counterPct = p.counter / total;
+    if (counterPct >= 0.75) return 'counter';
+    if (counterPct <= 0.25) return 'exit';
+    return null; // mixed — no strong preference
+  } catch(e) { return null; }
+}
+
+
+
+function buildExpectedToday() {
+  const today = todayKey();
+  const now   = new Date();
+  const dow   = now.getDay();
+  const allRoster = [...ROSTER_CXR, ...ROSTER_MGMT];
+  const expected  = {};
+
+  // Helper: normalize name to pid
+  function normPid(name) { return name.replace(/\s/g,'_'); }
+  // Helper: all variations of a name that might appear as stored pid
+  function namePidVariants(name) {
+    const base = name.replace(/\s/g,'_');
+    return [
+      base,                                         // exact spaces→underscore
+      base.replace(/[^A-Za-z0-9_]/g,'_').replace(/__+/g,'_').replace(/_$/,''), // strip parens to __
+      base.replace(/\(.*?\)/g,'_').replace(/__+/g,'_').replace(/_$/,''),     // strip (Nick) → single _
+      name.replace(/[^A-Za-z0-9]/g,'_').replace(/__+/g,'_').replace(/_$/,''), // all special → single _
+      // Also try first word match for short names
+      name.split(' ')[0]+'_'+name.split(' ').slice(-1)[0],  // First_Last only
+    ];
+  }
+
+  // 1. Pull management from stored schedule (most reliable)
+  const mgmtSched = getStoredSection('mgmt');
+  if (mgmtSched && mgmtSched.grid && mgmtSched.grid[today]) {
+    Object.entries(mgmtSched.grid[today]).forEach(([pid, shift]) => {
+      if (!shift || shift === 'OFF' || shift.toUpperCase().includes('VACA')) return;
+      // Find person: try all pid variants of each roster name
+      const person = allRoster.find(p => namePidVariants(p.name).includes(pid) ||
+        namePidVariants(p.name).some(v => pid.startsWith(v.slice(0,8)) || v.startsWith(pid.slice(0,8))));
+      if (person) {
+        const epid = normPid(person.name);
+        expected[epid] = { person, shift, source:'schedule' };
+      }
+    });
+  }
+
+  // 2. Pull CXR/Exit from stored CXR schedule
+  const cxrSched = getStoredSection('cxr');
+  if (cxrSched && cxrSched.grid && cxrSched.grid[today]) {
+    Object.entries(cxrSched.grid[today]).forEach(([pid, shift]) => {
+      if (!shift || shift === 'OFF' || shift.toUpperCase().includes('VACA')) return;
+      const person = allRoster.find(p => normPid(p.name) === pid);
+      if (person) expected[normPid(person.name)] = { person, shift, source:'schedule' };
+    });
+  }
+
+  // 3. Fill remaining from roster daysOn (CXR + Exit only — mgmt always from stored sched)
+  allRoster.forEach(person => {
+    const pid = normPid(person.name);
+    if (expected[pid]) return;
+    // Skip mgmt if not in stored schedule
+    if (['ARM','BRM','ABRM','MT'].includes(person.role)) return;
+    if (!person.daysOn || !Array.isArray(person.daysOn)) return;
+    if (!person.daysOn.includes(dow)) return;
+    if (!person.shiftStart && !person.shiftCode) return;
+    expected[pid] = { person, shift: person.shiftCode || 'varies', source:'roster' };
+  });
+
+  return expected;
+}
+
+function toggleEmailDataSection() {
+  _emailDataOpen = !_emailDataOpen;
+  const body = document.getElementById('email-data-body');
+  const lbl  = document.getElementById('email-data-toggle-lbl');
+  if (body) body.style.display = _emailDataOpen ? 'block' : 'none';
+  if (lbl)  lbl.textContent = _emailDataOpen ? '▲ Collapse' : '▼ Brand totals · Peaks · Greeting';
+}
 </script>
 
 </body>
