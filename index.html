@@ -1361,7 +1361,6 @@ cursor:pointer;white-space:nowrap;transition:all .12s;
   <button class="nbtn" id="tab-board"   onclick="showTab('board')"><span class="ni">📊</span>Availability</button>
   <button class="nbtn" id="tab-schedule" onclick="showTab('schedule')"><span class="ni">👥</span>Schedule</button>
   <button class="nbtn" id="tab-checklist" onclick="showTab('checklist')"><span class="ni">✅</span>Checklist</button>
-  <button class="nbtn" id="tab-closing" onclick="showTab('closing')"><span class="ni">🌙</span>Closing</button>
   <button class="nbtn" id="tab-reference" onclick="showTab('reference')"><span class="ni">📖</span>Reference</button>
   <button class="nbtn" id="tab-inventory" onclick="showTab('inventory')"><span class="ni">🔢</span>Inventory</button>
   <button class="nbtn" id="tab-history" onclick="showTab('history')"><span class="ni">📅</span>History</button>
@@ -1382,17 +1381,17 @@ cursor:pointer;white-space:nowrap;transition:all .12s;
   <!-- KPI row -->
 
   <div class="kpi-row">
-    <div class="kpi" onclick="focusField('f-cs')">
+    <div class="kpi" onclick="showTab('checklist')">
       <div class="kpi-lbl">CS Scores</div>
       <div class="kpi-val g" id="sum-cs">—</div>
       <div class="kpi-sub">Tap to enter</div>
     </div>
-    <div class="kpi" onclick="focusField('f-hot')">
+    <div class="kpi" onclick="showTab('checklist')">
       <div class="kpi-lbl">HOT Alerts</div>
       <div class="kpi-val r" id="sum-hot">—</div>
       <div class="kpi-sub">Tap to enter</div>
     </div>
-    <div class="kpi" onclick="focusField('f-oos')">
+    <div class="kpi" onclick="showTab('checklist')">
       <div class="kpi-lbl">OOS Units</div>
       <div class="kpi-val a" id="sum-oos">—</div>
       <div class="kpi-sub">All have claims?</div>
@@ -1416,183 +1415,64 @@ cursor:pointer;white-space:nowrap;transition:all .12s;
     </div>
   </div>
 
-  <!-- Morning setup — all in one card, ordered by workflow -->
+  <!-- Summary cards — tap to navigate to each section -->
 
-  <div class="card">
-    <div class="ch">⚙️ Morning Setup <span class="sub">Fill once · auto-populates everywhere</span></div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    <div class="card" onclick="showTab('schedule')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">👥 Today's Team</div>
+      <div style="font-size:12px">Opening: <b id="sum-open">—</b></div>
+      <div style="font-size:12px">Closing: <b id="sum-close">—</b></div>
+      <div style="font-size:10px;color:var(--acc);margin-top:4px" id="sum-staffcount">→ Schedule</div>
+    </div>
+    <div class="card" onclick="showTab('board')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">🚦 Availability</div>
+      <div style="font-size:12px">Walk-Ups: <b id="sum-wu2">—</b></div>
+      <div style="font-size:12px">Total Res: <b id="sum-totalres" style="color:var(--amber)">—</b></div>
+      <div style="font-size:10px;color:var(--acc);margin-top:4px">→ Board</div>
+    </div>
+    <div class="card" onclick="showTab('paste')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">📊 Brand Totals</div>
+      <div id="sum-brands" style="font-size:11px;font-family:var(--ff-mono);color:var(--txt2)">Nat — · Ala — · Ent —</div>
+      <div style="font-size:10px;color:var(--acc);margin-top:4px">→ Paste Data</div>
+    </div>
+    <div class="card" onclick="showTab('checklist')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">✅ Checklist</div>
+      <div id="sum-cl-progress" style="font-size:11px;color:var(--txt2)">—</div>
+      <div id="sum-cl-data" style="font-size:10px;color:var(--acc);margin-top:4px">→ Checklist</div>
+    </div>
+  </div>
+
+  <!-- Assignments strip -->
+
+  <div class="card" style="padding:10px 14px;margin-bottom:12px" onclick="showTab('checklist')" style="cursor:pointer">
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center">
+      <span style="color:var(--txt3)">XXAR <b id="sum-xxar" style="font-family:var(--ff-mono)">—</b></span>
+      <span style="color:var(--txt3)">SXAR <b id="sum-sxar" style="font-family:var(--ff-mono)">—</b></span>
+      <span style="color:var(--txt3)">PXAR <b id="sum-pxar" style="font-family:var(--ff-mono)">—</b></span>
+      <span style="color:var(--txt3)">Inv: <b id="sum-invagent">—</b></span>
+      <span style="color:var(--txt3)">FBOs: <b id="sum-fbo">—</b></span>
+      <span style="color:var(--acc);font-size:10px;margin-left:auto">→ Checklist</span>
+    </div>
+  </div>
 
 ```
-<!-- Row 1: Metrics -->
-<div class="setup-grid">
-  <div class="setup-field">
-    <label class="setup-lbl">CS Scores</label>
-    <input type="number" id="f-cs" min="0" placeholder="e.g. 87" oninput="sf('cs',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">HOT Alerts</label>
-    <input type="number" id="f-hot" min="0" placeholder="e.g. 2" oninput="sf('hot',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">OOS Units</label>
-    <input type="number" id="f-oos" min="0" placeholder="all have claims?" oninput="sf('oos',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Sales Leader</label>
-    <input type="text" id="f-sales" placeholder="Yesterday's leader" oninput="sf('salesLeader',this.value)">
-  </div>
-</div>
-
-<div class="divider"></div>
-
-<!-- Row 2: Managers (auto-filled from schedule, editable) -->
-<div class="setup-grid">
-  <div class="setup-field">
-    <label class="setup-lbl">Opening Manager <span style="color:var(--green);font-size:9px">AUTO</span></label>
-    <input type="text" id="f-openmgr" placeholder="Auto from schedule" oninput="sf('openMgr',this.value)" class="autofill">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Closing Manager <span style="color:var(--green);font-size:9px">AUTO</span></label>
-    <input type="text" id="f-closemgr" placeholder="Auto from schedule" oninput="sf('closeMgr',this.value)" class="autofill">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Inventory Agent</label>
-    <input type="text" id="f-invagent" placeholder="SAT / SUN / TUES" oninput="sf('invAgent',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Class Notes</label>
-    <input type="text" id="f-classnotes" placeholder="e.g. Minivans ✅  |  Trucks ✗" oninput="sf('classNotes',this.value)">
-  </div>
-</div>
-
-<div class="divider"></div>
-
-<!-- Peak Hours (from Game Plan — paste as-is) -->
-<div class="setup-grid">
-  <div class="setup-field" style="grid-column:span 2">
-    <label class="setup-lbl">Peak Reservations <span style="color:var(--txt3);font-weight:400;text-transform:none;letter-spacing:0">(from Game Plan — one per line, e.g. 10-64)</span></label>
-    <textarea id="f-peak-res" rows="4" placeholder="10-64&#10;11-37&#10;12-63&#10;3-44" oninput="sf('peakRes',this.value)"
-      style="resize:vertical;font-family:var(--ff-mono);font-size:12px"></textarea>
-  </div>
-  <div class="setup-field" style="grid-column:span 2">
-    <label class="setup-lbl">Peak Returns <span style="color:var(--txt3);font-weight:400;text-transform:none;letter-spacing:0">(from Game Plan)</span></label>
-    <textarea id="f-peak-ret" rows="4" placeholder="10-48&#10;11-49&#10;12-62&#10;3-60" oninput="sf('peakRet',this.value)"
-      style="resize:vertical;font-family:var(--ff-mono);font-size:12px"></textarea>
-  </div>
-  <div class="setup-field" style="grid-column:span 2">
-    <label class="setup-lbl">Email Greeting <span style="color:var(--txt3);font-weight:400;text-transform:none;letter-spacing:0">(manager writes their own opener)</span></label>
-    <textarea id="f-email-greeting" rows="2" placeholder="GOOOOOD MORNING CMH IT IS APRIL 9th BRIGHT AND SUNNY DAY IN THE LOWER 70s" oninput="sf('emailGreeting',this.value)"
-      style="resize:vertical;font-family:var(--ff-mono);font-size:12px"></textarea>
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">FBO Notes</label>
-    <input type="text" id="f-fbo-notes" placeholder="e.g. 2 of 4 written — all need delivery" oninput="sf('fboNotes',this.value)">
-  </div>
-</div>
-
-<div class="divider"></div>
-
-<!-- Email Data — collapsible -->
-<div style="display:flex;align-items:center;gap:8px;margin:4px 0 8px;cursor:pointer"
-  onclick="toggleEmailDataSection()">
-  <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">📧 Email Data</span>
-  <span id="email-data-toggle-lbl" style="font-size:10px;color:var(--txt3)">▼ Brand totals · Peaks · Greeting</span>
-</div>
-<div id="email-data-body" style="display:none">
-
-<!-- Row 2b: Brand totals — paste from GL or type manually -->
-<div style="margin-bottom:8px">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
-    <label class="setup-lbl" style="margin-bottom:0">Brand Totals</label>
-    <span style="font-size:10px;color:var(--txt3)">Paste GL block OR enter manually below</span>
-  </div>
-  <div style="display:flex;gap:8px;align-items:flex-start">
-    <textarea id="f-brand-paste" rows="2"
-      placeholder="Paste GL totals here:&#10;National: 116&#10;Alamo: 97&#10;Enterprise: 264&#10;2.0: 12"
-      oninput="parseBrandPaste(this.value)"
-      style="flex:1;font-family:var(--ff-mono);font-size:11px;resize:none;min-height:54px;
-        background:var(--bg3);border:1px dashed var(--bdr2);border-radius:4px;
-        color:var(--txt);padding:7px 10px"></textarea>
-    <button class="btn btn-gh btn-sm" onclick="clearBrandPaste()" style="flex-shrink:0">Clear</button>
-  </div>
-</div>
-<div class="setup-grid">
-  <div class="setup-field">
-    <label class="setup-lbl">Total Res Today</label>
-    <input type="number" id="f-total-res" placeholder="e.g. 607" oninput="sf('totalRes',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">National</label>
-    <input type="number" id="f-brand-nat" placeholder="116" oninput="sf('brandNational',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Alamo</label>
-    <input type="number" id="f-brand-ala" placeholder="97" oninput="sf('brandAlamo',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Enterprise</label>
-    <input type="number" id="f-brand-ent" placeholder="264" oninput="sf('brandEnterprise',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">2.0 (Non-Airport)</label>
-    <input type="number" id="f-brand-20" placeholder="12" oninput="sf('brand20',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">FBOs</label>
-    <input type="text" id="f-fbo-count" placeholder="e.g. 4" oninput="sf('fboCount',this.value)">
-  </div>
-</div>
-
-</div><!-- /email-data-body -->
-
-<div class="divider"></div>
-
-<!-- Row 3: XXAR Assignments -->
-<div class="xxar-row-group">
-  <div class="xxar-item">
-    <span class="xxar-code">XXAR</span>
-    <span class="xxar-lbl">We Pick</span>
-    <input type="text" id="f-xxar" placeholder="class code" oninput="sf('xxar',this.value)">
-  </div>
-  <div class="xxar-item">
-    <span class="xxar-code">SXAR</span>
-    <span class="xxar-lbl">Std Special</span>
-    <input type="text" id="f-sxar" placeholder="class code" oninput="sf('sxar',this.value)">
-  </div>
-  <div class="xxar-item">
-    <span class="xxar-code">PXAR</span>
-    <span class="xxar-lbl">Prem Special</span>
-    <input type="text" id="f-pxar" placeholder="class code" oninput="sf('pxar',this.value)">
-  </div>
-  <div class="xxar-item">
-    <span class="xxar-code" style="color:var(--txt3)">AUTH</span>
-    <span class="xxar-lbl">Manager</span>
-    <input type="text" id="f-auth" placeholder="initials" oninput="sf('auth',this.value)">
-  </div>
-</div>
-
-<div class="divider"></div>
-
-<!-- Row 4: Walk-Up Policy (canonical location) -->
-<div class="wu-master">
-  <span class="wu-lbl">🚦 Walk-Ups:</span>
-  <button class="wubtn on g" id="wu-open"    onclick="setWU('open')">✅ All Open</button>
-  <button class="wubtn"      id="wu-core"    onclick="setWU('core')">🔵 Core Only</button>
-  <button class="wubtn"      id="wu-noncore" onclick="setWU('noncore')">🔶 Non-Core</button>
-  <button class="wubtn"      id="wu-closed"  onclick="setWU('closed')">🔴 All Closed</button>
-</div>
-<div style="margin-top:8px;display:flex;align-items:center;gap:10px">
-  <label class="setup-lbl" style="white-space:nowrap">24hr Book</label>
-  <select id="f-24hr" onchange="sf('book24hr',this.value)" style="font-size:12px">
-    <option value="open">✅ Open</option>
-    <option value="blocked">🔴 Blocked</option>
-    <option value="suspended">🔴 Suspended</option>
-  </select>
-</div>
+<!-- Schedule mini-view on dashboard -->
 ```
 
+  <div id="dash-sched-mini" class="card" style="margin-bottom:10px;padding:10px 12px;cursor:pointer"
+    onclick="showTab('schedule')">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3)">
+        📋 Today's Coverage
+      </div>
+      <div style="font-size:10px;color:var(--acc)">→ Schedule</div>
+    </div>
+    <div id="dash-sched-content" style="font-size:11px;color:var(--txt3)">Loading...</div>
   </div>
 
-  <!-- Quick-action links -->
+```
+<!-- Quick-action links -->
+```
 
   <div class="quick-links">
     <div class="ql-btn" onclick="showTab('paste')">
@@ -1924,329 +1804,39 @@ cursor:pointer;white-space:nowrap;transition:all .12s;
   <div class="prog-lbl" id="cl-prog-lbl">0 / 0 completed</div>
   <div id="cl-body"></div>
 </div>
+  <!-- Inline email output -->
+  <div id="cl-email-output" style="display:none;margin-top:10px" class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:12px;font-weight:700;color:var(--txt2)" id="cl-email-type-lbl"></div>
+      <button onclick="document.getElementById('cl-email-output').style.display='none'"
+        style="font-size:16px;color:var(--txt3);background:none;border:none;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:11px;color:var(--txt3);margin-bottom:4px" id="cl-email-to"></div>
+    <textarea id="cl-email-body" rows="10" readonly
+      style="width:100%;font-family:var(--ff-mono);font-size:11px;resize:vertical;
+        background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;
+        color:var(--txt);padding:8px 10px;line-height:1.5"></textarea>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-g btn-sm" onclick="copyCLEmail()">📋 Copy</button>
+      <button class="btn btn-gh btn-sm" onclick="openCLMail()">✉ Open in Mail</button>
+    </div>
+  </div>
 
 <!-- ═══════════════════════════════════════════════════════════════
      SCREEN: CLOSING
 ═══════════════════════════════════════════════════════════════ -->
 
-<div class="scr" id="screen-closing">
-
-  <div class="card">
-    <div class="ch">🌙 Closing Notes</div>
-    <div class="setup-grid">
-      <div class="setup-field">
-        <label class="setup-lbl">Closing Manager <span style="color:var(--green);font-size:9px">AUTO</span></label>
-        <input type="text" id="f-closemgr2" placeholder="Auto from schedule" oninput="sf('closeMgr',this.value)" class="autofill">
-      </div>
-      <div class="setup-field">
-        <label class="setup-lbl">Final OOS Count</label>
-        <input type="number" id="f-oos-final" placeholder="All have claims?" oninput="sf('oosFinal',this.value)">
-      </div>
-      <div class="setup-field">
-        <label class="setup-lbl">Stayed Late</label>
-        <input type="text" id="f-latestaff" placeholder="Name + reason" oninput="sf('lateStaff',this.value)">
-      </div>
-    </div>
-    <div style="margin-top:10px">
-      <label class="setup-lbl">ABRM Notes / Observations</label>
-      <textarea id="f-closenotes" rows="3" placeholder="Notes for incoming team..." oninput="sf('closeNotes',this.value)"
-        style="width:100%;margin-top:6px;resize:vertical"></textarea>
-    </div>
-
-```
-<div class="divider"></div>
-
-<!-- Closing email specifics -->
-<div class="setup-grid">
-  <div class="setup-field">
-    <label class="setup-lbl">Today Total Ret</label>
-    <input type="number" id="f-close-today-ret" placeholder="447" oninput="sf('closeTodayRet',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Tomorrow Res</label>
-    <input type="number" id="f-close-tmrw-res" placeholder="681" oninput="sf('closeTmrwRes',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Tomorrow Ret</label>
-    <input type="number" id="f-close-tmrw-ret" placeholder="739" oninput="sf('closeTmrwRet',this.value)">
-  </div>
-</div>
-<div class="setup-grid" style="margin-top:8px">
-  <div class="setup-field" style="grid-column:span 2">
-    <label class="setup-lbl">Closing Greeting <span style="color:var(--txt3);font-weight:400;text-transform:none;letter-spacing:0">(manager writes their own)</span></label>
-    <textarea id="f-close-greeting" rows="2" oninput="sf('closeGreeting',this.value)"
-      placeholder="GOOOD EVENING CMH!! Today we completed a total of..."
-      style="resize:vertical;font-family:var(--ff-mono);font-size:12px"></textarea>
-  </div>
-  <div class="setup-field" style="grid-column:span 2">
-    <label class="setup-lbl">FBO Detail</label>
-    <textarea id="f-fbo-detail" rows="3" oninput="sf('fboDetail',this.value)"
-      placeholder="11am D. Murray - written and delivered to SIG&#10;10pm J. Niemann - written M&G"
-      style="resize:vertical;font-family:var(--ff-mono);font-size:11px"></textarea>
-  </div>
-</div>
-```
-
-  </div>
-
-  <!-- Brand totals + hourly peaks + FBO card -->
-
-  <div class="card">
-    <div class="ch">📊 Email Data Entry <span class="sub">Fills opening &amp; closing email automatically</span></div>
-
-```
-<div class="setup-grid" style="margin-bottom:12px">
-  <div class="setup-field">
-    <label class="setup-lbl">Total Today (Res out)</label>
-    <input type="number" id="f-total-today" placeholder="e.g. 607" oninput="sf('totalToday',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Total Returns Today</label>
-    <input type="number" id="f-total-ret" placeholder="e.g. 447" oninput="sf('totalRet',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Tomorrow's Reservations</label>
-    <input type="number" id="f-total-tmrw" placeholder="e.g. 681" oninput="sf('totalTmrw',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Tomorrow's Returns</label>
-    <input type="number" id="f-total-tmrw-ret" placeholder="e.g. 739" oninput="sf('totalTmrwRet',this.value)">
-  </div>
-</div>
-
-<div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;letter-spacing:.08em;
-  color:var(--txt2);text-transform:uppercase;margin-bottom:8px">Brand Breakdown</div>
-<div class="setup-grid" style="margin-bottom:12px">
-  <div class="setup-field">
-    <label class="setup-lbl">National</label>
-    <input type="number" id="f-brand-nat" placeholder="0" oninput="sf('brandNat',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Alamo</label>
-    <input type="number" id="f-brand-ala" placeholder="0" oninput="sf('brandAla',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">Enterprise</label>
-    <input type="number" id="f-brand-ent" placeholder="0" oninput="sf('brandEnt',this.value)">
-  </div>
-  <div class="setup-field">
-    <label class="setup-lbl">2.0</label>
-    <input type="number" id="f-brand-two" placeholder="0" oninput="sf('brandTwo',this.value)">
-  </div>
-</div>
-
-<div style="font-family:var(--ff-hd);font-size:11px;font-weight:700;letter-spacing:.08em;
-  color:var(--txt2);text-transform:uppercase;margin-bottom:6px">FBOs</div>
-<div class="setup-grid" style="margin-bottom:10px">
-  <div class="setup-field">
-    <label class="setup-lbl">FBO Count</label>
-    <input type="number" id="f-fbo-count" placeholder="0" oninput="sf('fboCount',this.value)">
-  </div>
-  <div class="setup-field" style="grid-column:span 3">
-    <label class="setup-lbl">FBO Notes</label>
-    <input type="text" id="f-fbo-notes" placeholder="e.g. 2/4 written, all need delivered" oninput="sf('fboNotes',this.value)">
-  </div>
-</div>
-
-<div style="font-size:11px;color:var(--txt3)">
-  💡 Car code breakdown (X/Y format) is auto-generated from your paste data.
-  Peak hourly data also auto-fills from paste data when available.
-</div>
-```
-
-  </div>
-
-  <!-- Team text + email in one unified card -->
-
-  <div class="card">
-    <div class="ch">📱 Shift Handoff + Emails <span class="sub">One tap to send</span></div>
-
-```
-<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-  <button class="btn btn-gh btn-sm" onclick="showEmailType('handoff')" id="et-handoff" style="border-color:var(--acc);color:var(--acc)">📱 Team Text</button>
-  <button class="btn btn-gh btn-sm" onclick="showEmailType('opening')" id="et-opening">🌅 Opening Email</button>
-  <button class="btn btn-gh btn-sm" onclick="showEmailType('closing')" id="et-closing">🌙 Closing Email</button>
-  <button class="btn btn-gh btn-sm" onclick="showEmailType('summary')" id="et-summary">📊 Day Summary</button>
-  <button class="btn btn-p btn-sm" onclick="genTeamText()" style="margin-left:auto">🔄 Regenerate</button>
-</div>
-
-<div id="team-text-output" style="background:var(--bg);border:1px solid var(--bdr2);border-radius:5px;
-  padding:14px;font-family:var(--ff-mono);font-size:12px;line-height:1.7;color:var(--txt);
-  white-space:pre-wrap;min-height:100px;margin-bottom:10px">—</div>
-
-<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-  <div style="font-size:11px;color:var(--txt3);flex:1" id="email-to-line"></div>
-  <button class="btn btn-gh btn-sm" onclick="copyTeamText()">📋 Copy</button>
-  <button class="btn btn-g" id="open-mail-btn" onclick="openInMail()" style="display:none">📧 Open in Mail</button>
-</div>
-```
-
-  </div>
-
-  <!-- Email settings (collapsed by default) -->
-
-  <div class="card" style="background:rgba(37,99,235,.03)">
-    <div class="ch" style="cursor:pointer;margin-bottom:0" onclick="toggleEmailSettings()">
-      ⚙️ Email Recipients <span style="margin-left:auto;font-size:11px;color:var(--txt3)" id="email-settings-toggle">▼ Show</span>
-    </div>
-    <div id="email-settings-body" style="display:none;margin-top:14px">
-      <div class="setup-grid">
-        <div class="setup-field">
-          <label class="setup-lbl">Morning To</label>
-          <input type="text" id="email-to-morning" placeholder="#CMHBoothCSR #NationalColumbusOH" oninput="sf('emailToMorning',this.value)" style="font-size:11px">
-        </div>
-        <div class="setup-field">
-          <label class="setup-lbl">Evening To</label>
-          <input type="text" id="email-to-evening" placeholder="#CMHBoothCSR #NationalColumbusOH" oninput="sf('emailToEvening',this.value)" style="font-size:11px">
-        </div>
-        <div class="setup-field">
-          <label class="setup-lbl">Log / Archive</label>
-          <input type="text" id="email-to-log" placeholder="cmh-daily-log@enterprise.com" oninput="sf('emailToLog',this.value)" style="font-size:11px">
-        </div>
-      </div>
-      <p style="font-size:11px;color:var(--txt3);margin-top:8px">💡 Send every email to the log address to build a searchable inbox history automatically.</p>
-    </div>
-  </div>
-
-  <!-- Day summary -->
-
-  <div class="card">
-    <div class="ch">📄 Day Summary</div>
-    <div id="day-summary" style="font-size:12px;color:var(--txt2);line-height:2"></div>
-    <button class="btn btn-gh mt8" onclick="window.print()">🖨 Print</button>
-  </div>
-
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════
-     SCREEN: REFERENCE (Car Codes + Loyalty + Hourly — tabbed)
-═══════════════════════════════════════════════════════════════ -->
-
-<div class="scr" id="screen-reference">
-  <div class="sched-section-tabs" style="margin-bottom:14px">
-    <button class="ss-tab on" id="ref-codes"  onclick="showRefSection('codes')">🚗 Car Codes</button>
-    <button class="ss-tab"    id="ref-loyalty" onclick="showRefSection('loyalty')">🏆 Loyalty</button>
-    <button class="ss-tab"    id="ref-hourly" onclick="showRefSection('hourly')">📈 Hourly Flow</button>
-  </div>
-
-  <!-- CAR CODES -->
-
-  <div id="ref-sec-codes">
-    <div class="card">
-      <div class="ch">🚗 Car Code Compendium <span class="badge">74 codes · live board status</span></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-        <input type="text" id="code-search" placeholder="Search code, group, or keyword..."
-          oninput="filterCodes()" style="flex:1;min-width:160px;font-size:13px;padding:7px 11px">
-        <select id="code-filter-group" onchange="filterCodes()" style="font-size:12px;padding:6px 10px">
-          <option value="">All Groups</option>
-        </select>
-        <select id="code-filter-core" onchange="filterCodes()" style="font-size:12px;padding:6px 10px">
-          <option value="">All</option>
-          <option value="core">◆ Core Only</option>
-          <option value="noncore">Non-Core Only</option>
-        </select>
-        <button class="btn btn-gh btn-sm" onclick="clearCodeSearch()">Clear</button>
-      </div>
-      <div style="font-size:11px;color:var(--txt3);margin-bottom:10px" id="code-result-count"></div>
-      <div id="code-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:6px"></div>
-    </div>
-    <div class="card" style="background:rgba(37,99,235,.04);border-color:rgba(37,99,235,.2)">
-      <div class="ch" style="color:var(--acc)">📖 Legend</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;font-size:12px;color:var(--txt2)">
-        <div><b style="color:var(--acc)">◆ Core</b> — General Emerald pick pool (Econ/Cmpct, Intermed, Std, Full + Compact/Mid/Std SUV)</div>
-        <div><b style="color:var(--green)">WU</b> — Walk-Up + Upgrade open · Net ≥ walk-up min</div>
-        <div><b style="color:var(--amber)">UP</b> — Upgrade only · Net between thresholds</div>
-        <div><b style="color:var(--red)">NA</b> — Not available · Below both thresholds</div>
-        <div><b>RVAR</b> — 12-pass van NOT stocked at CMH. Treated as Passenger Van.</div>
-        <div><b>Thresholds</b> — WU/UP mins. Core groups: 3/2. Premium/Luxury: 4/3.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- LOYALTY -->
-
-  <div id="ref-sec-loyalty" style="display:none">
-    <div class="card">
-      <div class="ch">🏆 Loyalty Program Guide <span class="badge">CMH operational rules</span></div>
-      <p style="font-size:12px;color:var(--txt3);margin-bottom:14px">
-        Quick counter reference for all three programs with CMH-specific overrides.
-      </p>
-      <div id="loyalty-content"></div>
-    </div>
-  </div>
-
-  <!-- HOURLY FLOW -->
-
-  <div id="ref-sec-hourly" style="display:none">
-    <div class="card">
-      <div class="ch">📈 Hourly Flow <span class="badge">Res · Ret · Net by group</span></div>
-      <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">Paste data first to see group totals.</p>
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-        <select id="hourly-group-filter" onchange="buildHourlyView()" style="font-size:12px;padding:7px 10px;flex:1;min-width:160px">
-          <option value="">All Groups</option>
-        </select>
-        <select id="hourly-type-filter" onchange="buildHourlyView()" style="font-size:12px;padding:7px 10px">
-          <option value="net">Net (Ret − Res)</option>
-          <option value="res">Reservations</option>
-          <option value="ret">Returns</option>
-        </select>
-      </div>
-      <div id="hourly-chart"></div>
-      <div id="hourly-table" style="margin-top:12px"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════
-     SCREEN: INVENTORY
-═══════════════════════════════════════════════════════════════ -->
-
-<div class="scr" id="screen-inventory">
-  <div class="card">
-    <div class="ch">🔢 Physical Inventory Count <span class="badge">Compare lot vs system</span></div>
-    <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">Walk the lot, enter actual counts. Paste data first to see system numbers.</p>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-      <button class="btn btn-gh btn-sm" onclick="clearInventoryCounts()">Clear All</button>
-      <button class="btn btn-p btn-sm" onclick="saveInventoryCounts()">💾 Save Counts</button>
-      <div style="margin-left:auto;font-size:11px;color:var(--txt3)" id="inv-last-saved"></div>
-    </div>
-  </div>
-  <div id="inv-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px"></div>
-</div>
-
-<!-- ═══════════════════════════════════════════════════════════════
-     SCREEN: HISTORY
-═══════════════════════════════════════════════════════════════ -->
-
-<div class="scr" id="screen-history">
-  <div class="card">
-    <div class="ch">📅 Shift History <span class="badge">Last 60 days · browser storage</span></div>
-    <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
-      Every day you use this app is saved here. Send a closing email to also log it in your inbox.
-    </p>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-      <button class="btn btn-gh btn-sm" onclick="exportHistory()">⬇ Export All</button>
-      <button class="btn btn-gh btn-sm" onclick="clearOldHistory()">🗑 Clear 30+ days</button>
-    </div>
-  </div>
-  <div id="history-list"><p style="font-size:12px;color:var(--txt3);text-align:center;padding:24px">Loading history...</p></div>
-</div>
-
-<!-- MODAL -->
-
-<div id="modal-overlay" onclick="closeModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center">
-  <div id="modal-box" onclick="event.stopPropagation()" style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;padding:20px;max-width:420px;width:90%;max-height:80vh;overflow-y:auto">
-    <div id="modal-title" style="font-family:var(--ff-hd);font-size:16px;font-weight:700;margin-bottom:14px"></div>
-    <div id="modal-body" style="font-size:13px;color:var(--txt2);line-height:1.6"></div>
-    <div style="margin-top:14px;display:flex;justify-content:flex-end"><button class="btn btn-gh" onclick="closeModal()">Close</button></div>
-  </div>
-</div>
+  <!-- SCREEN: Closing -->
 
 <!-- TOAST -->
 
 <div id="toast"></div>
 
 <script>
+
+const GITHUB_TOKEN = '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';
+const GITHUB_REPO  = 'werephoenix/CMH-Daily-Driver';
+const GITHUB_FILE  = 'cmh-state.json';
 
 // ── CAR CODE → GROUP MAPPING ────────────────────────────────────────────────
 var CODE_MAP = {
@@ -2397,9 +1987,6 @@ var GROUP_META = [
 ];
 
 // ── ROSTER ──────────────────────────────────────────────────────────────────
-const GITHUB_TOKEN = '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';
-const GITHUB_REPO  = 'werephoenix/CMH-Daily-Driver';
-const GITHUB_FILE  = 'state.json';
 var ROSTER_CXR = [
 
   // ═══ EARLY CXRs — 530A start ═══════════════════════════════════════════════
@@ -2408,28 +1995,28 @@ var ROSTER_CXR = [
   {id:'matt-j',   name:'Matthew Johnson',        nick:'Matt',    role:'CXR',
    shiftCode:'530A-200P', shiftStart:5.5, shiftEnd:14.0,
    daysOn:[0,1,2,3,4],  // Sun/Mon/Tue/Wed/Thu — confirmed ✓ marks in cols Su Mo Tu We Th
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Sun ends 1:00p. Mon–Thu ends 2:00p. Counter clock starts 6:00am.'},
 
   {id:'mini-c',   name:'Rukmini (Mini) Carr',    nick:'Mini',    role:'CXR',
    shiftCode:'530A-200P', shiftStart:5.5, shiftEnd:14.0,
    daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat — confirmed ✓ marks
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Sun/Mon/Thu/Fri/Sat 5:30a-2:00p. Counter clock starts 6am.'},
 
   {id:'laura',    name:'Laura Gonzalez',          nick:'Laura',   role:'CXR',
    shiftCode:'530A-230P/5P-1A', shiftStart:5.5, shiftEnd:14.5,
    daysOn:[0,2,3,4,6],  // Sun/Tue/Wed/Thu/Sat — confirmed ✓ marks
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'DUAL SHIFT: AM 5:30a-2:30p (Sun/Sat). Evening 5:00p-1:00a (Tue/Wed/Thu). Two patterns.'},
 
   {id:'guenther', name:'Guenther Meyer',          nick:'Guenther',role:'CXR',
    shiftCode:'830A-500P', shiftStart:8.5, shiftEnd:17.0,
    daysOn:[0,1,2,3,4],  // Sun-Thu — confirmed
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Sun-Thu 8:30a-5:00p. Last name Meyer (not Meyers).'},
 
@@ -2438,42 +2025,42 @@ var ROSTER_CXR = [
   {id:'lily',     name:'Lily Tesfaye',            nick:'Lily',    role:'CXR',
    shiftCode:'830A-500P', shiftStart:8.5, shiftEnd:17.0,
    daysOn:[2,3,4,5,6],  // Tue-Sat — confirmed from Excel
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Tue-Sat 8:30a-5:00p.'},
 
   {id:'cece',     name:'Ceandra (CeCe) Smith',    nick:'CeCe',    role:'CXR',
    shiftCode:'830A-500P', shiftStart:8.5, shiftEnd:17.0,
    daysOn:[1,2,3,4,5],  // Mon-Fri — confirmed from Excel
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Mon-Fri 8:30a-5:00p. Off Sat/Sun.'},
 
   {id:'mariam',   name:'Mariam Mbye',              nick:'Mariam',  role:'CXR',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
    daysOn:[0,1,4,5,6],  // Thu-Mon (Sun/Mon/Thu/Fri/Sat) — confirmed
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Thu-Mon 10a-6:30p. Off Tue/Wed.'},
 
   {id:'tt',       name:'Tighisty (TT) Haile',     nick:'TT',      role:'CXR',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
    daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat — confirmed from Excel
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Sun/Mon/Thu/Fri/Sat 10a-6:30p. Last name Haile (not Hale).'},
 
   {id:'sammi',    name:'Samantha (Sammi) Smith',  nick:'Sammi',   role:'CXR',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
    daysOn:[1,2,3,5,6],  // Mon/Tue/Wed/Fri/Sat — confirmed from Excel
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Mon/Tue/Wed/Fri/Sat 10a-6:30p.'},
 
   {id:'jay',      name:'JaJuantae (Jay) Young',   nick:'Jay',     role:'CXR',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
    daysOn:[0,1,2,3,5],  // Sun/Mon/Tue/Wed/Fri — confirmed from Excel
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Sun/Mon/Tue/Wed/Fri 10a-6:30p.'},
 
@@ -2482,28 +2069,28 @@ var ROSTER_CXR = [
   {id:'umesh',    name:'Umesh Acharya',            nick:'Umesh',   role:'CXR',
    shiftCode:'430P-100A', shiftStart:16.5, shiftEnd:25.0,
    daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat — confirmed from Excel
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Sun/Mon/Thu/Fri/Sat 4:30p-1:00a.'},
 
   {id:'leslie',   name:'Leslie Hamler',            nick:'Leslie',  role:'CXR',
    shiftCode:'430P-100A', shiftStart:16.5, shiftEnd:25.0,
    daysOn:[0,1,2,3,6],  // Sun/Mon/Tue/Wed/Sat — confirmed from Excel
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Sun/Mon/Tue/Wed/Sat 4:30p-1:00a.'},
 
   {id:'feven',    name:'Feven Dubale',             nick:'Feven',   role:'CXR',
    shiftCode:'600P-100A', shiftStart:18.0, shiftEnd:25.0,
    daysOn:[1,2,3,4,5],  // Mon-Fri — confirmed from Excel
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Mon-Fri 6:00p-1:00a.'},
 
   {id:'hamda',    name:'Hamda Wais',               nick:'Hamda',   role:'CXR',
    shiftCode:'430P-100A', shiftStart:16.5, shiftEnd:25.0,
    daysOn:[5,6],         // Fri/Sat confirmed. Sparse/variable.
-   pref:'counter', exitFairness:0,
+   pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Fri/Sat confirmed. Sparse/variable schedule. 4:30p-1:00a. Part-time.'},
 
@@ -2630,18 +2217,41 @@ var COVERAGE_RULES = {
 // ═══════════════════════════════════════════════════════════════════════
 var CL_DATA = {
   opening: [
-    {s:'📊 Data Entry', items:[
-      {t:'CS Count', p:false, field:'cs', fieldType:'number', fieldPlaceholder:'e.g. 91'},
-      {t:'HOT Alerts', p:false, field:'hot', fieldType:'number', fieldPlaceholder:'e.g. 1'},
-      {t:'OOS Units — all have claims?', p:false, field:'oos', fieldType:'text', fieldPlaceholder:'e.g. 3 or "All claimed"'},
-      {t:'Sales Leader (yesterday) + print sales report', p:false, field:'salesLeader', fieldType:'text', fieldPlaceholder:'Name'},
-      {t:'Inventory Agent for today', p:false, field:'invAgent', fieldType:'text', fieldPlaceholder:'Name'},
-      {t:'2.0 Reservations (Non-Airport)', p:false, field:'brand20', fieldType:'number', fieldPlaceholder:'e.g. 12'},
-      {t:"FBO's — count & notes", p:false, field:'fboNotes', fieldType:'text', fieldPlaceholder:'11am D. Murray - written & delivered to SIG'},
-      {t:'XXAR Assignment (We Pick)', p:false, field:'xxar', fieldType:'text', fieldPlaceholder:'e.g. FFAR'},
-      {t:'SXAR Assignment (Std Special)', p:false, field:'sxar', fieldType:'text', fieldPlaceholder:'e.g. SFAR'},
-      {t:'PXAR Assignment (Prem Special)', p:false, field:'pxar', fieldType:'text', fieldPlaceholder:'e.g. PFAR'},
-      {t:'Opening email greeting written', p:false, field:'emailGreeting', fieldType:'textarea', fieldPlaceholder:'GOOOD MORNING CMH!!...'},
+    {s:'📊 Morning Data', items:[
+      {t:'CS & HOT Alerts entered', p:false,
+        fields:[
+          {key:'cs',  label:'CS Count',   type:'number', ph:'e.g. 91'},
+          {key:'hot', label:'HOT Alerts', type:'number', ph:'e.g. 1'},
+        ]},
+      {t:'OOS Units — all have claims?', p:false,
+        fields:[{key:'oos', label:'OOS Count', type:'text', ph:'e.g. 3 or "All claimed"'}]},
+      {t:'Sales Leader (yesterday) — print sales report', p:false,
+        fields:[{key:'salesLeader', label:'Sales Leader', type:'text', ph:'Name'}]},
+      {t:'Inventory Agent confirmed for today', p:false,
+        fields:[{key:'invAgent', label:'Inv Agent', type:'text', ph:'Name'}]},
+      {t:'2.0 Reservations (Non-Airport)', p:false,
+        fields:[{key:'brand20', label:'2.0 Count', type:'number', ph:'e.g. 12'}]},
+      {t:"FBO's — written & delivered", p:true,
+        fields:[
+          {key:'fboCount', label:'FBO #',    type:'number', ph:'e.g. 4'},
+          {key:'fboNotes', label:'FBO Notes', type:'text',   ph:'11am D. Murray - written & delivered to SIG'},
+        ]},
+      {t:'XXAR / SXAR / PXAR assignments', p:false,
+        fields:[
+          {key:'xxar', label:'XXAR', type:'text', ph:'e.g. FFAR'},
+          {key:'sxar', label:'SXAR', type:'text', ph:'e.g. SFAR'},
+          {key:'pxar', label:'PXAR', type:'text', ph:'e.g. PFAR'},
+        ]},
+      {t:'Opening email greeting written', p:false,
+        fields:[{key:'emailGreeting', label:'Greeting', type:'textarea', ph:'GOOOD MORNING CMH!! It is...'}]},
+    ]},
+    {s:'⚙️ Operations', items:[
+      {t:'Brand totals pasted', p:false, autoKey:'brandsPasted'},
+      {t:'Game Plan car data pasted (all 4 zones)', p:false, autoKey:'gameplanPasted'},
+      {t:'Walk-Up policy set', p:false, autoKey:'wuSet'},
+      {t:'Schedule confirmed — stations assigned', p:false, autoKey:'schedConfirmed'},
+      {t:'Lunches scheduled', p:false},
+      {t:'CXR exit rotation — 4-hour blocks confirmed', p:false},
     ]},
     {s:'📣 Communications', items:[
       {t:'Morning Email sent (#CMHBoothCSR #NationalColumbusOH)', p:false},
@@ -2650,27 +2260,27 @@ var CL_DATA = {
     {s:'📸 Documentation', items:[
       {t:'Surveys sent', p:true},
       {t:'Goal Board updated', p:true},
-      {t:'All FBOs written & delivered', p:true},
       {t:'Clean Car Audits completed', p:true},
-    ]},
-    {s:'⚙️ Operations', items:[
-      {t:'Brand totals pasted (Paste Data tab)', p:false},
-      {t:'Game Plan car data pasted (all 4 zones)', p:false},
-      {t:'Walk-Up policy set (Availability tab)', p:false},
-      {t:'Lunches scheduled — Schedule tab', p:false},
-      {t:'CXR exit rotation confirmed — 4-hour blocks', p:false},
     ]},
     {s:'🏁 Opening Wrap', items:[
       {t:'Break room whiteboard filled out', p:false},
-      {t:'Station assignments set in Schedule tab', p:false},
+      {t:'Station assignments confirmed', p:false},
+    ]},
+    {s:'📧 Send Opening Email', email:true, items:[
+      {t:'Opening email greeting written', p:false,
+        fields:[{key:'emailGreeting', label:'Greeting', type:'textarea',
+          ph:'GOOOD MORNING CMH!! It is a beautiful...'}]},
+      {t:'Opening Email sent', p:false},
+      {t:'Team Text sent', p:false},
     ]},
   ],
   mid: [
     {s:'📊 Data Update', items:[
-      {t:'OOS current count', p:false, field:'oos', fieldType:'text', fieldPlaceholder:'Current OOS'},
+      {t:'OOS current count', p:false,
+        fields:[{key:'oos', label:'OOS Count', type:'text', ph:'Current OOS'}]},
     ]},
     {s:'📋 Review & Verify', items:[
-      {t:'Claims in OOS — all have claims?', p:false},
+      {t:'Claims in OOS reviewed', p:false},
       {t:'Drop Calls reviewed', p:false},
       {t:"FBO's written & delivered", p:true},
       {t:'Clean Car Audits completed', p:true},
@@ -2680,25 +2290,36 @@ var CL_DATA = {
     ]},
     {s:'📝 Notes', items:[
       {t:'ABRM / BRM observations logged', p:false},
-      {t:'Board update sent to team if needed', p:false},
+    ]},
+    {s:'📱 Team Update', email:true, items:[
+      {t:'Mid-shift Team Text sent (if needed)', p:false},
     ]},
   ],
   closing: [
-    {s:'📊 Data Entry', items:[
-      {t:'Final OOS count', p:false, field:'oosFinal', fieldType:'text', fieldPlaceholder:'Final count'},
-      {t:"FBO's total count", p:false, field:'fboCount', fieldType:'number', fieldPlaceholder:'e.g. 4'},
-      {t:"FBO detail (time · name · written/delivered)", p:false, field:'fboDetail', fieldType:'textarea', fieldPlaceholder:'11am D. Murray - written & delivered to SIG\n10pm J. Niemann - written M&G'},
-      {t:'Tomorrow Reservations', p:false, field:'closeTmrwRes', fieldType:'number', fieldPlaceholder:'e.g. 681'},
-      {t:'Tomorrow Returns', p:false, field:'closeTmrwRet', fieldType:'number', fieldPlaceholder:'e.g. 739'},
-      {t:'Staff who stayed late', p:false, field:'lateStaff', fieldType:'text', fieldPlaceholder:'Name + reason'},
-      {t:'Closing email greeting written', p:false, field:'closeGreeting', fieldType:'textarea', fieldPlaceholder:'GOOOD EVENING CMH!!...'},
+    {s:'📊 Closing Numbers', items:[
+      {t:'Final OOS count', p:false,
+        fields:[{key:'oosFinal', label:'Final OOS', type:'text', ph:'Final count'}]},
+      {t:"FBO's completed — count & detail", p:false,
+        fields:[
+          {key:'fboCount',  label:'FBO #',    type:'number', ph:'e.g. 4'},
+          {key:'fboDetail', label:'FBO Detail', type:'textarea',
+            ph:'11am D. Murray - written & delivered to SIG\n10pm J. Niemann - written M&G'},
+        ]},
+      {t:"Tomorrow's numbers", p:false,
+        fields:[
+          {key:'closeTmrwRes', label:'Tomorrow Res', type:'number', ph:'e.g. 681'},
+          {key:'closeTmrwRet', label:'Tomorrow Ret', type:'number', ph:'e.g. 739'},
+        ]},
+      {t:'Staff who stayed late', p:false,
+        fields:[{key:'lateStaff', label:'Stayed Late', type:'text', ph:'Name + reason'}]},
+      {t:'ABRM notes for incoming team', p:false,
+        fields:[{key:'closeNotes', label:'Notes', type:'textarea', ph:'Notes for incoming team...'}]},
     ]},
     {s:'📣 Communications', items:[
       {t:'End of Night Email sent (#CMHBoothCSR #CMHMgmt #NationalColumbusOH)', p:false},
       {t:'Message Center checked', p:false},
     ]},
     {s:'🚪 Booth & Equipment', items:[
-      {t:"FBO's completed", p:false},
       {t:'Return Booth — clean, locked, windows closed', p:false},
       {t:'Return Booth tablets & HH units charging', p:false},
       {t:'Navisnair put away', p:false},
@@ -2715,8 +2336,16 @@ var CL_DATA = {
     ]},
     {s:'🤝 Handover', items:[
       {t:'Counter area & break room tidy for next team', p:false},
-      {t:'Break room whiteboard updated', p:false},
+      {t:'Break room whiteboard updated — overnight notes & tomorrow overview', p:false},
       {t:'Day saved to History in app', p:false},
+    ]},
+    {s:'📧 Send Closing Email', email:true, items:[
+      {t:'Closing email greeting written', p:false,
+        fields:[{key:'closeGreeting', label:'Closing Greeting', type:'textarea',
+          ph:'GOOOD EVENING CMH!! Today we completed...'}]},
+      {t:'Closing Email sent', p:false},
+      {t:'Team Text sent', p:false},
+      {t:'Day Summary generated', p:false},
     ]},
   ],
 };
@@ -2806,13 +2435,16 @@ window.STATE = loadState();
 var STATE = window.STATE; // var hoists to script scope for function closures
 
 function saveState() {
+  // Local save always immediate
   try {
     const TODAY = new Date().toISOString().slice(0,10);
     const LS_KEY = 'cmh-v2-' + TODAY;
     localStorage.setItem(LS_KEY, JSON.stringify(STATE));
   } catch(e) {}
+  // Debounce GitHub push 2.5s
+  if (window._syncTimer) clearTimeout(window._syncTimer);
+  window._syncTimer = setTimeout(pushToGitHub, 2500);
 }
-
 
 function saveField(key, val) {
   STATE.fields[key] = val;
@@ -2857,15 +2489,14 @@ function startClock() {
 
 function autoRouteByTime() {
   const h = new Date().getHours();
-  if (h >= 15) showTab('closing');
+  if      (h >= 15) { showTab('checklist'); showChecklist('closing'); }
   else if (h >= 11) { showTab('checklist'); showChecklist('mid'); }
-  else showTab('opening');
+  else               { showTab('opening'); }
 }
 
-// ── TAB NAVIGATION ──────────────────────────────────────────────────────────
 function showTab(id) {
   // Map old tab names to new (emails→closing, codes→reference, hourly→reference, loyalty→reference)
-  const tabMap = { emails:'closing', codes:'reference', hourly:'reference', loyalty:'reference', dashboard:'opening' };
+  const tabMap = { emails:'checklist', codes:'reference', hourly:'reference', loyalty:'reference', dashboard:'opening' };
   if (tabMap[id]) id = tabMap[id];
 
   document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
@@ -2886,49 +2517,29 @@ function showTab(id) {
 
 
 function restoreFields() {
-  const f = STATE.fields;
-  const map = {
-    'f-cs':'cs','f-hot':'hot','f-oos':'oos',
-    'f-openmgr':'openMgr','f-closemgr':'closeMgr',
-    'f-sales':'salesLeader','f-invagent':'invAgent',
-    'f-classnotes':'classNotes',
-    'f-xxar':'xxar','f-sxar':'sxar','f-pxar':'pxar','f-auth':'auth',
-    'f-total-res':'totalRes',
-    'f-brand-nat':'brandNational','f-brand-ala':'brandAlamo',
-    'f-brand-ent':'brandEnterprise','f-brand-20':'brand20',
-    'f-fbo-count':'fboCount','f-fbo-notes':'fboNotes',
-    'f-peak-res':'peakRes','f-peak-ret':'peakRet',
-    'f-email-greeting':'emailGreeting',
-    'f-close-greeting':'closeGreeting',
-    'f-close-today-ret':'closeTodayRet',
-    'f-close-tmrw-res':'closeTmrwRes',
-    'f-close-tmrw-ret':'closeTmrwRet',
-    'f-fbo-detail':'fboDetail',
-    'f-oos-final':'oosFinal',
-    'f-latestaff':'lateStaff',
-    'f-closenotes':'closeNotes',
-    'email-to-morning':'emailToMorning',
-    'email-to-evening':'emailToEvening',
-    'email-to-log':'emailToLog',
-  };
-  for (const [id, key] of Object.entries(map)) {
-    const el = document.getElementById(id);
-    if (!el || f[key] === undefined || f[key] === null) continue;
-    el.value = f[key];
-  }
-  if (typeof updateWUBtns === 'function') updateWUBtns();
-  const book24 = document.getElementById('f-24hr');
-  if (book24 && f.book24hr) book24.value = f.book24hr;
-  // Restore brand paste display
-  if ((f.brandNational || f.brandAlamo) && !document.getElementById('f-brand-paste')?.value) {
-    const el = document.getElementById('f-brand-paste');
-    if (el) el.value = [
+  // Only restore fields that exist permanently in the DOM
+  // Checklist fields (cl-f-*) are rendered dynamically — restored by renderChecklist
+  // All Morning Setup fields were removed from dashboard — now live in checklist
+
+  // Restore 24hr booking select (board screen — always present)
+  const f = STATE.fields || {};
+  const b24 = document.getElementById('f-24hr-board');
+  if (b24 && f.book24hr) b24.value = f.book24hr;
+
+  // Restore brand paste textarea (paste screen)
+  const bp = document.getElementById('f-brand-paste');
+  if (bp && (f.brandNational || f.brandAlamo)) {
+    bp.value = [
       f.brandNational   ? 'National: '   + f.brandNational   : '',
       f.brandAlamo      ? 'Alamo: '      + f.brandAlamo      : '',
       f.brandEnterprise ? 'Enterprise: ' + f.brandEnterprise  : '',
       f.brand20         ? '2.0: '        + f.brand20         : '',
     ].filter(Boolean).join('\n');
   }
+
+  // Restore walk-up buttons
+  if (typeof updateWalkUpButtons === 'function') updateWalkUpButtons();
+  if (typeof updateWUBtns === 'function') updateWUBtns();
 }
 
 function restoreClosingFields() {
@@ -3126,7 +2737,7 @@ function parseStep(stepNum) {
   }
   refreshDash();
   buildBoardFlow();
-  toast('Step ' + stepNum + ' parsed ✓  (' + total.toLocaleString() + ' units)');
+  if(Object.keys(STATE.pasteData||{}).length>=4){if(!STATE.fields)STATE.fields={};STATE.fields.gameplanPasted='1';} toast('Step ' + stepNum + ' parsed ✓  (' + total.toLocaleString() + ' units)');
 }
 
 // Merge two peak strings, keeping highest value per hour
@@ -3315,9 +2926,9 @@ function updateBoardTotals() {
   const net = totalRet - totalRes;
   const netEl = document.getElementById('board-total-net');
 
-  document.getElementById('board-total-res').textContent = hasAnyData ? totalRes : '—';
-  document.getElementById('board-total-ret').textContent = hasAnyData ? totalRet : '—';
-  document.getElementById('board-groups-open').textContent = hasAnyData ? groupsOpen : '—';
+  const trEl = document.getElementById('board-total-res'); if(trEl) trEl.textContent = hasAnyData ? totalRes : '—';
+  const ttEl = document.getElementById('board-total-ret'); if(ttEl) ttEl.textContent = hasAnyData ? totalRet : '—';
+  const goEl = document.getElementById('board-groups-open'); if(goEl) goEl.textContent = hasAnyData ? groupsOpen : '—';
 
   if (netEl) {
     netEl.textContent = hasAnyData ? (net > 0 ? '+' : '') + net : '—';
@@ -3432,7 +3043,7 @@ function buildDaySummary() {
     else naCount++;
   });
 
-  document.getElementById('day-summary').innerHTML = `
+  (document.getElementById('day-summary')||{}).innerHTML = `
     <b>${today}</b><br><br>
     <b>Daily Data</b><br>
     CS Scores: ${f.cs||'—'}  ·  HOT Alerts: ${f.hot||'—'}  ·  OOS: ${f.oosFinal||f.oos||'—'}<br>
@@ -4138,7 +3749,7 @@ function handleSchedulePaste() {
     previewEl.innerHTML = preview;
     previewEl.style.display = 'block';
   }
-  document.getElementById('sched-apply-btn').style.display = 'inline-flex';
+  (document.getElementById('sched-apply-btn')||{}).style.display = 'inline-flex';
   toast(`Parsed ${count} staff members`);
 }
 
@@ -5141,7 +4752,7 @@ function closeAdjustPanel() {
 function resetSchedDay() {
   STATE.staffDuty = {}; STATE.staffStation = {};
   STATE.altSchedule = {}; STATE.shiftMod = {};
-  STATE.todayOverrides = {};
+  STATE.todayOverrides = {}; STATE.customSplits = {};
   _adjustPid = null;
   const panel = document.getElementById('adjust-panel');
   if (panel) panel.style.display = 'none';
@@ -5159,19 +4770,24 @@ function autoLoadFromExpected(expectedToday, dow) {
   if (!STATE.altSchedule)  STATE.altSchedule  = {};
   if (!STATE.stationPref)  STATE.stationPref  = {};
   Object.entries(expectedToday).forEach(([pid,e])=>{ STATE.staffDuty[pid]=true; STATE.shiftTimes[pid]=e.shift; });
+  // Clear CXR stations from previous state before fresh distribution
+  Object.entries(expectedToday).forEach(([pid,e])=>{
+    if(e.person.role==='CXR') delete STATE.staffStation[pid];
+  });
   Object.entries(expectedToday).forEach(([pid,e])=>{ if(e.person.role==='EXIT') STATE.staffStation[pid]='Exit Booth'; });
   Object.entries(expectedToday).forEach(([pid,e])=>{ if(['ARM','BRM','ABRM','MT'].includes(e.person.role)) STATE.staffStation[pid]='Counter Manager'; });
   const exitAgentCount = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='EXIT'&&STATE.staffDuty[pid]).length;
   const rules   = (typeof COVERAGE_RULES!=='undefined'&&COVERAGE_RULES[dow])||{};
   const exitMin = Math.max(0,(rules.exitMin||1)-exitAgentCount);
-  const exitMax = Math.max(exitMin,(rules.exitMax||2)-exitAgentCount);
+  const cxrTotal = Object.entries(expectedToday).filter(([,e])=>e.person.role==='CXR').length;
+  const exitMax = Math.max(exitMin, Math.min(3, Math.round(cxrTotal*0.30)));
   let lastSt={};try{const h=JSON.parse(localStorage.getItem('cmh-history-v2')||'{}');const dk=Object.keys(h).sort().slice(-1)[0];if(dk&&h[dk]&&h[dk].staffStation)lastSt=h[dk].staffStation;}catch(e){}
   let pats={};try{pats=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');}catch(err){}
   const cxrs = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='CXR')
-    .map(([pid,e])=>({pid, pref:STATE.stationPref[pid]||e.person.pref||'none',
+    .map(([pid,e])=>({pid, pref:(STATE.stationPref||{})[pid]||'none', rosterPref:e.person.pref||'none',
       overridePref:(pats[pid]&&pats[pid].suggestedPref)||null, shiftStart:e.person.shiftStart||99}))
     .sort((a,b)=>{
-      if(a.pref==='exit'&&b.pref!=='exit')return -1; if(b.pref==='exit'&&a.pref!=='exit')return 1;
+      if((a.pref==='exit'||a.rosterPref==='exit')&&b.pref!=='exit'&&b.rosterPref!=='exit')return -1; if((b.pref==='exit'||b.rosterPref==='exit')&&a.pref!=='exit'&&a.rosterPref!=='exit')return 1;
       if(a.pref==='counter'&&b.pref!=='counter')return 1; if(b.pref==='counter'&&a.pref!=='counter')return -1;
       if(a.overridePref==='exit'&&b.overridePref!=='exit')return -1; if(b.overridePref==='exit'&&a.overridePref!=='exit')return 1;
       if(a.overridePref==='counter'&&b.overridePref!=='counter')return 1; if(b.overridePref==='counter'&&a.overridePref!=='counter')return -1;
@@ -5179,7 +4795,15 @@ function autoLoadFromExpected(expectedToday, dow) {
       if(b.lastWasExit&&!a.lastWasExit)return -1;
       return a.shiftStart-b.shiftStart;
     });
-  cxrs.forEach((cxr,rank)=>{ if(!STATE.staffStation[cxr.pid]) STATE.staffStation[cxr.pid]=rank<exitMax&&(rank<exitMin||cxr.pref!=='counter')?'Exit Booth':'Counter'; });
+  cxrs.forEach((cxr,rank)=>{
+    if(STATE.staffStation[cxr.pid]) return; // already set (exit agent)
+    // First exitMax CXRs in sorted order go to Exit, rest to Counter
+    // Exception: if someone has explicit counter pref, keep at counter unless we're short
+    // forceCounter only for manager-set preference, not roster default
+    const managerSetPref = (STATE.stationPref||{})[cxr.pid];
+    const forceCounter = managerSetPref==='counter' && rank >= exitMin;
+    STATE.staffStation[cxr.pid] = (!forceCounter && rank < exitMax) ? 'Exit Booth' : 'Counter';
+  });
   if(typeof buildSmartRotation==='function'){try{const rot=buildSmartRotation();window._lastRotations={};if(rot&&rot.rotations)rot.rotations.forEach(r=>{window._lastRotations[r.pid]=r;});}catch(err){}}
   saveState();
 }
@@ -5335,7 +4959,7 @@ function confirmToday() {
     }
   });
 
-  saveState();
+  if(!STATE.fields)STATE.fields={}; STATE.fields.schedConfirmed='1'; saveState();
   buildStaffGrid();
   updateSchedHelper();
   buildCoverageUI();
@@ -5392,7 +5016,7 @@ function buildMonthGrid() {
 
   if (!sched || !Object.keys(sched.grid).length) {
     container.innerHTML = '<p style="font-size:12px;color:var(--txt3)">No schedule loaded.</p>';
-    document.getElementById('sched-range-badge').textContent = 'No schedule loaded';
+    (document.getElementById('sched-range-badge')||{}).textContent = 'No schedule loaded';
     return;
   }
 
@@ -5401,7 +5025,7 @@ function buildMonthGrid() {
   const today = todayKey();
   const allRoster = [...ROSTER_CXR, ...ROSTER_MGMT];
 
-  document.getElementById('sched-range-badge').textContent =
+  (document.getElementById('sched-range-badge')||{}).textContent =
     `${dateKeys.length} days · ${peopleIds.length} staff · ${sched.startDate} to ${sched.endDate}`;
 
   let html = '<div class="month-grid-wrap"><table class="month-grid"><tr><th class="mg-name">Name</th>';
@@ -5960,6 +5584,7 @@ function updateStatusBand() {
 }
 
 function refreshDash() {
+  buildDashSchedMini();
   updateSummary(); updateBoardHeader(); updateStatusBand();
   const f   = STATE.fields;
   const auto = typeof getAutoManagers==='function' ? getAutoManagers() : {};
@@ -6377,61 +6002,98 @@ function getCLDataForToday() {
 // Patch renderChecklist to use today-aware data
 const _origRenderCL = window.renderChecklist || function(){};
 function renderChecklist(mode) {
-  const sections = getCLDataForToday()[mode];
-  if (!sections) return;
-  const key = 'cl-' + mode;
   if (!STATE.checklist) STATE.checklist = {};
-  if (!STATE.checklist[key]) STATE.checklist[key] = {};
-  const checks = STATE.checklist[key];
+  const key  = 'cl-' + mode;
+  const cl   = STATE.checklist[key] || {};
+  const dow  = new Date().getDay();
+  const data = (typeof getCLDataForToday==='function') ? getCLDataForToday()[mode] : (CL_DATA[mode]||[]);
 
-  let total = 0, done = 0;
-  sections.forEach(s => s.items.forEach(i => {
-    total++;
-    if (checks[i.t]) done++;
-  }));
-
-  const pct = total > 0 ? Math.round(done/total*100) : 0;
-  const pr  = document.getElementById('cl-prog');
-  const pl  = document.getElementById('cl-prog-lbl');
-  if (pr) pr.style.width = pct + '%';
-  if (pl) pl.textContent = done + ' / ' + total + ' completed';
-
-  const dow = new Date().getDay();
-  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
-  let htm = '';
-  sections.forEach(sec => {
-    htm += '<div class="cl-sec-hdr">' + sec.s + '</div>';
-    sec.items.forEach(item => {
-      const d = !!checks[item.t];
-      const et = item.t.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
-      const isDaySpecific = item.t.startsWith('🔴') || item.t.includes('Monday') ||
-                            item.t.includes('Friday') || item.t.includes('Weekend') ||
-                            item.t.includes('VEM');
-      htm += '<div class="ci ' + (d?'done':'') + '" onclick="toggleCI(\'' + mode + '\',\'' + et + '\')">' +
-        '<div class="cbox">' + (d?'✓':'') + '</div>' +
-        '<div class="ci-txt">' + item.t +
-          (isDaySpecific ? ' <span style="font-size:9px;color:var(--amber);font-weight:700">' + dayNames[dow] + '</span>' : '') +
-        '</div>' +
-        (item.field ? '<div style="margin:4px 0 2px 28px" onclick="event.stopPropagation()">' +
-          (item.fieldType==='textarea'
-            ? '<textarea id="cl-f-' + item.field + '" rows="2" placeholder="' + (item.fieldPlaceholder||'') + '" oninput="sf(\'' + item.field + '\',this.value)" style="width:100%;padding:5px 8px;font-size:11px;resize:vertical;background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono)">' + (STATE.fields[item.field]||'') + '</textarea>'
+  function buildFields(fields) {
+    if (!fields || !fields.length) return '';
+    const style = 'padding:5px 8px;font-size:12px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);';
+    return '<div style="margin:5px 0 2px 28px;display:flex;gap:8px;flex-wrap:wrap" onclick="event.stopPropagation()">' +
+      fields.map(function(f) {
+        var val = (STATE.fields && STATE.fields[f.key]) || '';
+        var lbl = '<div style="font-size:9px;color:var(--txt3);margin-bottom:2px">' + f.label + '</div>';
+        if (f.type === 'textarea') {
+          return '<div style="flex:1;min-width:140px">' + lbl +
+            '<textarea id="cl-f-' + f.key + '" rows="2" placeholder="' + (f.ph||'') + '" ' +
+            'oninput="sf(\'' + f.key + '\',this.value)" ' +
+            'style="width:100%;resize:vertical;' + style + '">' + val + '</textarea></div>';
 
 ```
-        : '<input type="' + (item.fieldType||'text') + '" id="cl-f-' + item.field + '" placeholder="' + (item.fieldPlaceholder||'') + '" value="' + (STATE.fields[item.field]||'') + '" oninput="sf(\'' + item.field + '\',this.value)" style="width:100%;padding:5px 8px;font-size:12px;font-weight:600;background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono)">') +
-      '</div>' : '') +
-    (item.p ? '<div class=""ci-photo">📷</div>' : '') +
-    '</div>';
-});
+    }
+    return '<div><div style="min-width:60px">' + lbl +
+      '<input type="' + (f.type||'text') + '" id="cl-f-' + f.key + '" ' +
+      'placeholder="' + (f.ph||'') + '" value="' + val + '" ' +
+      'oninput="sf(\'' + f.key + '\',this.value)" ' +
+      'style="' + (f.type==='number'?'width:80px':'width:140px') + ';' + style + '"></div></div>';
+  }).join('') + '</div>';
 ```
 
-});
-
-const bd = document.getElementById(‘cl-body’);
-if (bd) bd.innerHTML = htm;
 }
 
-// toggleCI and resetCL use the today-aware data too
+var htm = ‘’;
+(data||[]).forEach(function(sec) {
+// Email section gets action buttons
+if (sec.email) {
+htm += ‘<div class="cl-sec-hdr" style="display:flex;align-items:center;justify-content:space-between">’ +
+sec.s +
+‘<div style="display:flex;gap:5px">’ +
+(mode===‘opening’ || mode===‘closing’ ?
+‘<button class=“btn btn-g btn-sm” style=“font-size:10px;padding:4px 10px” ’ +
+‘onclick=“event.stopPropagation();showCLEmail('’ + mode + ‘')” >📋 Generate</button>’ : ‘’) +
+‘<button class=“btn btn-gh btn-sm” style=“font-size:10px;padding:4px 10px” ’ +
+‘onclick=“event.stopPropagation();showCLTeamText()”>📱 Team Text</button>’ +
+‘</div></div>’;
+} else {
+htm += ‘<div class="cl-sec-hdr">’ + sec.s + ‘</div>’;
+}
+(sec.items||[]).forEach(function(it) {
+if (it.days && !it.days.includes(dow)) return;
+var done = cl[it.t] === true;
+var auto = it.autoKey ? checkAutoComplete(it.autoKey) : false;
+var isDone = done || auto;
+var fields = it.fields || (it.field ? [{key:it.field, label:it.fieldLabel||’’, type:it.fieldType||‘text’, ph:it.fieldPlaceholder||’’}] : []);
+htm += ‘<div class=“ci ’ + (isDone?‘done’:’’) + ‘” data-mode=”’ + mode + ‘” data-txt=”’ + it.t.replace(/”/g,’"’) + ‘” onclick=“ciClick(this)”>’ +
+‘<div class="cbox">’ + (isDone?‘✓’:’’) + ‘</div>’ +
+‘<div style="flex:1">’ +
+‘<div class="ci-txt">’ + it.t + (auto&&!done?’ <span style="font-size:9px;color:var(--green);opacity:.6">(auto)</span>’:’’) + ‘</div>’ +
+buildFields(fields) +
+‘</div>’ +
+(it.p ? ‘<div class="ci-photo">📷</div>’ : ‘’) +
+‘</div>’;
+});
+});
+
+var bd = document.getElementById(‘cl-body’);
+if (bd) bd.innerHTML = htm;
+
+var allItems = (data||[]).reduce(function(acc,s){return acc.concat((s.items||[]).filter(function(it){return !it.days||it.days.includes(dow);}));}, []);
+var doneCount = allItems.filter(function(it){return cl[it.t]||(it.autoKey&&checkAutoComplete(it.autoKey));}).length;
+var prog = document.getElementById(‘cl-progress’);
+var lbl  = document.getElementById(‘cl-progress-lbl’);
+if (prog) prog.style.width = allItems.length ? (doneCount/allItems.length*100)+’%’ : ‘0%’;
+if (lbl)  lbl.textContent  = doneCount + ’ / ’ + allItems.length + ’ completed’;
+}
+
+function checkAutoComplete(autoKey) {
+var f = STATE.fields || {};
+switch(autoKey) {
+case ‘brandsPasted’:   return !!(f.brandNational||f.brandAlamo||f.brandEnterprise);
+case ‘gameplanPasted’: return Object.keys(STATE.pasteData||{}).length >= 4;
+case ‘wuSet’:          return !!(f.wuSetManually);
+case ‘schedConfirmed’: return !!(f.schedConfirmed) || Object.values(STATE.staffStation||{}).filter(Boolean).length >= 3;
+default: return false;
+}
+}
+
+function ciClick(el) {
+var mode = el.getAttribute(‘data-mode’);
+var txt  = el.getAttribute(‘data-txt’);
+if (mode && txt) toggleCI(mode, txt);
+}
+
 function toggleCI(mode, text) {
 const key = ‘cl-’ + mode;
 if (!STATE.checklist) STATE.checklist = {};
@@ -7110,6 +6772,18 @@ _currentEmailData = data;
 if (out) out.textContent = data.subject + ‘\n\n’ + data.body;
 if (toLn) toLn.textContent = ’To: ’ + (data.to || ‘—’);
 if (mailBtn) mailBtn.style.display = ‘inline-flex’;
+// Also populate checklist inline email panel (used when called from checklist)
+var clBody = document.getElementById(‘cl-email-body’);
+if (clBody && data && data.body) {
+clBody.value = data.body;
+var clTo  = document.getElementById(‘cl-email-to’);
+var clLbl = document.getElementById(‘cl-email-type-lbl’);
+var clCrd = document.getElementById(‘cl-email-output’);
+if (clTo)  clTo.textContent  = data.to        || ‘’;
+if (clLbl) clLbl.textContent = data.typeLabel || ‘’;
+if (clCrd) clCrd.style.display = ‘block’;
+}
+
 }
 
 function openInMail() {
@@ -7174,7 +6848,7 @@ if (typeof generateTeamText === ‘function’) generateTeamText();
 
 function setWU(v) {
 if (typeof setWalkUp === ‘function’) setWalkUp(v);
-else { STATE.walkUpPolicy = v; saveState(); updateWUBtns(); buildBoardGrid(); }
+else { STATE.walkUpPolicy=v; if(!STATE.fields)STATE.fields={}; STATE.fields.wuSetManually=‘1’; saveState(); updateWUBtns(); buildBoardGrid(); }
 }
 
 function calcBoard() {
@@ -7815,7 +7489,7 @@ setF(‘f-brand-nat’,‘brandNational’,nat); setF(‘f-brand-ala’,‘brand
 setF(‘f-brand-ent’,‘brandEnterprise’,ent); setF(‘f-brand-20’,‘brand20’,two);
 if (totalRes){ STATE.fields.totalRes=String(totalRes); const e=document.getElementById(‘f-total-res’); if(e) e.value=totalRes; }
 updateBrandStatus(’Parsed: Nat ‘+nat+’ Ala ‘+ala+’ Ent ‘+ent+’ 2.0 ‘+two+’ Total ’+totalRes);
-saveState(); updateSummary();
+if(!STATE.fields)STATE.fields={}; STATE.fields.brandsPasted=‘1’; saveState(); updateSummary();
 }
 
 function updateBrandTotal() {
@@ -8271,6 +7945,309 @@ setStation(pid, el.value.trim());
 closeModal();
 buildSwitchboard();
 toast(‘Custom station set ✓’);
+}
+
+function buildDashSchedMini() {
+const el = document.getElementById(‘dash-sched-content’);
+if (!el) return;
+
+const exp = typeof buildExpectedToday === ‘function’ ? buildExpectedToday() : {};
+if (!Object.keys(exp).length) { el.textContent = ‘No schedule loaded — tap to set’; return; }
+
+const stations = STATE.staffStation  || {};
+const callouts = STATE.todayOverrides || {};
+const mods     = STATE.shiftMod       || {};
+const altSched = STATE.altSchedule    || {};
+const nowH     = new Date().getHours() + new Date().getMinutes() / 60;
+
+// Current position from rotation data
+function currentPosition(pid, person) {
+const rot = window._lastRotations && window._lastRotations[pid];
+if (!rot) {
+// No rotation data — use raw station assignment
+// Only show position if currently on shift
+if (person.shiftStart != null && (nowH < person.shiftStart || nowH > (person.shiftEnd||24))) return null;
+const s = stations[pid];
+if (s === ‘Exit Booth’ || person.role === ‘EXIT’) return {label:‘Exit’, color:‘var(–green)’};
+if (s === ‘Counter’) return {label:‘Counter’, color:‘var(–acc)’};
+return null;
+}
+// Check if currently on shift
+if (nowH < rot.shiftStart || nowH > rot.shiftEnd) return null; // not on shift — show nothing
+// Check each block
+if (rot.lunch && nowH >= rot.lunch.from && nowH < rot.lunch.to)
+return {label:‘Lunch’, color:‘var(–amber)’};
+if (rot.b1 && nowH >= rot.b1.from && nowH < rot.b1.to)
+return {label: rot.b1.station===‘exit’?‘Exit’:‘Counter’,
+color: rot.b1.station===‘exit’?‘var(–green)’:‘var(–acc)’};
+if (rot.b2 && nowH >= rot.b2.from && nowH <= rot.b2.to)
+return {label: rot.b2.station===‘exit’?‘Exit’:‘Counter’,
+color: rot.b2.station===‘exit’?‘var(–green)’:‘var(–acc)’};
+return null;
+}
+
+function shiftStr(pid, person, entry) {
+const mod = mods[pid];
+if (mod && mod.display) return mod.display;
+if (entry && entry.shift && entry.shift !== ‘varies’) return entry.shift;
+if (person.shiftCode && person.shiftCode !== ‘varies’) return person.shiftCode;
+if (person.shiftStart != null) {
+const fh = h => {
+const hr=Math.floor(h), mn=Math.round((h-hr)*60);
+const s=h>=12?‘p’:‘a’, d=hr>12?hr-12:hr===0?12:hr;
+return d+(mn?’:’+String(mn).padStart(2,‘0’):’’)+s;
+};
+return fh(person.shiftStart)+’–’+fh(person.shiftEnd);
+}
+return ‘—’;
+}
+
+function altBadge(pid) {
+const pos = altSched[pid];
+if (!pos || pos === ‘normal’) return ‘’;
+const labels = {‘full-counter’:‘Full Ctr’,‘full-exit’:‘Full Exit’,‘counter-first’:‘Ctr+30’,‘exit-first’:‘Exit+30’};
+return labels[pos]
+? ’ <span style="font-size:8px;background:rgba(217,119,6,.12);color:var(--amber);border-radius:2px;padding:1px 4px;margin-left:2px">’+labels[pos]+’</span>’
+: ‘’;
+}
+
+function personRow(pid, entry, forceStation) {
+const person   = entry.person;
+const nick     = person.nick || person.name.split(’ ’)[0];
+const time     = shiftStr(pid, person, entry);
+const timeColor= mods[pid] ? ‘var(–amber)’ : ‘var(–txt3)’;
+const pos      = forceStation || currentPosition(pid, person);
+
+```
+return '<div style="display:flex;align-items:center;gap:0;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);min-height:24px">'
+  + '<span style="font-size:12px;font-weight:700;color:var(--txt);width:54px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nick + '</span>'
+  + '<span style="font-size:10px;color:'+timeColor+';font-family:var(--ff-mono);flex:1;white-space:nowrap;overflow:hidden">' + time + '</span>'
+  + (pos ? '<span style="font-size:9px;font-weight:800;color:'+pos.color+';flex-shrink:0;margin-left:4px;min-width:42px;text-align:right">'+pos.label+'</span>' : '')
+  + altBadge(pid)
+  + '</div>';
+```
+
+}
+
+// Sort everyone by shift start
+const sorted = Object.entries(exp)
+.sort((a,b)=>(a[1].person.shiftStart||99)-(b[1].person.shiftStart||99));
+
+const counter=[], exitB=[], mgmtList=[], off=[];
+sorted.forEach(([pid, entry]) => {
+const person  = entry.person;
+const isOff   = callouts[pid] === ‘callout’;
+const station = stations[pid] || ‘’;
+if (isOff) { off.push([pid,entry]); return; }
+if ([‘ARM’,‘BRM’,‘ABRM’,‘MT’].includes(person.role)) { mgmtList.push([pid,entry,station]); return; }
+if (station === ‘Exit Booth’ || person.role === ‘EXIT’) exitB.push([pid,entry]);
+else counter.push([pid,entry]);
+});
+
+// Column header helper
+const colHdr = (emoji, label, count, color) =>
+‘<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:'+color+
+';padding-bottom:4px;border-bottom:2px solid '+color+';margin-bottom:4px">’+emoji+’ ‘+label+’ · ‘+count+’</div>’;
+
+let out = ‘<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 14px">’;
+
+// Counter column
+out += ‘<div>’;
+out += colHdr(‘🟦’,‘Counter’, counter.length, ‘var(–acc)’);
+out += counter.map(([pid,e])=>personRow(pid,e)).join(’’);
+out += ‘</div>’;
+
+// Exit + Mgmt column
+out += ‘<div>’;
+out += colHdr(‘🟩’,‘Exit’, exitB.length, ‘var(–green)’);
+out += exitB.map(([pid,e])=>personRow(pid,e)).join(’’);
+
+if (mgmtList.length) {
+out += ‘<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;'
++'color:var(--txt3);padding:4px 0 3px;border-bottom:1px solid var(--bdr);margin:8px 0 4px">🎯 Mgmt</div>’;
+out += mgmtList.map(([pid,entry,station])=>{
+// For management show their assigned station
+const pos = station && station !== ‘Counter Manager’
+? {label: station.replace(’ Manager’,’’).replace(’ Mgr’,’’), color:‘var(–txt3)’}
+: station === ‘Counter Manager’
+? {label:‘Ctr Mgr’, color:‘var(–txt3)’}
+: null;
+return personRow(pid, entry, pos);
+}).join(’’);
+}
+out += ‘</div>’;
+out += ‘</div>’;
+
+if (off.length) {
+out += ‘<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--bdr);'
++'font-size:10px;color:var(--red)">❌ Off: ’
++ off.map(([pid,e])=>e.person.nick||e.person.name.split(’ ‘)[0]).join(’, ’)
++ ‘</div>’;
+}
+
+el.innerHTML = out;
+}
+
+function showCLEmail(mode) {
+const type = mode === ‘closing’ ? ‘closing’ : ‘opening’;
+showEmailType(type);
+// Show the output inline
+const card = document.getElementById(‘cl-email-output’);
+if (card) {
+card.style.display = ‘block’;
+card.scrollIntoView({behavior:‘smooth’, block:‘nearest’});
+}
+}
+
+function showCLTeamText() {
+showEmailType(‘handoff’);
+const card = document.getElementById(‘cl-email-output’);
+if (card) {
+card.style.display = ‘block’;
+card.scrollIntoView({behavior:‘smooth’, block:‘nearest’});
+}
+}
+
+function copyCLEmail() {
+const el = document.getElementById(‘cl-email-body’);
+if (!el) return;
+if (navigator.clipboard) {
+navigator.clipboard.writeText(el.value).then(()=>toast(‘Copied ✓’));
+} else {
+el.select(); document.execCommand(‘copy’); toast(‘Copied ✓’);
+}
+}
+function openCLMail() {
+const body = document.getElementById(‘cl-email-body’);
+const lbl  = document.getElementById(‘cl-email-type-lbl’);
+if (!body) return;
+const sub  = encodeURIComponent(lbl ? lbl.textContent : ‘CMH Email’);
+const b    = encodeURIComponent(body.value);
+window.location.href = ‘mailto:?subject=’+sub+’&body=’+b;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// GITHUB LIVE SYNC — shared state across all devices (30s polling)
+// ═══════════════════════════════════════════════════════════════════════
+
+var _syncTimer    = null;
+var _pollTimer    = null;
+var _currentSHA   = null;
+var _lastRemoteAt = null;
+
+function setSyncStatus(status, msg) {
+const el = document.getElementById(‘sync-indicator’);
+if (!el) return;
+const cfg = {
+syncing: {color:‘var(–amber)’, dot:‘◉’, text:‘Syncing…’},
+synced:  {color:‘var(–green)’, dot:‘●’, text: msg || ‘Live’},
+error:   {color:‘var(–red)’,   dot:‘●’, text: msg || ‘Sync error’},
+offline: {color:‘var(–txt3)’,  dot:‘○’, text:‘Local only’},
+};
+const c = cfg[status] || cfg.offline;
+el.innerHTML = ‘<span style="color:'+c.color+'">’+c.dot+’ ‘+c.text+’</span>’;
+}
+
+async function pushToGitHub() {
+if (!GITHUB_TOKEN) return;
+setSyncStatus(‘syncing’);
+try {
+const payload = Object.assign({}, STATE, {
+_meta: { at: new Date().toISOString(), by: (STATE.fields&&STATE.fields.openMgr)||‘manager’ }
+});
+const content = btoa(unescape(encodeURIComponent(JSON.stringify(payload, null, 2))));
+const body = { message: ’CMH ’ + new Date().toISOString().slice(0,16), content };
+if (_currentSHA) body.sha = _currentSHA;
+
+```
+const res = await fetch('https://api.github.com/repos/'+GITHUB_REPO+'/contents/'+GITHUB_FILE, {
+  method: 'PUT',
+  headers: {
+    'Authorization': 'token '+GITHUB_TOKEN,
+    'Content-Type': 'application/json',
+    'Accept': 'application/vnd.github.v3+json',
+  },
+  body: JSON.stringify(body),
+});
+
+if (res.ok) {
+  const d = await res.json();
+  _currentSHA = d.content && d.content.sha;
+  const t = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  setSyncStatus('synced', 'Saved '+t);
+} else if (res.status === 409) {
+  // SHA conflict — refresh SHA and retry
+  await pullFromGitHub(false);
+  setTimeout(pushToGitHub, 500);
+} else {
+  setSyncStatus('error', 'Error '+res.status);
+}
+```
+
+} catch(e) {
+setSyncStatus(‘offline’);
+}
+}
+
+async function pullFromGitHub(apply) {
+if (!GITHUB_TOKEN) return;
+try {
+const res = await fetch(
+‘https://api.github.com/repos/’+GITHUB_REPO+’/contents/’+GITHUB_FILE+’?_=’+Date.now(),
+{ headers: { ‘Authorization’:‘token ‘+GITHUB_TOKEN, ‘Accept’:‘application/vnd.github.v3+json’ }}
+);
+if (!res.ok) {
+if (res.status === 404) setSyncStatus(‘synced’,‘Ready’);
+else setSyncStatus(‘offline’);
+return;
+}
+const data  = await res.json();
+_currentSHA = data.sha;
+const raw   = decodeURIComponent(escape(atob(data.content.replace(/\n/g,’’))));
+const remote = JSON.parse(raw);
+
+```
+// Skip if we already have this version
+if (remote._meta && remote._meta.at === _lastRemoteAt) return;
+_lastRemoteAt = remote._meta && remote._meta.at;
+
+if (apply) {
+  // Merge: remote wins on shared data, preserve local checklist ticks
+  const localCL = JSON.parse(JSON.stringify(STATE.checklist||{}));
+  Object.assign(STATE, remote);
+  delete STATE._meta;
+  // Re-merge checklist — keep any items checked locally
+  if (!STATE.checklist) STATE.checklist = {};
+  Object.keys(localCL).forEach(mode => {
+    if (!STATE.checklist[mode]) STATE.checklist[mode] = {};
+    Object.keys(localCL[mode]||{}).forEach(item => {
+      if (localCL[mode][item]) STATE.checklist[mode][item] = true;
+    });
+  });
+  // Re-render
+  ['refreshDash','buildBoardGrid','buildSwitchboard','buildDashSchedMini',
+   'updateBoardHeader','updateWalkUpButtons','updateSummary'].forEach(fn => {
+    if (typeof window[fn]==='function') try{window[fn]();}catch(e){}
+  });
+  const t = remote._meta ? new Date(remote._meta.at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+  setSyncStatus('synced','Updated '+(t||''));
+}
+```
+
+} catch(e) {
+setSyncStatus(‘offline’);
+}
+}
+
+function initSync() {
+if (!GITHUB_TOKEN || GITHUB_TOKEN === ‘YOUR_TOKEN_HERE’) {
+setSyncStatus(‘offline’,‘Local only’); return;
+}
+// Pull immediately on load
+pullFromGitHub(true);
+// Poll every 30s
+if (_pollTimer) clearInterval(_pollTimer);
+_pollTimer = setInterval(()=>pullFromGitHub(true), 30000);
 }
 
 </script>
