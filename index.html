@@ -45,12 +45,12 @@
   --font-mono: 'DM Mono', monospace;
   --font-hd:   'Barlow Condensed', sans-serif;
   /* ── Aliases — both naming schemes work ── */
-  --txt:    #dce8f5;  --txt2: #7a9ab8;  --txt3: #3d5a78;
-  --acc:    #2563eb;  --acc2: #1d4ed8;
-  --bdr:    #1e2d45;  --bdr2: #263a57;
-  --green:  #16a34a;  --green2:#052e16;  --green3:#15803d;
+  --txt:    #f0f7ff;  --txt2: #b8d4ef;  --txt3: #7aaac8;
+  --acc:    #4d9fff;  --acc2: #2563eb;
+  --bdr:    #1e3a5f;  --bdr2: #2a5080;
+  --green:  #34d399;  --green2:#052e16;  --green3:#10b981;
   --amber:  #d97706;  --amber2:#1c1200;  --amber3:#92400e;
-  --red:    #dc2626;  --red2:  #1c0505;  --red3:  #991b1b;
+  --red:    #f87171;  --red2:  #1c0505;  --red3:  #991b1b;
   --purple: #7c3aed;  --orange:#ea580c;  --teal:  #0891b2;
   --ff-ui:  'Barlow',sans-serif;
   --ff-mono:'DM Mono',monospace;
@@ -1373,6 +1373,7 @@ button { cursor: pointer; }
   <button class="nbtn" id="tab-reference" onclick="showTab('reference')"><span class="ni">📖</span>Reference</button>
   <button class="nbtn" id="tab-inventory" onclick="showTab('inventory')"><span class="ni">🔢</span>Inventory</button>
   <button class="nbtn" id="tab-history" onclick="showTab('history')"><span class="ni">📅</span>History</button>
+  <button class="nbtn" id="tab-admin" onclick="showTab('admin')"><span class="ni">⚙️</span>Admin</button>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════
@@ -1804,6 +1805,118 @@ button { cursor: pointer; }
 
   <!-- SCREEN: Closing -->
   
+  <!-- SCREEN: Admin -->
+  <div class="scr" id="screen-admin">
+
+    <!-- PIN lock -->
+    <div id="admin-lock" class="card" style="text-align:center;padding:28px 16px">
+      <div style="font-size:28px;margin-bottom:10px">⚙️</div>
+      <div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:6px">Admin Panel</div>
+      <div style="font-size:12px;color:var(--txt3);margin-bottom:16px">Enter manager PIN to continue</div>
+      <input id="admin-pin-input" type="password" inputmode="numeric" maxlength="6"
+        placeholder="PIN"
+        style="width:120px;padding:10px;text-align:center;font-size:20px;font-weight:700;
+          background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;
+          color:var(--txt);font-family:var(--ff-mono);margin-bottom:12px;display:block;margin-left:auto;margin-right:auto">
+      <button class="btn btn-g" onclick="checkAdminPin()" style="font-size:13px;padding:10px 28px">
+        Unlock →
+      </button>
+      <div id="admin-pin-error" style="color:var(--red);font-size:11px;margin-top:8px"></div>
+      <div style="font-size:10px;color:var(--txt3);margin-top:16px">Default PIN: 2826 (CMH0)</div>
+    </div>
+
+    <!-- Admin content (hidden until PIN entered) -->
+    <div id="admin-content" style="display:none">
+
+      <!-- Section tabs -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="btn btn-g btn-sm" id="adm-tab-staff" onclick="showAdminSection('staff')">👥 Staff</button>
+        <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
+        <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PIN</button>
+        <button class="btn btn-gh btn-sm" style="margin-left:auto;color:var(--red)" onclick="lockAdmin()">🔒 Lock</button>
+      </div>
+
+      <!-- STAFF section -->
+      <div id="adm-staff" class="adm-section">
+        <div class="card" style="margin-bottom:10px">
+          <div class="ch">👥 Staff Roster
+            <button class="btn btn-g btn-sm" style="margin-left:auto" onclick="showAddStaffModal()">+ Add Person</button>
+          </div>
+          <div id="adm-staff-list"></div>
+        </div>
+      </div>
+
+      <!-- CAR CODES section -->
+      <div id="adm-codes" class="adm-section" style="display:none">
+        <div class="card" style="margin-bottom:10px">
+          <div class="ch">🚗 Car Codes
+            <button class="btn btn-g btn-sm" style="margin-left:auto" onclick="showAddCodeModal()">+ Add Code</button>
+          </div>
+          <div style="font-size:11px;color:var(--txt3);margin-bottom:8px">
+            Tap any code to edit its group, description, or core status.
+          </div>
+          <div id="adm-code-list"></div>
+        </div>
+      </div>
+
+      <!-- PIN section -->
+      <div id="adm-pin" class="adm-section" style="display:none">
+        <div class="card">
+          <div class="ch">🔑 Change Manager PIN</div>
+          <div style="display:grid;gap:10px;max-width:260px">
+            <div>
+              <label style="font-size:11px;color:var(--txt3);display:block;margin-bottom:4px">Current PIN</label>
+              <input id="pin-current" type="password" inputmode="numeric" maxlength="6"
+                style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--txt3);display:block;margin-bottom:4px">New PIN</label>
+              <input id="pin-new" type="password" inputmode="numeric" maxlength="6"
+                style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--txt3);display:block;margin-bottom:4px">Confirm New PIN</label>
+              <input id="pin-confirm" type="password" inputmode="numeric" maxlength="6"
+                style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
+            </div>
+            <button class="btn btn-g" onclick="changeAdminPin()">Save New PIN</button>
+            <div id="pin-msg" style="font-size:11px;min-height:16px"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- SCREEN: Reference -->
+  <div class="scr" id="screen-reference">
+    <div class="card" style="margin-bottom:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn btn-g btn-sm" id="ref-tab-codes" onclick="showRefSection('codes')">🚗 Car Codes</button>
+        <button class="btn btn-gh btn-sm" id="ref-tab-loyalty" onclick="showRefSection('loyalty')">🏆 Loyalty</button>
+        <button class="btn btn-gh btn-sm" id="ref-tab-hourly" onclick="showRefSection('hourly')">⏱ Hourly View</button>
+      </div>
+      <div id="ref-content"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN: Inventory -->
+  <div class="scr" id="screen-inventory">
+    <div class="card">
+      <div class="ch">🔢 Physical Inventory</div>
+      <div id="inv-content"></div>
+    </div>
+  </div>
+
+  <!-- SCREEN: History -->
+  <div class="scr" id="screen-history">
+    <div class="card">
+      <div class="ch">📅 Shift History</div>
+      <div id="hist-content"></div>
+    </div>
+  </div>
+
 
 <!-- TOAST -->
 <div id="toast"></div>
@@ -2390,6 +2503,8 @@ function loadState() {
       s.stationPref  = s.stationPref  || {};
       s.shiftMod     = s.shiftMod     || {};
       s.customSplits = s.customSplits || {};
+      s.adminRoster  = s.adminRoster  || [];
+      s.adminCodes   = s.adminCodes   || [];
       s.closeFields  = s.closeFields  || {};
       return s;
     }
@@ -2398,7 +2513,7 @@ function loadState() {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
-    stationPref:{}, shiftMod:{}, customSplits:{},
+    stationPref:{}, shiftMod:{}, customSplits:{}, adminRoster:[], adminCodes:[],
   };
 }
 
@@ -3602,6 +3717,9 @@ function autoSaveHistory() {
 }
 
 function buildHistoryScreen() {
+  const wrapper = document.getElementById('hist-content');
+  if (!wrapper) return;
+  wrapper.innerHTML = '<div id="hist-grid"></div>';
   const hist = loadHistory();
   const el = document.getElementById('history-list');
   if (!el) return;
@@ -6258,6 +6376,9 @@ setTimeout(() => {
 // ═══════════════════════════════════════════════════════════════════════
 
 function buildInventoryScreen() {
+  const wrapper = document.getElementById('inv-content');
+  if (!wrapper) return;
+  wrapper.innerHTML = '<div id="inv-grid"></div>';
   const grid = document.getElementById('inv-grid');
   if (!grid) return;
 
@@ -7865,10 +7986,19 @@ function getPatternSuggestion(pid) {
 }
 
 function buildExpectedToday() {
+  // Merge admin roster overrides into base roster
+  const adminOvr = STATE.adminRoster || [];
+  function applyOvr(roster) {
+    return roster
+      .map(p => { const o=adminOvr.find(x=>x.id===p.id&&!x._deleted); return o?Object.assign({},p,o):p; })
+      .filter(p => !adminOvr.find(o=>o.id===p.id&&o._deleted));
+  }
+  const _ROSTER_CXR  = applyOvr(ROSTER_CXR).concat(adminOvr.filter(o=>o._new&&!o._deleted&&['CXR','EXIT'].includes(o.role)));
+  const _ROSTER_MGMT = applyOvr(ROSTER_MGMT).concat(adminOvr.filter(o=>o._new&&!o._deleted&&['ARM','BRM','ABRM','MT'].includes(o.role)));
   const today = todayKey();
   const now   = new Date();
   const dow   = now.getDay();
-  const allRoster = [...ROSTER_CXR, ...ROSTER_MGMT];
+  const allRoster = [..._ROSTER_CXR, ..._ROSTER_MGMT];
   const expected  = {};
 
   // Helper: normalize name to pid
@@ -8407,79 +8537,401 @@ function initSync() {
   _pollTimer = setInterval(()=>pullFromGitHub(true), 30000);
 }
 
-</script>
-</body>
-</html>  // ─── CLOSING / END OF NIGHT ─────────────────────────────────────────────────
+
+// ═══════════════════════════════════════════════════════════════════════
+// ADMIN PANEL
+// ═══════════════════════════════════════════════════════════════════════
+
+var _adminUnlocked = false;
+var ADMIN_PIN_KEY  = 'cmh-admin-pin';
+var DEFAULT_PIN    = '2826';
+
+function getAdminPin() {
+  return localStorage.getItem(ADMIN_PIN_KEY) || DEFAULT_PIN;
+}
+
+function checkAdminPin() {
+  const input = document.getElementById('admin-pin-input');
+  const err   = document.getElementById('admin-pin-error');
+  if (!input) return;
+  if (input.value === getAdminPin()) {
+    _adminUnlocked = true;
+    const lock    = document.getElementById('admin-lock');
+    const content = document.getElementById('admin-content');
+    if (lock)    lock.style.display    = 'none';
+    if (content) content.style.display = 'block';
+    input.value = '';
+    if (err) err.textContent = '';
+    showAdminSection('staff');
+  } else {
+    if (err) err.textContent = 'Incorrect PIN';
+    input.value = '';
+    input.focus();
+  }
+}
+
+function lockAdmin() {
+  _adminUnlocked = false;
+  const lock    = document.getElementById('admin-lock');
+  const content = document.getElementById('admin-content');
+  if (lock)    lock.style.display    = 'block';
+  if (content) content.style.display = 'none';
+}
+
+function changeAdminPin() {
+  const cur  = document.getElementById('pin-current');
+  const nw   = document.getElementById('pin-new');
+  const conf = document.getElementById('pin-confirm');
+  const msg  = document.getElementById('pin-msg');
+  if (!cur||!nw||!conf) return;
+  if (cur.value !== getAdminPin()) { if(msg){msg.textContent='Current PIN incorrect';msg.style.color='var(--red)';} return; }
+  if (nw.value.length < 4)         { if(msg){msg.textContent='PIN must be at least 4 digits';msg.style.color='var(--red)';} return; }
+  if (nw.value !== conf.value)     { if(msg){msg.textContent='New PINs do not match';msg.style.color='var(--red)';} return; }
+  localStorage.setItem(ADMIN_PIN_KEY, nw.value);
+  cur.value=''; nw.value=''; conf.value='';
+  if(msg){msg.textContent='✓ PIN changed successfully';msg.style.color='var(--green)';}
+}
+
+function showAdminSection(sec) {
+  ['staff','codes','pin'].forEach(s => {
+    const el  = document.getElementById('adm-'+s);
+    const btn = document.getElementById('adm-tab-'+s);
+    if(el)  el.style.display  = s===sec ? 'block' : 'none';
+    if(btn) { btn.className = s===sec ? 'btn btn-g btn-sm' : 'btn btn-gh btn-sm'; }
+  });
+  if (sec==='staff') buildAdminStaffList();
+  if (sec==='codes') buildAdminCodeList();
+}
+
+// ── Get effective roster (admin overrides merged with hardcoded) ───────────
+function getEffectiveRoster() {
+  const overrides = (STATE.adminRoster || []);
+  const base = [...ROSTER_CXR, ...ROSTER_MGMT].map(p => {
+    const ov = overrides.find(o => o.id === p.id);
+    return ov ? Object.assign({}, p, ov) : p;
+  });
+  // Add new people not in base
+  overrides.filter(o => o._new).forEach(o => base.push(o));
+  return base.filter(p => p.active !== false || p._deleted !== true);
+}
+
+// ── STAFF LIST ─────────────────────────────────────────────────────────
+function buildAdminStaffList() {
+  const el = document.getElementById('adm-staff-list');
+  if (!el) return;
+  const roster = getEffectiveRoster();
+  const days = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const roleColors = {ARM:'var(--acc)',BRM:'var(--acc)',ABRM:'var(--acc)',MT:'var(--acc)',CXR:'var(--green)',EXIT:'var(--amber)'};
+
+  el.innerHTML = roster.map(p => {
+    const daysStr = p.daysOn && p.daysOn.length ? p.daysOn.map(d=>days[d]).join('/') : '—';
+    const roleColor = roleColors[p.role] || 'var(--txt3)';
+    const isNew = p._new ? ' <span style="font-size:9px;background:rgba(22,163,74,.1);color:var(--green);border-radius:3px;padding:1px 4px">NEW</span>' : '';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:var(--txt)">${p.nick||p.name.split(' ')[0]}
+          <span style="font-size:10px;color:${roleColor};margin-left:4px">${p.role}</span>${isNew}
+        </div>
+        <div style="font-size:10px;color:var(--txt3)">${p.name} · ${p.shiftCode||'varies'} · ${daysStr}</div>
+      </div>
+      <button onclick="showEditStaffModal('${p.id}')"
+        style="font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid var(--bdr2);
+          background:var(--bg2);color:var(--txt3);cursor:pointer;flex-shrink:0">Edit</button>
+      <button onclick="removeStaff('${p.id}')"
+        style="font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid rgba(220,38,38,.3);
+          background:rgba(220,38,38,.06);color:var(--red);cursor:pointer;flex-shrink:0">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function showAddStaffModal()      { showEditStaffModal(null); }
+function showEditStaffModal(id) {
+  const all    = getEffectiveRoster();
+  const person = id ? all.find(p=>p.id===id) : null;
+  const days   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const daysOn = person && person.daysOn ? person.daysOn : [];
+  const roles  = ['CXR','EXIT','ABRM','BRM','ARM','MT'];
+
+  const body = `
+    <div style="display:grid;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Full Name</label>
+          <input id="es-name" value="${person?person.name:''}" placeholder="First Last"
+            style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Nickname</label>
+          <input id="es-nick" value="${person?person.nick||'':''}" placeholder="Matt"
+            style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Role</label>
+          <select id="es-role" style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
+            ${roles.map(r=>`<option value="${r}" ${person&&person.role===r?'selected':''}>${r}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Shift</label>
+          <input id="es-shift" value="${person?person.shiftCode||'':''}" placeholder="530A-200P"
+            style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px;font-family:var(--ff-mono)">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:6px">Days On</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          ${days.map((d,i)=>`<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+            <input type="checkbox" id="es-day-${i}" ${daysOn.includes(i)?'checked':''}
+              style="width:16px;height:16px;cursor:pointer"> ${d}
+          </label>`).join('')}
+        </div>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Notes (optional)</label>
+        <input id="es-notes" value="${person?person.notes||'':''}" placeholder="Any notes..."
+          style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:12px">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-g" style="flex:1" onclick="saveStaff('${id||''}')">
+          ${id ? '✓ Save Changes' : '✓ Add Person'}
+        </button>
+        <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>`;
+  openModal((id?'Edit: '+(person?person.name:''):'Add New Person'), body);
+}
+
+function saveStaff(id) {
+  const name  = document.getElementById('es-name')  && document.getElementById('es-name').value.trim();
+  const nick  = document.getElementById('es-nick')  && document.getElementById('es-nick').value.trim();
+  const role  = document.getElementById('es-role')  && document.getElementById('es-role').value;
+  const shift = document.getElementById('es-shift') && document.getElementById('es-shift').value.trim();
+  const notes = document.getElementById('es-notes') && document.getElementById('es-notes').value.trim();
+  if (!name) { toast('Name is required'); return; }
+
+  const daysOn = [];
+  for (let i=0; i<7; i++) {
+    const cb = document.getElementById('es-day-'+i);
+    if (cb && cb.checked) daysOn.push(i);
+  }
+
+  // Parse shift times from shiftCode
+  function parseShiftH(code) {
+    if (!code) return null;
+    const m = code.match(/^(\d+):?(\d+)?([AP])/i);
+    if (!m) return null;
+    let h = parseInt(m[1]);
+    const mn = m[2] ? parseInt(m[2]) : 0;
+    const ap = m[3].toUpperCase();
+    if (ap==='P' && h!==12) h+=12;
+    if (ap==='A' && h===12) h=0;
+    return h + mn/60;
+  }
+  const parts = shift ? shift.split(/[-–]/) : [];
+  const shiftStart = parts[0] ? parseShiftH(parts[0].trim()) : null;
+  const shiftEnd   = parts[1] ? parseShiftH(parts[1].trim()) : null;
+
+  if (!STATE.adminRoster) STATE.adminRoster = [];
+
+  if (id) {
+    // Update existing
+    const idx = STATE.adminRoster.findIndex(o=>o.id===id);
+    const update = { id, name, nick:nick||name.split(' ')[0], role, shiftCode:shift, shiftStart, shiftEnd, daysOn, notes };
+    if (idx>=0) STATE.adminRoster[idx] = Object.assign(STATE.adminRoster[idx], update);
+    else STATE.adminRoster.push(update);
+  } else {
+    // Add new
+    const newId = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'') + '-' + Date.now().toString(36);
+    STATE.adminRoster.push({ id:newId, name, nick:nick||name.split(' ')[0], role, shiftCode:shift,
+      shiftStart, shiftEnd, daysOn, notes, pref:'none', _new:true });
+  }
+
+  saveState();
+  closeModal();
+  buildAdminStaffList();
+  toast((id?'Updated: ':'Added: ') + name);
+}
+
+function removeStaff(id) {
+  if (!confirm('Remove this person from the roster?')) return;
+  if (!STATE.adminRoster) STATE.adminRoster = [];
+  const idx = STATE.adminRoster.findIndex(o=>o.id===id);
+  if (idx>=0) STATE.adminRoster[idx]._deleted = true;
+  else STATE.adminRoster.push({ id, _deleted:true });
+  saveState();
+  buildAdminStaffList();
+  toast('Removed from roster');
+}
+
+// ── CAR CODES ─────────────────────────────────────────────────────────
+function getEffectiveCodes() {
+  const overrides = STATE.adminCodes || [];
+  return FLEET_CODES
+    .map(c => {
+      const ov = overrides.find(o=>o.code===c.code);
+      return ov ? Object.assign({},c,ov) : c;
+    })
+    .filter(c=>!c._deleted)
+    .concat(overrides.filter(o=>o._new&&!o._deleted));
+}
+
+function buildAdminCodeList() {
+  const el = document.getElementById('adm-code-list');
+  if (!el) return;
+  const codes = getEffectiveCodes();
+  const groups = [...new Set(codes.map(c=>c.group))].sort();
+
+  el.innerHTML = groups.map(g => {
+    const gCodes = codes.filter(c=>c.group===g);
+    return `<div style="margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
+        color:var(--txt3);padding:4px 0;border-bottom:1px solid var(--bdr);margin-bottom:4px">${g}</div>
+      ${gCodes.map(c=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+          <code style="font-size:12px;font-weight:700;color:var(--acc);width:50px;flex-shrink:0">${c.code}</code>
+          <div style="flex:1;font-size:11px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.desc||''}</div>
+          ${c.core?'<span style="font-size:9px;color:var(--amber);flex-shrink:0">CORE</span>':''}
+          ${c._new?'<span style="font-size:9px;color:var(--green);flex-shrink:0">NEW</span>':''}
+          <button onclick="showEditCodeModal('${c.code}')"
+            style="font-size:10px;padding:3px 8px;border-radius:3px;border:1px solid var(--bdr2);
+              background:var(--bg2);color:var(--txt3);cursor:pointer;flex-shrink:0">Edit</button>
+          <button onclick="removeCode('${c.code}')"
+            style="font-size:10px;padding:3px 6px;border-radius:3px;border:1px solid rgba(220,38,38,.3);
+              background:rgba(220,38,38,.06);color:var(--red);cursor:pointer;flex-shrink:0">✕</button>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+function showAddCodeModal()    { showEditCodeModal(null); }
+function showEditCodeModal(code) {
+  const codes   = getEffectiveCodes();
+  const c       = code ? codes.find(x=>x.code===code) : null;
+  const groups  = [...new Set(getEffectiveCodes().map(x=>x.group))].sort();
+
+  const body = `
+    <div style="display:grid;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Code</label>
+          <input id="ec-code" value="${c?c.code:''}" placeholder="ECAR" maxlength="6"
+            ${c?'readonly style="opacity:.6"':''}
+            style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:14px;font-weight:700;font-family:var(--ff-mono);text-transform:uppercase">
+        </div>
+        <div>
+          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Core Car?</label>
+          <select id="ec-core" style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
+            <option value="false" ${c&&!c.core?'selected':''}>No</option>
+            <option value="true"  ${c&&c.core ?'selected':''}>Yes — Core Car</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Group</label>
+        <input id="ec-group" value="${c?c.group:''}" placeholder="Econ/Compact Car" list="ec-group-list"
+          style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
+        <datalist id="ec-group-list">
+          ${groups.map(g=>`<option value="${g}">`).join('')}
+        </datalist>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Description</label>
+        <input id="ec-desc" value="${c?c.desc||'':''}" placeholder="Economy Car — Nissan Versa or similar"
+          style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-g" style="flex:1" onclick="saveCode('${code||''}')">
+          ${code ? '✓ Save Changes' : '✓ Add Code'}
+        </button>
+        <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>`;
+  openModal((code?'Edit Code: '+code:'Add Car Code'), body);
+}
+
+function saveCode(code) {
+  const codeVal = document.getElementById('ec-code')  && document.getElementById('ec-code').value.trim().toUpperCase();
+  const group   = document.getElementById('ec-group') && document.getElementById('ec-group').value.trim();
+  const desc    = document.getElementById('ec-desc')  && document.getElementById('ec-desc').value.trim();
+  const core    = document.getElementById('ec-core')  && document.getElementById('ec-core').value === 'true';
+  if (!codeVal || !group) { toast('Code and Group are required'); return; }
+
+  if (!STATE.adminCodes) STATE.adminCodes = [];
+
+  if (code) {
+    const idx = STATE.adminCodes.findIndex(o=>o.code===code);
+    const update = { code:codeVal, group, desc, core };
+    if (idx>=0) STATE.adminCodes[idx] = Object.assign(STATE.adminCodes[idx], update);
+    else STATE.adminCodes.push(update);
+  } else {
+    STATE.adminCodes.push({ code:codeVal, group, desc, core, _new:true });
+  }
+
+  saveState();
+  closeModal();
+  buildAdminCodeList();
+  toast((code?'Updated: ':'Added: ') + codeVal);
+}
+
+function removeCode(code) {
+  if (!confirm('Remove code '+code+'?')) return;
+  if (!STATE.adminCodes) STATE.adminCodes = [];
+  const idx = STATE.adminCodes.findIndex(o=>o.code===code);
+  if (idx>=0) STATE.adminCodes[idx]._deleted = true;
+  else STATE.adminCodes.push({ code, _deleted:true });
+  saveState();
+  buildAdminCodeList();
+  toast('Code removed: '+code);
+}
+
+// Enter key on PIN input — wired in window.onload
+  // ─── CLOSING / END OF NIGHT ─────────────────────────────────────────────────
   if (type === 'closing') {
     const to      = toLog ? toEvening + '; ' + toLog : toEvening;
-    const subject = 'closing ' + (mo) + '.' + dy;
+    const subject = 'Closing / End of Night — CMH ' + mo + '/' + dy;
+    const f       = STATE.fields || {};
+    const cmgr    = f.closeMgr || f.openMgr || '[Closing Manager]';
+    const greeting = f.closeGreeting || '';
+    const oosFinal = f.oosFinal || f.oos || '—';
+    const fboCount = f.fboCount || '';
+    const fboDetail= f.fboDetail || f.fboNotes || '';
+    const tmrwRes  = f.closeTmrwRes || '—';
+    const tmrwRet  = f.closeTmrwRet || '—';
+    const lateStaff= f.lateStaff || '';
+    const closeNotes=f.closeNotes || '';
+    const natTotal = f.brandNational || '—';
+    const alaTotal = f.brandAlamo    || '—';
+    const entTotal = f.brandEnterprise || '—';
+    const twoTotal = f.brand20       || '—';
+    const peakResStr = f.peakRes || '';
+    const peakRetStr = f.peakRet || '';
+    const classLines = f.classNotes || '';
 
-    const clO = typeof countCLDone === 'function' ? countCLDone('opening') : {done:0,total:0};
-    const clM = typeof countCLDone === 'function' ? countCLDone('mid')     : {done:0,total:0};
-    const clC = typeof countCLDone === 'function' ? countCLDone('closing') : {done:0,total:0};
-
-    // Greeting line — manager writes their own
-    const greeting = f.closeGreeting ||
-      'GOOOD EVENING CMH!!';
-
-    const todayRes  = f.totalRes        || '—';
-    const todayRet  = f.closeTodayRet   || '—';
-    const tmrwRes   = f.closeTmrwRes    || '—';
-    const tmrwRet   = f.closeTmrwRet    || '—';
-
-    const natTotal  = f.brandNational   || '—';
-    const alaTotal  = f.brandAlamo      || '—';
-    const entTotal  = f.brandEnterprise || '—';
-    const twoTotal  = f.brand20         || '—';
-
-    const peakResStr = fmtPeak(f.peakRes);
-    const peakRetStr = fmtPeak(f.peakRet);
-    const classLines = buildClassLines();
-
-    const fboCount  = f.fboCount || '';
-    const fboDetail = f.fboDetail || f.fboNotes || '';
-
-    let body = greeting;
-    if (todayRes !== '—' || todayRet !== '—') {
-      body += ` Today we completed a total of ${todayRes} reservations and returned a total of ${todayRet}!`;
-    }
-    if (tmrwRes !== '—' || tmrwRet !== '—') {
-      body += ` Tomorrow we have ${tmrwRes} reservations and ${tmrwRet} returns.`;
-    }
-    if (f.closeMotivation) body += ' ' + f.closeMotivation;
-    body += '
-
-';
-
-    body += 'National: '    + natTotal  + '
-';
-    body += 'Alamo: '       + alaTotal  + '
-';
-    body += 'Enterprise: '  + entTotal  + '
-';
-    body += '2.0: '         + twoTotal  + '
-';
-
-    if (peakResStr) body += '
-Peak Reservations:
-' + f.peakRes + '
-';
-    if (peakRetStr) body += '
-Peak Returns:
-' + f.peakRet + '
-';
-    if (classLines)  body += '
-' + classLines;
-
-    body += "
-FBO's:
-" + (fboDetail || fboCount || '—');
-
-    body += '
-
-Best,
-' + cmgr;
+    let body = greeting ? greeting + '\n\n' : '';
+    body += 'Today\'s Closing Summary:\n';
+    body += 'OOS: ' + oosFinal + '\n';
+    body += 'FBO\'s: ' + (fboDetail || fboCount || '—') + '\n\n';
+    body += 'Brand Totals:\n';
+    body += 'National: ' + natTotal + '\n';
+    body += 'Alamo: '    + alaTotal + '\n';
+    body += 'Enterprise: ' + entTotal + '\n';
+    body += '2.0: '      + twoTotal  + '\n';
+    if (peakResStr) body += '\nPeak Reservations:\n' + f.peakRes + '\n';
+    if (peakRetStr) body += '\nPeak Returns:\n'      + f.peakRet + '\n';
+    if (classLines)  body += '\n' + classLines;
+    body += '\nTomorrow: ' + tmrwRes + ' res / ' + tmrwRet + ' ret\n';
+    if (lateStaff)  body += '\nStayed Late: ' + lateStaff + '\n';
+    if (closeNotes) body += '\nNotes: ' + closeNotes + '\n';
+    body += '\n\nBest,\n' + cmgr;
 
     return { typeLabel:'Closing / End of Night', to, subject, body };
   }
 
+
+
+
+</script>
+</body>
+</html>
