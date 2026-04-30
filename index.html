@@ -8887,47 +8887,6 @@ function removeCode(code) {
 }
 
 // Enter key on PIN input — wired in window.onload
-  // ─── CLOSING / END OF NIGHT ─────────────────────────────────────────────────
-  if (type === 'closing') {
-    const to      = toLog ? toEvening + '; ' + toLog : toEvening;
-    const subject = 'Closing / End of Night — CMH ' + mo + '/' + dy;
-    const f       = STATE.fields || {};
-    const cmgr    = f.closeMgr || f.openMgr || '[Closing Manager]';
-    const greeting = f.closeGreeting || '';
-    const oosFinal = f.oosFinal || f.oos || '—';
-    const fboCount = f.fboCount || '';
-    const fboDetail= f.fboDetail || f.fboNotes || '';
-    const tmrwRes  = f.closeTmrwRes || '—';
-    const tmrwRet  = f.closeTmrwRet || '—';
-    const lateStaff= f.lateStaff || '';
-    const closeNotes=f.closeNotes || '';
-    const natTotal = f.brandNational || '—';
-    const alaTotal = f.brandAlamo    || '—';
-    const entTotal = f.brandEnterprise || '—';
-    const twoTotal = f.brand20       || '—';
-    const peakResStr = f.peakRes || '';
-    const peakRetStr = f.peakRet || '';
-    const classLines = f.classNotes || '';
-
-    let body = greeting ? greeting + '\n\n' : '';
-    body += 'Today\'s Closing Summary:\n';
-    body += 'OOS: ' + oosFinal + '\n';
-    body += 'FBO\'s: ' + (fboDetail || fboCount || '—') + '\n\n';
-    body += 'Brand Totals:\n';
-    body += 'National: ' + natTotal + '\n';
-    body += 'Alamo: '    + alaTotal + '\n';
-    body += 'Enterprise: ' + entTotal + '\n';
-    body += '2.0: '      + twoTotal  + '\n';
-    if (peakResStr) body += '\nPeak Reservations:\n' + f.peakRes + '\n';
-    if (peakRetStr) body += '\nPeak Returns:\n'      + f.peakRet + '\n';
-    if (classLines)  body += '\n' + classLines;
-    body += '\nTomorrow: ' + tmrwRes + ' res / ' + tmrwRet + ' ret\n';
-    if (lateStaff)  body += '\nStayed Late: ' + lateStaff + '\n';
-    if (closeNotes) body += '\nNotes: ' + closeNotes + '\n';
-    body += '\n\nBest,\n' + cmgr;
-
-    return { typeLabel:'Closing / End of Night', to, subject, body };
-  }
 
 
 
