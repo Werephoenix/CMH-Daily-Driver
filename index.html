@@ -1368,7 +1368,7 @@ button { cursor: pointer; }
   <button class="nbtn on" id="tab-opening" onclick="showTab('opening')"><span class="ni">🏠</span>Dashboard</button>
   <button class="nbtn" id="tab-paste"   onclick="showTab('paste')"><span class="ni">📋</span>Paste Data</button>
   <button class="nbtn" id="tab-board"   onclick="showTab('board')"><span class="ni">📊</span>Availability</button>
-  <button class="nbtn" id="tab-schedule" onclick="showTab('schedule')"><span class="ni">👥</span>Schedule</button>
+  <button class="nbtn" id="tab-coverage" onclick="showTab('schedule')"><span class="ni">📊</span>Coverage</button>
   <button class="nbtn" id="tab-checklist" onclick="showTab('checklist')"><span class="ni">✅</span>Checklist</button>
   <button class="nbtn" id="tab-reference" onclick="showTab('reference')"><span class="ni">📖</span>Reference</button>
   <button class="nbtn" id="tab-inventory" onclick="showTab('inventory')"><span class="ni">🔢</span>Inventory</button>
@@ -1641,130 +1641,80 @@ button { cursor: pointer; }
 ═══════════════════════════════════════════════════════════════ -->
 <div class="scr" id="screen-schedule">
 
-  <!-- Sub-tab nav (Today / Month View / Load Schedule) -->
-  <div class="sched-section-tabs">
-    <button class="ss-tab on" id="ss-today"  onclick="showSchedSection('today')">📅 Today</button>
-    <button class="ss-tab"    id="ss-month"  onclick="showSchedSection('month')">🗓 Month</button>
-    <button class="ss-tab"    id="ss-paste"  onclick="showSchedSection('paste')">📋 Paste Schedule</button>
+  <!-- Manager Mode toggle bar -->
+  <div id="mgr-mode-bar" style="display:flex;align-items:center;gap:8px;
+    padding:8px 12px;background:var(--bg2);border:1px solid var(--bdr);
+    border-radius:8px;margin-bottom:10px">
+    <div id="mgr-mode-status" style="flex:1;font-size:11px;font-weight:700;color:var(--txt3)">
+      🔒 View Mode
+    </div>
+    <button id="mgr-mode-btn" onclick="toggleManagerModePrompt()"
+      style="padding:5px 12px;border-radius:4px;font-size:11px;font-weight:700;
+        border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer">
+      Unlock
+    </button>
   </div>
 
-  <!-- TODAY — unified switchboard -->
-  <div id="ss-sec-today">
+  <!-- Zone map — right now -->
+  <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
+    gap:6px;margin-bottom:10px"></div>
 
-    <!-- Header bar -->
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;
-      background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;
-      margin-bottom:10px;flex-wrap:wrap">
+  <!-- Coverage action bar (manager mode only) -->
+  <div id="cov-action-bar" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="btn btn-g btn-sm" onclick="suggestLunches()">🍽 Auto Lunches</button>
+    <button class="btn btn-gh btn-sm" onclick="undoCoverage()" title="Undo">↩ Undo</button>
+    <button class="btn btn-gh btn-sm" onclick="redoCoverage()" title="Redo">↪ Redo</button>
+    <button class="btn btn-gh btn-sm" onclick="confirmToday()" style="margin-left:auto">✅ Confirm</button>
+  </div>
+
+  <!-- Coverage chart -->
+  <div id="coverage-chart" style="margin-bottom:8px"></div>
+
+  <!-- Person timeline -->
+  <div class="card" style="padding:10px 12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;
+        letter-spacing:.08em;color:var(--txt3)">Today's Coverage</div>
+      <div style="display:flex;gap:6px;font-size:8px">
+        <span style="color:var(--green)">🟩 Exit</span>
+        <span style="color:var(--acc)">🟦 Counter</span>
+        <span style="color:#6366f1">🌟 Emerald</span>
+        <span style="color:#06b6d4">↩ Returns</span>
+        <span style="color:var(--amber)">🍽 Lunch</span>
+      </div>
+    </div>
+    <div id="coverage-timeline" style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <div style="font-size:11px;color:var(--txt3);padding:8px">
+        Loading coverage...
+      </div>
+    </div>
+  </div>
+
+  <!-- Person detail panel (slides up on bar tap) -->
+  <div id="person-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;
+    background:var(--bg2);border-top:2px solid var(--bdr2);
+    border-radius:12px 12px 0 0;padding:16px;z-index:500;
+    max-height:75vh;overflow-y:auto;box-shadow:0 -4px 24px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
       <div>
-        <div id="sched-date-lbl" style="font-family:var(--ff-hd);font-size:15px;
-          font-weight:800;color:var(--txt)">Loading...</div>
-        <div id="sched-count-lbl" style="font-size:11px;color:var(--txt3);margin-top:2px"></div>
+        <div id="pp-name" style="font-size:16px;font-weight:800;color:var(--txt)"></div>
+        <div id="pp-shift" style="font-size:11px;color:var(--txt3);font-family:var(--ff-mono)"></div>
       </div>
-      <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn btn-gh btn-sm" onclick="resetSchedDay()">↺ Reset</button>
-        <button class="btn btn-g" onclick="confirmToday()">✅ Confirm</button>
-      </div>
+      <button onclick="closePersonPanel()"
+        style="font-size:22px;color:var(--txt3);background:none;border:none;cursor:pointer;line-height:1">×</button>
     </div>
-
-    <!-- Coverage snapshot -->
-    <div style="display:flex;gap:14px;padding:8px 14px;background:var(--bg3);
-      border-radius:6px;margin-bottom:10px;font-size:12px;font-weight:600;flex-wrap:wrap">
-      <span id="snap-counter" style="color:var(--acc)">🟦 Counter: —</span>
-      <span id="snap-exit"    style="color:var(--green)">🟩 Exit: —</span>
-      <span id="snap-off"     style="color:var(--txt3)">❌ Off: 0</span>
-      <span id="snap-gap"     style="margin-left:auto"></span>
-    </div>
-
-    <!-- Two-column switchboard -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-
-      <!-- LEFT: Counter -->
-      <div>
-        <div style="font-size:10px;font-weight:800;letter-spacing:.1em;
-          text-transform:uppercase;color:var(--acc);padding:5px 2px;
-          border-bottom:2px solid var(--acc);margin-bottom:6px">🟦 Counter</div>
-        <div id="col-counter"></div>
-      </div>
-
-      <!-- RIGHT: Exit + Management -->
-      <div>
-        <div style="font-size:10px;font-weight:800;letter-spacing:.1em;
-          text-transform:uppercase;color:var(--green);padding:5px 2px;
-          border-bottom:2px solid var(--green);margin-bottom:6px">🟩 Exit</div>
-        <div id="col-exit"></div>
-
-        <div style="font-size:10px;font-weight:800;letter-spacing:.1em;
-          text-transform:uppercase;color:var(--txt3);padding:5px 2px;
-          border-bottom:1px solid var(--bdr);margin:12px 0 6px">🎯 Management</div>
-        <div id="col-mgmt"></div>
-      </div>
-    </div>
-
-    <!-- Unassigned + callouts -->
-    <div id="col-unassigned" style="margin-top:10px"></div>
-
-    <!-- Slide-up adjust panel -->
-    <div id="adjust-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;
-      background:var(--bg2);border-top:2px solid var(--acc);padding:14px 16px;
-      z-index:500;box-shadow:0 -4px 24px rgba(0,0,0,.5)">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-        <span id="adjust-name" style="font-weight:800;font-size:15px;color:var(--txt)"></span>
-        <span id="adjust-shift" style="font-size:11px;color:var(--txt3);
-          font-family:var(--ff-mono)"></span>
-        <button onclick="closeAdjustPanel()" style="margin-left:auto;font-size:20px;
-          line-height:1;color:var(--txt3);background:none;border:none;cursor:pointer">×</button>
-      </div>
-      <div id="adjust-actions" style="display:flex;gap:6px;flex-wrap:wrap"></div>
-    </div>
-
-  </div>
-  <!-- MONTH VIEW -->
-  <div id="ss-sec-month" style="display:none">
-    <div class="card">
-      <div class="ch">🗓 Stored Schedule <span class="badge" id="sched-range-badge">No schedule loaded</span></div>
-      <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">Click any cell to edit a single shift. Today highlighted.</p>
-      <div id="month-grid-container"><p style="font-size:12px;color:var(--txt3)">Load a schedule first.</p></div>
-    </div>
+    <!-- Assignment summary (always visible) -->
+    <div id="pp-summary" style="margin-bottom:12px"></div>
+    <!-- Exit fairness (always visible) -->
+    <div id="pp-fairness" style="margin-bottom:12px"></div>
+    <!-- What if button (always visible) -->
+    <div id="pp-whatif-section" style="margin-bottom:12px"></div>
+    <!-- Manager controls (manager mode only) -->
+    <div id="pp-mgr-controls" style="display:none"></div>
   </div>
 
-  <!-- LOAD SCHEDULE -->
-  <div id="ss-sec-paste" style="display:none">
-
-    <div class="card">
-      <div class="ch">🎯 Management Schedule <span class="badge">ARM · BRM · ABRM · MT</span></div>
-      <p style="font-size:12px;color:var(--txt3);margin-bottom:10px">Paste management schedule grid or one line per person.</p>
-      <textarea class="sched-paste-area" id="sched-paste-input" rows="7"
-        placeholder="Name     Apr-26  Apr-27  Apr-28&#10;Vada     OFF     530A    530A&#10;Ami      8A-6P   4P-C    OFF&#10;&#10;Or: Vada: 530A-330P"></textarea>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">
-        <button class="btn btn-p" onclick="parseSection('mgmt')">🔍 Parse Management</button>
-        <button class="btn btn-g" id="sched-apply-btn" onclick="saveSection('mgmt')" style="display:none">💾 Save Management</button>
-        <button class="btn btn-gh btn-sm" onclick="clearStoredSchedule()" style="margin-left:auto">🗑 Clear All</button>
-      </div>
-      <div id="sched-parse-preview" style="display:none;margin-top:10px;background:var(--bg);border:1px solid var(--bdr);border-radius:5px;max-height:220px;overflow-y:auto"></div>
-    </div>
-
-    <div class="card">
-      <div class="ch">🏃 CXR &amp; Exit Schedule <span class="badge">Counter · Exit Agents</span></div>
-      <textarea class="sched-paste-area" id="sched-paste-cxr" rows="7"
-        placeholder="Name     Apr-26  Apr-27  Apr-28&#10;Matt     530A    530A    OFF&#10;Genesis  7A-330P 7A-330P 7A-330P&#10;CeCe     830A    OFF     830A"></textarea>
-      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-        <button class="btn btn-p" onclick="parseSection('cxr')">🔍 Parse CXR/Exit</button>
-        <button class="btn btn-g" id="save-btn-cxr" onclick="saveSection('cxr')" style="display:none">💾 Save CXR/Exit</button>
-      </div>
-      <div id="preview-cxr" style="display:none;margin-top:10px;background:var(--bg);border:1px solid var(--bdr);border-radius:5px;max-height:200px;overflow-y:auto"></div>
-    </div>
-
-    <div class="card" style="background:rgba(37,99,235,.04);border-color:rgba(37,99,235,.2)">
-      <div class="ch" style="color:var(--acc)">📊 Stored Schedule Status</div>
-      <div id="stored-status" style="font-size:12px;color:var(--txt2);line-height:2">Loading...</div>
-      <p style="font-size:11px;color:var(--txt3);margin-top:8px">
-        <b>Format:</b> 530A-330P · 4P-C · 9A-7P · OFF · VACA · 99 TRAINING<br>
-        <b>Names:</b> First name or nickname (Matt, CeCe, Mini, Genesis, TT)
-      </p>
-    </div>
-
-  </div>
 </div>
+
 
 <!-- ═══════════════════════════════════════════════════════════════
      SCREEN: CHECKLIST
@@ -1832,7 +1782,7 @@ button { cursor: pointer; }
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-g btn-sm" id="adm-tab-staff" onclick="showAdminSection('staff')">👥 Staff</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
-        <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PIN</button>
+        <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
         <button class="btn btn-gh btn-sm" style="margin-left:auto;color:var(--red)" onclick="lockAdmin()">🔒 Lock</button>
       </div>
 
@@ -1861,27 +1811,34 @@ button { cursor: pointer; }
 
       <!-- PIN section -->
       <div id="adm-pin" class="adm-section" style="display:none">
-        <div class="card">
-          <div class="ch">🔑 Change Manager PIN</div>
-          <div style="display:grid;gap:10px;max-width:260px">
-            <div>
-              <label style="font-size:11px;color:var(--txt3);display:block;margin-bottom:4px">Current PIN</label>
-              <input id="pin-current" type="password" inputmode="numeric" maxlength="6"
-                style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--txt3);display:block;margin-bottom:4px">New PIN</label>
-              <input id="pin-new" type="password" inputmode="numeric" maxlength="6"
-                style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
-            </div>
-            <div>
-              <label style="font-size:11px;color:var(--txt3);display:block;margin-bottom:4px">Confirm New PIN</label>
-              <input id="pin-confirm" type="password" inputmode="numeric" maxlength="6"
-                style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
-            </div>
-            <button class="btn btn-g" onclick="changeAdminPin()">Save New PIN</button>
+        <div class="card" style="margin-bottom:10px">
+          <div class="ch">🔑 Admin PIN <span style="font-size:10px;color:var(--txt3);font-weight:400">(Roster & Car Codes)</span></div>
+          <div style="display:grid;gap:8px;max-width:260px">
+            <input id="pin-current" type="password" inputmode="numeric" maxlength="6" placeholder="Current Admin PIN"
+              style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
+            <input id="pin-new" type="password" inputmode="numeric" maxlength="6" placeholder="New Admin PIN"
+              style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
+            <input id="pin-confirm" type="password" inputmode="numeric" maxlength="6" placeholder="Confirm New PIN"
+              style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
+            <button class="btn btn-g" onclick="changeAdminPin()">Save Admin PIN</button>
             <div id="pin-msg" style="font-size:11px;min-height:16px"></div>
           </div>
+        </div>
+        <div class="card">
+          <div class="ch">🔓 Manager Mode PIN <span style="font-size:10px;color:var(--txt3);font-weight:400">(Daily Coverage Controls)</span></div>
+          <div style="display:grid;gap:8px;max-width:260px">
+            <input id="mod-pin-current" type="password" inputmode="numeric" maxlength="6" placeholder="Current MOD PIN"
+              style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
+            <input id="mod-pin-new" type="password" inputmode="numeric" maxlength="6" placeholder="New MOD PIN"
+              style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
+            <input id="mod-pin-confirm" type="password" inputmode="numeric" maxlength="6" placeholder="Confirm MOD PIN"
+              style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
+            <button class="btn btn-g" onclick="changeModPin()">Save MOD PIN</button>
+            <div id="mod-pin-msg" style="font-size:11px;min-height:16px"></div>
+          </div>
+        </div>
+        <div style="font-size:10px;color:var(--txt3);margin-top:4px">
+          Default Admin PIN: 2826 · Default MOD PIN: 1234
         </div>
       </div>
 
@@ -1897,7 +1854,14 @@ button { cursor: pointer; }
         <button class="btn btn-gh btn-sm" id="ref-tab-loyalty" onclick="showRefSection('loyalty')">🏆 Loyalty</button>
         <button class="btn btn-gh btn-sm" id="ref-tab-hourly" onclick="showRefSection('hourly')">⏱ Hourly View</button>
       </div>
-      <div id="ref-content"></div>
+      <div id="ref-sec-codes">
+        <input id="code-search" placeholder="🔍 Filter codes..." oninput="buildCodeCompendium()"
+          style="width:100%;padding:7px 10px;background:var(--bg3);border:1px solid var(--bdr2);
+            border-radius:4px;color:var(--txt);font-size:12px;margin-bottom:8px">
+        <div id="code-grid"></div>
+      </div>
+      <div id="ref-sec-loyalty" style="display:none"><div id="loyalty-content"></div></div>
+      <div id="ref-sec-hourly" style="display:none"><div id="hourly-content"></div></div>
     </div>
   </div>
 
@@ -2291,14 +2255,33 @@ var ROSTER_MGMT = [
 // notes = reason / flag
 // ═══════════════════════════════════════════════════════════════════════
 var COVERAGE_RULES = {
-  0: { exitMin:1, counterMin:2, notes:'Sunday — moderate traffic' },
-  1: { exitMin:2, counterMin:2, notes:'Monday — highest volume, full exit staffing required' },
-  2: { exitMin:1, counterMin:2, notes:'Tuesday — moderate' },
-  3: { exitMin:1, counterMin:2, notes:'Wednesday — moderate' },
-  4: { exitMin:1, counterMin:2, notes:'Thursday — picks up toward weekend' },
-  5: { exitMin:2, counterMin:2, notes:'Friday — high volume, full exit needed' },
-  6: { exitMin:1, counterMin:2, notes:'Saturday — steady traffic' },
+  0: { label:'Sunday',    monday:false },
+  1: { label:'Monday',    monday:true  },
+  2: { label:'Tuesday',   monday:false },
+  3: { label:'Wednesday', monday:false },
+  4: { label:'Thursday',  monday:false },
+  5: { label:'Friday',    monday:false },
+  6: { label:'Saturday',  monday:false },
 };
+
+var COVERAGE_BY_HOUR = function(hour, dow) {
+  const isMonday = dow === 1;
+  if (hour < 5)  return { exitMin:1, counterMin:0, label:'Overnight' };
+  if (hour < 7)  return { exitMin:isMonday?2:1, counterMin:1, label:'Early AM' };
+  if (hour < 10) return { exitMin:isMonday?3:1, counterMin:2, label:'Morning' };
+  if (hour < 14) return { exitMin:isMonday?5:2, counterMin:isMonday?3:3, label:'Peak' };
+  if (hour < 18) return { exitMin:isMonday?3:2, counterMin:2, label:'Afternoon' };
+  if (hour < 24) return { exitMin:1, counterMin:1, label:'Evening' };
+  return { exitMin:1, counterMin:0, label:'Late Night' };
+};
+
+var SPECIAL_ASSIGNMENTS = [
+  { key:'emerald',   label:'Emerald Booth', icon:'🌟', color:'#6366f1' },
+  { key:'shuttling', label:'Shuttling/QTA', icon:'🚗', color:'#f59e0b' },
+  { key:'returns',   label:'Returns',       icon:'↩️',  color:'#06b6d4' },
+  { key:'break',     label:'Break',         icon:'☕',  color:'#78716c' },
+  { key:'training',  label:'Training',      icon:'📚',  color:'#8b5cf6' },
+];
 
 // ═══════════════════════════════════════════════════════════════════════
 // CHECKLIST DATA — all three shift modes
@@ -2505,6 +2488,7 @@ function loadState() {
       s.customSplits = s.customSplits || {};
       s.adminRoster  = s.adminRoster  || [];
       s.adminCodes   = s.adminCodes   || [];
+      s.specialBlocks = s.specialBlocks || {};
       s.closeFields  = s.closeFields  || {};
       return s;
     }
@@ -2513,7 +2497,7 @@ function loadState() {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
-    stationPref:{}, shiftMod:{}, customSplits:{}, adminRoster:[], adminCodes:[],
+    stationPref:{}, shiftMod:{}, customSplits:{}, adminRoster:[], adminCodes:[], specialBlocks:{},
   };
 }
 
@@ -2558,6 +2542,18 @@ window.onload = function() {
   autoRouteByTime();
   // Initialize schedule engine with pre-loaded data
   if (typeof initScheduleEngine === 'function') initScheduleEngine();
+  if (typeof initSync === 'function') initSync();
+  // Auto-load from roster on startup so Coverage tab shows immediately
+  if (typeof buildExpectedToday === 'function') {
+    const _startExp = buildExpectedToday();
+    if (Object.keys(_startExp).length > 0) {
+      if (typeof autoLoadFromExpected === 'function')
+        autoLoadFromExpected(_startExp, new Date().getDay());
+      if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+      if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
+    }
+  }
+  if (typeof refreshDash === 'function') refreshDash();
 };
 
 // ── CLOCK ───────────────────────────────────────────────────────────────────
@@ -2598,7 +2594,7 @@ function showTab(id) {
   if (btn) btn.classList.add('on');
 
   if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); }
-  if (id === 'schedule')  { buildStaffGrid(); showSchedSection('today'); updateSchedHelper(); buildCoverageUI(); }
+  if (id === 'schedule')  { buildCoverageTimeline(); updateManagerModeUI(); }
   if (id === 'checklist') { renderChecklist(window._curCLMode || 'opening'); }
   if (id === 'closing')   { restoreClosingFields(); genTeamText(); buildDaySummary(); }
   if (id === 'reference') { buildCodeCompendium(); }
@@ -4057,16 +4053,57 @@ function buildSmartRotation() {
 
   // Build rotation blocks for each CXR
   const rotations = workingCXRs.map(cxr => {
-    const { shift, startStation } = cxr;
-    const totalWork = (shift.end - shift.start) - ROTATION.lunchHours;
-    const block1H   = Math.min(ROTATION.blockHours, totalWork / 2);
-    const lunchStart= shift.start + block1H;
-    const lunchEnd  = lunchStart + ROTATION.lunchHours;
-    const block2H   = totalWork - block1H;
-    const shiftEnd  = shift.start + totalWork + ROTATION.lunchHours;
+    const { shift, startStation, pid } = cxr;
+    const altPos     = (STATE.altSchedule || {})[pid] || 'normal';
+    const custSplit  = (STATE.customSplits || {})[pid];
+    const noLunch    = (STATE.altSchedule || {})[pid + '_nolunch'] === true;
+    const totalWork  = (shift.end - shift.start) - (noLunch ? 0 : ROTATION.lunchHours);
+    const shiftDur   = shift.end - shift.start;
 
-    const b1Station = startStation;
-    const b2Station = startStation === 'counter' ? 'exit' : 'counter';
+    // ── Full Counter: entire shift at counter, lunch at midpoint ──────────
+    if (altPos === 'full-counter') {
+      const lunchStart = noLunch ? null : shift.start + shiftDur / 2 - ROTATION.lunchHours / 2;
+      const lunchEnd   = noLunch ? null : lunchStart + ROTATION.lunchHours;
+      return {
+        pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
+        shiftStart:shift.start, shiftEnd:shift.end,
+        b1: { station:'counter', from:shift.start, to:noLunch?shift.end:lunchStart, hours:noLunch?shiftDur:lunchStart-shift.start },
+        lunch: noLunch ? null : { from:lunchStart, to:lunchEnd },
+        b2: noLunch ? null : { station:'counter', from:lunchEnd, to:shift.end, hours:shift.end-lunchEnd },
+        warnExceedsLimit:false, bumpNeeded:null, fullShift:'counter',
+      };
+    }
+
+    // ── Full Exit: entire shift at exit, lunch at midpoint ────────────────
+    if (altPos === 'full-exit') {
+      const lunchStart = noLunch ? null : shift.start + shiftDur / 2 - ROTATION.lunchHours / 2;
+      const lunchEnd   = noLunch ? null : lunchStart + ROTATION.lunchHours;
+      return {
+        pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
+        shiftStart:shift.start, shiftEnd:shift.end,
+        b1: { station:'exit', from:shift.start, to:noLunch?shift.end:lunchStart, hours:noLunch?shiftDur:lunchStart-shift.start },
+        lunch: noLunch ? null : { from:lunchStart, to:lunchEnd },
+        b2: noLunch ? null : { station:'exit', from:lunchEnd, to:shift.end, hours:shift.end-lunchEnd },
+        warnExceedsLimit:false, bumpNeeded:null, fullShift:'exit',
+      };
+    }
+
+    // ── Normal 4hr split (with optional custom split from +/- buttons) ────
+    let block1H, block2H;
+    if (custSplit) {
+      block1H = custSplit.b1H;
+      block2H = custSplit.b2H;
+    } else {
+      block1H = Math.min(ROTATION.blockHours, totalWork / 2);
+      block2H = totalWork - block1H;
+    }
+
+    const lunchStart = shift.start + block1H;
+    const lunchEnd   = noLunch ? lunchStart : lunchStart + ROTATION.lunchHours;
+    const shiftEnd   = shift.end;
+
+    const b1Station = startStation || 'counter';
+    const b2Station = b1Station === 'counter' ? 'exit' : 'counter';
 
     // Check if block2 (exit) would exceed 4 hours
     const exitBlock = b1Station === 'exit' ? block1H : block2H;
@@ -5054,6 +5091,8 @@ function confirmToday() {
   });
 
   if(!STATE.fields)STATE.fields={}; STATE.fields.schedConfirmed='1'; saveState();
+  saveExitFairnessForToday();
+  if(typeof buildCoverageTimeline==="function")buildCoverageTimeline();
   buildStaffGrid();
   updateSchedHelper();
   buildCoverageUI();
@@ -6874,10 +6913,10 @@ function buildStaffGrid() { buildSwitchboard(); }
 
 function showRefSection(sec) {
   ['codes','loyalty','hourly'].forEach(s => {
-    const el = document.getElementById('ref-sec-'+s);
-    if (el) el.style.display = s === sec ? '' : 'none';
-    const btn = document.getElementById('ref-'+s);
-    if (btn) btn.className = 'ss-tab' + (s===sec?' on':'');
+    const el  = document.getElementById('ref-sec-'+s);
+    const btn = document.getElementById('ref-tab-'+s);
+    if (el)  el.style.display = s===sec ? '' : 'none';
+    if (btn) btn.className = s===sec ? 'btn btn-g btn-sm' : 'btn btn-gh btn-sm';
   });
   if (sec === 'codes')   buildCodeCompendium();
   if (sec === 'loyalty') buildLoyaltyGuide();
@@ -7333,15 +7372,46 @@ var PRELOADED_MGMT_SCHEDULE = {
     "Joshua__Josh__Osei": "4P-C",
     "Brittney_Francis": "6A-4P",
     "Lauren_Kretschman": "10A-8P"
+  },
+  "2026-05-01": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "12P-10P", "Josh_Osei": "4P-C", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "4P-C" },
+  "2026-05-02": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "OFF", "Lauren_Kretsc": "OFF" },
+  "2026-05-03": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" },
+  "2026-05-04": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "12P-10P", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
+  "2026-05-05": { "Ami_Lhom": "8A-6P", "Matt_Johnson_(BRM)": "4A-2P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "4P-C", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
+  "2026-05-06": { "Ami_Lhom": "6A-4P", "Matt_Johnson_(BRM)": "4A-2P", "Ty_Lumpkin": "9A-7P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "6A-4P", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "OFF" },
+  "2026-05-07": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "4P-C", "Josh_Osei": "10A-8P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "4P-C" },
+  "2026-05-08": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "7A-5P", "Josh_Osei": "10A-8P", "Brittney_Francis": "10A-8P", "Lauren_Kretsc": "4P-C" },
+  "2026-05-09": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "4P-C", "Brittney_Francis": "10A-8P", "Lauren_Kretsc": "12P-10P" },
+  "2026-05-10": { "Ami_Lhom": "OFF", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "OFF", "Lauren_Kretsc": "4P-C" },
+  "2026-05-11": { "Ami_Lhom": "OFF", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "530A-330P", "Carlos_Aviles": "530A-330P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "4P-C", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
+  "2026-05-12": { "Ami_Lhom": "8A-6P", "Matt_Johnson_(BRM)": "9A-7P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "9A-7P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "10A-8P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "4P-C" },
+  "2026-05-13": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "4P-C", "Josh_Osei": "10A-8P", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "6A-4P" },
+  "2026-05-14": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "9A-7P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" },
+  "2026-05-15": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "12P-10P", "Josh_Osei": "4P-C", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "4P-C" },
+  "2026-05-16": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "OFF", "Lauren_Kretsc": "OFF" },
+  "2026-05-17": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" },
+  "2026-05-18": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "12P-10P", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
+  "2026-05-19": { "Ami_Lhom": "8A-6P", "Matt_Johnson_(BRM)": "4A-2P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "4P-C", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
+  "2026-05-20": { "Ami_Lhom": "6A-4P", "Matt_Johnson_(BRM)": "4A-2P", "Ty_Lumpkin": "9A-7P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "6A-4P", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "OFF" },
+  "2026-05-21": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "4P-C", "Josh_Osei": "10A-8P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "4P-C" },
+  "2026-05-22": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "7A-5P", "Josh_Osei": "10A-8P", "Brittney_Francis": "10A-8P", "Lauren_Kretsc": "4P-C" },
+  "2026-05-23": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "4P-C", "Brittney_Francis": "10A-8P", "Lauren_Kretsc": "12P-10P" },
+  "2026-05-24": { "Ami_Lhom": "OFF", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "OFF", "Lauren_Kretsc": "4P-C" },
+  "2026-05-25": { "Ami_Lhom": "OFF", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "530A-330P", "Carlos_Aviles": "530A-330P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "4P-C", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
+  "2026-05-26": { "Ami_Lhom": "8A-6P", "Matt_Johnson_(BRM)": "9A-7P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "9A-7P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "10A-8P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "4P-C" },
+  "2026-05-27": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "4P-C", "Josh_Osei": "10A-8P", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "6A-4P" },
+  "2026-05-28": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "9A-7P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" },
+  "2026-05-29": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "12P-10P", "Josh_Osei": "4P-C", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "4P-C" },
+  "2026-05-30": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "OFF", "Lauren_Kretsc": "OFF" },
+  "2026-05-31": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" }
   }
-}
 };
 
 function initPreloadedSchedule() {
   const existing = getStoredSection('mgmt');
   if (existing && Object.keys(existing.grid || {}).length > 0) return;
   putStoredSection('mgmt', PRELOADED_MGMT_SCHEDULE);
-  console.log('Pre-loaded management schedule seeded: Apr 12–Apr 30 2026');
+  console.log('Pre-loaded management schedule seeded: Apr 12–May 31 2026');
 }
 
 
@@ -7744,8 +7814,8 @@ function setAltPosition(pid, posKey) {
   if (posKey === 'normal') delete STATE.altSchedule[pid];
   else STATE.altSchedule[pid] = posKey;
   saveState();
-  buildStaffGrid();
-  buildCoverageUI();
+  if(typeof buildSwitchboard==="function")buildSwitchboard();
+  if(typeof buildCoverageTimeline==="function")buildCoverageTimeline();
   toast(posKey === 'normal' ? 'Rotation reset to normal' : 'Alt schedule set ✓');
 }
 
@@ -8245,140 +8315,136 @@ function buildDashSchedMini() {
   const el = document.getElementById('dash-sched-content');
   if (!el) return;
 
-  const exp = typeof buildExpectedToday === 'function' ? buildExpectedToday() : {};
-  if (!Object.keys(exp).length) { el.textContent = 'No schedule loaded — tap to set'; return; }
-
-  const stations = STATE.staffStation  || {};
+  const exp      = typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const stations = STATE.staffStation   || {};
   const callouts = STATE.todayOverrides || {};
-  const mods     = STATE.shiftMod       || {};
-  const altSched = STATE.altSchedule    || {};
-  const nowH     = new Date().getHours() + new Date().getMinutes() / 60;
+  const nowH     = new Date().getHours() + new Date().getMinutes()/60;
+  const dow      = new Date().getDay();
 
-  // Current position from rotation data
-  function currentPosition(pid, person) {
+  if (!Object.keys(exp).length) {
+    el.innerHTML='<div style="color:var(--txt3);font-size:11px">No schedule — confirm in Opening checklist</div>';
+    return;
+  }
+
+  // Get zone for each person right now
+  function getZoneNow(pid, person) {
+    if (callouts[pid]==='callout') return 'off';
     const rot = window._lastRotations && window._lastRotations[pid];
-    if (!rot) {
-      // No rotation data — use raw station assignment
-      // Only show position if currently on shift
-      if (person.shiftStart != null && (nowH < person.shiftStart || nowH > (person.shiftEnd||24))) return null;
-      const s = stations[pid];
-      if (s === 'Exit Booth' || person.role === 'EXIT') return {label:'Exit', color:'var(--green)'};
-      if (s === 'Counter') return {label:'Counter', color:'var(--acc)'};
-      return null;
+    const mods = STATE.shiftMod||{}, ov=mods[pid]||{};
+    const ss = ov.start!=null?ov.start:person.shiftStart;
+    const se = ov.end!=null?ov.end:person.shiftEnd;
+    if (ss==null||nowH<ss||nowH>=se) return 'off';
+    if (rot) {
+      if (rot.lunch&&nowH>=rot.lunch.from&&nowH<rot.lunch.to) return 'lunch';
+      if (rot.b1&&nowH>=rot.b1.from&&nowH<rot.b1.to) return rot.b1.station==='exit'?'exit':'counter';
+      if (rot.b2&&nowH>=rot.b2.from&&nowH<=rot.b2.to) return rot.b2.station==='exit'?'exit':'counter';
+      return 'off';
     }
-    // Check if currently on shift
-    if (nowH < rot.shiftStart || nowH > rot.shiftEnd) return null; // not on shift — show nothing
-    // Check each block
-    if (rot.lunch && nowH >= rot.lunch.from && nowH < rot.lunch.to)
-      return {label:'Lunch', color:'var(--amber)'};
-    if (rot.b1 && nowH >= rot.b1.from && nowH < rot.b1.to)
-      return {label: rot.b1.station==='exit'?'Exit':'Counter',
-              color: rot.b1.station==='exit'?'var(--green)':'var(--acc)'};
-    if (rot.b2 && nowH >= rot.b2.from && nowH <= rot.b2.to)
-      return {label: rot.b2.station==='exit'?'Exit':'Counter',
-              color: rot.b2.station==='exit'?'var(--green)':'var(--acc)'};
-    return null;
+    const st = stations[pid]||(person.role==='EXIT'?'Exit Booth':'Counter');
+    if (st==='Exit Booth'||person.role==='EXIT') return 'exit';
+    if (['ARM','BRM','ABRM','MT'].includes(person.role)) return 'mgmt';
+    return 'counter';
   }
 
-  function shiftStr(pid, person, entry) {
-    const mod = mods[pid];
-    if (mod && mod.display) return mod.display;
-    if (entry && entry.shift && entry.shift !== 'varies') return entry.shift;
-    if (person.shiftCode && person.shiftCode !== 'varies') return person.shiftCode;
-    if (person.shiftStart != null) {
-      const fh = h => {
-        const hr=Math.floor(h), mn=Math.round((h-hr)*60);
-        const s=h>=12?'p':'a', d=hr>12?hr-12:hr===0?12:hr;
-        return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;
-      };
-      return fh(person.shiftStart)+'–'+fh(person.shiftEnd);
-    }
-    return '—';
-  }
-
-  function altBadge(pid) {
-    const pos = altSched[pid];
-    if (!pos || pos === 'normal') return '';
-    const labels = {'full-counter':'Full Ctr','full-exit':'Full Exit','counter-first':'Ctr+30','exit-first':'Exit+30'};
-    return labels[pos]
-      ? ' <span style="font-size:8px;background:rgba(217,119,6,.12);color:var(--amber);border-radius:2px;padding:1px 4px;margin-left:2px">'+labels[pos]+'</span>'
-      : '';
-  }
-
-  function personRow(pid, entry, forceStation) {
-    const person   = entry.person;
-    const nick     = person.nick || person.name.split(' ')[0];
-    const time     = shiftStr(pid, person, entry);
-    const timeColor= mods[pid] ? 'var(--amber)' : 'var(--txt3)';
-    const pos      = forceStation || currentPosition(pid, person);
-
-    return '<div style="display:flex;align-items:center;gap:0;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);min-height:24px">'
-      + '<span style="font-size:12px;font-weight:700;color:var(--txt);width:54px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + nick + '</span>'
-      + '<span style="font-size:10px;color:'+timeColor+';font-family:var(--ff-mono);flex:1;white-space:nowrap;overflow:hidden">' + time + '</span>'
-      + (pos ? '<span style="font-size:9px;font-weight:800;color:'+pos.color+';flex-shrink:0;margin-left:4px;min-width:42px;text-align:right">'+pos.label+'</span>' : '')
-      + altBadge(pid)
-      + '</div>';
-  }
-
-  // Sort everyone by shift start
-  const sorted = Object.entries(exp)
+  // Sort by shift start
+  const people = Object.entries(exp)
     .sort((a,b)=>(a[1].person.shiftStart||99)-(b[1].person.shiftStart||99));
 
-  const counter=[], exitB=[], mgmtList=[], off=[];
-  sorted.forEach(([pid, entry]) => {
-    const person  = entry.person;
-    const isOff   = callouts[pid] === 'callout';
-    const station = stations[pid] || '';
-    if (isOff) { off.push([pid,entry]); return; }
-    if (['ARM','BRM','ABRM','MT'].includes(person.role)) { mgmtList.push([pid,entry,station]); return; }
-    if (station === 'Exit Booth' || person.role === 'EXIT') exitB.push([pid,entry]);
-    else counter.push([pid,entry]);
+  // Group by current zone
+  const zones = {exit:[], counter:[], emerald:[], returns:[], off:[]};
+  const mgmt  = [];
+
+  people.forEach(([pid,entry]) => {
+    const p    = entry.person;
+    const nick = p.nick||p.name.split(' ')[0];
+    const isMgmt = ['ARM','BRM','ABRM','MT'].includes(p.role);
+    const mods = STATE.shiftMod||{}, ov=(mods[pid]||{});
+    const ss = ov.start!=null?ov.start:p.shiftStart;
+    const se = ov.end!=null?ov.end:p.shiftEnd;
+    const zone = getZoneNow(pid, p);
+    const isNow = zone !== 'off';
+    const shiftStr = ss!=null ? fmtHm(ss)+'–'+fmtHm(se) : p.shiftCode||'—';
+
+    const row = {pid, nick, zone, shiftStr, isNow, isMgmt, callout:callouts[pid]==='callout'};
+    if (isMgmt) mgmt.push(row);
+    else if (zones[zone]) zones[zone].push(row);
+    else zones.counter.push(row);
   });
 
-  // Column header helper
-  const colHdr = (emoji, label, count, color) =>
-    '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:'+color+
-    ';padding-bottom:4px;border-bottom:2px solid '+color+';margin-bottom:4px">'+emoji+' '+label+' · '+count+'</div>';
-
-  let out = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 14px">';
-
-  // Counter column
-  out += '<div>';
-  out += colHdr('🟦','Counter', counter.length, 'var(--acc)');
-  out += counter.map(([pid,e])=>personRow(pid,e)).join('');
-  out += '</div>';
-
-  // Exit + Mgmt column
-  out += '<div>';
-  out += colHdr('🟩','Exit', exitB.length, 'var(--green)');
-  out += exitB.map(([pid,e])=>personRow(pid,e)).join('');
-
-  if (mgmtList.length) {
-    out += '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;'
-      +'color:var(--txt3);padding:4px 0 3px;border-bottom:1px solid var(--bdr);margin:8px 0 4px">🎯 Mgmt</div>';
-    out += mgmtList.map(([pid,entry,station])=>{
-      // For management show their assigned station
-      const pos = station && station !== 'Counter Manager'
-        ? {label: station.replace(' Manager','').replace(' Mgr',''), color:'var(--txt3)'}
-        : station === 'Counter Manager'
-          ? {label:'Ctr Mgr', color:'var(--txt3)'}
-          : null;
-      return personRow(pid, entry, pos);
-    }).join('');
+  function fmtHm(h) {
+    if (h==null) return '—';
+    const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;
+    return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;
   }
-  out += '</div>';
-  out += '</div>';
 
-  if (off.length) {
-    out += '<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--bdr);'
-      +'font-size:10px;color:var(--red)">❌ Off: '
-      + off.map(([pid,e])=>e.person.nick||e.person.name.split(' ')[0]).join(', ')
-      + '</div>';
+  function personChip(row) {
+    const zColors = {exit:'var(--green)',counter:'var(--acc)',emerald:'#6366f1',
+                     returns:'#06b6d4',lunch:'var(--amber)',mgmt:'var(--txt3)',off:'var(--txt3)'};
+    const col = zColors[row.zone]||'var(--txt3)';
+    const zLabel = {exit:'Exit',counter:'Ctr',emerald:'EB',returns:'Ret',lunch:'🍽',mgmt:'',off:''}[row.zone]||'';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;
+      opacity:${row.callout?'0.4':row.isNow?'1':'0.55'}">
+      <div style="width:6px;height:6px;border-radius:50%;background:${row.isNow?col:'var(--bdr2)'};flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <span style="font-size:11px;font-weight:${row.isNow?700:400};color:${row.callout?'var(--red)':row.isNow?'var(--txt)':'var(--txt3)'};
+          text-decoration:${row.callout?'line-through':'none'}">${row.nick}</span>
+        <span style="font-size:9px;color:var(--txt3);margin-left:4px;font-family:var(--ff-mono)">${row.shiftStr}</span>
+      </div>
+      ${row.isNow&&zLabel?`<span style="font-size:8px;font-weight:800;color:${col}">${zLabel}</span>`:''}
+    </div>`;
+  }
+
+  // Coverage rules for right now
+  const rules = typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(Math.floor(nowH),dow):{exitMin:1,counterMin:2};
+  const exitOk = zones.exit.length >= rules.exitMin;
+  const ctrOk  = zones.counter.length >= rules.counterMin;
+
+  let out = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+
+  // Exit column
+  out += `<div>
+    <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+      color:${exitOk?'var(--green)':'var(--red)'};padding-bottom:4px;
+      border-bottom:2px solid ${exitOk?'var(--green)':'var(--red)'};margin-bottom:4px">
+      🟩 Exit · ${zones.exit.length}/${rules.exitMin}
+    </div>`;
+  out += zones.exit.map(personChip).join('');
+  // Off-shift exit agents
+  zones.off.filter(r=>r.zone==='off'&&Object.values(exp).find(e=>normPid(e.person.name)===r.pid)?.person.role==='EXIT').forEach(r=>{
+    out += personChip({...r,isNow:false});
+  });
+  out += `</div>`;
+
+  // Counter + Mgmt column
+  out += `<div>
+    <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+      color:${ctrOk?'var(--acc)':'var(--amber)'};padding-bottom:4px;
+      border-bottom:2px solid ${ctrOk?'var(--acc)':'var(--amber)'};margin-bottom:4px">
+      🟦 Counter · ${zones.counter.length}/${rules.counterMin}
+    </div>`;
+  out += zones.counter.map(personChip).join('');
+
+  if (mgmt.length) {
+    out += `<div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+      color:var(--txt3);padding:4px 0 3px;border-bottom:1px solid var(--bdr);margin:6px 0 3px">Mgmt</div>`;
+    out += mgmt.map(r=>personChip({...r,zone:'mgmt'})).join('');
+  }
+  out += `</div>`;
+  out += `</div>`;
+
+  // Off/called out strip
+  const offPeople = Object.entries(exp)
+    .filter(([pid])=>callouts[pid]==='callout')
+    .map(([,e])=>e.person.nick||e.person.name.split(' ')[0]);
+  if (offPeople.length) {
+    out += `<div style="margin-top:6px;padding-top:5px;border-top:1px solid var(--bdr);
+      font-size:9px;color:var(--red)">❌ Called Off: ${offPeople.join(', ')}</div>`;
   }
 
   el.innerHTML = out;
-}
 
+  function normPid(name){return name.replace(/\s/g,'_');}
+}
 
 function showCLEmail(mode) {
   const type = mode === 'closing' ? 'closing' : 'opening';
@@ -8544,7 +8610,33 @@ function initSync() {
 
 var _adminUnlocked = false;
 var ADMIN_PIN_KEY  = 'cmh-admin-pin';
+var MOD_PIN_KEY    = 'cmh-mod-pin';
 var DEFAULT_PIN    = '2826';
+var DEFAULT_MOD_PIN= '1234';
+var _managerMode   = false;
+
+function getModPin()   { return localStorage.getItem(MOD_PIN_KEY)   || DEFAULT_MOD_PIN; }
+function isManagerMode(){ return _managerMode; }
+
+function unlockManagerMode(pin) {
+  if (pin === getModPin()) {
+    _managerMode = true;
+    toast('Manager Mode unlocked 🔓');
+    buildCoverageTimeline();
+    return true;
+  }
+  return false;
+}
+function lockManagerMode() {
+  _managerMode = false;
+  toast('Manager Mode locked 🔒');
+  buildCoverageTimeline();
+}
+function promptManagerMode() {
+  const pin = prompt('Enter Manager PIN:');
+  if (pin === null) return;
+  if (!unlockManagerMode(pin)) toast('Incorrect PIN');
+}
 
 function getAdminPin() {
   return localStorage.getItem(ADMIN_PIN_KEY) || DEFAULT_PIN;
@@ -8890,6 +8982,727 @@ function removeCode(code) {
 
 
 
+
+
+function buildCoverageTimeline() {
+  updateManagerModeUI();
+  const exp  = typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const dow  = new Date().getDay();
+  const nowH = new Date().getHours()+new Date().getMinutes()/60;
+  if (!Object.keys(exp).length) {
+    const tlEl=document.getElementById('coverage-timeline');
+    if(tlEl) tlEl.innerHTML='<div style="padding:12px;font-size:11px;color:var(--txt3)">No schedule loaded — confirm schedule from Opening Checklist</div>';
+    return;
+  }
+
+  const H_START=5, H_END=26;
+  const HOURS=Array.from({length:H_END-H_START},(_,i)=>H_START+i);
+  const hLbl=h=>{const hh=h%24,d=hh>12?hh-12:hh===0?12:hh,s=hh>=12?'p':'a';return d+s;};
+
+  function getZone(pid,person,h) {
+    const specs=(STATE.specialBlocks||{})[pid]||[];
+    for(const b of specs){if(h>=b.from&&h<b.to)return b.key;}
+    const mods=STATE.shiftMod||{},ov=mods[pid]||{};
+    const ss=ov.start!=null?ov.start:person.shiftStart;
+    const se=ov.end!=null?ov.end:person.shiftEnd;
+    if(ss==null||h<ss||h>=se)return'off';
+    if((STATE.todayOverrides||{})[pid]==='callout')return'off';
+    const rot=window._lastRotations&&window._lastRotations[pid];
+    if(rot){
+      if(rot.lunch&&h>=rot.lunch.from&&h<rot.lunch.to)return'lunch';
+      if(rot.b1&&h>=rot.b1.from&&h<rot.b1.to)return rot.b1.station==='exit'?'exit':'counter';
+      if(rot.b2&&h>=rot.b2.from&&h<=rot.b2.to)return rot.b2.station==='exit'?'exit':'counter';
+      // 3-block: check b3
+      if(rot.b3&&h>=rot.b3.from&&h<=rot.b3.to)return rot.b3.station==='exit'?'exit':'counter';
+      return'off';
+    }
+    const st=(STATE.staffStation||{})[pid];
+    if(person.role==='EXIT'||st==='Exit Booth')return'exit';
+    if(['ARM','BRM','ABRM','MT'].includes(person.role)){
+      if(st&&st.toLowerCase().includes('emerald'))return'emerald';
+      if(st&&st.toLowerCase().includes('return'))return'returns';
+      if(st==='Exit Booth')return'exit';
+      return'mgmt';
+    }
+    return'counter';
+  }
+
+  const zColor={counter:'var(--acc)',exit:'var(--green)',emerald:'#6366f1',
+    returns:'#06b6d4',lunch:'var(--amber)',shuttling:'#f59e0b',break:'#78716c',
+    training:'#8b5cf6',mgmt:'rgba(37,99,235,.35)',off:'transparent'};
+
+  const people=Object.entries(exp).sort((a,b)=>{
+    const ra=a[1].person.role,rb=b[1].person.role,mg=['ARM','BRM','ABRM','MT'];
+    if(ra==='EXIT'&&rb!=='EXIT')return -1;if(rb==='EXIT'&&ra!=='EXIT')return 1;
+    if(mg.includes(ra)&&!mg.includes(rb))return 1;if(mg.includes(rb)&&!mg.includes(ra))return -1;
+    return(a[1].person.shiftStart||99)-(b[1].person.shiftStart||99);
+  });
+
+  // ── Zone map ────────────────────────────────────────────────────────────────
+  const nowFloor=Math.floor(nowH);
+  const zones={exit:[],counter:[],emerald:[],returns:[]};
+  people.forEach(([pid,e])=>{
+    const z=getZone(pid,e.person,nowFloor),nick=e.person.nick||e.person.name.split(' ')[0];
+    if(z==='exit')zones.exit.push(nick);
+    else if(z==='emerald')zones.emerald.push(nick);
+    else if(z==='returns')zones.returns.push(nick);
+    else if(z==='counter'||z==='mgmt')zones.counter.push(nick);
+  });
+  const rules=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(nowFloor,dow):{exitMin:1,counterMin:2};
+  const exitOk=zones.exit.length>=rules.exitMin,ctrOk=zones.counter.length>=rules.counterMin;
+  const zEl=document.getElementById('zone-map');
+  if(zEl){
+    const zCard=(lbl,icon,names,ok,min)=>`<div style="background:var(--bg3);
+      border:1px solid ${ok?'rgba(52,211,153,.3)':'rgba(248,113,113,.4)'};border-radius:6px;padding:8px;
+      cursor:pointer" onclick="showTab('schedule')">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:${ok?'var(--green)':'var(--red)'};margin-bottom:4px">
+        ${icon} ${lbl} <span style="font-weight:400">${names.length}${min?'/'+min:''}</span>
+      </div>
+      <div style="font-size:10px;color:var(--txt2);line-height:1.5">${names.length?names.join(', '):'<span style="color:var(--red)">⚠ Empty</span>'}</div>
+    </div>`;
+    zEl.innerHTML=zCard('Exit','🟩',zones.exit,exitOk,rules.exitMin)+
+      zCard('Emerald','🌟',zones.emerald,true,1)+
+      zCard('Counter','🟦',zones.counter,ctrOk,rules.counterMin)+
+      zCard('Returns','↩',zones.returns,true,0);
+  }
+
+  // ── Coverage chart ──────────────────────────────────────────────────────────
+  const W=26;
+  const exitCts=HOURS.map(h=>people.filter(([pid,e])=>getZone(pid,e.person,h)==='exit').length);
+  const ctrCts =HOURS.map(h=>people.filter(([pid,e])=>{const z=getZone(pid,e.person,h);return z==='counter'||z==='mgmt';}).length);
+  const maxC=Math.max(...exitCts,...ctrCts,4);
+  const chEl=document.getElementById('coverage-chart');
+  if(chEl){
+    const barH=28;
+    let c=`<div style="position:relative;padding-left:40px">`;
+    c+=`<div style="display:flex;margin-bottom:1px">`;
+    HOURS.forEach(h=>{const isNow=Math.floor(nowH)===h%24;c+=`<div style="width:${W}px;flex-shrink:0;text-align:center;font-size:7px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:400}">${hLbl(h)}</div>`;});
+    c+=`</div>`;
+    c+=`<div style="position:absolute;left:0;top:10px;font-size:8px;font-weight:700;color:var(--green)">Exit</div>`;
+    c+=`<div style="display:flex;align-items:flex-end;height:${barH}px;margin-bottom:2px">`;
+    HOURS.forEach((h,i)=>{
+      const ct=exitCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow):{exitMin:1};
+      const pct=Math.min(100,ct/maxC*100);
+      const col=ct===0?'var(--red)':ct<r.exitMin?'var(--amber)':'var(--green)';
+      c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
+    });
+    c+=`</div>`;
+    c+=`<div style="position:absolute;left:0;top:${10+barH+2}px;font-size:8px;font-weight:700;color:var(--acc)">Ctr</div>`;
+    c+=`<div style="display:flex;align-items:flex-end;height:${barH}px">`;
+    HOURS.forEach((h,i)=>{
+      const ct=ctrCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow):{counterMin:2};
+      const pct=Math.min(100,ct/maxC*100);
+      const col=ct===0?'transparent':ct<r.counterMin?'var(--amber)':'var(--acc)';
+      c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
+    });
+    c+=`</div></div>`;
+    chEl.innerHTML=c;
+  }
+
+  // ── Person timeline bars ────────────────────────────────────────────────────
+  const tlEl=document.getElementById('coverage-timeline');
+  if(!tlEl)return;
+  const totalW=46+HOURS.length*W;
+  let htm=`<div style="min-width:${totalW}px">`;
+
+  // Gap row
+  const hasGap=HOURS.some((h,i)=>{
+    const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow):{exitMin:1,counterMin:2};
+    return exitCts[i]<r.exitMin;
+  });
+  if(hasGap){
+    htm+=`<div style="display:flex;margin-bottom:3px">`;
+    htm+=`<div style="width:46px;flex-shrink:0;font-size:8px;color:var(--red);text-align:right;padding-right:4px;line-height:14px">⚠ gap</div>`;
+    HOURS.forEach((h,i)=>{
+      const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow):{exitMin:1};
+      const eg=exitCts[i]<r.exitMin;
+      htm+=`<div style="width:${W}px;flex-shrink:0;height:14px;background:${eg?'rgba(248,113,113,.25)':'transparent'};border-radius:2px"></div>`;
+    });
+    htm+=`</div>`;
+  }
+
+  // Person rows — the bar IS the control
+  people.forEach(([pid,entry])=>{
+    const p=entry.person,nick=p.nick||p.name.split(' ')[0];
+    const isMgmt=['ARM','BRM','ABRM','MT'].includes(p.role);
+    const isOff=(STATE.todayOverrides||{})[pid]==='callout';
+    const cells=HOURS.map(h=>getZone(pid,p,h));
+    const onShift=cells.some(z=>z!=='off');
+    if(!onShift&&isMgmt)return; // hide off-shift mgmt to reduce clutter
+
+    htm+=`<div style="display:flex;align-items:center;margin-bottom:2px;cursor:pointer"
+      onclick="openPersonPanel('${pid}')">`;
+    htm+=`<div style="width:46px;flex-shrink:0;font-size:10px;
+      font-weight:${isMgmt?400:700};
+      color:${isOff?'var(--red)':isMgmt?'var(--txt3)':'var(--txt)'};
+      text-align:right;padding-right:5px;
+      text-decoration:${isOff?'line-through':'none'};
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nick}</div>`;
+
+    let i=0;
+    while(i<cells.length){
+      const z=cells[i];let j=i+1;
+      while(j<cells.length&&cells[j]===z)j++;
+      const spanW=(j-i)*W,col=zColor[z]||'transparent';
+      const isNowBlock=nowH>=HOURS[i]&&nowH<(HOURS[Math.min(j,cells.length-1)]+1);
+      if(z==='off'){
+        htm+=`<div style="width:${spanW}px;flex-shrink:0;height:22px;
+          border-bottom:1px solid rgba(255,255,255,.03)"></div>`;
+      } else {
+        const lbl=z==='counter'?'Ctr':z==='exit'?'Exit':z==='emerald'?'EB':
+                   z==='returns'?'Ret':z==='lunch'?'🍽':z==='mgmt'?'':
+                   z.charAt(0).toUpperCase()+z.slice(1);
+        htm+=`<div style="width:${spanW}px;flex-shrink:0;height:22px;padding:0 1px">
+          <div style="width:100%;height:18px;margin-top:2px;
+            background:${col};border-radius:4px;
+            display:flex;align-items:center;justify-content:center;
+            font-size:${(j-i)>2?'9':'8'}px;font-weight:700;color:#fff;opacity:.9;
+            ${isNowBlock?'box-shadow:0 0 0 2px white;':''}"
+            title="${nick}: ${z} ${hLbl(HOURS[i])}–${hLbl(HOURS[Math.min(j,cells.length-1)]+1)}">
+            ${(j-i)>1?lbl:''}
+          </div>
+        </div>`;
+      }
+      i=j;
+    }
+    htm+=`</div>`;
+  });
+  htm+=`</div>`;
+  tlEl.innerHTML=htm;
+}
+
+function saveCoverageSnapshot() {
+  _coverageHistory.push(JSON.stringify({staffStation:STATE.staffStation,altSchedule:STATE.altSchedule,shiftMod:STATE.shiftMod,customSplits:STATE.customSplits,specialBlocks:STATE.specialBlocks}));
+  if(_coverageHistory.length>20)_coverageHistory.shift();
+  _coverageRedoStack=[];
+}
+var _coverageHistory=[], _coverageRedoStack=[];
+function undoCoverage() {
+  if(!_coverageHistory.length){toast('Nothing to undo');return;}
+  const redoSnap=JSON.stringify({staffStation:STATE.staffStation,altSchedule:STATE.altSchedule,shiftMod:STATE.shiftMod,customSplits:STATE.customSplits,specialBlocks:STATE.specialBlocks});
+  _coverageRedoStack.push(redoSnap);
+  const undoSnap=_coverageHistory.pop();
+  if(!undoSnap){toast('Nothing to undo');return;}
+  try{Object.assign(STATE,JSON.parse(undoSnap));}catch(e){toast('Undo failed');return;}
+  buildCoverageTimeline();buildSwitchboard();toast('Undone ↩');
+}
+function redoCoverage() {
+  if(!_coverageRedoStack.length){toast('Nothing to redo');return;}
+  const snap=_coverageRedoStack.pop();
+  if(!snap){toast('Nothing to redo');return;}
+  saveCoverageSnapshot();
+  try{Object.assign(STATE,JSON.parse(snap));}catch(e){toast('Redo failed');return;}
+  buildCoverageTimeline();buildSwitchboard();toast('Redone ↪');
+}
+function showWhatif(pid) {
+  const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const entry=exp[pid];if(!entry)return;
+  const p=entry.person,nick=p.nick||p.name.split(' ')[0];
+  const mods=STATE.shiftMod||{},ov=mods[pid]||{};
+  const se=ov.end!=null?ov.end:p.shiftEnd;
+  const ss=ov.start!=null?ov.start:p.shiftStart;
+  const panel=document.getElementById('whatif-panel'),nameEl=document.getElementById('whatif-name'),bodyEl=document.getElementById('whatif-body');
+  if(!panel)return;
+  if(nameEl)nameEl.textContent=nick;
+  const fmtH=h=>{if(h==null)return'—';const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
+  const dow=new Date().getDay();
+  function gapMsg(newEnd) {
+    const gaps=[];
+    for(let h=Math.floor(newEnd);h<Math.ceil(se||0);h++){
+      const z=getZoneForWhatif(pid,p,h);
+      if(z!=='off'&&z!=='lunch'){
+        const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h,dow):{exitMin:1};
+        gaps.push(fmtH(h));
+      }
+    }
+    return gaps.length?'⚠ Creates gap at '+gaps.slice(0,3).join(', '):'✅ Coverage maintained';
+  }
+  function getZoneForWhatif(pid,person,h){
+    const mods2=STATE.shiftMod||{},ov2=mods2[pid]||{};
+    const ss2=ov2.start!=null?ov2.start:person.shiftStart;
+    if(ss2==null||h<ss2||h>=newEndLocal)return'off';
+    const rot=window._lastRotations&&window._lastRotations[pid];
+    if(rot){if(rot.lunch&&h>=rot.lunch.from&&h<rot.lunch.to)return'lunch';if(rot.b1&&h>=rot.b1.from&&h<rot.b1.to)return rot.b1.station==='exit'?'exit':'counter';if(rot.b2&&h>=rot.b2.from&&h<=rot.b2.to)return rot.b2.station==='exit'?'exit':'counter';return'off';}
+    const st=(STATE.staffStation||{})[pid];return st==='Exit Booth'?'exit':'counter';
+  }
+  var newEndLocal=se;
+  let body='<div style="display:grid;gap:10px">';
+  // Special assignments
+  body+=`<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Assign to...</div><div style="display:flex;gap:5px;flex-wrap:wrap">`;
+  (SPECIAL_ASSIGNMENTS||[]).forEach(sa=>{body+=`<button onclick="addSpecialBlock('${pid}','${sa.key}')" style="padding:5px 9px;border-radius:4px;border:1px solid ${sa.color}44;background:${sa.color}18;color:${sa.color};font-size:10px;font-weight:700;cursor:pointer">${sa.icon} ${sa.label}</button>`;});
+  body+=`</div></div>`;
+  // Move station
+  body+=`<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Move Station</div><div style="display:flex;gap:6px">
+    <button onclick="setStation('${pid}','Counter');closeWhatif();buildCoverageTimeline();buildSwitchboard()" style="flex:1;padding:7px;border-radius:4px;border:1px solid var(--acc)44;background:rgba(37,99,235,.1);color:var(--acc);font-size:11px;font-weight:700;cursor:pointer">🟦 Counter</button>
+    <button onclick="setStation('${pid}','Exit Booth');closeWhatif();buildCoverageTimeline();buildSwitchboard()" style="flex:1;padding:7px;border-radius:4px;border:1px solid var(--green)44;background:rgba(52,211,153,.1);color:var(--green);font-size:11px;font-weight:700;cursor:pointer">🟩 Exit</button>
+  </div></div>`;
+  // Early out
+  if(se){
+    body+=`<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Simulate Early Out</div>`;
+    [-2,-1.5,-1,-0.5].forEach(d=>{
+      const ne=se+d;if(ne<=(ss||0)+2)return;
+      newEndLocal=ne;
+      const msg=gapMsg(ne);
+      body+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr)">
+        <button onclick="applyEarlyOut('${pid}',${ne})" style="padding:4px 10px;border-radius:4px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:11px;cursor:pointer;flex-shrink:0">End ${fmtH(ne)}</button>
+        <div style="font-size:10px;color:${msg.startsWith('✅')?'var(--green)':'var(--amber)'}">${msg}</div>
+      </div>`;
+    });
+    body+=`</div>`;
+  }
+  body+=`</div>`;
+  if(bodyEl)bodyEl.innerHTML=body;
+  panel.style.display='block';
+}
+function closeWhatif(){const p=document.getElementById('whatif-panel');if(p)p.style.display='none';}
+function applyEarlyOut(pid,newEnd){
+  saveCoverageSnapshot();
+  if(!STATE.shiftMod)STATE.shiftMod={};
+  const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const person=exp[pid]&&exp[pid].person;
+  if(!STATE.shiftMod[pid])STATE.shiftMod[pid]={};
+  STATE.shiftMod[pid].end=newEnd;
+  if(!STATE.shiftMod[pid].start&&person)STATE.shiftMod[pid].start=person.shiftStart;
+  const fmtH=h=>{if(h==null)return'—';const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
+  STATE.shiftMod[pid].display=fmtH(STATE.shiftMod[pid].start)+'–'+fmtH(newEnd)+' (early out)';
+  STATE.shiftMod[pid].reason='early-out';
+  saveState();closeWhatif();buildCoverageTimeline();buildSwitchboard();
+  toast(((person&&person.nick)||pid)+' early out at '+fmtH(newEnd));
+}
+function addSpecialBlock(pid,key){
+  const sa=(SPECIAL_ASSIGNMENTS||[]).find(s=>s.key===key);if(!sa)return;
+  const nowH=new Date().getHours()+new Date().getMinutes()/60;
+  const from=Math.round(nowH*2)/2,to=from+1;
+  saveCoverageSnapshot();
+  if(!STATE.specialBlocks)STATE.specialBlocks={};
+  if(!STATE.specialBlocks[pid])STATE.specialBlocks[pid]=[];
+  STATE.specialBlocks[pid].push({key,label:sa.label,icon:sa.icon,from,to});
+  saveState();closeWhatif();buildCoverageTimeline();
+  const fmtH=h=>{const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
+  toast(sa.icon+' '+sa.label+' '+fmtH(from)+'–'+fmtH(to));
+}
+function suggestLunches(){
+  const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  if(!Object.keys(exp).length){toast('Confirm schedule first');return;}
+  const workers=Object.entries(exp).filter(([pid,e])=>!['ARM','BRM','ABRM','MT'].includes(e.person.role)&&(STATE.todayOverrides||{})[pid]!=='callout')
+    .map(([pid,e])=>{
+      const p=e.person,mods=STATE.shiftMod||{},ov=mods[pid]||{};
+      const ss=ov.start!=null?ov.start:p.shiftStart,se=ov.end!=null?ov.end:p.shiftEnd;
+      const mid=(ss+se)/2;
+      const st=(STATE.staffStation||{})[pid];
+      const exitOpener=(st==='Exit Booth'||p.role==='EXIT')&&ss<8;
+      const ctrOpener=st==='Counter'&&ss<8;
+      const target=exitOpener?9.5:ctrOpener?Math.max(10,mid):mid;
+      return{pid,nick:p.nick||p.name.split(' ')[0],ss,se,target};
+    }).sort((a,b)=>a.target-b.target);
+  const assigned=[];
+  workers.forEach(w=>{
+    let t=w.target,attempts=0;
+    while(attempts<8){const conflict=assigned.filter(a=>Math.abs(a.t-t)<0.5).length>=2;if(!conflict)break;t+=0.5;attempts++;}
+    assigned.push({...w,t});
+  });
+  saveCoverageSnapshot();
+  if(!STATE.specialBlocks)STATE.specialBlocks={};
+  assigned.forEach(({pid,t})=>{
+    STATE.specialBlocks[pid]=(STATE.specialBlocks[pid]||[]).filter(b=>b.key!=='lunch-slot');
+    STATE.specialBlocks[pid].push({key:'lunch',label:'Lunch',icon:'🍽',from:t,to:t+0.5});
+  });
+  saveState();buildCoverageTimeline();
+  const fmtH=h=>{const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
+  toast('Lunches: '+assigned.map(a=>a.nick+' '+fmtH(a.t)).join(' · ').slice(0,80));
+}
+
+
+function changeModPin() {
+  const cur  = document.getElementById('mod-pin-current');
+  const nw   = document.getElementById('mod-pin-new');
+  const conf = document.getElementById('mod-pin-confirm');
+  const msg  = document.getElementById('mod-pin-msg');
+  if (!cur||!nw||!conf) return;
+  if (cur.value !== getModPin()) {
+    if(msg){msg.textContent='Current MOD PIN incorrect';msg.style.color='var(--red)';}
+    return;
+  }
+  if (nw.value.length < 4) {
+    if(msg){msg.textContent='PIN must be at least 4 digits';msg.style.color='var(--red)';}
+    return;
+  }
+  if (nw.value !== conf.value) {
+    if(msg){msg.textContent='PINs do not match';msg.style.color='var(--red)';}
+    return;
+  }
+  localStorage.setItem(MOD_PIN_KEY, nw.value);
+  cur.value=''; nw.value=''; conf.value='';
+  if(msg){msg.textContent='✓ MOD PIN updated';msg.style.color='var(--green)';}
+}
+
+function toggleManagerModePrompt() {
+  if (_managerMode) {
+    lockManagerMode();
+    updateManagerModeUI();
+    return;
+  }
+  // Use inline modal instead of prompt() (prompt blocked on some corporate browsers)
+  openModal('🔓 Manager Mode', `
+    <div style="display:grid;gap:12px">
+      <div style="font-size:12px;color:var(--txt3)">Enter Manager (MOD) PIN to unlock daily controls.</div>
+      <input id="mod-pin-entry" type="password" inputmode="numeric" maxlength="6"
+        placeholder="PIN"
+        style="width:100%;padding:12px;text-align:center;font-size:24px;font-weight:700;
+          background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;
+          color:var(--txt);font-family:var(--ff-mono);letter-spacing:4px"
+        onkeydown="if(event.key==='Enter')applyModPin()">
+      <div id="mod-pin-entry-error" style="color:var(--red);font-size:11px;min-height:14px"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-g" style="flex:1" onclick="applyModPin()">Unlock</button>
+        <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+      </div>
+      <div style="font-size:10px;color:var(--txt3);text-align:center">Default MOD PIN: 1234</div>
+    </div>
+  `);
+  setTimeout(()=>{const el=document.getElementById('mod-pin-entry');if(el)el.focus();},100);
+}
+
+function applyModPin() {
+  const input = document.getElementById('mod-pin-entry');
+  const err   = document.getElementById('mod-pin-entry-error');
+  if (!input) return;
+  if (unlockManagerMode(input.value)) {
+    closeModal();
+    updateManagerModeUI();
+  } else {
+    if (err) err.textContent = 'Incorrect PIN — try again';
+    input.value = '';
+    input.focus();
+  }
+}
+
+function updateManagerModeUI() {
+  const bar = document.getElementById('mgr-mode-bar');
+  const status = document.getElementById('mgr-mode-status');
+  const btn    = document.getElementById('mgr-mode-btn');
+  const actBar = document.getElementById('cov-action-bar');
+  if (_managerMode) {
+    if (bar)    bar.style.borderColor    = 'var(--green)';
+    if (status) { status.textContent = '🔓 Manager Mode'; status.style.color = 'var(--green)'; }
+    if (btn)    { btn.textContent = 'Lock'; btn.style.color = 'var(--green)'; btn.style.borderColor = 'var(--green)'; }
+    if (actBar) actBar.style.display = 'flex';
+  } else {
+    if (bar)    bar.style.borderColor    = 'var(--bdr)';
+    if (status) { status.textContent = '🔒 View Mode'; status.style.color = 'var(--txt3)'; }
+    if (btn)    { btn.textContent = 'Unlock'; btn.style.color = 'var(--txt3)'; btn.style.borderColor = 'var(--bdr2)'; }
+    if (actBar) actBar.style.display = 'none';
+  }
+}
+
+function openPersonPanel(pid) {
+  const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const entry = exp[pid]; if(!entry)return;
+  const p = entry.person;
+  const nick = p.nick||p.name.split(' ')[0];
+  const mods = STATE.shiftMod||{}, ov=mods[pid]||{};
+  const ss = ov.start!=null?ov.start:p.shiftStart;
+  const se = ov.end!=null?ov.end:p.shiftEnd;
+  const dow = new Date().getDay();
+  const nowH= new Date().getHours()+new Date().getMinutes()/60;
+
+  const panel = document.getElementById('person-panel');
+  if(!panel)return;
+
+  const fmtH=h=>{if(h==null)return'—';const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
+
+  // Name + shift
+  const nameEl=document.getElementById('pp-name'),shiftEl=document.getElementById('pp-shift');
+  if(nameEl) nameEl.textContent=nick;
+  if(shiftEl) shiftEl.textContent=fmtH(ss)+'–'+fmtH(se)+(ov.reason?' ('+ov.reason+')':'');
+
+  // ── Assignment summary ──────────────────────────────────────────────────────
+  const rot=window._lastRotations&&window._lastRotations[pid];
+  let sumHtml='';
+  if(rot){
+    const blocks=[];
+    if(rot.b1)blocks.push({z:rot.b1.station==='exit'?'exit':'counter',from:rot.b1.from,to:rot.lunch?rot.lunch.from:rot.b1.to});
+    if(rot.lunch)blocks.push({z:'lunch',from:rot.lunch.from,to:rot.lunch.to});
+    if(rot.b2)blocks.push({z:rot.b2.station==='exit'?'exit':'counter',from:rot.lunch?rot.lunch.to:rot.b2.from,to:rot.b2.to});
+    if(rot.b3)blocks.push({z:rot.b3.station==='exit'?'exit':'counter',from:rot.b3.from,to:rot.b3.to});
+    const colMap={counter:'var(--acc)',exit:'var(--green)',lunch:'var(--amber)'};
+    const lblMap={counter:'🟦 Counter',exit:'🟩 Exit',lunch:'🍽 Lunch'};
+    // Find current block
+    sumHtml='<div style="display:flex;flex-direction:column;gap:4px">';
+    blocks.forEach(b=>{
+      const isCurrent=nowH>=b.from&&nowH<b.to;
+      sumHtml+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;
+        border-radius:6px;background:${isCurrent?'rgba(255,255,255,.06)':'transparent'};
+        border:1px solid ${isCurrent?'rgba(255,255,255,.15)':'transparent'}">
+        <span style="font-size:12px;color:${colMap[b.z]||'var(--txt3)'};font-weight:700;min-width:80px">${lblMap[b.z]||b.z}</span>
+        <span style="font-size:11px;color:var(--txt3);font-family:var(--ff-mono)">${fmtH(b.from)} → ${fmtH(b.to)}</span>
+        ${isCurrent?'<span style="font-size:9px;color:var(--acc);margin-left:auto;font-weight:700">NOW</span>':''}
+      </div>`;
+    });
+    sumHtml+='</div>';
+  } else {
+    const st=(STATE.staffStation||{})[pid]||'—';
+    const z=st==='Exit Booth'?'exit':st==='Counter'?'counter':'other';
+    const col=z==='exit'?'var(--green)':z==='counter'?'var(--acc)':'var(--txt3)';
+    sumHtml=`<div style="font-size:13px;font-weight:700;color:${col};padding:8px 0">${st}</div>`;
+  }
+  const sumEl=document.getElementById('pp-summary');
+  if(sumEl)sumEl.innerHTML=sumHtml;
+
+  // ── Exit fairness ───────────────────────────────────────────────────────────
+  const fairEl=document.getElementById('pp-fairness');
+  if(fairEl){
+    const exitH=getExitHoursToday(pid);
+    const weekH=getExitHoursWeek(pid);
+    const teamAvg=getTeamExitAvgWeek();
+    if(exitH>0||weekH>0){
+      fairEl.innerHTML=`<div style="padding:8px;background:var(--bg3);border-radius:6px;
+        font-size:10px;color:var(--txt3)">
+        <span style="color:var(--green);font-weight:700">Exit today: ${exitH.toFixed(1)}h</span>
+        ${weekH?` · This week: ${weekH.toFixed(1)}h`:''}
+        ${teamAvg?` · Team avg: ${teamAvg.toFixed(1)}h/wk`:''}
+      </div>`;
+    } else {
+      fairEl.innerHTML='';
+    }
+  }
+
+  // ── What if…? ───────────────────────────────────────────────────────────────
+  const wiEl=document.getElementById('pp-whatif-section');
+  if(wiEl){
+    wiEl.innerHTML=`<button onclick="openWhatifFor('${pid}')"
+      style="width:100%;padding:10px;border-radius:8px;
+        border:1px solid var(--bdr2);background:var(--bg3);
+        color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;
+        text-align:left">
+      What if…? →
+    </button>`;
+  }
+
+  // ── Manager controls ────────────────────────────────────────────────────────
+  const mgrEl=document.getElementById('pp-mgr-controls');
+  if(mgrEl){
+    if(_managerMode){
+      mgrEl.style.display='block';
+      mgrEl.innerHTML=buildManagerControls(pid,p,ss,se,fmtH);
+    } else {
+      mgrEl.style.display='none';
+    }
+  }
+
+  panel.style.display='block';
+}
+
+function buildManagerControls(pid,person,ss,se,fmtH) {
+  const altPos=(STATE.altSchedule||{})[pid]||'normal';
+  const noLunch=(STATE.altSchedule||{})[pid+'_nolunch']===true;
+  const station=(STATE.staffStation||{})[pid]||'';
+  const isExit=person.role==='EXIT';
+
+  let h=`<div style="border-top:1px solid var(--bdr);padding-top:12px;margin-top:4px">
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+      color:var(--txt3);margin-bottom:8px">Manager Controls</div>`;
+
+  if(!isExit){
+    // Station
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+      <button onclick="setStation('${pid}','Counter');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
+        style="padding:8px;border-radius:6px;border:1px solid;font-size:12px;font-weight:700;cursor:pointer;
+          background:${station==='Counter'?'rgba(37,99,235,.15)':'var(--bg3)'};
+          border-color:${station==='Counter'?'var(--acc)':'var(--bdr2)'};
+          color:${station==='Counter'?'var(--acc)':'var(--txt3)'}">🟦 Counter</button>
+      <button onclick="setStation('${pid}','Exit Booth');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
+        style="padding:8px;border-radius:6px;border:1px solid;font-size:12px;font-weight:700;cursor:pointer;
+          background:${station==='Exit Booth'?'rgba(52,211,153,.15)':'var(--bg3)'};
+          border-color:${station==='Exit Booth'?'var(--green)':'var(--bdr2)'};
+          color:${station==='Exit Booth'?'var(--green)':'var(--txt3)'}">🟩 Exit</button>
+    </div>`;
+    // Rotation
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px">`;
+    [['normal','4hr Split','var(--acc)'],['full-counter','Full Ctr','var(--acc)'],['full-exit','Full Exit','var(--green)']].forEach(([key,lbl,col])=>{
+      const on=altPos===key;
+      h+=`<button onclick="setAltPosition('${pid}','${key}');openPersonPanel('${pid}')"
+        style="padding:6px 4px;border-radius:4px;border:1px solid;font-size:10px;font-weight:600;cursor:pointer;
+          background:${on?'rgba(37,99,235,.1)':'var(--bg3)'};
+          border-color:${on?col:'var(--bdr2)'};color:${on?col:'var(--txt3)'}">
+        ${lbl}</button>`;
+    });
+    h+=`</div>`;
+    // Split adjuster
+    h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;
+      padding:6px 10px;background:var(--bg3);border-radius:6px">
+      <button onclick="adjustSplit('${pid}',-30);openPersonPanel('${pid}')"
+        style="width:32px;height:28px;border-radius:4px;border:1px solid var(--bdr2);
+          background:var(--bg2);color:var(--txt2);font-size:16px;cursor:pointer;line-height:1">−</button>
+      <div id="split-disp-${pid}" style="flex:1;text-align:center;font-size:10px;color:var(--txt2)">4h / 4h</div>
+      <button onclick="adjustSplit('${pid}',30);openPersonPanel('${pid}')"
+        style="width:32px;height:28px;border-radius:4px;border:1px solid var(--bdr2);
+          background:var(--bg2);color:var(--txt2);font-size:16px;cursor:pointer;line-height:1">+</button>
+    </div>`;
+    // Special assignments
+    h+=`<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">`;
+    (SPECIAL_ASSIGNMENTS||[]).forEach(sa=>{
+      h+=`<button onclick="addSpecialBlock('${pid}','${sa.key}');openPersonPanel('${pid}')"
+        style="padding:4px 8px;border-radius:4px;border:1px solid ${sa.color}44;
+          background:${sa.color}18;color:${sa.color};font-size:10px;font-weight:700;cursor:pointer">
+        ${sa.icon} ${sa.label}</button>`;
+    });
+    h+=`</div>`;
+  }
+
+  // Shift time edit + no lunch
+  h+=`<div style="display:flex;gap:6px;margin-bottom:8px">
+    <button onclick="showTimeEditModal('${pid}','${person.nick||person.name.split(' ')[0]}')"
+      style="flex:1;padding:6px;border-radius:4px;border:1px solid var(--bdr2);
+        background:var(--bg3);color:var(--txt3);font-size:10px;font-weight:600;cursor:pointer">
+      ⏰ Edit Shift Time
+    </button>
+    <button onclick="toggleNoLunch('${pid}');openPersonPanel('${pid}')"
+      style="padding:6px 10px;border-radius:4px;border:1px solid;font-size:10px;font-weight:600;cursor:pointer;
+        background:${noLunch?'rgba(217,119,6,.1)':'var(--bg3)'};
+        border-color:${noLunch?'var(--amber)':'var(--bdr2)'};
+        color:${noLunch?'var(--amber)':'var(--txt3)'}">
+      🍽 ${noLunch?'No Lunch ✓':'Lunch?'}
+    </button>
+  </div>`;
+
+  // Called off toggle
+  const isCallout=(STATE.todayOverrides||{})[pid]==='callout';
+  h+=`<button onclick="toggleCallout('${pid}');buildCoverageTimeline();closePersonPanel()"
+    style="width:100%;padding:7px;border-radius:6px;border:1px solid;font-size:11px;font-weight:700;cursor:pointer;
+      background:${isCallout?'rgba(248,113,113,.1)':'var(--bg3)'};
+      border-color:${isCallout?'var(--red)':'var(--bdr2)'};
+      color:${isCallout?'var(--red)':'var(--txt3)'}">
+    ${isCallout?'❌ Called Off — Tap to Reinstate':'Mark Called Off'}
+  </button>`;
+
+  h+=`</div>`;
+  return h;
+}
+
+function closePersonPanel() {
+  const p=document.getElementById('person-panel');
+  if(p)p.style.display='none';
+}
+
+function openWhatifFor(pid) {
+  const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const entry=exp[pid];if(!entry)return;
+  const p=entry.person,nick=p.nick||p.name.split(' ')[0];
+  const mods=STATE.shiftMod||{},ov=mods[pid]||{};
+  const se=ov.end!=null?ov.end:p.shiftEnd;
+  const ss=ov.start!=null?ov.start:p.shiftStart;
+  const dow=new Date().getDay();
+  const fmtH=h=>{if(h==null)return'—';const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
+
+  function simGap(newEnd){
+    const gaps=[];
+    for(let h=Math.floor(newEnd);h<Math.ceil(se||0);h++){
+      const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h,dow):{exitMin:1};
+      const exitNow=Object.entries(exp).filter(([xpid,e])=>{
+        if(xpid===pid)return false;
+        const rot=window._lastRotations&&window._lastRotations[xpid];
+        if(rot){return rot.b1&&h>=rot.b1.from&&h<rot.b1.to&&rot.b1.station==='exit'||rot.b2&&h>=rot.b2.from&&h<=rot.b2.to&&rot.b2.station==='exit';}
+        return(STATE.staffStation||{})[xpid]==='Exit Booth';
+      }).length;
+      if(exitNow<r.exitMin)gaps.push(fmtH(h));
+    }
+    return gaps;
+  }
+
+  openModal('What if…? — '+nick,
+    `<div style="display:grid;gap:10px">
+      <div style="font-size:12px;color:var(--txt3)">
+        Simulate changes to see the coverage impact — nothing applies until you confirm.
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;
+          text-transform:uppercase;letter-spacing:.06em">What if they leave early?</div>
+        ${[-2,-1.5,-1,-0.5].map(d=>{
+          const ne=(se||0)+d;
+          if(ne<=(ss||0)+2)return'';
+          const gaps=simGap(ne);
+          const hasGap=gaps.length>0;
+          return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr)">
+            <div style="flex:1">
+              <div style="font-size:12px;color:var(--txt);font-weight:600">Leave at ${fmtH(ne)}</div>
+              <div style="font-size:10px;color:${hasGap?'var(--amber)':'var(--green)'}">
+                ${hasGap?'⚠ Exit gap at '+gaps.slice(0,3).join(', '):'✅ Coverage maintained'}
+              </div>
+            </div>
+            ${_managerMode?`<button onclick="applyEarlyOut('${pid}',${ne});closeModal();buildCoverageTimeline()"
+              style="padding:5px 12px;border-radius:4px;border:1px solid var(--bdr2);
+                background:var(--bg3);color:var(--txt);font-size:11px;cursor:pointer">
+              Apply
+            </button>`:'<span style="font-size:9px;color:var(--txt3)">View only</span>'}
+          </div>`;
+        }).join('')}
+      </div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;
+          text-transform:uppercase;letter-spacing:.06em">What if they skip lunch?</div>
+        ${(()=>{
+          const rot=window._lastRotations&&window._lastRotations[pid];
+          if(!rot||!rot.lunch)return'<div style="font-size:11px;color:var(--txt3)">No lunch scheduled</div>';
+          const lh=rot.lunch.from,gaps=simGap(lh);
+          return`<div style="font-size:11px;color:${gaps.length?'var(--amber)':'var(--green)'}">
+            ${gaps.length?'⚠ Skipping lunch shifts coverage at '+gaps.join(', '):'✅ Coverage maintained without lunch'}
+          </div>`;
+        })()}
+      </div>
+      <button onclick="closeModal()" class="btn btn-gh" style="margin-top:4px">Close</button>
+    </div>`
+  );
+}
+
+// Exit fairness helpers
+function getExitHoursToday(pid) {
+  const rot=window._lastRotations&&window._lastRotations[pid];
+  if(!rot)return 0;
+  let h=0;
+  if(rot.b1&&rot.b1.station==='exit')h+=rot.b1.hours||0;
+  if(rot.b2&&rot.b2.station==='exit')h+=rot.b2.hours||0;
+  if(rot.b3&&rot.b3.station==='exit')h+=rot.b3.hours||0;
+  if(rot.fullShift==='exit')h=rot.shiftEnd-rot.shiftStart-(rot.lunch?0.5:0);
+  return Math.round(h*10)/10;
+}
+
+function getExitHoursWeek(pid) {
+  try {
+    const data=JSON.parse(localStorage.getItem('cmh-exit-fairness-v1')||'{}');
+    const week=getWeekKey();
+    return (data[week]&&data[week][pid])||0;
+  }catch(e){return 0;}
+}
+
+function getTeamExitAvgWeek() {
+  try {
+    const data=JSON.parse(localStorage.getItem('cmh-exit-fairness-v1')||'{}');
+    const week=getWeekKey();
+    const wData=data[week]||{};
+    const vals=Object.values(wData).filter(v=>v>0);
+    return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;
+  }catch(e){return 0;}
+}
+
+function saveExitFairnessForToday() {
+  try {
+    const week=getWeekKey();
+    const data=JSON.parse(localStorage.getItem('cmh-exit-fairness-v1')||'{}');
+    if(!data[week])data[week]={};
+    const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
+    Object.keys(exp).forEach(pid=>{
+      const person=exp[pid].person;
+      if(['ARM','BRM','ABRM','MT','EXIT'].includes(person.role))return;
+      const h=getExitHoursToday(pid);
+      if(h>0)data[week][pid]=(data[week][pid]||0)+h;
+    });
+    // Keep only last 8 weeks
+    const weeks=Object.keys(data).sort();
+    while(weeks.length>8){delete data[weeks.shift()];}
+    localStorage.setItem('cmh-exit-fairness-v1',JSON.stringify(data));
+  }catch(e){}
+}
 
 </script>
 </body>
