@@ -1425,19 +1425,19 @@ button { cursor: pointer; }
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
     <div class="card" onclick="showTab('schedule')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">👥 Today's Team</div>
-      <div style="font-size:12px">Opening: <b id="sum-open">—</b></div>
-      <div style="font-size:12px">Closing: <b id="sum-close">—</b></div>
+      <div style="font-size:12px;color:var(--txt)">Opening: <b id="sum-open" style="color:var(--green)">—</b></div>
+      <div style="font-size:12px;color:var(--txt)">Closing: <b id="sum-close" style="color:var(--acc)">—</b></div>
       <div style="font-size:10px;color:var(--acc);margin-top:4px" id="sum-staffcount">→ Schedule</div>
     </div>
     <div class="card" onclick="showTab('board')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">🚦 Availability</div>
-      <div style="font-size:12px">Walk-Ups: <b id="sum-wu2">—</b></div>
-      <div style="font-size:12px">Total Res: <b id="sum-totalres" style="color:var(--amber)">—</b></div>
+      <div style="font-size:12px;color:var(--txt)">Walk-Ups: <b id="sum-wu2" style="color:var(--green)">—</b></div>
+      <div style="font-size:12px;color:var(--txt)">Total Res: <b id="sum-totalres" style="color:var(--amber)">—</b></div>
       <div style="font-size:10px;color:var(--acc);margin-top:4px">→ Board</div>
     </div>
     <div class="card" onclick="showTab('paste')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">📊 Brand Totals</div>
-      <div id="sum-brands" style="font-size:11px;font-family:var(--ff-mono);color:var(--txt2)">Nat — · Ala — · Ent —</div>
+      <div id="sum-brands" style="font-size:11px;font-family:var(--ff-mono);color:var(--txt)">Nat — · Ala — · Ent —</div>
       <div style="font-size:10px;color:var(--acc);margin-top:4px">→ Paste Data</div>
     </div>
     <div class="card" onclick="showTab('checklist')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
@@ -1557,7 +1557,23 @@ button { cursor: pointer; }
   </div>
 
   <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
-    <div id="paste-overall-status" style="font-size:12px;color:var(--txt3)">0 of 4 completed</div>
+    
+    <!-- Step 5: Brand Totals -->
+    <div id="pstep-5" class="pstep">
+      <div class="pstep-head">
+        <div class="psn" id="psn5">5</div>
+        <div>
+          <div class="pstep-title">Brand Totals</div>
+          <div class="pstep-sub">Agent Sales Summary → select all rows including headers → Copy</div>
+        </div>
+        <button class="btn btn-g btn-sm" onclick="parseStep(5)">Parse ✓</button>
+      </div>
+      <textarea id="pa5" class="paste-ta" rows="4"
+        placeholder="Paste the Brands table (Alamo / Enterprise / National rows)..."></textarea>
+      <div id="pr5" class="pr" style="display:none"></div>
+    </div>
+
+<div id="paste-overall-status" style="font-size:12px;color:var(--txt3)">0 of 4 completed</div>
     <div class="row">
       <button class="btn btn-gh btn-sm" onclick="clearPaste()">Clear All</button>
       <button class="btn btn-p btn-lg" onclick="calcBoard();showTab('board')">→ View Live Board</button>
@@ -1639,6 +1655,16 @@ button { cursor: pointer; }
   </div>
 
 </div>
+  <!-- Hourly Flow Chart -->
+  <div class="card" style="margin-top:12px;padding:10px 12px">
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+      color:var(--txt3);margin-bottom:8px">📊 Hourly Flow — Reservations vs Returns</div>
+    <div id="hourly-flow-chart" style="min-height:60px">
+      <div style="font-size:11px;color:var(--txt3);font-style:italic">Paste data to see hourly flow</div>
+    </div>
+  </div>
+
+
 
 <!-- ═══════════════════════════════════════════════════════════════
      SCREEN: SCHEDULE
@@ -1671,7 +1697,7 @@ button { cursor: pointer; }
 
   <!-- Coverage action bar (manager mode only) -->
   <div id="cov-action-bar" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-    <button class="btn btn-g btn-sm" onclick="suggestLunches()">🍽 Auto Lunches</button>
+    <button class="btn btn-g btn-sm" onclick="autoSchedule()">📅 Auto Schedule</button>
     <button class="btn btn-gh btn-sm" onclick="undoCoverage()" title="Undo">↩ Undo</button>
     <button class="btn btn-gh btn-sm" onclick="redoCoverage()" title="Redo">↪ Redo</button>
     
@@ -1793,6 +1819,7 @@ button { cursor: pointer; }
         <button class="btn btn-g btn-sm" id="adm-tab-staff" onclick="showAdminSection('staff')">👥 Staff</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
+        <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
         <button class="btn btn-gh btn-sm" style="margin-left:auto;color:var(--red)" onclick="lockAdmin()">🔒 Lock</button>
       </div>
 
@@ -1802,6 +1829,21 @@ button { cursor: pointer; }
           <div class="ch">👥 Staff Roster
             <button class="btn btn-g btn-sm" style="margin-left:auto" onclick="showAddStaffModal()">+ Add Person</button>
           </div>
+  <!-- Print controls -->
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <button onclick="printChecklist(false)"
+      style="padding:8px 14px;border-radius:6px;border:1px solid var(--bdr2);
+        background:var(--bg3);color:var(--txt);font-size:12px;font-weight:700;cursor:pointer">
+      🖨 Print Current
+    </button>
+    <button onclick="printChecklist(true)"
+      style="padding:8px 14px;border-radius:6px;border:1px solid var(--bdr2);
+        background:var(--bg3);color:var(--txt);font-size:12px;font-weight:700;cursor:pointer">
+      📄 Print Blank
+    </button>
+  </div>
+
+
           <div id="adm-staff-list"></div>
         </div>
       </div>
@@ -2792,8 +2834,8 @@ function hourArrayToPeakStr(hourly, topN) {
 }
 
 function parseStep(stepNum) {
-  const idMap  = {1:'pa1',  2:'pa2',  3:'pa3',  4:'pa4'};
-  const keyMap = {1:'resAM',2:'resPM',3:'retAM',4:'retPM'};
+  const idMap  = {1:'pa1',  2:'pa2',  3:'pa3',  4:'pa4',  5:'pa5'};
+  const keyMap = {1:'resAM',2:'resPM',3:'retAM',4:'retPM',5:'brands'};
   const key    = keyMap[stepNum];
   const ta     = document.getElementById(idMap[stepNum]);
   const pr     = document.getElementById('pr'+stepNum);
@@ -2802,6 +2844,31 @@ function parseStep(stepNum) {
 
   // Use the new GL parser
   const text   = ta.value.trim();
+  // Step 5: brand section only
+  if (stepNum === 5) {
+    const brands = parseBrandSection(text);
+    if (!brands || !Object.keys(brands).length) {
+      if(pr){pr.textContent='⚠ No brand data found — paste the Alamo/Enterprise/National table';pr.style.color='var(--red)';pr.style.display='block';}
+      return;
+    }
+    STATE.pasteData = STATE.pasteData||{};
+    STATE.pasteData.brands = brands;
+    updateBrandTotalsDisplay();
+    saveState();
+    const ent=brands.enterprise||{},nat=brands.national||{},ala=brands.alamo||{},tot=brands.total||{};
+    if(pr){
+      pr.textContent=`✓ Ent ${ent.totalRes||0} · Nat ${nat.totalRes||0} · Ala ${ala.totalRes||0} · Total ${tot.totalRes||0} res`;
+      pr.style.color='var(--green)';pr.style.display='block';
+    }
+    if(ta){ta.style.borderColor='var(--green)';setTimeout(()=>{ta.style.borderColor='';},2000);}
+    const step5=document.getElementById('pstep-5');const num5=document.getElementById('psn5');
+    if(step5){step5.classList.add('done');step5.classList.remove('active');}
+    if(num5)num5.textContent='✓';
+    refreshDash();
+    toast(`Brands: Ent ${ent.totalRes||0} · Nat ${nat.totalRes||0} · Ala ${ala.totalRes||0}`);
+    return;
+  }
+
   const result = parseGLFull(text);
 
   if (!result || Object.keys(result.codes).length === 0) {
@@ -2820,15 +2887,21 @@ function parseStep(stepNum) {
     updateBrandTotalsDisplay();
   }
 
-  // Aggregate into groups for board
+  // Aggregate into groups for board — use total for res/ret counts
+  const isRet = stepNum >= 3;
   const groups = {};
+  const groupsRemaining = {};
   for (const [code, v] of Object.entries(result.codes)) {
     const grp = CODE_MAP[code];
-    if (grp) groups[grp] = (groups[grp]||0) + (v.remaining||0);
+    if (!grp) continue;
+    groups[grp]          = (groups[grp]||0)          + (v.total||0);
+    groupsRemaining[grp] = (groupsRemaining[grp]||0) + (v.remaining||0);
   }
   // Keep old format for board compatibility
-  const legacyKey = {1:'res-am',2:'res-pm',3:'ret-am',4:'ret-pm'}[stepNum];
+  const legacyKey = {1:'res-am',2:'res-pm',3:'ret-am',4:'ret-pm',5:'brands-legacy'}[stepNum];
   STATE.pasteData[legacyKey] = groups;
+  // Also store remaining for availability reference
+  STATE.pasteData[legacyKey+'-remaining'] = groupsRemaining;
 
   // Hourly totals for peak view
   if (!STATE.pasteHourly) STATE.pasteHourly = {};
@@ -2936,12 +3009,13 @@ function getGroupNetData() {
   const pd = STATE.pasteData || {};
   const result = {};
 
-  // Aggregate: Res = AM + PM, Ret = AM + PM
   GROUP_META.forEach(g => {
+    // Support both old format (group totals) and new format (code-level)
     const res = (pd['res-am']?.[g.name]||0) + (pd['res-pm']?.[g.name]||0);
     const ret = (pd['ret-am']?.[g.name]||0) + (pd['ret-pm']?.[g.name]||0);
     const net = ret - res;
-    result[g.name] = {res, ret, net, hasData: !!(res || ret)};
+    const has = !!(res || ret);
+    result[g.name] = {res, ret, net, has, hasData: has};
   });
   return result;
 }
@@ -3210,52 +3284,6 @@ function toast(msg) {
 //   Vada     VACA   VACA   9A-7P  OFF    530A   4P-C   OFF
 //   Ami      9A-7P  4P-C   OFF    ...
 // OR the simpler format: "Vada: 530A-330P"
-
-function parseSchedulePaste(text) {
-  const lines = text.split(/[\n\r]+/).filter(l => l.trim());
-  const result = {}; // name → {shift, status}
-
-  // Try "Name: ShiftCode" format first (simple daily format)
-  const simplePattern = /^([A-Za-z][\w\s()./-]+?)\s*[:\t]\s*([\w-]+(?:[\w\s()]+)?)$/;
-  let matchedSimple = 0;
-
-  lines.forEach(line => {
-    const m = line.trim().match(simplePattern);
-    if (!m) return;
-    const name = m[1].trim();
-    const shift = m[2].trim().toUpperCase();
-    const mgr = findMgrByName(name);
-    if (mgr) {
-      result[mgr.id] = { name: mgr.name, nick: mgr.nick, shift, status: classifyShift(shift) };
-      matchedSimple++;
-    }
-  });
-
-  if (matchedSimple > 0) return result;
-
-  // Try tab/space separated grid format
-  // First line = header row (dates or day names)
-  // Subsequent lines = name + shift values
-  if (lines.length < 2) return result;
-
-  const headerCols = lines[0].trim().split(/[\t]+|  +/);
-  const todayIdx = detectTodayColumn(headerCols);
-
-  lines.slice(1).forEach(line => {
-    const parts = line.trim().split(/[\t]+|  +/);
-    if (parts.length < 2) return;
-    const name = parts[0].trim();
-    const shift = todayIdx >= 0 && todayIdx < parts.length
-      ? parts[todayIdx].trim().toUpperCase()
-      : parts[1].trim().toUpperCase(); // fallback to first shift col
-    const mgr = findMgrByName(name);
-    if (mgr) {
-      result[mgr.id] = { name: mgr.name, nick: mgr.nick, shift, status: classifyShift(shift) };
-    }
-  });
-
-  return result;
-}
 
 function detectTodayColumn(cols) {
   const today = new Date();
@@ -8633,9 +8661,9 @@ function buildDashSchedMini() {
 
   // Row 1: Exit | Emerald | Counter
   out+=`<div style="display:grid;grid-template-columns:2fr 1fr 2fr;gap:5px;margin-bottom:6px">`;
-  out+=zoneCard('Exit','🟩',exitPeople,'var(--green)',rules.exitMin);
-  out+=zoneCard('Emerald','🌟',emeraldPeople,'#6366f1',0);
   out+=zoneCard('Counter','🟦',ctrPeople,'var(--acc)',rules.counterMin);
+  out+=zoneCard('Emerald','🌟',emeraldPeople,'#6366f1',0);
+  out+=zoneCard('Exit','🟩',exitPeople,'var(--green)',rules.exitMin);
   out+=`</div>`;
 
   // Row 2: Returns | Lunch | Floater (only if occupied)
@@ -8921,7 +8949,7 @@ function changeAdminPin() {
 }
 
 function showAdminSection(sec) {
-  ['staff','codes','pin'].forEach(s => {
+  ['staff','codes','pin','sched'].forEach(s => {
     const el  = document.getElementById('adm-'+s);
     const btn = document.getElementById('adm-tab-'+s);
     if(el)  el.style.display  = s===sec ? 'block' : 'none';
@@ -9245,11 +9273,11 @@ function buildCoverageTimeline() {
     if((STATE.todayOverrides||{})[pid]==='callout')return'off';
     const rot=window._lastRotations&&window._lastRotations[pid];
     if(rot){
-      if(rot.lunch&&h>=rot.lunch.from&&h<rot.lunch.to)return'lunch';
-      if(rot.b1&&h>=rot.b1.from&&h<rot.b1.to)return rot.b1.station==='exit'?'exit':'counter';
-      if(rot.b2&&h>=rot.b2.from&&h<=rot.b2.to)return rot.b2.station==='exit'?'exit':'counter';
+      if(rot.lunch&&h<rot.lunch.to&&h+1>rot.lunch.from)return'lunch'; // overlap check
+      if(rot.b1&&h<rot.b1.to&&h+1>rot.b1.from)return rot.b1.station==='exit'?'exit':'counter';
+      if(rot.b2&&h<rot.b2.to&&h+1>rot.b2.from)return rot.b2.station==='exit'?'exit':'counter';
       // 3-block: check b3
-      if(rot.b3&&h>=rot.b3.from&&h<=rot.b3.to)return rot.b3.station==='exit'?'exit':'counter';
+      if(rot.b3&&h<rot.b3.to&&h+1>rot.b3.from)return rot.b3.station==='exit'?'exit':'counter';
       return'off';
     }
     const st=(STATE.staffStation||{})[pid];
@@ -9333,9 +9361,10 @@ function buildCoverageTimeline() {
       </div>
       <div style="font-size:10px;color:var(--txt2);line-height:1.5">${names.length?names.join(', '):'<span style="color:var(--red)">⚠ Empty</span>'}</div>
     </div>`;
-    zEl.innerHTML=zCard('Exit','🟩',zones.exit,exitOk,rules.exitMin)+
+    // Layout: Counter | Emerald | Exit (counter left, exit right — matches physical flow)
+    zEl.innerHTML=zCard('Counter','🟦',zones.counter,ctrOk,rules.counterMin)+
       zCard('Emerald','🌟',zones.emerald,true,1)+
-      zCard('Counter','🟦',zones.counter,ctrOk,rules.counterMin)+
+      zCard('Exit','🟩',zones.exit,exitOk,rules.exitMin)+
       zCard('Returns','↩',zones.returns,true,0);
   }
 
@@ -9392,7 +9421,7 @@ function buildCoverageTimeline() {
       return exitCts[i]<r.exitMin;
     });
     // Find best fill candidate: off-exit CXR on shift, then ABRM/BRM/ARM/MT
-    const fillOrder=['CXR','ABRM','BRM','ARM','MT'];
+    const fillOrder=['CXR']; // Only CXRs fill exit gaps via suggestion — managers assign themselves
     let fillSuggestion='';
     for(const role of fillOrder){
       const candidate=people.find(([pid,e])=>{
@@ -9459,32 +9488,72 @@ function buildCoverageTimeline() {
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
       line-height:1.2">${nick}${mgmtBadge}</div>`;
 
-    let i=0;
-    while(i<cells.length){
-      const z=cells[i];let j=i+1;
-      while(j<cells.length&&cells[j]===z)j++;
-      const spanW=(j-i)*W,col=zColor[z]||'transparent';
-      const isNowBlock=nowH>=HOURS[i]&&nowH<(HOURS[Math.min(j,cells.length-1)]+1);
-      if(z==='off'){
-        htm+=`<div style="width:${spanW}px;flex-shrink:0;height:22px;
-          border-bottom:1px solid rgba(255,255,255,.03)"></div>`;
-      } else {
-        const lbl=z==='counter'?'Ctr':z==='exit'?'Exit':z==='emerald'?'EB':
-                   z==='returns'?'Ret':z==='lunch'?'🍽':z==='mgmt'?'':
-                   z.charAt(0).toUpperCase()+z.slice(1);
-        htm+=`<div style="width:${spanW}px;flex-shrink:0;height:22px;padding:0 1px">
-          <div style="width:100%;height:18px;margin-top:2px;
-            background:${col};border-radius:4px;
-            display:flex;align-items:center;justify-content:center;
-            font-size:${(j-i)>2?'9':'8'}px;font-weight:700;color:#fff;opacity:.9;
-            ${isNowBlock?'box-shadow:0 0 0 2px white;':''}"
-            title="${nick}: ${z} ${hLbl(HOURS[i])}–${hLbl(HOURS[Math.min(j,cells.length-1)]+1)}">
-            ${(j-i)>1?lbl:''}
-          </div>
-        </div>`;
-      }
-      i=j;
+    // Render bars using pixel-accurate fractional time positions
+    // Collect all time segments from rotation + special blocks
+    const rot=window._lastRotations&&window._lastRotations[pid];
+    const specs=(STATE.specialBlocks||{})[pid]||[];
+    const mods2=STATE.shiftMod||{},ov2=mods2[pid]||{};
+    const ss2=ov2.start!=null?ov2.start:p.shiftStart;
+    const se2=ov2.end!=null?ov2.end:p.shiftEnd;
+
+    // Build segment list with actual times
+    const segments=[];
+    const H_S=H_START,H_E=H_END;
+    const totalW2=(H_E-H_S)*W;
+
+    function addSeg(from,to,zone){
+      if(from>=to)return;
+      const x=Math.max(0,(from-H_S)*W);
+      const w2=Math.max(0,Math.min((H_E-H_S)*W,(to-H_S)*W)-x);
+      if(w2<1)return;
+      segments.push({x,w:w2,zone});
     }
+
+    if(ss2!=null&&se2!=null){
+      // Background: off (full shift width)
+      addSeg(H_S,H_E,'bg');
+      // Main rotation blocks
+      if(rot){
+        if(rot.b1)addSeg(rot.b1.from,rot.lunch?rot.lunch.from:rot.b1.to,rot.b1.station==='exit'?'exit':'counter');
+        if(rot.lunch)addSeg(rot.lunch.from,rot.lunch.to,'lunch');
+        if(rot.b2)addSeg(rot.lunch?rot.lunch.to:rot.b2.from,rot.b2.to,rot.b2.station==='exit'?'exit':'counter');
+        if(rot.b3)addSeg(rot.b3.from,rot.b3.to,rot.b3.station==='exit'?'exit':'counter');
+      } else {
+        // No rotation — use station
+        const st2=(STATE.staffStation||{})[pid];
+        const z2=p.role==='EXIT'||st2==='Exit Booth'?'exit':
+          (['ARM','BRM','ABRM','MT'].includes(p.role)?'mgmt':'counter');
+        addSeg(ss2,se2,z2);
+      }
+      // Special blocks overlay (on top of rotation)
+      specs.forEach(b=>{if(b.from<b.to)addSeg(b.from,b.to,b.key);});
+    }
+
+    // Render as absolute-positioned overlapping divs
+    htm+=`<div style="position:relative;height:22px;width:${totalW2}px;flex-shrink:0">`;
+    segments.filter(s=>s.zone!=='bg').forEach(s=>{
+      const col=zColor[s.zone]||'rgba(255,255,255,.08)';
+      const lbl=s.zone==='counter'?'Ctr':s.zone==='exit'?'Exit':
+                 s.zone==='emerald'?'EB':s.zone==='returns'?'Ret':
+                 s.zone==='lunch'?'🍽':s.zone==='mgmt'?'':
+                 s.zone==='shuttling'?'🚌':s.zone==='break'?'☕':
+                 s.zone==='training'?'📚':'';
+      const isNow=nowH>=s.x/W+H_S&&nowH<(s.x+s.w)/W+H_S;
+      const wHrs=s.w/W;
+      htm+=`<div style="position:absolute;left:${s.x}px;top:2px;
+        width:${s.w-2}px;height:18px;
+        background:${col};border-radius:4px;
+        display:flex;align-items:center;justify-content:center;
+        font-size:${wHrs>1?'9':'7'}px;font-weight:700;color:#fff;opacity:.92;
+        ${isNow?'box-shadow:0 0 0 2px white,0 0 8px rgba(255,255,255,.3);':''}"
+        title="${nick}: ${s.zone} ${hLbl(s.x/W+H_S)}–${hLbl((s.x+s.w)/W+H_S)}">
+        ${wHrs>0.4?lbl:''}
+      </div>`;
+    });
+    htm+=`</div>`;
+    // Reset old loop variables so nothing breaks
+    let i=cells.length;
+    while(false){i=cells.length;}
     htm+=`</div>`;
   });
   htm+=`</div>`;
@@ -9589,18 +9658,92 @@ function applyEarlyOut(pid,newEnd){
   saveState();closeWhatif();buildCoverageTimeline();buildSwitchboard();
   toast(((person&&person.nick)||pid)+' early out at '+fmtH(newEnd));
 }
-function addSpecialBlock(pid,key){
-  const sa=(SPECIAL_ASSIGNMENTS||[]).find(s=>s.key===key);if(!sa)return;
-  const nowH=new Date().getHours()+new Date().getMinutes()/60;
-  const from=Math.round(nowH*2)/2,to=from+1;
-  saveCoverageSnapshot();
-  if(!STATE.specialBlocks)STATE.specialBlocks={};
-  if(!STATE.specialBlocks[pid])STATE.specialBlocks[pid]=[];
-  STATE.specialBlocks[pid].push({key,label:sa.label,icon:sa.icon,from,to});
-  saveState();closeWhatif();buildCoverageTimeline();
-  const fmtH=h=>{const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
-  toast(sa.icon+' '+sa.label+' '+fmtH(from)+'–'+fmtH(to));
+function addSpecialBlock(pid, key, fromTime, toTime) {
+  const sa = (SPECIAL_ASSIGNMENTS||[]).find(s=>s.key===key);
+  if (!sa) return;
+
+  const apply = (from, to) => {
+    saveCoverageSnapshot();
+    if (!STATE.specialBlocks) STATE.specialBlocks = {};
+    if (!STATE.specialBlocks[pid]) STATE.specialBlocks[pid] = [];
+    // Remove existing block of same key
+    STATE.specialBlocks[pid] = STATE.specialBlocks[pid].filter(b=>b.key!==key);
+    STATE.specialBlocks[pid].push({key, label:sa.label, icon:sa.icon, from, to,
+      color:sa.color});
+    buildCoverageTimeline();
+    buildDashSchedMini();
+    saveState();
+    openPersonPanel(pid);
+  };
+
+  // If times provided directly, apply immediately
+  if (fromTime != null && toTime != null) { apply(fromTime, toTime); return; }
+
+  // Show time entry modal
+  const exp = typeof buildExpectedToday==='function' ? buildExpectedToday() : {};
+  const person = exp[pid]?.person;
+  const mods = STATE.shiftMod||{}, ov = mods[pid]||{};
+  const ss = ov.start!=null?ov.start:person?.shiftStart;
+  const se = ov.end!=null?ov.end:person?.shiftEnd;
+  const nowH = new Date().getHours() + new Date().getMinutes()/60;
+  const defFrom = Math.round(nowH*4)/4;
+  const defTo   = Math.min(se||24, defFrom+1);
+  const pad = n => String(n).padStart(2,'0');
+  const toTimeStr = h => { const hh=Math.floor(h%24),mn=Math.round((h%1)*60); return pad(hh)+':'+pad(mn); };
+
+  openModal(sa.icon+' '+sa.label, `
+    <div style="display:grid;gap:12px">
+      <div style="font-size:12px;color:var(--txt3)">
+        Set time window for <strong style="color:${sa.color}">${sa.label}</strong>
+        ${person?'<br><span style="font-size:10px">'+
+          (person.nick||person.name.split(' ')[0])+
+          ' · shift '+toTimeStr(ss||0)+'–'+toTimeStr(se||0)+'</span>':''}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px">FROM</div>
+          <input id="sb-from" type="time" value="${toTimeStr(defFrom)}"
+            style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--bdr2);
+              border-radius:6px;color:var(--txt);font-size:16px">
+        </div>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:4px">TO</div>
+          <input id="sb-to" type="time" value="${toTimeStr(defTo)}"
+            style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--bdr2);
+              border-radius:6px;color:var(--txt);font-size:16px">
+        </div>
+      </div>
+      <button onclick="
+        const fp=document.getElementById('sb-from').value.split(':');
+        const tp=document.getElementById('sb-to').value.split(':');
+        addSpecialBlock('${pid}','${key}',
+          parseInt(fp[0])+(parseInt(fp[1]||0)/60),
+          parseInt(tp[0])+(parseInt(tp[1]||0)/60));
+        closeModal();"
+        style="padding:11px;border-radius:6px;border:none;
+          background:${sa.color};color:#fff;font-size:14px;font-weight:700;cursor:pointer">
+        ${sa.icon} Assign ${sa.label}
+      </button>
+      <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+    </div>`);
 }
+
+function autoSchedule() {
+  // 1. Assign exit rotation first (fill gaps with CXRs fairly)
+  const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  autoDistributeExit(exp);
+  // 2. Rebuild rotations with new assignments
+  try {
+    const rot=buildSmartRotation();
+    window._lastRotations={};
+    if(rot&&rot.rotations)rot.rotations.forEach(r=>{window._lastRotations[r.pid]=r;});
+  } catch(e){}
+  // 3. Assign lunches for everyone
+  suggestLunches();
+  // Toast handled by suggestLunches
+}
+
+
 function suggestLunches(){
   const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
   if(!Object.keys(exp).length){toast('Confirm schedule first');return;}
@@ -9611,7 +9754,7 @@ function suggestLunches(){
 
   // Build worker list with targets
   const workers=Object.entries(exp)
-    .filter(([pid,e])=>!['ARM','BRM','ABRM','MT'].includes(e.person.role)
+    .filter(([pid,e])=>true // include everyone — managers get lunches too
       &&(STATE.todayOverrides||{})[pid]!=='callout')
     .map(([pid,e])=>{
       const p=e.person,mods=STATE.shiftMod||{},ov=mods[pid]||{};
@@ -9721,7 +9864,7 @@ function autoDistributeExit(exp) {
   // Find CXRs available per hour (on shift, not at exit, not on lunch)
   function availCXRs(h) {
     return Object.entries(exp).filter(([pid,e])=>{
-      if(e.person.role!=='CXR')return false;
+      if(!['CXR'].includes(e.person.role))return false; // only CXRs fill exit
       if((STATE.todayOverrides||{})[pid]==='callout')return false;
       if((STATE.staffStation||{})[pid]==='Exit Booth')return false;
       const ov=(STATE.shiftMod||{})[pid]||{};
@@ -9962,11 +10105,12 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
     if (isMgrRole) {
       // Managers get: Emerald Booth, Counter, Exit, Returns, Floater
       const mgmtStations = [
-        {key:'Emerald Booth', label:'🌟 Emerald', col:'#6366f1'},
-        {key:'Counter',       label:'🟦 Counter', col:'var(--acc)'},
-        {key:'Exit Booth',    label:'🟩 Exit',    col:'var(--green)'},
-        {key:'Returns',       label:'↩ Returns',  col:'#06b6d4'},
-        {key:'Floater',       label:'🚗 Floater', col:'var(--amber)'},
+        {key:'Emerald Booth',   label:'🌟 Emerald',   col:'#6366f1'},
+        {key:'Counter Manager', label:'🟦 Counter',   col:'var(--acc)'},
+        {key:'Exit Booth',      label:'🟩 Exit',      col:'var(--green)'},
+        {key:'Returns',         label:'↩ Returns',    col:'#06b6d4'},
+        {key:'Floater',         label:'🚗 Floater',   col:'var(--amber)'},
+        {key:'Shuttling',       label:'🚌 Shuttle',   col:'#f59e0b'},
       ];
       h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">`;
       mgmtStations.forEach(s=>{
@@ -10334,22 +10478,49 @@ function updateAvailabilityFromPaste() {
 
 function updateBrandTotalsDisplay() {
   const brands = (STATE.pasteData||{}).brands || {};
+  if (!Object.keys(brands).length) return;
+
   const ent = brands.enterprise||{};
   const nat = brands.national||{};
   const ala = brands.alamo||{};
   const tot = brands.total||{};
 
+  // Dashboard brand totals
   const natEl=document.getElementById('brand-nat');
   const alaEl=document.getElementById('brand-ala');
   const entEl=document.getElementById('brand-ent');
   const retEl=document.getElementById('brand-ret');
   const rentedEl=document.getElementById('brand-rented');
 
-  if(natEl) natEl.textContent = nat.totalRes||'—';
-  if(alaEl) alaEl.textContent = ala.totalRes||'—';
-  if(entEl) entEl.textContent = ent.totalRes||'—';
-  if(retEl) retEl.textContent = tot.totRet||'—';
+  if(natEl)    natEl.textContent    = nat.totalRes||'—';
+  if(alaEl)    alaEl.textContent    = ala.totalRes||'—';
+  if(entEl)    entEl.textContent    = ent.totalRes||'—';
+  if(retEl)    retEl.textContent    = tot.totRet||'—';
   if(rentedEl) rentedEl.textContent = tot.rented||'—';
+
+  // Availability board header
+  const totalResEl=document.getElementById('board-total-res');
+  const totalRetEl=document.getElementById('board-total-ret');
+  const netEl     =document.getElementById('board-net');
+  const wuEl      =document.getElementById('board-wu');
+
+  if(totalResEl) totalResEl.textContent = tot.totalRes||'—';
+  if(totalRetEl) totalRetEl.textContent = tot.totRet||'—';
+  if(netEl)      netEl.textContent      = tot.totRet&&tot.totalRes ? (tot.totRet-tot.totalRes) : '—';
+  if(wuEl)       wuEl.textContent       = (ent.walkUp||0)+(nat.walkUp||0)+(ala.walkUp||0);
+
+  // Checklist auto-fill fields from brand totals
+  if(!STATE.fields) STATE.fields={};
+  if(tot.totalRes) { STATE.fields.totalRes=String(tot.totalRes); const el=document.getElementById('f-total-res'); if(el)el.value=tot.totalRes; }
+  if(tot.totRet)   { STATE.fields.totalRet=String(tot.totRet);   const el=document.getElementById('f-total-ret'); if(el)el.value=tot.totRet; }
+  if(ent.rented)   { STATE.fields.rented=String(ent.rented+nat.rented+(ala.rented||0)); }
+
+  // CS and HOT from checklist fields (not from paste)
+  // Walk-up count for availability board
+  const walkUpTotal=(ent.walkUp||0)+(nat.walkUp||0)+(ala.walkUp||0);
+  if(walkUpTotal>0){ STATE.fields.walkUps=String(walkUpTotal); }
+
+  saveState();
 }
 
 
@@ -10547,6 +10718,228 @@ function refreshDNRDNQCards(){
   // Also update checklist if visible
   const clEl=document.getElementById('dnr-dnq-checklist');
   if(clEl) clEl.innerHTML=buildDNRDNQCards();
+}
+
+
+function buildHourlyFlowChart() {
+  const el = document.getElementById('hourly-flow-chart');
+  if (!el) return;
+  const ph = STATE.pasteHourly || {};
+  const res = ph.res || [];
+  const ret = ph.ret || [];
+  if (!res.length && !ret.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--txt3);font-style:italic">Paste data to see hourly flow</div>';
+    return;
+  }
+
+  const HOURS = Array.from({length:24},(_,i)=>i);
+  const hLbl = h => { const d=h>12?h-12:h===0?12:h,s=h>=12?'p':'a'; return d+s; };
+  const maxV = Math.max(...res,...ret,1);
+  const W = 18, H = 50;
+
+  let out = `<div style="display:flex;align-items:flex-end;gap:1px;height:${H+16}px;overflow-x:auto">`;
+  HOURS.forEach(h=>{
+    const r=res[h]||0, t=ret[h]||0;
+    const rH=Math.round(r/maxV*H), tH=Math.round(t/maxV*H);
+    const isNow=new Date().getHours()===h;
+    out+=`<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;width:${W}px">
+      <div style="display:flex;align-items:flex-end;gap:1px;height:${H}px">
+        <div title="Res ${r}" style="width:7px;height:${rH}px;background:var(--acc);border-radius:2px 2px 0 0;opacity:.85"></div>
+        <div title="Ret ${t}" style="width:7px;height:${tH}px;background:var(--green);border-radius:2px 2px 0 0;opacity:.85"></div>
+      </div>
+      <div style="font-size:6px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:400}">${hLbl(h)}</div>
+    </div>`;
+  });
+  out += `</div>`;
+  out += `<div style="display:flex;gap:12px;margin-top:4px;font-size:9px;color:var(--txt3)">
+    <span><span style="color:var(--acc)">▪</span> Reservations</span>
+    <span><span style="color:var(--green)">▪</span> Returns</span>
+  </div>`;
+  el.innerHTML = out;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// MAY 2026 SCHEDULE — parsed from Excel
+// ═══════════════════════════════════════════════════════════════════════
+var MAY_SCHEDULE = {"2026-05-03":{"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,13.0],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18.0,26.5]},"2026-05-04":{"Julian_Returns":[4.0,13.0],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-05":{"Julian_Returns":[4.0,13.0],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-06":{"Kerv_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-07":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":"OFF","Tighisty_(TT)_Haile":[10.0,18.5],"BRM":"OFF","MQI":"OFF","Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-08":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0]},"2026-05-09":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Laura_Gonzalez":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0]},"2026-05-10":{"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,13.0],"Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18.0,26.5]},"2026-05-11":{"Julian_Returns":[4.0,13.0],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-12":{"Julian_Returns":[4.0,13.0],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-13":{"Kerv_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-14":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"MENTOR":"OFF","MENTEE":"OFF","Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-15":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0]},"2026-05-16":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Laura_Gonzalez":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0]},"2026-05-17":{"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18.0,26.5]},"2026-05-18":{"Julian_Returns":[4.0,13.0],"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-19":{"Julian_Returns":[4.0,13.0],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-20":{"Kerv_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-21":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-22":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0]},"2026-05-23":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Laura_Gonzalez":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0]},"2026-05-24":{"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,13.0],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18.0,26.5]},"2026-05-25":{"Julian_Returns":[4.0,13.0],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-26":{"Julian_Returns":[4.0,13.0],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-27":{"Kerv_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":"OFF","Kenneth_Hooks":[18.0,26.5]},"2026-05-28":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Laura_Gonzalez":"OFF","Kenneth_Hooks":[18.0,26.5]},"2026-05-29":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0]},"2026-05-30":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Laura_Gonzalez":[5.5,14.5],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0]}};
+
+function getScheduleForDate(dateStr) {
+  return MAY_SCHEDULE[dateStr] || null;
+}
+
+function loadScheduleForToday() {
+  const today = new Date();
+  const key = today.getFullYear()+'-'+
+    String(today.getMonth()+1).padStart(2,'0')+'-'+
+    String(today.getDate()).padStart(2,'0');
+  const sched = MAY_SCHEDULE[key];
+  if (!sched) return false;
+
+  if (!STATE.shiftMod) STATE.shiftMod = {};
+  if (!STATE.staffDuty) STATE.staffDuty = {};
+  if (!STATE.todayOverrides) STATE.todayOverrides = {};
+
+  Object.entries(sched).forEach(([pid, shift]) => {
+    if (shift === 'OFF' || shift === 'VACA') {
+      STATE.staffDuty[pid] = false;
+      STATE.todayOverrides[pid] = 'off';
+    } else if (Array.isArray(shift) && shift.length === 2) {
+      STATE.staffDuty[pid] = true;
+      STATE.shiftMod[pid] = { start: shift[0], end: shift[1] };
+    }
+  });
+
+  saveState();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
+  toast('Schedule loaded for ' + key);
+  return true;
+}
+
+function parseSchedulePaste(text) {
+  // Parse a copy-pasted block from Excel matching the schedule format
+  // Returns dict of pid -> (start, end) | 'OFF'
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const result = {};
+  const nameMap = {"mini":"Rukmini_(Mini)_Carr","matt":"Matthew_Johnson","laura":"Laura_Gonzalez","guenther":"Guenther_Meyer","lily":"Lily_Tesfaye","cece":"Ceandra_(CeCe)_Smith","mariam":"Mariam_Mbye","zina":"Zina_Kellen","tightisty":"Tighisty_(TT)_Haile","tt":"Tighisty_(TT)_Haile","sammi":"Samantha_(Sammi)_Smith","jay":"JaJuantae_(Jay)_Young","umesh":"Umesh_Acharya","feven":"Feven_Dubale","hamda":"Hamda_Wais","leslie":"Leslie_Brown","genesis":"Genesis_Cochran","shawnee":"Shawnee_Exit","lisa":"Lisa_(Exit)","kenneth":"Kenneth_Hooks","ami":"Ami_Lhom","ty":"Ty_Lumpkin","carlos":"Carlos_Aviles","caitlin":"Caitlin_Kelsey","khala":"Khala_Shackleford","maddy":"Madelyne_(Maddy)_Shirer","josh":"Joshua_(Josh)_Osei","britney":"Brittney_Francis","lauren":"Lauren_Kretschman","ennis":"Ennis_MT","vada":"Vada_Griffith"};
+
+  function parseTime(t) {
+    t = t.trim().toLowerCase();
+    const m = t.match(/(\d{1,3})(?::(\d{2}))?([ap])/i);
+    if (!m) return null;
+    let num=parseInt(m[1]),mn=parseInt(m[2]||0),ap=m[3].toLowerCase();
+    if(num>99){num=Math.floor(num/100)+(num%100)/60;}
+    let h=num+mn/60;
+    if(ap==='p'&&h<12)h+=12;
+    if(ap==='a'&&h===12)h=0;
+    return Math.round(h*100)/100;
+  }
+
+  lines.forEach(line => {
+    const m = line.match(/^([A-Za-z]+)\s+(.+)/);
+    if (!m) return;
+    const name=m[1].toLowerCase(), rest=m[2].trim();
+    const pid = nameMap[name] || (m[1]+'_'+rest).replace(/\s/g,'_');
+    if (!nameMap[name]) return;
+    if (/off|vaca/i.test(rest)) { result[pid]='OFF'; return; }
+    const parts = rest.split(/-(?=\d)/);
+    if (parts.length===2) {
+      const s=parseTime(parts[0]),e=parseTime(parts[1]);
+      if(s!=null&&e!=null) {
+        result[pid]=[s,e<s?e+24:e];
+      }
+    }
+  });
+  return result;
+}
+
+
+function applySchedulePaste() {
+  const ta  = document.getElementById('sched-paste-ta');
+  const res = document.getElementById('sched-paste-result');
+  if (!ta || !ta.value.trim()) { if(res)res.textContent='Paste schedule data first'; return; }
+  const parsed = parseSchedulePaste(ta.value);
+  const count = Object.keys(parsed).length;
+  if (!count) { if(res){res.textContent='No entries found — check format';res.style.color='var(--red)';}return; }
+
+  if (!STATE.shiftMod)  STATE.shiftMod  = {};
+  if (!STATE.staffDuty) STATE.staffDuty = {};
+  Object.entries(parsed).forEach(([pid, shift]) => {
+    if (shift === 'OFF') { STATE.staffDuty[pid]=false; }
+    else { STATE.staffDuty[pid]=true; STATE.shiftMod[pid]={start:shift[0],end:shift[1]}; }
+  });
+  saveState();
+  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+  if(typeof buildDashSchedMini==='function') buildDashSchedMini();
+  if(res){res.textContent=`✓ ${count} people loaded`;res.style.color='var(--green)';}
+  toast(`Schedule applied: ${count} people`);
+}
+
+
+function printChecklist(blank) {
+  const f = blank ? {} : (STATE.fields || {});
+  const auto = typeof getAutoManagers==='function' ? getAutoManagers() : {};
+  const today = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+
+  // Collect checklist items
+  const clSections = ['opening','mid','closing'];
+  let clHtml = '';
+  clSections.forEach(sec => {
+    const items = typeof CHECKLIST_ITEMS !== 'undefined' ? (CHECKLIST_ITEMS[sec]||[]) : [];
+    if (!items.length) return;
+    const done = blank ? 0 : items.filter(it => (STATE.clDone||{})[sec+':'+it.id]).length;
+    clHtml += `<div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;
+        letter-spacing:.08em;color:#666;border-bottom:1px solid #ccc;
+        padding-bottom:4px;margin-bottom:8px">
+        ${sec.charAt(0).toUpperCase()+sec.slice(1)} (${blank?'___':done}/${items.length})
+      </div>`;
+    items.forEach(it => {
+      const checked = !blank && (STATE.clDone||{})[sec+':'+it.id];
+      const val = blank ? '________' : ((STATE.fields||{})[it.fieldId] || (checked ? '✓' : '___'));
+      clHtml += `<div style="display:flex;align-items:flex-start;gap:8px;
+        padding:3px 0;border-bottom:1px solid #eee;font-size:11px">
+        <span style="font-size:14px;color:${checked?'#16a34a':'#999'};flex-shrink:0">
+          ${checked?'☑':'☐'}
+        </span>
+        <span style="flex:1;color:${checked?'#333':'#555'}">${it.label||it.id}</span>
+        <span style="color:#333;font-family:monospace">${it.fieldId?val:''}</span>
+      </div>`;
+    });
+    clHtml += '</div>';
+  });
+
+  // Dashboard summary
+  const summaryHtml = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Opening Mgr</div>
+        <div style="font-size:14px;font-weight:700">${blank?'___________':f.openMgr||auto.open||'—'}</div>
+      </div>
+      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Closing Mgr</div>
+        <div style="font-size:14px;font-weight:700">${blank?'___________':f.closeMgr||auto.close||'—'}</div>
+      </div>
+      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">CS Score</div>
+        <div style="font-size:14px;font-weight:700">${blank?'___________':f.cs||'—'}</div>
+      </div>
+      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">HOT Alerts</div>
+        <div style="font-size:14px;font-weight:700">${blank?'___________':f.hot||'—'}</div>
+      </div>
+      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Total Res</div>
+        <div style="font-size:14px;font-weight:700">${blank?'___________':f.totalRes||'—'}</div>
+      </div>
+      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Total Ret</div>
+        <div style="font-size:14px;font-weight:700">${blank?'___________':f.totalRet||'—'}</div>
+      </div>
+    </div>`;
+
+  const win = window.open('','_blank','width=800,height=900');
+  if (!win) { toast('Allow popups to print'); return; }
+  win.document.write(`<!DOCTYPE html><html><head>
+    <title>CMH Daily Driver — ${blank?'Blank Checklist':today}</title>
+    <style>
+      body{font-family:Arial,sans-serif;margin:24px;color:#333;font-size:12px}
+      h1{font-size:18px;margin:0 0 4px}
+      h2{font-size:13px;color:#666;margin:0 0 16px;font-weight:400}
+      @media print{body{margin:12px}}
+    </style>
+  </head><body>
+    <h1>🚗 CMH Daily Driver${blank?' — Blank Checklist':''}</h1>
+    <h2>${blank?'Fill in and enter into app later':today}</h2>
+    ${summaryHtml}
+    ${clHtml || '<p style="color:#999">No checklist items found</p>'}
+    <div style="margin-top:24px;border-top:1px solid #ccc;padding-top:8px;font-size:9px;color:#999">
+      Printed ${new Date().toLocaleString()} · CMH Daily Driver
+    </div>
+  </body></html>`);
+  win.document.close();
+  win.print();
 }
 
 </script>
