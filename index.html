@@ -1448,7 +1448,11 @@ button { cursor: pointer; }
   </div>
 
   <!-- Assignments strip -->
-  <div class="card" style="padding:10px 14px;margin-bottom:12px" onclick="showTab('checklist')" style="cursor:pointer">
+  
+  <!-- DNR / DNQ Alerts -->
+  <div id="dnr-dnq-section" style="margin-bottom:10px"></div>
+
+<div class="card" style="padding:10px 14px;margin-bottom:12px" onclick="showTab('checklist')" style="cursor:pointer">
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center">
       <span style="color:var(--txt3)">XXAR <b id="sum-xxar" style="font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--txt3)">SXAR <b id="sum-sxar" style="font-family:var(--ff-mono)">—</b></span>
@@ -2584,6 +2588,9 @@ window.onload = function() {
       } catch(e) {}
       if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
       if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
+  refreshDNRDNQCards();
+  updateBrandTotalsDisplay();
+  updateAvailabilityFromPaste();
     }
   }
   if (typeof refreshDash === 'function') refreshDash();
@@ -2785,80 +2792,85 @@ function hourArrayToPeakStr(hourly, topN) {
 }
 
 function parseStep(stepNum) {
-  // ID map: step number → textarea ID and data key
   const idMap  = {1:'pa1',  2:'pa2',  3:'pa3',  4:'pa4'};
-  const keyMap = {1:'res-am',2:'res-pm',3:'ret-am',4:'ret-pm'};
-  const key = keyMap[stepNum];
-  const ta  = document.getElementById(idMap[stepNum]);
-  const pr  = document.getElementById('pr'+stepNum);
+  const keyMap = {1:'resAM',2:'resPM',3:'retAM',4:'retPM'};
+  const key    = keyMap[stepNum];
+  const ta     = document.getElementById(idMap[stepNum]);
+  const pr     = document.getElementById('pr'+stepNum);
 
   if (!ta || !ta.value.trim()) { toast('Paste data first'); return; }
 
-  const parsed   = parsePasteText(ta.value);
-  const counts   = parsed.counts;
-  const hourly   = parsed.hourlyTotals; // 24-element array or null
+  // Use the new GL parser
+  const text   = ta.value.trim();
+  const result = parseGLFull(text);
 
-  // Aggregate code-level counts into group totals
-  const groups = {};
-  for (const [code, count] of Object.entries(counts)) {
-    const grp = CODE_MAP[code];
-    if (grp) groups[grp] = (groups[grp] || 0) + count;
+  if (!result || Object.keys(result.codes).length === 0) {
+    if (pr) { pr.textContent='⚠ No car codes found — check paste format'; pr.style.color='var(--red)'; pr.style.display='block'; }
+    toast('No codes found — check paste format');
+    return;
   }
 
-  // Store group totals
   if (!STATE.pasteData) STATE.pasteData = {};
-  STATE.pasteData[key] = groups;
+  STATE.pasteData[key] = result;
 
-  // Store raw hourly array for the hour-by-hour chart
-  if (hourly) {
-    if (!STATE.pasteHourly) STATE.pasteHourly = {};
-    // Accumulate hourly data (AM + PM combine into full day)
-    const existing = STATE.pasteHourly[key.startsWith('res') ? 'res' : 'ret'] || new Array(24).fill(0);
-    hourly.forEach((v, h) => { existing[h] += v; });
-    STATE.pasteHourly[key.startsWith('res') ? 'res' : 'ret'] = existing;
-
-    // Auto-fill peak hours fields
-    const peakStr = hourArrayToPeakStr(hourly, 10);
-    if (peakStr) {
-      const fieldKey = key.startsWith('res') ? 'peakRes' : 'peakRet';
-      const elId     = key.startsWith('res') ? 'f-peak-res' : 'f-peak-ret';
-      // Merge with existing (other half-day already parsed)
-      const existPeak = STATE.fields[fieldKey] || '';
-      const merged = mergePeakStrings(existPeak, peakStr);
-      STATE.fields[fieldKey] = merged;
-      const el = document.getElementById(elId);
-      if (el) el.value = merged;
-    }
+  // Also try to parse brand section if present
+  const brands = parseBrandSection(text);
+  if (brands && Object.keys(brands).length) {
+    STATE.pasteData.brands = brands;
+    updateBrandTotalsDisplay();
   }
+
+  // Aggregate into groups for board
+  const groups = {};
+  for (const [code, v] of Object.entries(result.codes)) {
+    const grp = CODE_MAP[code];
+    if (grp) groups[grp] = (groups[grp]||0) + (v.remaining||0);
+  }
+  // Keep old format for board compatibility
+  const legacyKey = {1:'res-am',2:'res-pm',3:'ret-am',4:'ret-pm'}[stepNum];
+  STATE.pasteData[legacyKey] = groups;
+
+  // Hourly totals for peak view
+  if (!STATE.pasteHourly) STATE.pasteHourly = {};
+  const halfKey = key.startsWith('res') ? 'res' : 'ret';
+  const existing = STATE.pasteHourly[halfKey] || new Array(24).fill(0);
+  // Sum hourly from all codes
+  Object.values(result.codes).forEach(v=>{
+    if (v.hourlyRaw) v.hourlyRaw.forEach((n,i)=>{ existing[i]=(existing[i]||0)+n; });
+  });
+  STATE.pasteHourly[halfKey] = existing;
+
+  // Update availability display
+  updateAvailabilityFromPaste();
 
   saveState();
 
   // UI feedback
-  const total  = Object.values(counts).reduce((a,b)=>a+b,0);
-  const gCount = Object.keys(groups).length;
+  const total  = Object.values(result.codes).reduce((s,v)=>s+(v.remaining||0),0);
+  const cCount = Object.keys(result.codes).length;
   if (pr) {
-    pr.textContent = `✓ ${total.toLocaleString()} units across ${gCount} groups`
-      + (hourly ? ` · hourly data captured` : '');
+    pr.textContent = `✓ ${cCount} codes · ${total.toLocaleString()} units remaining`;
+    pr.style.color = 'var(--green)';
     pr.style.display = 'block';
   }
+  if(ta){ ta.style.borderColor='var(--green)'; setTimeout(()=>{ ta.style.borderColor=''; },2000); }
+
   const step = document.getElementById('pstep-'+stepNum);
   const num  = document.getElementById('psn'+stepNum);
   if (step) { step.classList.add('done'); step.classList.remove('active'); }
   if (num)  num.textContent = '✓';
-  if (stepNum < 4) {
-    const next = document.getElementById('pstep-'+(stepNum+1));
-    if (next) next.classList.add('active');
-  }
+  if (stepNum < 4) { const next=document.getElementById('pstep-'+(stepNum+1)); if(next)next.classList.add('active'); }
+
   const st = document.getElementById('paste-overall-status');
-  const done = Object.keys(STATE.pasteData).length;
-  if (st) {
-    st.textContent = done + ' of 4 completed' + (done === 4 ? ' — Board ready!' : '');
-    st.style.color = done === 4 ? 'var(--green)' : 'var(--txt3)';
-  }
+  const done = ['resAM','resPM','retAM','retPM'].filter(k=>STATE.pasteData[k]).length;
+  if (st) { st.textContent=done+' of 4 completed'+(done===4?' — Board ready!':''); st.style.color=done===4?'var(--green)':'var(--txt3)'; }
+
   refreshDash();
   buildBoardFlow();
-  if(Object.keys(STATE.pasteData||{}).length>=4){if(!STATE.fields)STATE.fields={};STATE.fields.gameplanPasted='1';} toast('Step ' + stepNum + ' parsed ✓  (' + total.toLocaleString() + ' units)');
+  if(done>=4){if(!STATE.fields)STATE.fields={};STATE.fields.gameplanPasted='1';}
+  toast('Step '+stepNum+' parsed ✓  ('+cCount+' codes · '+total.toLocaleString()+' remaining)');
 }
+
 
 // Merge two peak strings, keeping highest value per hour
 function mergePeakStrings(strA, strB) {
@@ -5758,6 +5770,7 @@ function updateSchedHelper() { buildSwitchboard(); }
 function setStation(key, val) {
   STATE.staffStation[key] = val;
   saveState();
+  if(typeof buildCoverageTimeline==="function")buildCoverageTimeline();
   buildStaffGrid();
   buildCoverageUI();
 }
@@ -7950,6 +7963,7 @@ function setAltPosition(pid, posKey) {
   saveState();
   if(typeof buildSwitchboard==="function")buildSwitchboard();
   if(typeof buildCoverageTimeline==="function")buildCoverageTimeline();
+  buildDashSchedMini();
   toast(posKey === 'normal' ? 'Rotation reset to normal' : 'Alt schedule set ✓');
 }
 
@@ -10162,6 +10176,377 @@ function saveExitFairnessForToday() {
     while(weeks.length>8){delete data[weeks.shift()];}
     localStorage.setItem('cmh-exit-fairness-v1',JSON.stringify(data));
   }catch(e){}
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// GL PASTE PARSER
+// ═══════════════════════════════════════════════════════════════════════
+
+function parseGLFull(text) {
+  if (!text || !text.trim()) return null;
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+
+  const isAM = lines.some(l=>/^(12am|1am|6am)$/i.test(l));
+  const isNum = s => /^\d+$/.test(s);
+  const isCode = s => /^[A-Z]{2,5}[0-9]?$/.test(s)
+    && !isNum(s)
+    && !['AM','PM','TOTAL','REMAINING','BRANDS','ALAMO','ENTERPRISE','NATIONAL'].includes(s.toUpperCase());
+
+  // Find data start after 'Total' header
+  let dataStart = 0;
+  for (let i=0; i<lines.length; i++) {
+    if (lines[i].toLowerCase()==='total') { dataStart=i+1; break; }
+  }
+  const dataLines = lines.slice(dataStart);
+
+  // Skip leading subtotal numbers
+  let i=0;
+  while (i < dataLines.length && !isCode(dataLines[i])) i++;
+
+  const codes = {};
+  let cur = null, nums = [];
+
+  function save() {
+    if (!cur || nums.length===0) return;
+    const total     = nums[nums.length-1];
+    const remaining = nums.length >= 2 ? nums[nums.length-2] : nums[0];
+    const hourlyRaw = nums.slice(0, Math.max(0, nums.length-2));
+    codes[cur] = { remaining, total, hourlySum: hourlyRaw.reduce((s,n)=>s+n,0), hourlyRaw, halfDay: isAM?'AM':'PM' };
+  }
+
+  for (; i<dataLines.length; i++) {
+    const line = dataLines[i];
+    if (isCode(line)) { save(); cur=line; nums=[]; }
+    else if (isNum(line)) nums.push(parseInt(line));
+  }
+  save();
+
+  return { codes, halfDay: isAM?'AM':'PM' };
+}
+
+function parseBrandSection(text) {
+  if (!text) return null;
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  const headers = ['totalRes','schRes','lateRes','rented','newToday','walkUp','prewrite','totRet','schRet','lateRet','returned'];
+  const brandNames = ['ALAMO','ENTERPRISE','NATIONAL','TOTAL'];
+  const result = {};
+  let i=0;
+  while (i<lines.length && !brandNames.includes(lines[i].toUpperCase())) i++;
+  while (i<lines.length) {
+    const brand = lines[i].toUpperCase();
+    if (!brandNames.includes(brand)) { i++; continue; }
+    i++;
+    const nums=[];
+    while (i<lines.length && /^\d+$/.test(lines[i])) { nums.push(parseInt(lines[i])); i++; }
+    const obj={};
+    headers.forEach((h,idx)=>{ obj[h]=nums[idx]??0; });
+    result[brand.toLowerCase()]=obj;
+  }
+  return result;
+}
+
+// Detect if paste contains brand section
+function detectPasteType(text) {
+  if (!text) return null;
+  const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  if (lines.some(l=>l==='Brands'||l==='BRANDS')) return 'brands';
+  if (lines.some(l=>/^(12am|1am)$/i.test(l))) return 'AM';
+  if (lines.some(l=>/^(12pm|1pm)$/i.test(l))) return 'PM';
+  return 'unknown';
+}
+
+function handlePaste(zoneId, textareaId, statusId) {
+  const ta  = document.getElementById(textareaId);
+  const st  = document.getElementById(statusId);
+  if (!ta) return;
+  const text = ta.value.trim();
+  if (!text) { if(st){st.textContent='Paste data first';st.style.color='var(--amber)';}return; }
+
+  if (!STATE.pasteData) STATE.pasteData = {};
+
+  // Try brand section first
+  const type = detectPasteType(text);
+
+  if (type==='brands') {
+    const brands = parseBrandSection(text);
+    if (brands) {
+      STATE.pasteData.brands = brands;
+      updateBrandTotalsDisplay();
+      saveState();
+      if(st){st.textContent='✓ Brand totals updated';st.style.color='var(--green)';}
+      toast('Brand totals: Ent '+brands.enterprise?.totalRes+' · Nat '+brands.national?.totalRes+' · Ala '+brands.alamo?.totalRes);
+      return;
+    }
+  }
+
+  const result = parseGLFull(text);
+  if (!result || Object.keys(result.codes).length===0) {
+    if(st){st.textContent='⚠ No data found — check paste format';st.style.color='var(--red)';}
+    return;
+  }
+
+  STATE.pasteData[zoneId] = result;
+  const units    = Object.values(result.codes).reduce((s,v)=>s+(v.remaining||0),0);
+  const codeCount= Object.keys(result.codes).length;
+
+  // Update availability after any paste
+  updateAvailabilityFromPaste();
+  updateBrandTotalsDisplay();
+  saveState();
+
+  if(st){st.textContent=`✓ ${codeCount} codes · ${units} remaining`;st.style.color='var(--green)';}
+  if(ta){ta.style.borderColor='var(--green)';setTimeout(()=>{ta.style.borderColor='';},2000);}
+  toast(`${zoneId}: ${codeCount} codes parsed · ${units} units remaining`);
+}
+
+function updateAvailabilityFromPaste() {
+  if (!STATE.pasteData) return;
+  // Merge all zones — for each code, sum remaining across zones
+  const merged = {};
+  ['resAM','resPM','retAM','retPM'].forEach(zone=>{
+    const d = (STATE.pasteData[zone]||{}).codes || {};
+    Object.entries(d).forEach(([code,v])=>{
+      if (!merged[code]) merged[code]={ remaining:0, total:0 };
+      merged[code].remaining = Math.max(merged[code].remaining, v.remaining||0);
+      merged[code].total     = Math.max(merged[code].total, v.total||0);
+    });
+  });
+  STATE.mergedAvailability = merged;
+
+  // Update walk-up indicator
+  const noSupply=['PXAR','XXAR','SXAR'];
+  const walkUpEl=document.getElementById('dash-walkup');
+  if (walkUpEl) {
+    const avail=Object.entries(merged).filter(([c,v])=>!noSupply.includes(c)&&(v.remaining||0)>0).length;
+    walkUpEl.textContent = avail>0 ? 'Units Available' : 'Check Board';
+    walkUpEl.style.color = avail>0 ? 'var(--green)' : 'var(--amber)';
+  }
+
+  // Update total res display
+  const totalResEl=document.getElementById('dash-total-res');
+  if (totalResEl) {
+    const brands=(STATE.pasteData||{}).brands||{};
+    const tot=(brands.total||brands.enterprise||{});
+    totalResEl.textContent = tot.totalRes||'—';
+  }
+}
+
+function updateBrandTotalsDisplay() {
+  const brands = (STATE.pasteData||{}).brands || {};
+  const ent = brands.enterprise||{};
+  const nat = brands.national||{};
+  const ala = brands.alamo||{};
+  const tot = brands.total||{};
+
+  const natEl=document.getElementById('brand-nat');
+  const alaEl=document.getElementById('brand-ala');
+  const entEl=document.getElementById('brand-ent');
+  const retEl=document.getElementById('brand-ret');
+  const rentedEl=document.getElementById('brand-rented');
+
+  if(natEl) natEl.textContent = nat.totalRes||'—';
+  if(alaEl) alaEl.textContent = ala.totalRes||'—';
+  if(entEl) entEl.textContent = ent.totalRes||'—';
+  if(retEl) retEl.textContent = tot.totRet||'—';
+  if(rentedEl) rentedEl.textContent = tot.rented||'—';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════
+// DNR / DNQ SYSTEM
+// ═══════════════════════════════════════════════════════════════════════
+var DNQ_REASONS = [
+  'No valid credit card','Credit/debit card declined','No CC in renter name',
+  'No valid driver license','DL expired','DL suspended/revoked',
+  'Under age requirement (21/25)','No insurance (required state)',
+  'Outstanding balance / previous damage','Previous DNR on record',
+  'Failed identity verification','Other (see notes)'
+];
+var DNR_REASONS = [
+  'Fraud — false identity','Fraud — stolen credit card','Vehicle not returned',
+  'Unreported damage','Threatening/abusive behavior','Driving under influence',
+  'Previous unpaid damage claim','Corporate blacklist','Other (see notes)'
+];
+
+function getDNRList(){try{return JSON.parse(localStorage.getItem('cmh-dnr')||'[]');}catch(e){return[];}}
+function getDNQList(){try{return JSON.parse(localStorage.getItem('cmh-dnq')||'[]');}catch(e){return[];}}
+function saveDNR(list){localStorage.setItem('cmh-dnr',JSON.stringify(list));}
+function saveDNQ(list){localStorage.setItem('cmh-dnq',JSON.stringify(list));}
+
+function pruneDNQ(){
+  const cutoff=Date.now()-48*60*60*1000;
+  saveDNQ(getDNQList().filter(r=>r.ts>=cutoff));
+}
+
+function addDNR(name,reason){
+  if(!name.trim())return;
+  const list=getDNRList();
+  list.unshift({id:Date.now(),name:name.trim(),reason,added:new Date().toLocaleDateString(),ts:Date.now()});
+  saveDNR(list);
+  refreshDNRDNQCards();
+  toast('🚫 DNR added: '+name.trim());
+}
+
+function addDNQ(name,reason){
+  if(!name.trim())return;
+  const list=getDNQList();
+  list.unshift({id:Date.now(),name:name.trim(),reason,added:new Date().toLocaleString(),ts:Date.now()});
+  saveDNQ(list);
+  refreshDNRDNQCards();
+  toast('⚠️ DNQ logged: '+name.trim());
+}
+
+function deleteDNR(id){saveDNR(getDNRList().filter(r=>r.id!==id));refreshDNRDNQCards();}
+function deleteDNQ(id){saveDNQ(getDNQList().filter(r=>r.id!==id));refreshDNRDNQCards();}
+
+function openAddDNR(){
+  if(typeof isManagerMode==='function'&&!isManagerMode()){
+    toast('Manager Mode required for DNR');return;
+  }
+  openModal('🚫 Add Fraud / DNR Alert',`
+    <div style="display:grid;gap:12px">
+      <input id="dnr-name" type="text" placeholder="Customer full name"
+        style="width:100%;padding:11px;background:var(--bg3);border:1px solid var(--bdr2);
+          border-radius:6px;color:var(--txt);font-size:14px">
+      <div>
+        <select id="dnr-reason-sel" onchange="document.getElementById('dnr-notes').style.display=this.value==='Other (see notes)'?'block':'none'"
+          style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--bdr2);
+            border-radius:6px;color:var(--txt);font-size:13px;margin-bottom:6px">
+          ${DNR_REASONS.map(r=>`<option>${r}</option>`).join('')}
+        </select>
+        <textarea id="dnr-notes" placeholder="Additional notes..." rows="2"
+          style="display:none;width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);
+            border-radius:6px;color:var(--txt);font-size:12px;resize:none"></textarea>
+      </div>
+      <button onclick="const n=document.getElementById('dnr-name').value;
+        const r=document.getElementById('dnr-reason-sel').value;
+        const no=document.getElementById('dnr-notes').value;
+        addDNR(n,r==='Other (see notes)'?(no||r):r);closeModal();"
+        style="padding:11px;border-radius:6px;border:none;background:var(--red);
+          color:#fff;font-size:13px;font-weight:700;cursor:pointer">
+        🚫 Add to DNR / Fraud Alert List
+      </button>
+      <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+    </div>`);
+  setTimeout(()=>{const el=document.getElementById('dnr-name');if(el)el.focus();},100);
+}
+
+function openAddDNQ(){
+  openModal('⚠️ Log DNQ Customer',`
+    <div style="display:grid;gap:12px">
+      <input id="dnq-name" type="text" placeholder="Customer full name"
+        style="width:100%;padding:11px;background:var(--bg3);border:1px solid var(--bdr2);
+          border-radius:6px;color:var(--txt);font-size:14px">
+      <div>
+        <select id="dnq-reason-sel" onchange="document.getElementById('dnq-notes').style.display=this.value==='Other (see notes)'?'block':'none'"
+          style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--bdr2);
+            border-radius:6px;color:var(--txt);font-size:13px;margin-bottom:6px">
+          ${DNQ_REASONS.map(r=>`<option>${r}</option>`).join('')}
+        </select>
+        <textarea id="dnq-notes" placeholder="Additional notes..." rows="2"
+          style="display:none;width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);
+            border-radius:6px;color:var(--txt);font-size:12px;resize:none"></textarea>
+      </div>
+      <button onclick="const n=document.getElementById('dnq-name').value;
+        const r=document.getElementById('dnq-reason-sel').value;
+        const no=document.getElementById('dnq-notes').value;
+        addDNQ(n,r==='Other (see notes)'?(no||r):r);closeModal();"
+        style="padding:11px;border-radius:6px;border:none;
+          background:var(--amber);color:#000;font-size:13px;font-weight:700;cursor:pointer">
+        ⚠️ Log DNQ Customer
+      </button>
+      <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+    </div>`);
+  setTimeout(()=>{const el=document.getElementById('dnq-name');if(el)el.focus();},100);
+}
+
+function buildDNRDNQCards(){
+  pruneDNQ();
+  const dnr=getDNRList();
+  const dnq=getDNQList();
+  const isMgr=typeof isManagerMode==='function'&&isManagerMode();
+  const today=new Date().toLocaleDateString();
+
+  // DNR card
+  let dnrHtml=`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);
+    border-left:3px solid var(--red);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--red)">
+        🚫 Fraud / DNR${dnr.length?' ('+dnr.length+')':''}
+      </div>
+      ${isMgr?`<button onclick="openAddDNR()"
+        style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid var(--red);
+          background:rgba(239,68,68,.2);color:var(--red);cursor:pointer;font-weight:700">+ Add</button>`:''}
+    </div>`;
+  if(!dnr.length){
+    dnrHtml+=`<div style="font-size:11px;color:var(--txt3);font-style:italic">No active alerts</div>`;
+  } else {
+    dnr.forEach(r=>{
+      dnrHtml+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;
+        border-bottom:1px solid rgba(239,68,68,.15)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:800;color:#fca5a5">${r.name}</div>
+          <div style="font-size:10px;color:var(--txt3)">${r.reason} · Added ${r.added}</div>
+        </div>
+        ${isMgr?`<button onclick="if(confirm('Remove DNR for ${r.name}?'))deleteDNR(${r.id})"
+          style="font-size:18px;background:none;border:none;color:var(--txt3);cursor:pointer;
+            line-height:1;padding:0 2px;flex-shrink:0">×</button>`:''}
+      </div>`;
+    });
+  }
+  dnrHtml+=`</div>`;
+
+  // DNQ card
+  const todayDNQ=dnq.filter(r=>r.added.startsWith(today));
+  const yestDNQ =dnq.filter(r=>!r.added.startsWith(today));
+  let dnqHtml=`<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);
+    border-left:3px solid var(--amber);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--amber)">
+        ⚠️ Did Not Qualify${dnq.length?' ('+dnq.length+')':''}
+      </div>
+      <button onclick="openAddDNQ()"
+        style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid var(--amber);
+          background:rgba(245,158,11,.15);color:var(--amber);cursor:pointer;font-weight:700">+ Add</button>
+    </div>`;
+
+  function dnqRow(r,dim){
+    return `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;
+      border-bottom:1px solid rgba(245,158,11,.12);opacity:${dim?.65:1}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:${dim?11:13}px;font-weight:${dim?600:700};color:#fcd34d">${r.name}</div>
+        <div style="font-size:10px;color:var(--txt3)">${r.reason}</div>
+      </div>
+      <button onclick="deleteDNQ(${r.id})"
+        style="font-size:18px;background:none;border:none;color:var(--txt3);cursor:pointer;
+          line-height:1;padding:0 2px;flex-shrink:0">×</button>
+    </div>`;
+  }
+
+  if(!dnq.length){
+    dnqHtml+=`<div style="font-size:11px;color:var(--txt3);font-style:italic">No DNQ customers in last 48hrs</div>`;
+  } else {
+    if(todayDNQ.length){
+      dnqHtml+=`<div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--txt3);margin-bottom:3px">Today</div>`;
+      dnqHtml+=todayDNQ.map(r=>dnqRow(r,false)).join('');
+    }
+    if(yestDNQ.length){
+      dnqHtml+=`<div style="font-size:8px;font-weight:700;text-transform:uppercase;color:var(--txt3);margin:6px 0 3px">Yesterday</div>`;
+      dnqHtml+=yestDNQ.map(r=>dnqRow(r,true)).join('');
+    }
+  }
+  dnqHtml+=`</div>`;
+
+  return dnrHtml+dnqHtml;
+}
+
+function refreshDNRDNQCards(){
+  const el=document.getElementById('dnr-dnq-section');
+  if(el) el.innerHTML=buildDNRDNQCards();
+  // Also update checklist if visible
+  const clEl=document.getElementById('dnr-dnq-checklist');
+  if(clEl) clEl.innerHTML=buildDNRDNQCards();
 }
 
 </script>
