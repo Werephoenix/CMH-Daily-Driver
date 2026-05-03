@@ -1653,6 +1653,12 @@ button { cursor: pointer; }
         border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer">
       Unlock
     </button>
+    <button onclick="confirmToday()"
+      style="padding:5px 12px;border-radius:4px;font-size:11px;font-weight:700;
+        border:1px solid var(--green);background:rgba(52,211,153,.1);
+        color:var(--green);cursor:pointer">
+      ✅ Confirm
+    </button>
   </div>
 
   <!-- Zone map — right now -->
@@ -1664,7 +1670,7 @@ button { cursor: pointer; }
     <button class="btn btn-g btn-sm" onclick="suggestLunches()">🍽 Auto Lunches</button>
     <button class="btn btn-gh btn-sm" onclick="undoCoverage()" title="Undo">↩ Undo</button>
     <button class="btn btn-gh btn-sm" onclick="redoCoverage()" title="Redo">↪ Redo</button>
-    <button class="btn btn-gh btn-sm" onclick="confirmToday()" style="margin-left:auto">✅ Confirm</button>
+    
   </div>
 
   <!-- Coverage chart -->
@@ -1880,6 +1886,24 @@ button { cursor: pointer; }
       <div id="hist-content"></div>
     </div>
   </div>
+
+<!-- MODAL OVERLAY -->
+<div id="modal-overlay" style="display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.75);z-index:1000;
+  align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;
+    width:100%;max-width:420px;max-height:85vh;overflow-y:auto;padding:20px;
+    box-shadow:0 8px 32px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div id="modal-title" style="font-size:15px;font-weight:800;color:var(--txt)"></div>
+      <button onclick="closeModal()"
+        style="font-size:24px;color:var(--txt3);background:none;border:none;
+          cursor:pointer;line-height:1;padding:0 4px">×</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
 
 
 <!-- TOAST -->
@@ -2264,12 +2288,15 @@ var COVERAGE_RULES = {
   6: { label:'Saturday',  monday:false },
 };
 
-var COVERAGE_BY_HOUR = function(hour, dow) {
+var COVERAGE_BY_HOUR = function(hour, dow, exitAgentCount) {
   const isMonday = dow === 1;
+  const eaCount = exitAgentCount || 0;
+  // exitMin = total people needed at exit (agents + CXRs combined)
+  // counterMin = CXRs needed at counter
   if (hour < 5)  return { exitMin:1, counterMin:0, label:'Overnight' };
   if (hour < 7)  return { exitMin:isMonday?2:1, counterMin:1, label:'Early AM' };
   if (hour < 10) return { exitMin:isMonday?3:1, counterMin:2, label:'Morning' };
-  if (hour < 14) return { exitMin:isMonday?5:2, counterMin:isMonday?3:3, label:'Peak' };
+  if (hour < 14) return { exitMin:isMonday?5:2, counterMin:3, label:'Peak' };
   if (hour < 18) return { exitMin:isMonday?3:2, counterMin:2, label:'Afternoon' };
   if (hour < 24) return { exitMin:1, counterMin:1, label:'Evening' };
   return { exitMin:1, counterMin:0, label:'Late Night' };
@@ -2549,6 +2576,12 @@ window.onload = function() {
     if (Object.keys(_startExp).length > 0) {
       if (typeof autoLoadFromExpected === 'function')
         autoLoadFromExpected(_startExp, new Date().getDay());
+      // Pre-build rotations so timeline shows immediately
+      try {
+        const _rot = buildSmartRotation();
+        window._lastRotations = {};
+        if (_rot && _rot.rotations) _rot.rotations.forEach(r=>{window._lastRotations[r.pid]=r;});
+      } catch(e) {}
       if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
       if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
     }
@@ -3262,6 +3295,28 @@ function parseShiftStartHour(code) {
   if (ap === 'P' && num < 12) num += 12;
   if (ap === 'A' && num === 12) num = 0;
   return num;
+}
+
+function parseShiftEndHour(code) {
+  if (!code) return null;
+  // Handle close codes: "4P-C", "12P-10P-C" etc.
+  if (/-C$/i.test(code)) return 26; // close = ~2am next day
+  const m = code.match(/-(\d{1,3})(A|P)/i);
+  if (!m) return null;
+  let num = parseInt(m[1]);
+  const ap = m[2].toUpperCase();
+  if (num > 99) num = Math.floor(num/100) + (num%100)/60;
+  if (ap === 'P' && num < 12) num += 12;
+  if (ap === 'A' && num === 12) num = 0;
+  return num;
+}
+function parseShiftToTimes(code) {
+  if (!code || code === 'OFF') return { shiftStart: null, shiftEnd: null };
+  const start = parseShiftStartHour(code);
+  let end = parseShiftEndHour(code);
+  // Fix overnight: end should be > start (or next day)
+  if (start != null && end != null && end <= start) end += 24;
+  return { shiftStart: start, shiftEnd: end, shiftCode: code };
 }
 
 // Apply parsed schedule to state
@@ -4018,7 +4073,7 @@ function buildSmartRotation() {
       let startStation;
       if (stationOverride === 'Exit Booth') startStation = 'exit';
       else if (stationOverride === 'Counter') startStation = 'counter';
-      else startStation = null; // will be auto-assigned below
+      else startStation = 'counter'; // default to counter
       workingCXRs.push({ ...person, shift, startStation, pid });
     }
   });
@@ -4103,7 +4158,12 @@ function buildSmartRotation() {
     const shiftEnd   = shift.end;
 
     const b1Station = startStation || 'counter';
-    const b2Station = b1Station === 'counter' ? 'exit' : 'counter';
+    // b2Station: only flip to exit if this person is assigned Exit Booth
+    // (meaning we actually need them there). Otherwise stay at counter.
+    const assignedExit = (STATE.staffStation||{})[pid] === 'Exit Booth';
+    const b2Station = assignedExit
+      ? (b1Station === 'counter' ? 'exit' : 'counter')  // normal exit rotation
+      : 'counter';  // counter all day unless assigned to exit
 
     // Check if block2 (exit) would exceed 4 hours
     const exitBlock = b1Station === 'exit' ? block1H : block2H;
@@ -4130,7 +4190,36 @@ function buildSmartRotation() {
   // Build hourly coverage map
   const coverage = buildHourlyCoverage(rotations, workingExit, today);
 
-  return { rotations, workingExit, coverage, rules, exitGap, dow };
+
+  // Build rotation objects for exit agents (with lunch)
+  const exitRotations = workingExit.map(ea => {
+    const pid   = ea.name.replace(/\s/g,'_');
+    const shift = ea.shift;
+    // Handle overnight shifts (end < start means crosses midnight)
+    const dur = shift.end < shift.start ? (24 - shift.start) + shift.end : shift.end - shift.start;
+    const shiftEndAdj = shift.end < shift.start ? shift.end + 24 : shift.end;
+    // 30min lunch if shift >= 5hrs, centered on shift midpoint
+    const hasLunch = dur >= 5;
+    const lunchStart = hasLunch ? shift.start + (dur / 2) - 0.25 : null;
+    const lunchEnd   = hasLunch ? lunchStart + 0.5 : null;
+    return {
+      pid,
+      name:       ea.name,
+      nick:       ea.nick,
+      shiftCode:  shift.code,
+      shiftStart: shift.start,
+      shiftEnd:   shift.end,
+      b1: { station:'exit', from:shift.start, to:hasLunch?lunchStart:shiftEndAdj, hours:hasLunch?lunchStart-shift.start:dur },
+      lunch: hasLunch ? { from:lunchStart, to:lunchEnd } : null,
+      b2: hasLunch ? { station:'exit', from:lunchEnd, to:shiftEndAdj, hours:shiftEndAdj-lunchEnd } : null,
+      warnExceedsLimit: false, bumpNeeded: null, fullShift:'exit',
+    };
+  });
+
+  // Merge exit rotations into main rotations array for _lastRotations
+  const allRotations = [...rotations, ...exitRotations];
+
+  return { rotations: allRotations, workingExit, coverage, rules, exitGap, dow };
 }
 
 function buildHourlyCoverage(rotations, exitAgents, date) {
@@ -4906,12 +4995,49 @@ function autoLoadFromExpected(expectedToday, dow) {
     if(e.person.role==='CXR') delete STATE.staffStation[pid];
   });
   Object.entries(expectedToday).forEach(([pid,e])=>{ if(e.person.role==='EXIT') STATE.staffStation[pid]='Exit Booth'; });
-  Object.entries(expectedToday).forEach(([pid,e])=>{ if(['ARM','BRM','ABRM','MT'].includes(e.person.role)) STATE.staffStation[pid]='Counter Manager'; });
+  // Auto-assign managers: opener → Emerald Booth (show runner), others → Counter Manager
+  const mgmtOnShift = Object.entries(expectedToday)
+    .filter(([,e])=>['ARM','BRM','ABRM','MT'].includes(e.person.role))
+    .sort((a,b)=>(a[1].person.shiftStart||99)-(b[1].person.shiftStart||99));
+
+  mgmtOnShift.forEach(([pid,e])=>{
+    // Don't override manually set stations
+    if (STATE.staffStation[pid] && STATE.staffStation[pid] !== 'Counter Manager') return;
+    STATE.staffStation[pid] = 'Counter Manager';
+  });
+
+  // Assign Emerald to the manager currently acting as show runner:
+  // The manager with the earliest shift start who is still on shift right now
+  const nowHere = new Date().getHours() + new Date().getMinutes()/60;
+  const currentlyOnShift = mgmtOnShift.filter(([pid,e])=>{
+    const ov=(STATE.shiftMod||{})[pid]||{};
+    const ss=ov.start!=null?ov.start:e.person.shiftStart;
+    const se=ov.end!=null?ov.end:e.person.shiftEnd;
+    return ss!=null&&nowHere>=ss&&nowHere<se;
+  });
+
+  // Emerald = earliest on-shift manager (show runner for this part of day)
+  const emeraldMgr = currentlyOnShift[0];
+  if (emeraldMgr) {
+    const [epid] = emeraldMgr;
+    if (!STATE.staffStation[epid] || STATE.staffStation[epid]==='Counter Manager') {
+      STATE.staffStation[epid] = 'Emerald Booth';
+    }
+  }
   const exitAgentCount = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='EXIT'&&STATE.staffDuty[pid]).length;
   const rules   = (typeof COVERAGE_RULES!=='undefined'&&COVERAGE_RULES[dow])||{};
-  const exitMin = Math.max(0,(rules.exitMin||1)-exitAgentCount);
+  const isMonday = dow===1;
+  const baseExitMin = isMonday ? 5 : 1;
+  // How many CXRs we need at exit = max(0, exitMin - exitAgentsCovered)
+  // Exit agents cover 1 booth each for their full shift
+  const cxrExitNeeded = Math.max(0, baseExitMin - exitAgentCount);
   const cxrTotal = Object.entries(expectedToday).filter(([,e])=>e.person.role==='CXR').length;
-  const exitMax = Math.max(exitMin, Math.min(3, Math.round(cxrTotal*0.30)));
+  // exitMax: enough to meet minimum, but cap at reasonable number
+  // If exit agents already meet minimum, no CXRs need to go to exit (exitMax=0)
+  // But we always want at least 1 CXR at exit as backup during peak
+  const exitMax = isMonday
+    ? Math.max(cxrExitNeeded, Math.min(5, Math.round(cxrTotal*0.4)))
+    : Math.max(cxrExitNeeded, exitAgentCount>=baseExitMin ? 0 : 1);
   let lastSt={};try{const h=JSON.parse(localStorage.getItem('cmh-history-v2')||'{}');const dk=Object.keys(h).sort().slice(-1)[0];if(dk&&h[dk]&&h[dk].staffStation)lastSt=h[dk].staffStation;}catch(e){}
   let pats={};try{pats=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');}catch(err){}
   const cxrs = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='CXR')
@@ -5089,6 +5215,15 @@ function confirmToday() {
       if (person) STATE.staffStation[pid] = suggestStation(person, shift);
     }
   });
+
+  // Build and store rotations for timeline display
+  try {
+    const _rot = buildSmartRotation();
+    window._lastRotations = {};
+    if (_rot && _rot.rotations) {
+      _rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
+    }
+  } catch(e) {}
 
   if(!STATE.fields)STATE.fields={}; STATE.fields.schedConfirmed='1'; saveState();
   saveExitFairnessForToday();
@@ -5830,7 +5965,8 @@ function openModal(title, bodyHtml) {
     const bodyEl  = document.getElementById('modal-body');
     if (titleEl) titleEl.textContent = title;
     if (bodyEl)  bodyEl.innerHTML = bodyHtml;
-    overlay.classList.add('show');
+    overlay.style.display = 'flex';
+    overlay.onclick = function(e){ if(e.target===overlay) closeModal(); };
   } else {
     // Fallback: strip HTML tags for alert
     const plain = bodyHtml.replace(/<[^>]+>/g, '');
@@ -5839,10 +5975,8 @@ function openModal(title, bodyHtml) {
 }
 function closeModal() {
   const overlay = document.getElementById('modal-overlay');
-  if (overlay) overlay.classList.remove('show');
+  if (overlay) overlay.style.display = 'none';
 }
-
-// putStoredSchedule: backward compat alias (saves to 'mgmt' section)
 function putStoredSchedule(sched) {
   if (typeof putStoredSection === 'function') {
     putStoredSection('mgmt', sched);
@@ -8096,7 +8230,10 @@ function buildExpectedToday() {
         namePidVariants(p.name).some(v => pid.startsWith(v.slice(0,8)) || v.startsWith(pid.slice(0,8))));
       if (person) {
         const epid = normPid(person.name);
-        expected[epid] = { person, shift, source:'schedule' };
+        // Parse shift code into start/end times and apply to person
+        const times = parseShiftToTimes(shift);
+        const personWithTimes = Object.assign({}, person, times);
+        expected[epid] = { person: personWithTimes, shift, source:'schedule' };
       }
     });
   }
@@ -8318,132 +8455,217 @@ function buildDashSchedMini() {
   const exp      = typeof buildExpectedToday==='function'?buildExpectedToday():{};
   const stations = STATE.staffStation   || {};
   const callouts = STATE.todayOverrides || {};
+  const mods     = STATE.shiftMod       || {};
   const nowH     = new Date().getHours() + new Date().getMinutes()/60;
   const dow      = new Date().getDay();
 
   if (!Object.keys(exp).length) {
-    el.innerHTML='<div style="color:var(--txt3);font-size:11px">No schedule — confirm in Opening checklist</div>';
+    el.innerHTML='<div style="color:var(--txt3);font-size:11px">No schedule loaded</div>';
     return;
   }
 
-  // Get zone for each person right now
-  function getZoneNow(pid, person) {
-    if (callouts[pid]==='callout') return 'off';
-    const rot = window._lastRotations && window._lastRotations[pid];
-    const mods = STATE.shiftMod||{}, ov=mods[pid]||{};
-    const ss = ov.start!=null?ov.start:person.shiftStart;
-    const se = ov.end!=null?ov.end:person.shiftEnd;
-    if (ss==null||nowH<ss||nowH>=se) return 'off';
-    if (rot) {
-      if (rot.lunch&&nowH>=rot.lunch.from&&nowH<rot.lunch.to) return 'lunch';
-      if (rot.b1&&nowH>=rot.b1.from&&nowH<rot.b1.to) return rot.b1.station==='exit'?'exit':'counter';
-      if (rot.b2&&nowH>=rot.b2.from&&nowH<=rot.b2.to) return rot.b2.station==='exit'?'exit':'counter';
-      return 'off';
-    }
-    const st = stations[pid]||(person.role==='EXIT'?'Exit Booth':'Counter');
-    if (st==='Exit Booth'||person.role==='EXIT') return 'exit';
-    if (['ARM','BRM','ABRM','MT'].includes(person.role)) return 'mgmt';
-    return 'counter';
-  }
-
-  // Sort by shift start
-  const people = Object.entries(exp)
-    .sort((a,b)=>(a[1].person.shiftStart||99)-(b[1].person.shiftStart||99));
-
-  // Group by current zone
-  const zones = {exit:[], counter:[], emerald:[], returns:[], off:[]};
-  const mgmt  = [];
-
-  people.forEach(([pid,entry]) => {
-    const p    = entry.person;
-    const nick = p.nick||p.name.split(' ')[0];
-    const isMgmt = ['ARM','BRM','ABRM','MT'].includes(p.role);
-    const mods = STATE.shiftMod||{}, ov=(mods[pid]||{});
-    const ss = ov.start!=null?ov.start:p.shiftStart;
-    const se = ov.end!=null?ov.end:p.shiftEnd;
-    const zone = getZoneNow(pid, p);
-    const isNow = zone !== 'off';
-    const shiftStr = ss!=null ? fmtHm(ss)+'–'+fmtHm(se) : p.shiftCode||'—';
-
-    const row = {pid, nick, zone, shiftStr, isNow, isMgmt, callout:callouts[pid]==='callout'};
-    if (isMgmt) mgmt.push(row);
-    else if (zones[zone]) zones[zone].push(row);
-    else zones.counter.push(row);
-  });
-
-  function fmtHm(h) {
+  function fmtH(h) {
     if (h==null) return '—';
     const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;
     return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;
   }
-
-  function personChip(row) {
-    const zColors = {exit:'var(--green)',counter:'var(--acc)',emerald:'#6366f1',
-                     returns:'#06b6d4',lunch:'var(--amber)',mgmt:'var(--txt3)',off:'var(--txt3)'};
-    const col = zColors[row.zone]||'var(--txt3)';
-    const zLabel = {exit:'Exit',counter:'Ctr',emerald:'EB',returns:'Ret',lunch:'🍽',mgmt:'',off:''}[row.zone]||'';
-    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;
-      opacity:${row.callout?'0.4':row.isNow?'1':'0.55'}">
-      <div style="width:6px;height:6px;border-radius:50%;background:${row.isNow?col:'var(--bdr2)'};flex-shrink:0"></div>
-      <div style="flex:1;min-width:0">
-        <span style="font-size:11px;font-weight:${row.isNow?700:400};color:${row.callout?'var(--red)':row.isNow?'var(--txt)':'var(--txt3)'};
-          text-decoration:${row.callout?'line-through':'none'}">${row.nick}</span>
-        <span style="font-size:9px;color:var(--txt3);margin-left:4px;font-family:var(--ff-mono)">${row.shiftStr}</span>
-      </div>
-      ${row.isNow&&zLabel?`<span style="font-size:8px;font-weight:800;color:${col}">${zLabel}</span>`:''}
-    </div>`;
+  function fmtDur(h) {
+    // Format remaining/elapsed hours
+    const tot=Math.round(h*60);
+    const hr=Math.floor(tot/60),mn=tot%60;
+    return hr>0?(hr+'h'+(mn?mn+'m':'')):(mn+'m');
   }
 
-  // Coverage rules for right now
-  const rules = typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(Math.floor(nowH),dow):{exitMin:1,counterMin:2};
-  const exitOk = zones.exit.length >= rules.exitMin;
-  const ctrOk  = zones.counter.length >= rules.counterMin;
+  function getInfo(pid, person) {
+    if (callouts[pid]==='callout') return {zone:'callout',label:'Called Off',color:'var(--red)',timeNote:'',lunchNote:''};
+    const ov=mods[pid]||{};
+    const ss=ov.start!=null?ov.start:person.shiftStart;
+    const se=ov.end!=null?ov.end:person.shiftEnd;
+    if (ss==null||nowH<ss||nowH>=se) return {zone:'off',label:'Off shift',color:'var(--txt3)',timeNote:'',lunchNote:''};
 
-  let out = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+    // Check special blocks first (emerald booth, shuttling, lunch suggestion, etc.)
+    const specials=(STATE.specialBlocks||{})[pid]||[];
+    for (const b of specials) {
+      if (nowH>=b.from&&nowH<b.to) {
+        const col=b.key==='lunch'?'var(--amber)':b.key==='emerald'?'#6366f1':b.key==='returns'?'#06b6d4':'#f59e0b';
+        const lbl=b.key==='lunch'?'🍽 Lunch':b.label||b.key;
+        return {zone:b.key,label:lbl,color:col,timeNote:fmtDur(b.to-nowH)+' left',lunchNote:''};
+      }
+    }
+    // Find upcoming lunch from special blocks
+    const nextLunch=specials.filter(b=>(b.key==='lunch')&&b.from>nowH).sort((a,b2)=>a.from-b2.from)[0];
 
-  // Exit column
-  out += `<div>
-    <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
-      color:${exitOk?'var(--green)':'var(--red)'};padding-bottom:4px;
-      border-bottom:2px solid ${exitOk?'var(--green)':'var(--red)'};margin-bottom:4px">
-      🟩 Exit · ${zones.exit.length}/${rules.exitMin}
-    </div>`;
-  out += zones.exit.map(personChip).join('');
-  // Off-shift exit agents
-  zones.off.filter(r=>r.zone==='off'&&Object.values(exp).find(e=>normPid(e.person.name)===r.pid)?.person.role==='EXIT').forEach(r=>{
-    out += personChip({...r,isNow:false});
+    const rot=window._lastRotations&&window._lastRotations[pid];
+    let zone='counter', label='Counter', color='var(--acc)', timeNote='', lunchNote='';
+    if (nextLunch) lunchNote='🍽 '+fmtH(nextLunch.from);
+
+    if (rot) {
+      // Determine current block
+      if (rot.lunch&&nowH>=rot.lunch.from&&nowH<rot.lunch.to) {
+        zone='lunch'; label='🍽 Lunch'; color='var(--amber)';
+        const rem=rot.lunch.to-nowH;
+        timeNote=fmtDur(rem)+' left';
+      } else if (rot.b1&&nowH>=rot.b1.from&&nowH<(rot.lunch?rot.lunch.from:rot.b1.to)) {
+        zone=rot.b1.station==='exit'?'exit':'counter';
+        label=rot.b1.station==='exit'?'Exit':'Counter';
+        color=rot.b1.station==='exit'?'var(--green)':'var(--acc)';
+        const blockEnd=rot.lunch?rot.lunch.from:rot.b1.to;
+        const rem=blockEnd-nowH;
+        timeNote=fmtDur(rem)+' left';
+        if (rot.lunch&&rot.lunch.from>nowH) {
+          const lunchIn=rot.lunch.from-nowH;
+          if(!lunchNote) lunchNote='🍽 '+fmtH(rot.lunch.from);
+        }
+      } else if (rot.b2&&nowH>=(rot.lunch?rot.lunch.to:rot.b2.from)&&nowH<=rot.b2.to) {
+        zone=rot.b2.station==='exit'?'exit':'counter';
+        label=rot.b2.station==='exit'?'Exit':'Counter';
+        color=rot.b2.station==='exit'?'var(--green)':'var(--acc)';
+        const rem=rot.b2.to-nowH;
+        timeNote=fmtDur(rem)+' left';
+      } else if (rot.b3&&nowH>=rot.b3.from&&nowH<=rot.b3.to) {
+        zone=rot.b3.station==='exit'?'exit':'counter';
+        label=rot.b3.station==='exit'?'Exit':'Counter';
+        color=rot.b3.station==='exit'?'var(--green)':'var(--acc)';
+        timeNote=fmtDur(rot.b3.to-nowH)+' left';
+      }
+    } else {
+      // No rotation — use station assignment
+      const st=stations[pid];
+      if (person.role==='EXIT'||st==='Exit Booth') { zone='exit'; label='Exit'; color='var(--green)'; }
+      else if (['ARM','BRM','ABRM','MT'].includes(person.role)) {
+        const mgmtSt=st||'Floater';
+        if(mgmtSt==='Emerald Booth'){zone='emerald';label='🌟 Emerald';color='#6366f1';}
+        else if(mgmtSt==='Returns'){zone='returns';label='↩ Returns';color='#06b6d4';}
+        else if(mgmtSt==='Exit Booth'){zone='exit';label='Exit';color='var(--green)';}
+        else if(mgmtSt==='Floater'){zone='floater';label='🚗 Floater';color='var(--amber)';}
+        else{zone='mgmt';label=mgmtSt?mgmtSt.replace(' Manager',''):'Counter';color='var(--txt3)';}
+      } else if (st==='Counter') { zone='counter'; label='Counter'; color='var(--acc)'; }
+      const rem=se-nowH;
+      timeNote=fmtDur(rem)+' left';
+    }
+    return {zone, label, color, timeNote, lunchNote};
+  }
+
+  // Sort by shift start
+  const people=Object.entries(exp)
+    .sort((a,b)=>(a[1].person.shiftStart||99)-(b[1].person.shiftStart||99));
+
+  // Separate into groups
+  const onShift=[], offShift=[], mgmtOn=[];
+  people.forEach(([pid,entry])=>{
+    const p=entry.person, isMgmt=['ARM','BRM','ABRM','MT'].includes(p.role);
+    const info=getInfo(pid,p);
+    const nick=p.nick||p.name.split(' ')[0];
+    const ov=mods[pid]||{};
+    const ss=ov.start!=null?ov.start:p.shiftStart;
+    const se=ov.end!=null?ov.end:p.shiftEnd;
+    const shiftStr=fmtH(ss)+'–'+fmtH(se);
+    const _ov2=(mods[pid]||{}),_ss2=_ov2.start!=null?_ov2.start:p.shiftStart;
+    const item={pid,nick,info,shiftStr,isMgmt,callout:callouts[pid]==='callout',ss:_ss2};
+    if(info.zone==='off'||info.zone==='callout')offShift.push(item);
+    else if(isMgmt)mgmtOn.push(item);
+    else onShift.push(item);
   });
-  out += `</div>`;
 
-  // Counter + Mgmt column
-  out += `<div>
-    <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
-      color:${ctrOk?'var(--acc)':'var(--amber)'};padding-bottom:4px;
-      border-bottom:2px solid ${ctrOk?'var(--acc)':'var(--amber)'};margin-bottom:4px">
-      🟦 Counter · ${zones.counter.length}/${rules.counterMin}
+  function personRow(item) {
+    const {nick,info,shiftStr,callout,isMgmt}=item;
+    const dimmed=info.zone==='off'||info.zone==='callout';
+    // For managers show their station assignment label
+    const mgmtStation=isMgmt&&info.label&&info.label!=='Off shift'?info.label:'';
+    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;
+      border-bottom:1px solid rgba(255,255,255,.04);opacity:${dimmed?.5:1}">
+      <div style="width:8px;height:8px;border-radius:50%;background:${info.color};flex-shrink:0;
+        box-shadow:${info.zone!=='off'&&info.zone!=='callout'?'0 0 4px '+info.color+'88':'none'}"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:11px;font-weight:${isMgmt?500:700};
+          color:${callout?'var(--red)':isMgmt?'var(--txt2)':'var(--txt)'};
+          text-decoration:${callout?'line-through':'none'};
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          ${nick}${isMgmt&&mgmtStation?` <span style="font-size:9px;color:${info.color};font-weight:600">· ${mgmtStation}</span>`:''}
+          ${info.zone==='lunch'?'<span style="color:var(--amber);font-size:9px"> · Lunch</span>':''}
+        </div>
+        ${!isMgmt?`<div style="font-size:9px;color:var(--txt3);display:flex;gap:6px;align-items:center">
+          <span style="color:${info.color};font-weight:600">${info.label}</span>
+          ${info.timeNote?`<span>${info.timeNote}</span>`:''}
+          ${info.lunchNote?`<span style="color:var(--amber)">${info.lunchNote}</span>`:''}
+        </div>`:''}
+      </div>
     </div>`;
-  out += zones.counter.map(personChip).join('');
-
-  if (mgmt.length) {
-    out += `<div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
-      color:var(--txt3);padding:4px 0 3px;border-bottom:1px solid var(--bdr);margin:6px 0 3px">Mgmt</div>`;
-    out += mgmt.map(r=>personChip({...r,zone:'mgmt'})).join('');
-  }
-  out += `</div>`;
-  out += `</div>`;
-
-  // Off/called out strip
-  const offPeople = Object.entries(exp)
-    .filter(([pid])=>callouts[pid]==='callout')
-    .map(([,e])=>e.person.nick||e.person.name.split(' ')[0]);
-  if (offPeople.length) {
-    out += `<div style="margin-top:6px;padding-top:5px;border-top:1px solid var(--bdr);
-      font-size:9px;color:var(--red)">❌ Called Off: ${offPeople.join(', ')}</div>`;
   }
 
-  el.innerHTML = out;
+  const rules=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(Math.floor(nowH),dow):{exitMin:1,counterMin:2};
+  const exitOk=onShift.filter(i=>i.info.zone==='exit').length>=rules.exitMin;
+  const ctrOk=onShift.filter(i=>(i.info.zone==='counter'||i.info.zone==='mgmt')&&!i.isMgmt).length>=rules.counterMin;
 
-  function normPid(name){return name.replace(/\s/g,'_');}
+  function zoneCard(title,icon,people,borderColor,minReq) {
+    const ok=people.length>=(minReq||0);
+    const hc=minReq?(ok?borderColor:'var(--red)'):borderColor;
+    return `<div style="background:var(--bg3);border:1px solid ${borderColor}33;border-top:2px solid ${borderColor};border-radius:6px;padding:8px;min-height:52px">
+      <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:${hc};margin-bottom:5px;display:flex;justify-content:space-between">
+        <span>${icon} ${title}</span>${minReq?`<span style="color:${hc}">${people.length}/${minReq}</span>`:''}
+      </div>
+      ${people.length?people.map(personRow).join(''):`<div style="font-size:9px;color:var(--red);opacity:.7">⚠ Empty</div>`}
+    </div>`;
+  }
+
+  const exitPeople    =onShift.filter(i=>i.info.zone==='exit');
+  const ctrPeople     =onShift.filter(i=>i.info.zone==='counter'&&!i.isMgmt);
+  const emeraldPeople =[...onShift,...mgmtOn].filter(i=>i.info.zone==='emerald');
+  const returnsPeople =[...onShift,...mgmtOn].filter(i=>i.info.zone==='returns');
+  const lunchPeople   =onShift.filter(i=>i.info.zone==='lunch');
+  const floatPeople   =mgmtOn.filter(i=>i.info.zone==='floater'||(STATE.staffStation||{})[i.pid]==='Floater');
+
+  let out='';
+
+  // Row 1: Exit | Emerald | Counter
+  out+=`<div style="display:grid;grid-template-columns:2fr 1fr 2fr;gap:5px;margin-bottom:6px">`;
+  out+=zoneCard('Exit','🟩',exitPeople,'var(--green)',rules.exitMin);
+  out+=zoneCard('Emerald','🌟',emeraldPeople,'#6366f1',0);
+  out+=zoneCard('Counter','🟦',ctrPeople,'var(--acc)',rules.counterMin);
+  out+=`</div>`;
+
+  // Row 2: Returns | Lunch | Floater (only if occupied)
+  if(returnsPeople.length||lunchPeople.length||floatPeople.length){
+    out+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:6px">`;
+    out+=zoneCard('Returns','↩',returnsPeople,'#06b6d4',0);
+    out+=zoneCard('On Lunch','🍽',lunchPeople,'var(--amber)',0);
+    out+=zoneCard('Floater','🚗',floatPeople,'var(--txt3)',0);
+    out+=`</div>`;
+  }
+
+  // Managers row
+  // Managers in dedicated zone cards (don't show in management row)
+  const mgmtInZones=new Set([
+    ...emeraldPeople.map(i=>i.pid),
+    ...returnsPeople.map(i=>i.pid),
+    ...exitPeople.filter(i=>i.isMgmt).map(i=>i.pid),
+  ]);
+  // Management row: managers NOT in a specific zone card and NOT counter managers
+  // Counter managers go in counter zone, emerald goes in emerald, etc.
+  const activeMgmt=mgmtOn.filter(i=>!mgmtInZones.has(i.pid));
+  if(activeMgmt.length){
+    out+=`<div style="background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;padding:6px 8px;margin-bottom:6px">
+      <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:4px">🎯 Management</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">${activeMgmt.map(personRow).join('')}</div>
+    </div>`;
+  }
+
+  // Coming up
+  // Only show people whose shift starts in the future
+  const upcoming=offShift.filter(i=>
+    !i.callout&&i.info.zone==='off'&&i.ss!=null&&i.ss>nowH
+  ).sort((a,b)=>a.ss-b.ss).slice(0,4);
+  if(upcoming.length){
+    out+=`<div style="padding:4px 0;border-top:1px solid var(--bdr);margin-top:2px">
+      <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:4px">Coming Up</div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px">${upcoming.map(i=>`<span style="font-size:9px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:3px;padding:2px 6px;color:var(--txt3)">${i.nick} <span style="font-family:var(--ff-mono)">${i.shiftStr}</span></span>`).join('')}</div>
+    </div>`;
+  }
+
+  const calledOff=offShift.filter(i=>i.callout);
+  if(calledOff.length) out+=`<div style="margin-top:4px;font-size:9px;color:var(--red)">❌ Off: ${calledOff.map(i=>i.nick).join(', ')}</div>`;
+
+  el.innerHTML=out;
 }
 
 function showCLEmail(mode) {
@@ -9029,7 +9251,42 @@ function buildCoverageTimeline() {
 
   const zColor={counter:'var(--acc)',exit:'var(--green)',emerald:'#6366f1',
     returns:'#06b6d4',lunch:'var(--amber)',shuttling:'#f59e0b',break:'#78716c',
-    training:'#8b5cf6',mgmt:'rgba(37,99,235,.35)',off:'transparent'};
+    training:'#8b5cf6',mgmt:'#4f46e5',off:'transparent'};
+
+  // Auto-assign Emerald to currently on-shift manager (show runner)
+  {
+    const nowHH=new Date().getHours()+new Date().getMinutes()/60;
+    const hasEmerald=Object.entries(STATE.staffStation||{}).some(([pid,s])=>{
+      if(s!=='Emerald Booth')return false;
+      // Check they're still on shift
+      const ov=(STATE.shiftMod||{})[pid]||{};
+      const person=exp[pid]?.person;
+      const ss=ov.start!=null?ov.start:person?.shiftStart;
+      const se=ov.end!=null?ov.end:person?.shiftEnd;
+      return ss!=null&&nowHH>=ss&&nowHH<se;
+    });
+    if(!hasEmerald){
+      const onShiftMgmt=Object.entries(exp)
+        .filter(([pid,e])=>{
+          if(!['ARM','BRM','ABRM','MT'].includes(e.person.role))return false;
+          const ov=(STATE.shiftMod||{})[pid]||{};
+          const ss=ov.start!=null?ov.start:e.person.shiftStart;
+          const se=ov.end!=null?ov.end:e.person.shiftEnd;
+          return ss!=null&&nowHH>=ss&&nowHH<se;
+        })
+        .sort((a,b)=>(a[1].person.shiftStart||99)-(b[1].person.shiftStart||99));
+      if(onShiftMgmt.length){
+        if(!STATE.staffStation)STATE.staffStation={};
+        STATE.staffStation[onShiftMgmt[0][0]]='Emerald Booth';
+      }
+    }
+  }
+
+  // Count dedicated exit agents on shift
+  const exitAgentCount=Object.entries(exp).filter(([pid,e])=>
+    e.person.role==='EXIT'&&
+    (STATE.todayOverrides||{})[pid]!=='callout'
+  ).length;
 
   const people=Object.entries(exp).sort((a,b)=>{
     const ra=a[1].person.role,rb=b[1].person.role,mg=['ARM','BRM','ABRM','MT'];
@@ -9039,16 +9296,18 @@ function buildCoverageTimeline() {
   });
 
   // ── Zone map ────────────────────────────────────────────────────────────────
-  const nowFloor=Math.floor(nowH);
+  const nowFloor=Math.floor(nowH%24); // use 24h modulo for overnight hours
   const zones={exit:[],counter:[],emerald:[],returns:[]};
   people.forEach(([pid,e])=>{
     const z=getZone(pid,e.person,nowFloor),nick=e.person.nick||e.person.name.split(' ')[0];
+    if(z==='off')return; // skip off-shift
+    if(z==='lunch')return; // lunching people handled separately
     if(z==='exit')zones.exit.push(nick);
     else if(z==='emerald')zones.emerald.push(nick);
     else if(z==='returns')zones.returns.push(nick);
     else if(z==='counter'||z==='mgmt')zones.counter.push(nick);
   });
-  const rules=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(nowFloor,dow):{exitMin:1,counterMin:2};
+  const rules=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(nowFloor,dow,exitAgentCount):{exitMin:1,counterMin:2};
   const exitOk=zones.exit.length>=rules.exitMin,ctrOk=zones.counter.length>=rules.counterMin;
   const zEl=document.getElementById('zone-map');
   if(zEl){
@@ -9081,7 +9340,7 @@ function buildCoverageTimeline() {
     c+=`<div style="position:absolute;left:0;top:10px;font-size:8px;font-weight:700;color:var(--green)">Exit</div>`;
     c+=`<div style="display:flex;align-items:flex-end;height:${barH}px;margin-bottom:2px">`;
     HOURS.forEach((h,i)=>{
-      const ct=exitCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow):{exitMin:1};
+      const ct=exitCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{exitMin:1};
       const pct=Math.min(100,ct/maxC*100);
       const col=ct===0?'var(--red)':ct<r.exitMin?'var(--amber)':'var(--green)';
       c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
@@ -9090,7 +9349,7 @@ function buildCoverageTimeline() {
     c+=`<div style="position:absolute;left:0;top:${10+barH+2}px;font-size:8px;font-weight:700;color:var(--acc)">Ctr</div>`;
     c+=`<div style="display:flex;align-items:flex-end;height:${barH}px">`;
     HOURS.forEach((h,i)=>{
-      const ct=ctrCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow):{counterMin:2};
+      const ct=ctrCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{counterMin:2};
       const pct=Math.min(100,ct/maxC*100);
       const col=ct===0?'transparent':ct<r.counterMin?'var(--amber)':'var(--acc)';
       c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
@@ -9103,22 +9362,55 @@ function buildCoverageTimeline() {
   const tlEl=document.getElementById('coverage-timeline');
   if(!tlEl)return;
   const totalW=46+HOURS.length*W;
-  let htm=`<div style="min-width:${totalW}px">`;
+  let htm=`<div style="min-width:${totalW}px">`;let _mgmtHeaderShown=false;
 
   // Gap row
   const hasGap=HOURS.some((h,i)=>{
-    const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow):{exitMin:1,counterMin:2};
+    if(h%24<Math.floor(nowH%24)&&h<24)return false;
+    const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{exitMin:1,counterMin:2};
     return exitCts[i]<r.exitMin;
   });
   if(hasGap){
-    htm+=`<div style="display:flex;margin-bottom:3px">`;
-    htm+=`<div style="width:46px;flex-shrink:0;font-size:8px;color:var(--red);text-align:right;padding-right:4px;line-height:14px">⚠ gap</div>`;
+    // Find gap hours and suggest who can fill exit
+    const gapHours=HOURS.filter((h,i)=>{
+      if(h%24<Math.floor(nowH)&&h<24)return false; // past hour
+      const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{exitMin:1};
+      return exitCts[i]<r.exitMin;
+    });
+    // Find best fill candidate: off-exit CXR on shift, then ABRM/BRM/ARM/MT
+    const fillOrder=['CXR','ABRM','BRM','ARM','MT'];
+    let fillSuggestion='';
+    for(const role of fillOrder){
+      const candidate=people.find(([pid,e])=>{
+        if(e.person.role!==role)return false;
+        if((STATE.todayOverrides||{})[pid]==='callout')return false;
+        const st=(STATE.staffStation||{})[pid];
+        if(st==='Exit Booth')return false; // already at exit
+        // Must be currently ON shift (not just scheduled — actually working now)
+        const ov=STATE.shiftMod&&STATE.shiftMod[pid]||{};
+        const ss=ov.start!=null?ov.start:e.person.shiftStart;
+        const se=ov.end!=null?ov.end:e.person.shiftEnd;
+        if(ss==null||nowH<ss||nowH>=se)return false; // not on shift right now
+        // Must also cover at least one gap hour
+        return gapHours.some(h=>h>=ss&&h<se);
+      });
+      if(candidate){
+        fillSuggestion=candidate[1].person.nick||candidate[1].person.name.split(' ')[0];
+        break;
+      }
+    }
+    htm+=`<div style="display:flex;align-items:center;margin-bottom:3px">`;
+    htm+=`<div style="width:46px;flex-shrink:0;font-size:8px;color:var(--red);text-align:right;padding-right:4px;line-height:14px">⚠ exit</div>`;
     HOURS.forEach((h,i)=>{
-      const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow):{exitMin:1};
+      const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{exitMin:1};
       const eg=exitCts[i]<r.exitMin;
-      htm+=`<div style="width:${W}px;flex-shrink:0;height:14px;background:${eg?'rgba(248,113,113,.25)':'transparent'};border-radius:2px"></div>`;
+      const isPast=h%24<Math.floor(nowH%24)&&h<24;htm+=`<div style="width:${W}px;flex-shrink:0;height:14px;background:${eg&&!isPast?'rgba(248,113,113,.3)':'transparent'};border-radius:2px"></div>`;
     });
     htm+=`</div>`;
+    if(fillSuggestion){
+      htm+=`<div style="font-size:9px;color:var(--amber);padding:2px 0 4px 50px">
+        ⚑ Suggest ${fillSuggestion} cover exit gap</div>`;
+    }
   }
 
   // Person rows — the bar IS the control
@@ -9128,16 +9420,30 @@ function buildCoverageTimeline() {
     const isOff=(STATE.todayOverrides||{})[pid]==='callout';
     const cells=HOURS.map(h=>getZone(pid,p,h));
     const onShift=cells.some(z=>z!=='off');
-    if(!onShift&&isMgmt)return; // hide off-shift mgmt to reduce clutter
+    // Hide off-shift people unless they start within 2 hours
+    if(!onShift) {
+      const ov2=STATE.shiftMod&&STATE.shiftMod[pid]||{};
+      const nextStart=ov2.start!=null?ov2.start:p.shiftStart;
+      const hoursUntil=nextStart!=null?nextStart-nowH:99;
+      // Hide if more than 2 hours away (or already past)
+      if(hoursUntil>2||hoursUntil<-0.5)return;
+    }
 
     htm+=`<div style="display:flex;align-items:center;margin-bottom:2px;cursor:pointer"
       onclick="openPersonPanel('${pid}')">`;
-    htm+=`<div style="width:46px;flex-shrink:0;font-size:10px;
-      font-weight:${isMgmt?400:700};
-      color:${isOff?'var(--red)':isMgmt?'var(--txt3)':'var(--txt)'};
+    const mgmtSt=isMgmt?(STATE.staffStation||{})[pid]||'':'' ;
+    const mgmtBadge=isMgmt&&mgmtSt?`<span style="font-size:7px;color:#a5b4fc;display:block;line-height:1;margin-top:1px">${mgmtSt.replace(' Booth','').replace(' Manager','')}</span>`:'';
+    if(isMgmt&&!_mgmtHeaderShown){
+      _mgmtHeaderShown=true;
+      htm+=`<div style="display:flex;margin:6px 0 3px"><div style="width:46px;flex-shrink:0"></div><div style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#a5b4fc;border-bottom:1px solid rgba(99,102,241,.3);padding-bottom:2px;flex:1">— Management —</div></div>`;
+    }
+    htm+=`<div style="width:46px;flex-shrink:0;font-size:${isMgmt?9:10}px;
+      font-weight:${isMgmt?500:700};
+      color:${isOff?'var(--red)':isMgmt?'#c4b5fd':'var(--txt)'};
       text-align:right;padding-right:5px;
       text-decoration:${isOff?'line-through':'none'};
-      white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nick}</div>`;
+      white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+      line-height:1.2">${nick}${mgmtBadge}</div>`;
 
     let i=0;
     while(i<cells.length){
@@ -9284,34 +9590,156 @@ function addSpecialBlock(pid,key){
 function suggestLunches(){
   const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
   if(!Object.keys(exp).length){toast('Confirm schedule first');return;}
-  const workers=Object.entries(exp).filter(([pid,e])=>!['ARM','BRM','ABRM','MT'].includes(e.person.role)&&(STATE.todayOverrides||{})[pid]!=='callout')
+
+  const fmtH=h=>{const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
+  const LUNCH_DUR=0.5;
+  const STEP=0.25; // 15-min increments
+
+  // Build worker list with targets
+  const workers=Object.entries(exp)
+    .filter(([pid,e])=>!['ARM','BRM','ABRM','MT'].includes(e.person.role)
+      &&(STATE.todayOverrides||{})[pid]!=='callout')
     .map(([pid,e])=>{
       const p=e.person,mods=STATE.shiftMod||{},ov=mods[pid]||{};
-      const ss=ov.start!=null?ov.start:p.shiftStart,se=ov.end!=null?ov.end:p.shiftEnd;
-      const mid=(ss+se)/2;
+      const ss=ov.start!=null?ov.start:p.shiftStart;
+      const se=ov.end!=null?ov.end:p.shiftEnd;
+      if(ss==null||se==null)return null;
+      const dur=(se<ss)?((24-ss)+se):(se-ss);
       const st=(STATE.staffStation||{})[pid];
-      const exitOpener=(st==='Exit Booth'||p.role==='EXIT')&&ss<8;
-      const ctrOpener=st==='Counter'&&ss<8;
-      const target=exitOpener?9.5:ctrOpener?Math.max(10,mid):mid;
-      return{pid,nick:p.nick||p.name.split(' ')[0],ss,se,target};
-    }).sort((a,b)=>a.target-b.target);
+      const rot=window._lastRotations&&window._lastRotations[pid];
+      const exitFirst=rot?(rot.b1&&rot.b1.station==='exit'):
+        (st==='Exit Booth'||p.role==='EXIT');
+      const isOpener=ss<8;
+      let target;
+      if(p.role==='EXIT'&&isOpener) target=ss+(dur/2)-LUNCH_DUR/2;
+      else if(exitFirst&&isOpener) target=9.5;
+      else if(isOpener) target=Math.max(10,ss+(dur/2)-LUNCH_DUR/2);
+      else target=ss+(dur/2)-LUNCH_DUR/2;
+      // Clamp: min 3h in, max 5.5h in
+      target=Math.max(ss+3,Math.min(ss+5.5,target));
+      // Round to nearest 15min
+      target=Math.round(target/STEP)*STEP;
+      return{pid,nick:p.nick||p.name.split(' ')[0],ss,se,target,isExit:p.role==='EXIT'};
+    })
+    .filter(Boolean)
+    .sort((a,b)=>a.target-b.target);
+
+  // Slot-based assignment: track how many people are on lunch at each 15-min slot
+  // Key: slot index = (time - 0) * 4
+  const occupied={}; // slot -> count
+  const exitOccupied={}; // slot -> count (exit agents only)
+
+  function slotsFor(t){
+    // A 30-min lunch occupies 2 slots
+    const s=Math.round(t/STEP);
+    return[s,s+1];
+  }
+  function canPlace(t,isExit){
+    const slots=slotsFor(t);
+    for(const s of slots){
+      if((occupied[s]||0)>=2)return false;
+      if(isExit&&(exitOccupied[s]||0)>=1)return false;
+    }
+    return true;
+  }
+  function place(t,isExit){
+    slotsFor(t).forEach(s=>{
+      occupied[s]=(occupied[s]||0)+1;
+      if(isExit)exitOccupied[s]=(exitOccupied[s]||0)+1;
+    });
+  }
+
   const assigned=[];
   workers.forEach(w=>{
-    let t=w.target,attempts=0;
-    while(attempts<8){const conflict=assigned.filter(a=>Math.abs(a.t-t)<0.5).length>=2;if(!conflict)break;t+=0.5;attempts++;}
-    assigned.push({...w,t});
+    let t=w.target;
+    let found=false;
+    // Try target, then push forward up to 3 hours
+    for(let attempt=0;attempt<12;attempt++){
+      if(canPlace(t,w.isExit)){
+        place(t,w.isExit);
+        assigned.push({...w,t});
+        found=true;
+        break;
+      }
+      t=Math.round((t+STEP)/STEP)*STEP;
+      if(t>w.ss+6)break;
+    }
+    if(!found){
+      // Fallback: place at target regardless (better than nothing)
+      place(w.target,w.isExit);
+      assigned.push({...w,t:w.target});
+    }
   });
+
   saveCoverageSnapshot();
   if(!STATE.specialBlocks)STATE.specialBlocks={};
   assigned.forEach(({pid,t})=>{
-    STATE.specialBlocks[pid]=(STATE.specialBlocks[pid]||[]).filter(b=>b.key!=='lunch-slot');
-    STATE.specialBlocks[pid].push({key:'lunch',label:'Lunch',icon:'🍽',from:t,to:t+0.5});
+    STATE.specialBlocks[pid]=(STATE.specialBlocks[pid]||[])
+      .filter(b=>b.key!=='lunch'&&b.key!=='lunch-slot');
+    STATE.specialBlocks[pid].push({key:'lunch',label:'Lunch',icon:'🍽',from:t,to:t+LUNCH_DUR});
   });
-  saveState();buildCoverageTimeline();
-  const fmtH=h=>{const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
-  toast('Lunches: '+assigned.map(a=>a.nick+' '+fmtH(a.t)).join(' · ').slice(0,80));
+  // Auto-distribute exit coverage based on gaps
+  autoDistributeExit(exp);
+
+  saveState();
+  buildCoverageTimeline();
+  buildDashSchedMini();
+  toast('Lunches: '+assigned.map(a=>a.nick+' '+fmtH(a.t)).join(' · ').slice(0,120));
 }
 
+function autoDistributeExit(exp) {
+  // Find hours where exit is below minimum and assign CXRs to fill
+  const dow=new Date().getDay();
+  const HOURS=Array.from({length:21},(_,i)=>5+i); // 5am-2am
+
+  // Count exit coverage per hour from exit agents
+  function exitAgentCoverage(h) {
+    return Object.entries(exp).filter(([pid,e])=>{
+      if(e.person.role!=='EXIT')return false;
+      if((STATE.todayOverrides||{})[pid]==='callout')return false;
+      const ov=(STATE.shiftMod||{})[pid]||{};
+      const ss=ov.start!=null?ov.start:e.person.shiftStart;
+      const se=ov.end!=null?ov.end:e.person.shiftEnd;
+      return ss!=null&&h>=ss&&(se<ss?h<se+24:h<se);
+    }).length;
+  }
+
+  // Find CXRs available per hour (on shift, not at exit, not on lunch)
+  function availCXRs(h) {
+    return Object.entries(exp).filter(([pid,e])=>{
+      if(e.person.role!=='CXR')return false;
+      if((STATE.todayOverrides||{})[pid]==='callout')return false;
+      if((STATE.staffStation||{})[pid]==='Exit Booth')return false;
+      const ov=(STATE.shiftMod||{})[pid]||{};
+      const ss=ov.start!=null?ov.start:e.person.shiftStart;
+      const se=ov.end!=null?ov.end:e.person.shiftEnd;
+      if(ss==null||h<ss||h>=se)return false;
+      // Not on lunch during this hour
+      const lunchBlock=((STATE.specialBlocks||{})[pid]||[]).find(b=>b.key==='lunch');
+      if(lunchBlock&&h>=lunchBlock.from&&h<lunchBlock.to)return false;
+      return true;
+    });
+  }
+
+  // Find gap hours where exit agents don't cover minimum
+  const isMonday=dow===1;
+  HOURS.forEach(h=>{
+    const need=isMonday?5:1; // simplified minimum
+    const agentCov=exitAgentCoverage(h);
+    const gap=Math.max(0,need-agentCov);
+    if(gap<=0)return;
+    // Find CXRs to assign to exit for this hour
+    const candidates=availCXRs(h);
+    let assigned2=0;
+    candidates.forEach(([pid])=>{
+      if(assigned2>=gap)return;
+      if((STATE.staffStation||{})[pid]!=='Exit Booth'){
+        STATE.staffStation[pid]='Exit Booth';
+        assigned2++;
+      }
+    });
+  });
+}
 
 function changeModPin() {
   const cur  = document.getElementById('mod-pin-current');
@@ -9486,7 +9914,18 @@ function openPersonPanel(pid) {
       mgrEl.style.display='block';
       mgrEl.innerHTML=buildManagerControls(pid,p,ss,se,fmtH);
     } else {
-      mgrEl.style.display='none';
+      mgrEl.style.display='block';
+      mgrEl.innerHTML=`<div style="margin-top:12px;padding:10px;border-radius:8px;
+        background:var(--bg3);border:1px solid var(--bdr2);text-align:center">
+        <div style="font-size:11px;color:var(--txt3);margin-bottom:8px">
+          🔒 Unlock Manager Mode to make changes
+        </div>
+        <button onclick="closePersonPanel();toggleManagerModePrompt()"
+          style="padding:7px 16px;border-radius:6px;border:1px solid var(--bdr2);
+            background:var(--bg2);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer">
+          Unlock →
+        </button>
+      </div>`;
     }
   }
 
@@ -9504,19 +9943,40 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
       color:var(--txt3);margin-bottom:8px">Manager Controls</div>`;
 
   if(!isExit){
-    // Station
-    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-      <button onclick="setStation('${pid}','Counter');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
-        style="padding:8px;border-radius:6px;border:1px solid;font-size:12px;font-weight:700;cursor:pointer;
-          background:${station==='Counter'?'rgba(37,99,235,.15)':'var(--bg3)'};
-          border-color:${station==='Counter'?'var(--acc)':'var(--bdr2)'};
-          color:${station==='Counter'?'var(--acc)':'var(--txt3)'}">🟦 Counter</button>
-      <button onclick="setStation('${pid}','Exit Booth');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
-        style="padding:8px;border-radius:6px;border:1px solid;font-size:12px;font-weight:700;cursor:pointer;
-          background:${station==='Exit Booth'?'rgba(52,211,153,.15)':'var(--bg3)'};
-          border-color:${station==='Exit Booth'?'var(--green)':'var(--bdr2)'};
-          color:${station==='Exit Booth'?'var(--green)':'var(--txt3)'}">🟩 Exit</button>
-    </div>`;
+    // Station buttons — different options for mgmt vs CXR
+    const isMgrRole=['ARM','BRM','ABRM','MT'].includes(person.role);
+    if (isMgrRole) {
+      // Managers get: Emerald Booth, Counter, Exit, Returns, Floater
+      const mgmtStations = [
+        {key:'Emerald Booth', label:'🌟 Emerald', col:'#6366f1'},
+        {key:'Counter',       label:'🟦 Counter', col:'var(--acc)'},
+        {key:'Exit Booth',    label:'🟩 Exit',    col:'var(--green)'},
+        {key:'Returns',       label:'↩ Returns',  col:'#06b6d4'},
+        {key:'Floater',       label:'🚗 Floater', col:'var(--amber)'},
+      ];
+      h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">`;
+      mgmtStations.forEach(s=>{
+        const on=station===s.key;
+        h+=`<button onclick="setStation('${pid}','${s.key}');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
+          style="padding:7px 4px;border-radius:6px;border:1px solid;font-size:11px;font-weight:700;cursor:pointer;
+            background:${on?s.col+'22':'var(--bg3)'};border-color:${on?s.col:'var(--bdr2)'};color:${on?s.col:'var(--txt3)'}">${s.label}</button>`;
+      });
+      h+=`</div>`;
+    } else {
+      // CXRs get: Counter, Exit
+      h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+        <button onclick="setStation('${pid}','Counter');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
+          style="padding:8px;border-radius:6px;border:1px solid;font-size:12px;font-weight:700;cursor:pointer;
+            background:${station==='Counter'?'rgba(37,99,235,.15)':'var(--bg3)'};
+            border-color:${station==='Counter'?'var(--acc)':'var(--bdr2)'};
+            color:${station==='Counter'?'var(--acc)':'var(--txt3)'}">🟦 Counter</button>
+        <button onclick="setStation('${pid}','Exit Booth');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
+          style="padding:8px;border-radius:6px;border:1px solid;font-size:12px;font-weight:700;cursor:pointer;
+            background:${station==='Exit Booth'?'rgba(52,211,153,.15)':'var(--bg3)'};
+            border-color:${station==='Exit Booth'?'var(--green)':'var(--bdr2)'};
+            color:${station==='Exit Booth'?'var(--green)':'var(--txt3)'}">🟩 Exit</button>
+      </div>`;
+    }
     // Rotation
     h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px">`;
     [['normal','4hr Split','var(--acc)'],['full-counter','Full Ctr','var(--acc)'],['full-exit','Full Exit','var(--green)']].forEach(([key,lbl,col])=>{
