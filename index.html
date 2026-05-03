@@ -1440,6 +1440,15 @@ button { cursor: pointer; }
       <div id="sum-brands" style="font-size:11px;font-family:var(--ff-mono);color:var(--txt)">Nat — · Ala — · Ent —</div>
       <div style="font-size:10px;color:var(--acc);margin-top:4px">→ Paste Data</div>
     </div>
+    <!-- Hourly flow preview on dashboard -->
+    <div class="card" style="padding:10px 12px;margin-bottom:10px;cursor:pointer" onclick="showTab('board')">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:6px">
+        📊 Hourly Flow <span style="font-weight:400;color:var(--acc)">→ Board</span>
+      </div>
+      <div id="dash-hourly-flow" style="min-height:40px">
+        <div style="font-size:10px;color:var(--txt3);font-style:italic">Paste res &amp; ret data to see flow</div>
+      </div>
+    </div>
     <div class="card" onclick="showTab('checklist')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">✅ Checklist</div>
       <div id="sum-cl-progress" style="font-size:11px;color:var(--txt2)">—</div>
@@ -1820,6 +1829,7 @@ button { cursor: pointer; }
         <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
+        <button class="btn btn-gh btn-sm" onclick="openThresholdQuiz()">📊 Thresholds</button>
         <button class="btn btn-gh btn-sm" style="margin-left:auto;color:var(--red)" onclick="lockAdmin()">🔒 Lock</button>
       </div>
 
@@ -2276,6 +2286,21 @@ var ROSTER_RETURNS = [
 ];
 
 
+var ROSTER_EXIT = [
+  {id:'genesis',  name:'Genesis Cochran',  nick:'Genesis', role:'EXIT',
+   daysOn:[0,1,4,5,6], shiftStart:7, shiftEnd:16,
+   shiftCode:'7A-4P', active:true},
+  {id:'shawnee',  name:'Shawnee', nick:'Shawnee', role:'EXIT',
+   daysOn:[0,1,2,3,4], shiftStart:6.75, shiftEnd:16,
+   shiftCode:'645A-4P', active:true},
+  {id:'lisa_exit', name:'Lisa (Exit)', nick:'Lisa', role:'EXIT',
+   daysOn:[0], shiftStart:16.5, shiftEnd:36.5,
+   shiftCode:'430P-1230A', active:true},
+  {id:'kenneth',  name:'Kenneth Hooks', nick:'Kenneth', role:'EXIT',
+   daysOn:[0,1,2,3,4], shiftStart:18, shiftEnd:26.5,
+   shiftCode:'6P-230A', active:true},
+];
+
 var ROSTER_MGMT = [
   // Source: Excel ROSTER sheet v16.4 — variable schedules, paste weekly
   {id:'vada',    name:'Vada Griffith',           nick:'Vada',    role:'ARM',
@@ -2313,7 +2338,11 @@ var ROSTER_MGMT = [
    notes:'MT. Typical: 6A-4P / 8A-6P / 12P-10P / 4P-C.'},
   {id:'elle',    name:'Elle',                   nick:'Elle',    role:'MT',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'MT (verify level). Typical: 9A-7P / 12P-10P / 4P-C. Last name TBD.'},
+   notes:'MT (verify level). Typical: 9A-7P / 12P-10P / 4P-C. Last name TBD.'},,
+  {id:'ennis_mt', name:'Ennis', nick:'Ennis', role:'MT',
+   shiftCode:'varies', shiftStart:null, shiftEnd:null,
+   defaultStation:'Counter Manager', active:true,
+   notes:'MT. Added May 2026.'}
 ];
 
 
@@ -2335,17 +2364,53 @@ var COVERAGE_RULES = {
 };
 
 var COVERAGE_BY_HOUR = function(hour, dow, exitAgentCount) {
+  // exitAgentCount = dedicated exit agents (Genesis, Shawnee, etc.) already covering exit
+  // exitMin = total bodies needed at exit (agents + CXRs combined)
+  // counterMin = minimum bodies needed at counter
+  // closed = true means no one needs to be staffed
   const isMonday = dow === 1;
-  const eaCount = exitAgentCount || 0;
-  // exitMin = total people needed at exit (agents + CXRs combined)
-  // counterMin = CXRs needed at counter
-  if (hour < 5)  return { exitMin:1, counterMin:0, label:'Overnight' };
-  if (hour < 7)  return { exitMin:isMonday?2:1, counterMin:1, label:'Early AM' };
-  if (hour < 10) return { exitMin:isMonday?3:1, counterMin:2, label:'Morning' };
-  if (hour < 14) return { exitMin:isMonday?5:2, counterMin:3, label:'Peak' };
-  if (hour < 18) return { exitMin:isMonday?3:2, counterMin:2, label:'Afternoon' };
-  if (hour < 24) return { exitMin:1, counterMin:1, label:'Evening' };
-  return { exitMin:1, counterMin:0, label:'Late Night' };
+  const ea = exitAgentCount || 0;
+  const h  = hour % 24;
+
+  // Use manager-configured thresholds if available
+  if (STATE && STATE.coverageThresholds) {
+    const t = STATE.coverageThresholds;
+    let block = isMonday&&h>=6&&h<13 ? t.mon_peak :
+                h<6 ? t.night :
+                h<8 ? t.early :
+                h<11 ? t.morning :
+                h<14 ? t.peak :
+                h<17 ? t.midday :
+                h<21 ? t.evening : t.night;
+    if(block&&block.exitMin!=null)
+      return { exitMin:block.exitMin, exitMax:block.exitMax||5,
+               counterMin:block.counterMin||0, closed:block.closed||false, label:block.label||'' };
+  }
+
+  // ── Hardcoded rules per your specs ───────────────────────────────────────
+  // CLOSED: before 6am OR after 2:30am (hour >= 26.5 in 24+ notation or h < 6)
+  if (h < 6 || h >= 26 || hour >= 26) {
+    return { exitMin:0, exitMax:0, counterMin:0, closed:true, label:'Closed' };
+  }
+
+  // Open hours: 6am – ~12:30am (hour 24.5 = 12:30am)
+  const closing = 24.5; // 12:30am — after this, buffer only
+
+  // MONDAY — target 5 exit lanes open
+  if (isMonday) {
+    if (h >= 6 && h < 10)  return { exitMin:2, exitMax:5, counterMin:1, closed:false, label:'Mon Early' };
+    if (h >= 10 && h < 14) return { exitMin:5, exitMax:5, counterMin:3, closed:false, label:'Mon Peak' };
+    if (h >= 14 && h < 20) return { exitMin:3, exitMax:5, counterMin:2, closed:false, label:'Mon PM' };
+    if (h >= 20)           return { exitMin:1, exitMax:5, counterMin:1, closed:false, label:'Mon Night' };
+  }
+
+  // OTHER DAYS — even split, exit priority
+  if (h >= 6  && h < 8)  return { exitMin:1, exitMax:2, counterMin:0, closed:false, label:'Early' };
+  if (h >= 8  && h < 12) return { exitMin:1, exitMax:3, counterMin:1, closed:false, label:'Morning' };
+  if (h >= 12 && h < 18) return { exitMin:2, exitMax:3, counterMin:2, closed:false, label:'Peak' };
+  if (h >= 18 && h < 21) return { exitMin:1, exitMax:2, counterMin:2, closed:false, label:'Evening' };
+  // 9pm–close (12:30am)
+  return { exitMin:1, exitMax:2, counterMin:1, closed:false, label:'Night' };
 };
 
 var SPECIAL_ASSIGNMENTS = [
@@ -2633,6 +2698,7 @@ window.onload = function() {
   refreshDNRDNQCards();
   updateBrandTotalsDisplay();
   updateAvailabilityFromPaste();
+  if(typeof buildHourlyFlowChart==='function') buildHourlyFlowChart();
     }
   }
   if (typeof refreshDash === 'function') refreshDash();
@@ -2903,15 +2969,36 @@ function parseStep(stepNum) {
   // Also store remaining for availability reference
   STATE.pasteData[legacyKey+'-remaining'] = groupsRemaining;
 
-  // Hourly totals for peak view
+  // Build hourly totals — spread code totals across hour slots
+  // AM paste covers hours 0-11, PM paste covers hours 12-23
   if (!STATE.pasteHourly) STATE.pasteHourly = {};
   const halfKey = key.startsWith('res') ? 'res' : 'ret';
-  const existing = STATE.pasteHourly[halfKey] || new Array(24).fill(0);
-  // Sum hourly from all codes
-  Object.values(result.codes).forEach(v=>{
-    if (v.hourlyRaw) v.hourlyRaw.forEach((n,i)=>{ existing[i]=(existing[i]||0)+n; });
+  const isAM = result.halfDay === 'AM';
+  const hourStart = isAM ? 0 : 12;
+  const hourEnd   = isAM ? 12 : 24;
+  const existing  = STATE.pasteHourly[halfKey] || new Array(24).fill(0);
+
+  // Per code: distribute its hourly values across the right hour slots
+  Object.values(result.codes).forEach(v => {
+    if (!v.hourlyRaw || !v.hourlyRaw.length) {
+      // No hourly detail — spread total evenly across this half
+      const perHour = Math.round((v.total || 0) / (hourEnd - hourStart));
+      for(let h=hourStart; h<hourEnd; h++) existing[h] = (existing[h]||0) + perHour;
+    } else {
+      // We have hourly raw values — assign them to slots in order
+      // GL lists only non-zero hours in sequence; map to slots sequentially
+      const slots = hourEnd - hourStart;
+      const step  = Math.max(1, Math.floor(slots / (v.hourlyRaw.length + 1)));
+      v.hourlyRaw.forEach((n, i) => {
+        const h = hourStart + Math.min(i * step, slots - 1);
+        existing[h] = (existing[h]||0) + n;
+      });
+    }
   });
   STATE.pasteHourly[halfKey] = existing;
+
+  // Trigger chart update
+  if (typeof buildHourlyFlowChart === 'function') buildHourlyFlowChart();
 
   // Update availability display
   updateAvailabilityFromPaste();
@@ -4109,11 +4196,7 @@ function buildSmartRotation() {
       workingExit.push({ ...person, shift });
     } else {
       // Determine starting station: from staffStation override or fairness logic
-      const stationOverride = STATE.staffStation[pid];
-      let startStation;
-      if (stationOverride === 'Exit Booth') startStation = 'exit';
-      else if (stationOverride === 'Counter') startStation = 'counter';
-      else startStation = 'counter'; // default to counter
+      let startStation = 'counter'; // CXRs default counter; altPos handles rotation
       workingCXRs.push({ ...person, shift, startStation, pid });
     }
   });
@@ -4154,6 +4237,21 @@ function buildSmartRotation() {
     const noLunch    = (STATE.altSchedule || {})[pid + '_nolunch'] === true;
     const totalWork  = (shift.end - shift.start) - (noLunch ? 0 : ROTATION.lunchHours);
     const shiftDur   = shift.end - shift.start;
+
+    // ── Exit-First: first half exit, second half counter ─────────────────────
+    if (altPos === 'exit-first') {
+      const mid2 = shift.start + (shift.end - shift.start) / 2;
+      const ls2  = noLunch ? null : mid2 - ROTATION.lunchHours / 2;
+      const le2  = noLunch ? null : ls2  + ROTATION.lunchHours;
+      return {
+        pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
+        shiftStart:shift.start, shiftEnd:shift.end,
+        b1:    { station:'exit',    from:shift.start, to:noLunch?mid2:ls2,  hours:(noLunch?mid2:ls2)-shift.start },
+        lunch: noLunch ? null : { from:ls2, to:le2 },
+        b2:    { station:'counter', from:noLunch?mid2:le2, to:shift.end, hours:shift.end-(noLunch?mid2:le2) },
+        b3:null, fullShift:null,
+      };
+    }
 
     // ── Full Counter: entire shift at counter, lunch at midpoint ──────────
     if (altPos === 'full-counter') {
@@ -5474,280 +5572,34 @@ var PRELOADED_MGMT_SCHEDULE = {
   }
 },
   grid: {
-  "2026-04-16": {
-    "Vada_Griffith": "6A-1P",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson_(BRM)": "10A-8P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Maddy_Shirer": "530A-330P",
-    "Josh_Osei": "12P-10P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-17": {
-    "Vada_Griffith": "VACA",
-    "Ami_Lhom": "8A-6P",
-    "Matt_Johnson_(BRM)": "4A-2P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "12P-10P",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Maddy_Shirer": "530A-330P",
-    "Josh_Osei": "VACA",
-    "Brittney_Francis": "99 TRAINING",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-18": {
-    "Vada_Griffith": "VACA",
-    "Ami_Lhom": "530A-330P",
-    "Matt_Johnson_(BRM)": "VACA",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "9A-7P",
-    "Khala_Shackleford": "OFF",
-    "Maddy_Shirer": "OFF",
-    "Josh_Osei": "VACA",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-19": {
-    "Vada_Griffith": "VACA",
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson_(BRM)": "VACA",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "OFF",
-    "Maddy_Shirer": "OFF",
-    "Josh_Osei": "VACA",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-22": {
-    "Vada_Griffith": "STRONGER TOGETHER",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson_(BRM)": "4P-C",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "530A-330P",
-    "Caitlin_Kelsey": "STRONGER TOGETHER",
-    "Khala_Shackleford": "10A-8P",
-    "Maddy_Shirer": "OFF",
-    "Josh_Osei": "6A-4P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-23": {
-    "Vada_Griffith": "6A-4P",
-    "Ami_Lhom": "6A-4P",
-    "Matt_Johnson_(BRM)": "OFF",
-    "Ty_Lumpkin": "12P-10P",
-    "Carlos_Aviles": "530A-330P",
-    "Caitlin_Kelsey": "OFF",
-    "Khala_Shackleford": "OFF",
-    "Maddy_Shirer": "4P-C",
-    "Josh_Osei": "OFF",
-    "Brittney_Francis": "4P-C",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-24": {
-    "Vada_Griffith": "6A-4P",
-    "Ami_Lhom": "6A-4P",
-    "Matt_Johnson_(BRM)": "4A-2P",
-    "Ty_Lumpkin": "VACA",
-    "Carlos_Aviles": "VACA",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "10A-8P",
-    "Maddy_Shirer": "4P-C",
-    "Josh_Osei": "6A-4P",
-    "Brittney_Francis": "4P-C",
-    "Lauren_Kretschman": "99 TRAINING"
-  },
-  "2026-04-29": {
-    "Vada_Griffith": "TOP 20",
-    "Ami_Lhom": "4P-C",
-    "Matt_Johnson_(BRM)": "OFF",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "OFF",
-    "Khala_Shackleford": "530A-330P",
-    "Maddy_Shirer": "12P-10P",
-    "Josh_Osei": "OFF",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-30": {
-    "Vada_Griffith": "ARMS",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson_(BRM)": "8A-6P",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Maddy_Shirer": "12P-10P",
-    "Josh_Osei": "4P-C",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-05-01": {
-    "Vada_Griffith": "ARMS",
-    "Ami_Lhom": "6A-4P",
-    "Matt_Johnson_(BRM)": "4A-2P",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "10A-8P",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Maddy_Shirer": "12P-10P",
-    "Josh_Osei": "4P-C",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-05-02": {
-    "Vada_Griffith": "ARMS",
-    "Ami_Lhom": "530A-330P",
-    "Matt_Johnson_(BRM)": "OFF",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "10A-8P",
-    "Caitlin_Kelsey": "OFF",
-    "Khala_Shackleford": "OFF",
-    "Maddy_Shirer": "OFF",
-    "Josh_Osei": "4P-C",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-12": {
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson_(BRM)": "OFF",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "12P-10P",
-    "Maddy_Shirer": "530A-330P",
-    "Josh_Osei": "OFF",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "4P-C",
-    "Vada_Griffith": "OFF"
-  },
-  "2026-04-13": {
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson_(BRM)": "530A-330P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "12P-10P",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Maddy_Shirer": "9A-7P",
-    "Josh_Osei": "12P-10P",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "4P-C",
-    "Vada_Griffith": "OFF"
-  },
-  "2026-04-14": {
-    "Ami_Lhom": "4P-C",
-    "Matt_Johnson_(BRM)": "530A-330P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "12P-10P",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "OFF",
-    "Maddy_Shirer": "530A-330P",
-    "Josh_Osei": "12P-10P",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "OFF",
-    "Vada_Griffith": "OFF"
-  },
-  "2026-04-15": {
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson_(BRM)": "4P-C",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Maddy_Shirer": "530A-330P",
-    "Josh_Osei": "12P-10P",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "OFF",
-    "Vada_Griffith": "OFF"
-  },
-  "2026-04-20": {
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson_(BRM)": "VACA",
-    "Ty_Lumpkin": "12P-10P",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "10A-8P",
-    "Maddy_Shirer": "4P-C",
-    "Josh_Osei": "6A-4P",
-    "Brittney_Francis": "10A-8P",
-    "Lauren_Kretschman": "12P-10P",
-    "Vada_Griffith": "OFF"
-  },
-  "2026-04-21": {
-    "Ami_Lhom": "4P-C",
-    "Matt_Johnson_(BRM)": "8A-6P",
-    "Ty_Lumpkin": "12P-10P",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "VACA",
-    "Maddy_Shirer": "4P-C",
-    "Josh_Osei": "6A-4P",
-    "Brittney_Francis": "10A-8P",
-    "Lauren_Kretschman": "OFF",
-    "Vada_Griffith": "OFF"
-  },
-  "2026-04-25": {
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson_(BRM)": "530A-330P",
-    "Ty_Lumpkin": "VACA",
-    "Carlos_Aviles": "VACA",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "9A-7P",
-    "Maddy_Shirer": "4P-C",
-    "Josh_Osei": "6A-4P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "OFF",
-    "Vada_Griffith": "OFF"
-  },
-  "2026-04-26": {
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson_(BRM)": "9A-7P",
-    "Ty_Lumpkin": "VACA",
-    "Carlos_Aviles": "VACA",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Maddy_Shirer": "4P-C",
-    "Josh_Osei": "10A-8P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "OFF",
-    "Vada_Griffith": "OFF"
-  },
-  "2026-04-27": {
-    "Ami_Lhom": "8A-6P",
-    "Matt_Johnson_(BRM)": "9A-7P",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "10A-8P",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Maddy_Shirer": "4P-C",
-    "Josh_Osei": "12P-10P",
-    "Brittney_Francis": "VACA",
-    "Lauren_Kretschman": "10A-8P",
-    "Vada_Griffith": "OFF"
-  },
-  "2026-04-28": {
-    "Ami_Lhom": "530A-330P",
-    "Matt_Johnson_(BRM)": "4P-C",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "10A-8P",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "OFF",
-    "Maddy_Shirer": "OFF",
-    "Josh_Osei": "OFF",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "10A-8P",
-    "Vada_Griffith": "OFF"
+  "2026-05-03": {"Ami_Lhom":"6A-4P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"10A-8P","Lauren_Kretschman":"4P-C","Ennis_MT":"OFF"},
+  "2026-05-04": {"Ami_Lhom":"9A-7P","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"4P-C","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"6A-4P","Joshua_(Josh)_Osei":"10A-8P","Brittney_Francis":"OFF","Lauren_Kretschman":"4P-C","Ennis_MT":"4P-C"},
+  "2026-05-05": {"Ami_Lhom":"4P-C","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"OFF","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"10A-8P","Brittney_Francis":"6A-4P","Lauren_Kretschman":"12P-10P","Ennis_MT":"4P-C"},
+  "2026-05-06": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"6A-4P","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"10A-8P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"6A-4P","Lauren_Kretschman":"OFF","Ennis_MT":"4P-C"},
+  "2026-05-07": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"8A-6P","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"10A-8P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"4P-C"},
+  "2026-05-08": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"4A-2P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"OFF","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"10A-8P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"6A-4P","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
+  "2026-05-09": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"530A-330P","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"8A-6P","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
+  "2026-05-10": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"6A-4P","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
+  "2026-05-11": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"6A-4P","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
+  "2026-05-12": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"9A-7P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"12P-10P","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"4P-C","Lauren_Kretschman":"6A-4P","Ennis_MT":"6A-4P"},
+  "2026-05-13": {"Ami_Lhom":"4P-C","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"12P-10P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"6A-4P","Ennis_MT":"6A-4P"},
+  "2026-05-14": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"OFF","Carlos_Aviles":"12P-10P","Caitlin_Kelsey":"530A-330P","Khala_Shackleford":"12P-10P","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"10A-8P","Brittney_Francis":"OFF","Lauren_Kretschman":"6A-4P","Ennis_MT":"6A-4P"},
+  "2026-05-15": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"10A-8P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"OFF","Caitlin_Kelsey":"OFF","Khala_Shackleford":"12P-10P","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"6A-4P","Ennis_MT":"OFF"},
+  "2026-05-16": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"6A-4P","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"12P-10P","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"OFF","Ennis_MT":"6A-4P"},
+  "2026-05-17": {"Ami_Lhom":"10A-8P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"4P-C","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"12P-10P","Ennis_MT":"6A-4P"},
+  "2026-05-18": {"Ami_Lhom":"10A-8P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"4P-C","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"12P-10P","Ennis_MT":"6A-4P"},
+  "2026-05-19": {"Ami_Lhom":"9A-7P","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"4P-C","Carlos_Aviles":"4P-C","Caitlin_Kelsey":"6A-4P","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"12P-10P","Ennis_MT":"10A-8P"},
+  "2026-05-20": {"Ami_Lhom":"4P-C","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"6A-4P","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"530A-330P","Brittney_Francis":"OFF","Lauren_Kretschman":"12P-10P","Ennis_MT":"10A-8P"},
+  "2026-05-21": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"OFF","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"6A-4P","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"12P-10P","Lauren_Kretschman":"4P-C","Ennis_MT":"OFF"},
+  "2026-05-22": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"6A-4P","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
+  "2026-05-23": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"6A-4P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"OFF","Lauren_Kretschman":"4P-C","Ennis_MT":"10A-8P"},
+  "2026-05-25": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"OFF","Caitlin_Kelsey":"4P-C","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"12P-10P"},
+  "2026-05-26": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Brittney_Francis":"OFF"},
+  "2026-05-27": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},
+  "2026-05-28": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},
+  "2026-05-29": {"Ami_Lhom":"OFF"},
+  "2026-05-30": {"Ami_Lhom":"OFF"}
   }
-}
 };
 
 
@@ -6146,7 +5998,17 @@ var FLEET_CODES = [
   
   {code:'PPAR', group:'Large Pickup',       core:false, desc:'Large Pickup — F-150 SuperCrew, Ram 1500 or similar. Crew cab full-size.'},
   {code:'PPBR', group:'Large Pickup',       core:false, desc:'Large Pickup — alternate billing rate. Same class as PPAR.'},
-  
+  ,
+  {id:'kerv',   name:'Kerv Returns',   nick:'Kerv',   role:'RETURNS',
+   daysOn:[3,5,6,0], shiftStart:3.5, shiftEnd:12,  active:true, notes:'Return agent.'},
+  {id:'julian', name:'Julian Returns', nick:'Julian', role:'RETURNS',
+   daysOn:[1,2,4,5,6], shiftStart:4, shiftEnd:13,  active:true, notes:'Return agent.'},
+  {id:'toney',  name:'Toney Returns',  nick:'Toney',  role:'RETURNS',
+   daysOn:[0,3,4,5,6], shiftStart:10, shiftEnd:18.5, active:true, notes:'Return agent.'},
+  {id:'nas',    name:'Nas Returns',    nick:'Nas',    role:'RETURNS',
+   daysOn:[0,3,4,5,6], shiftStart:14, shiftEnd:23,  active:true, notes:'Return agent.'},
+  {id:'rob',    name:'Rob Returns',    nick:'Rob',    role:'RETURNS',
+   daysOn:[0,1,2,3,4], shiftStart:16, shiftEnd:36.5, active:true, notes:'Return agent.'}
 ];
 
 // ── Build compendium UI ───────────────────────────────────────────────────────
@@ -6254,12 +6116,12 @@ function renderCodes(codes) {
           <div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;
             padding:4px 8px;display:flex;flex-direction:column;gap:1px;min-width:72px">
             <span style="font-family:var(--ff-mono);font-size:12px;font-weight:500;
-              color:${c.code.includes('⚠')||c.group.includes('Pending')?'var(--amber)':'var(--txt)'}">${c.code}</span>
-            <span style="font-size:9px;color:var(--txt3);line-height:1.3">${c.desc.split('—')[0].trim()}</span>
+              color:${(c.code||'').includes('⚠')||(c.group||'').includes('Pending')?'var(--amber)':'var(--txt)'}">${c.code||''}</span>
+            <span style="font-size:9px;color:var(--txt3);line-height:1.3">${(c.desc||'').split('—')[0].trim()}</span>
           </div>`).join('')}
       </div>
       <div style="font-size:10px;color:var(--txt3);line-height:1.5">
-        ${groupCodes[0]?.desc.split('—').slice(1).join('—').trim() || ''}
+        ${(groupCodes[0]?.desc||'').split('—').slice(1).join('—').trim()}
       </div>
     </div>`;
   });
@@ -7985,14 +7847,14 @@ function getAltPosition(pid) {
 }
 
 function setAltPosition(pid, posKey) {
+  saveCoverageSnapshot();
   if (!STATE.altSchedule) STATE.altSchedule = {};
   if (posKey === 'normal') delete STATE.altSchedule[pid];
   else STATE.altSchedule[pid] = posKey;
   saveState();
-  if(typeof buildSwitchboard==="function")buildSwitchboard();
-  if(typeof buildCoverageTimeline==="function")buildCoverageTimeline();
+  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
   buildDashSchedMini();
-  toast(posKey === 'normal' ? 'Rotation reset to normal' : 'Alt schedule set ✓');
+  openPersonPanel(pid);
 }
 
 function showAltScheduleModal(pid, personName) {
@@ -8299,6 +8161,7 @@ function buildExpectedToday() {
     if (person.active === false) return;
     if (!person.daysOn || !Array.isArray(person.daysOn)) return;
     if (!person.daysOn.includes(dow)) return;
+    if (!person || !person.role) return;
     if (!person.shiftStart && !person.shiftCode) return;
     expected[pid] = { person, shift: person.shiftCode || 'varies', source:'roster' };
   });
@@ -8962,13 +8825,15 @@ function showAdminSection(sec) {
 // ── Get effective roster (admin overrides merged with hardcoded) ───────────
 function getEffectiveRoster() {
   const overrides = (STATE.adminRoster || []);
-  const base = [...ROSTER_CXR, ...ROSTER_MGMT].map(p => {
+  const exitArr    = typeof ROSTER_EXIT    !== 'undefined' ? ROSTER_EXIT    : [];
+  const returnsArr = typeof ROSTER_RETURNS !== 'undefined' ? ROSTER_RETURNS : [];
+  const base = [...ROSTER_CXR, ...ROSTER_MGMT, ...exitArr, ...returnsArr].map(p => {
     const ov = overrides.find(o => o.id === p.id);
     return ov ? Object.assign({}, p, ov) : p;
   });
   // Add new people not in base
   overrides.filter(o => o._new).forEach(o => base.push(o));
-  return base.filter(p => p.active !== false || p._deleted !== true);
+  return base.filter(p => p && p.active !== false && p._deleted !== true);
 }
 
 // ── STAFF LIST ─────────────────────────────────────────────────────────
@@ -9845,56 +9710,139 @@ function suggestLunches(){
 }
 
 function autoDistributeExit(exp) {
-  // Find hours where exit is below minimum and assign CXRs to fill
-  const dow=new Date().getDay();
-  const HOURS=Array.from({length:21},(_,i)=>5+i); // 5am-2am
+  // Assigns CXRs to exit rotation to fill coverage gaps.
+  // Rules:
+  // - 4-hour blocks: CXR covers exit for 4hrs then counter (or vice versa)
+  // - Even split preferred: if 4 CXRs available, 2 exit / 2 counter
+  // - Exit priority: exit gaps filled before worrying about even split
+  // - Monday: up to 5 CXRs at exit (1 per lane)
+  // - If only 1 CXR and no exit agent → that CXR goes to exit
+  // - Closed hours: no one assigned
 
-  // Count exit coverage per hour from exit agents
+  const dow = new Date().getDay();
+  const HOURS = Array.from({length:24},(_,i)=>i); // 0-23
+
+  function getCBH(h) {
+    return typeof COVERAGE_BY_HOUR==='function'
+      ? COVERAGE_BY_HOUR(h, dow, 0)
+      : { exitMin:1, counterMin:1, closed:false };
+  }
+
   function exitAgentCoverage(h) {
     return Object.entries(exp).filter(([pid,e])=>{
-      if(e.person.role!=='EXIT')return false;
-      if((STATE.todayOverrides||{})[pid]==='callout')return false;
+      if(e.person.role!=='EXIT') return false;
+      if((STATE.todayOverrides||{})[pid]==='callout') return false;
       const ov=(STATE.shiftMod||{})[pid]||{};
       const ss=ov.start!=null?ov.start:e.person.shiftStart;
       const se=ov.end!=null?ov.end:e.person.shiftEnd;
-      return ss!=null&&h>=ss&&(se<ss?h<se+24:h<se);
+      return ss!=null&&h>=ss&&(se==null||h<se%24+24*(se<ss?1:0));
     }).length;
   }
 
-  // Find CXRs available per hour (on shift, not at exit, not on lunch)
-  function availCXRs(h) {
-    return Object.entries(exp).filter(([pid,e])=>{
-      if(!['CXR'].includes(e.person.role))return false; // only CXRs fill exit
-      if((STATE.todayOverrides||{})[pid]==='callout')return false;
-      if((STATE.staffStation||{})[pid]==='Exit Booth')return false;
+  // Get available CXRs (on shift, role=CXR, not called out)
+  const cxrList = Object.entries(exp)
+    .filter(([pid,e])=>{
+      if(e.person.role!=='CXR') return false;
+      if((STATE.todayOverrides||{})[pid]==='callout') return false;
       const ov=(STATE.shiftMod||{})[pid]||{};
       const ss=ov.start!=null?ov.start:e.person.shiftStart;
       const se=ov.end!=null?ov.end:e.person.shiftEnd;
-      if(ss==null||h<ss||h>=se)return false;
-      // Not on lunch during this hour
-      const lunchBlock=((STATE.specialBlocks||{})[pid]||[]).find(b=>b.key==='lunch');
-      if(lunchBlock&&h>=lunchBlock.from&&h<lunchBlock.to)return false;
-      return true;
-    });
+      return ss!=null&&se!=null;
+    })
+    .map(([pid,e])=>{
+      const ov=(STATE.shiftMod||{})[pid]||{};
+      const ss=ov.start!=null?ov.start:e.person.shiftStart;
+      const se=ov.end!=null?ov.end:e.person.shiftEnd;
+      return {pid, ss, se, dur:se-ss};
+    })
+    .sort((a,b)=>a.ss-b.ss);
+
+  const totalCXR = cxrList.length;
+  if(!STATE.altSchedule) STATE.altSchedule={};
+
+  // Respect manual manager overrides — don't touch those
+  const managerSet = new Set(
+    Object.entries(STATE.altSchedule)
+      .filter(([,v])=>['full-counter','full-exit'].includes(v))
+      .map(([k])=>k)
+  );
+
+  // ── Special case: only 1 CXR, no exit agent at all ────────────────────────
+  if(totalCXR===1) {
+    const {pid,ss,se}=cxrList[0];
+    // Check if exit agent covers the whole shift
+    const hasExitAgentAllShift=Array.from({length:Math.ceil(se-ss)},(_,i)=>Math.floor(ss)+i)
+      .every(h=>exitAgentCoverage(h)>0);
+    if(!hasExitAgentAllShift&&!managerSet.has(pid)) {
+      STATE.altSchedule[pid]='exit-first'; // solo CXR → exit first
+    }
+    return;
   }
 
-  // Find gap hours where exit agents don't cover minimum
-  const isMonday=dow===1;
-  HOURS.forEach(h=>{
-    const need=isMonday?5:1; // simplified minimum
+  // ── General case: distribute evenly, exit priority ────────────────────────
+  // Target: half of available CXRs at exit during open hours
+  // But first fill any hard gaps
+
+  // Find which hours need CXR exit coverage
+  const exitGapHours = HOURS.filter(h=>{
+    const cbh=getCBH(h);
+    if(cbh.closed) return false;
     const agentCov=exitAgentCoverage(h);
-    const gap=Math.max(0,need-agentCov);
-    if(gap<=0)return;
-    // Find CXRs to assign to exit for this hour
-    const candidates=availCXRs(h);
-    let assigned2=0;
-    candidates.forEach(([pid])=>{
-      if(assigned2>=gap)return;
-      if((STATE.staffStation||{})[pid]!=='Exit Booth'){
-        STATE.staffStation[pid]='Exit Booth';
-        assigned2++;
-      }
+    const cxrsOnShift=cxrList.filter(c=>h>=c.ss&&h<c.se).length;
+    // Gap = exit minimum not met by agents alone, and CXRs are available
+    return agentCov < cbh.exitMin && cxrsOnShift > 0;
+  });
+
+  if(!exitGapHours.length) {
+    // No gaps — still do even split during open hours
+    const openCXRs = cxrList.filter(c=>!managerSet.has(c.pid));
+    const halfExit = Math.floor(openCXRs.length/2);
+    openCXRs.slice(0,halfExit).forEach(c=>{
+      if(!STATE.altSchedule[c.pid]) STATE.altSchedule[c.pid]='exit-first';
     });
+    openCXRs.slice(halfExit).forEach(c=>{
+      if(!STATE.altSchedule[c.pid]) delete STATE.altSchedule[c.pid]; // counter-first (default)
+    });
+    return;
+  }
+
+  // Assign CXRs to exit-first to cover gaps (exit priority)
+  const exitAssigned = new Set();
+  const counterAssigned = new Set();
+
+  // Per-hour: assign CXRs until exit minimum met, then balance remainder
+  exitGapHours.forEach(h=>{
+    const cbh=getCBH(h);
+    const agentCov=exitAgentCoverage(h);
+    let needed=cbh.exitMin-agentCov;
+    const available=cxrList.filter(c=>
+      h>=c.ss&&h<c.se&&!exitAssigned.has(c.pid)&&!managerSet.has(c.pid)
+    );
+    available.forEach(c=>{
+      if(needed<=0) return;
+      exitAssigned.add(c.pid);
+      needed--;
+    });
+  });
+
+  // Even split: fill remaining CXRs to counter-first up to half
+  const unassigned=cxrList.filter(c=>!exitAssigned.has(c.pid)&&!managerSet.has(c.pid));
+  const targetExitCount=Math.round(totalCXR/2);
+  const additionalExitNeeded=Math.max(0,targetExitCount-exitAssigned.size);
+
+  unassigned.slice(0,additionalExitNeeded).forEach(c=>exitAssigned.add(c.pid));
+  unassigned.slice(additionalExitNeeded).forEach(c=>counterAssigned.add(c.pid));
+
+  // Apply assignments
+  cxrList.forEach(c=>{
+    if(managerSet.has(c.pid)) return; // don't override manager
+    if(exitAssigned.has(c.pid)) {
+      STATE.altSchedule[c.pid]='exit-first';
+    } else {
+      // Counter-first (default normal rotation)
+      if(STATE.altSchedule[c.pid]==='exit-first')
+        delete STATE.altSchedule[c.pid];
+    }
   });
 }
 
@@ -10756,13 +10704,42 @@ function buildHourlyFlowChart() {
     <span><span style="color:var(--green)">▪</span> Returns</span>
   </div>`;
   el.innerHTML = out;
+
+  // Also update dashboard mini version
+  const dashEl = document.getElementById('dash-hourly-flow');
+  if (dashEl) {
+    if (!res.length && !ret.length) {
+      dashEl.innerHTML = '<div style="font-size:10px;color:var(--txt3);font-style:italic">Paste res & ret data to see flow</div>';
+    } else {
+      // Compact version: 12px bars, no labels except peak hours
+      const maxV2 = Math.max(...res,...ret,1);
+      const W2=11, H2=32;
+      let out2=`<div style="display:flex;align-items:flex-end;gap:1px;height:${H2+10}px;overflow:hidden">`;
+      Array.from({length:24},(_,h)=>{
+        const r=res[h]||0,t=ret[h]||0;
+        const rH=Math.round(r/maxV2*H2),tH=Math.round(t/maxV2*H2);
+        const isNow=new Date().getHours()===h;
+        const showLbl=h===6||h===12||h===18||h===0||isNow;
+        out2+=`<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;width:${W2}px">
+          <div style="display:flex;align-items:flex-end;gap:1px;height:${H2}px">
+            <div style="width:4px;height:${rH}px;background:var(--acc);border-radius:1px 1px 0 0;opacity:.85"></div>
+            <div style="width:4px;height:${tH}px;background:var(--green);border-radius:1px 1px 0 0;opacity:.85"></div>
+          </div>
+          <div style="font-size:5px;color:${isNow?'var(--acc)':'var(--txt3)'};">${showLbl?(h===0?'12a':h>12?h-12+'p':h+'a'):''}</div>
+        </div>`;
+      });
+      out2+=`</div>`;
+      dashEl.innerHTML=out2;
+    }
+  }
 }
 
 
 // ═══════════════════════════════════════════════════════════════════════
 // MAY 2026 SCHEDULE — parsed from Excel
 // ═══════════════════════════════════════════════════════════════════════
-var MAY_SCHEDULE = {"2026-05-03":{"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,13.0],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18.0,26.5]},"2026-05-04":{"Julian_Returns":[4.0,13.0],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-05":{"Julian_Returns":[4.0,13.0],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-06":{"Kerv_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-07":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":"OFF","Tighisty_(TT)_Haile":[10.0,18.5],"BRM":"OFF","MQI":"OFF","Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-08":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0]},"2026-05-09":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Laura_Gonzalez":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0]},"2026-05-10":{"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,13.0],"Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18.0,26.5]},"2026-05-11":{"Julian_Returns":[4.0,13.0],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-12":{"Julian_Returns":[4.0,13.0],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-13":{"Kerv_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-14":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"MENTOR":"OFF","MENTEE":"OFF","Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-15":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0]},"2026-05-16":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Laura_Gonzalez":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0]},"2026-05-17":{"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18.0,26.5]},"2026-05-18":{"Julian_Returns":[4.0,13.0],"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-19":{"Julian_Returns":[4.0,13.0],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-20":{"Kerv_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-21":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-22":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0]},"2026-05-23":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Laura_Gonzalez":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0]},"2026-05-24":{"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,13.0],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18.0,26.5]},"2026-05-25":{"Julian_Returns":[4.0,13.0],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Leslie_Brown":[16.5,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-26":{"Julian_Returns":[4.0,13.0],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":[17.0,25.0],"Kenneth_Hooks":[18.0,26.5]},"2026-05-27":{"Kerv_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Shawnee_Exit":[6.75,16.0],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Leslie_Brown":[16.5,25.0],"Laura_Gonzalez":"OFF","Kenneth_Hooks":[18.0,26.5]},"2026-05-28":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Shawnee_Exit":[6.75,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14.0],"Guenther_Meyer":[8.5,17.0],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Rob_Returns":[16.0,36.5],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Laura_Gonzalez":"OFF","Kenneth_Hooks":[18.0,26.5]},"2026-05-29":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Lily_Tesfaye":[8.5,17.0],"Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"JaJuantae_(Jay)_Young":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Feven_Dubale":[18.0,25.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0]},"2026-05-30":{"Julian_Returns":[4.0,13.0],"Toney_Returns":[10.0,18.5],"Genesis_Cochran":[7.0,16.0],"Rukmini_(Mini)_Carr":[5.5,14.5],"Laura_Gonzalez":[5.5,14.5],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17.0],"Mariam_Mbye":[10.0,18.5],"Zina_Kellen":[10.0,18.5],"Tighisty_(TT)_Haile":[10.0,18.5],"Samantha_(Sammi)_Smith":[10.0,18.5],"Nas_Returns":[14.0,23.0],"Umesh_Acharya":[16.5,25.0],"Hamda_Wais":[16.5,25.0],"Leslie_Brown":[16.5,25.0]}};
+var MAY_SCHEDULE = {"2026-05-03":{"Genesis_Cochran":[7,16],"Shawnee_Exit":[6.75,16],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Laura_Gonzalez":[5.5,14.5],"Ami_Lhom":[6.0,16.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[10.0,20.0],"Lauren_Kretschman":[16.0,26],"Ennis_MT":"OFF"},"2026-05-04":{"Genesis_Cochran":[7,16],"Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":"OFF","Ami_Lhom":[9.0,19.0],"Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[6.0,16.0],"Joshua_(Josh)_Osei":[10.0,20.0],"Brittney_Francis":"OFF","Lauren_Kretschman":[16.0,26],"Ennis_MT":[16.0,26]},"2026-05-05":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":[16.0,26],"Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":"OFF","Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":[10.0,20.0],"Brittney_Francis":[6.0,16.0],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[16.0,26]},"2026-05-06":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":[6.0,16.0],"Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":[10.0,20.0],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[6.0,16.0],"Lauren_Kretschman":"OFF","Ennis_MT":[16.0,26]},"2026-05-07":{"Genesis_Cochran":[7,16],"Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":"OFF","Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[8.0,18.0],"Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[10.0,20.0],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":[16.0,26]},"2026-05-08":{"Genesis_Cochran":[7,16],"Shawnee_Exit":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Laura_Gonzalez":"OFF","Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":[4.0,14.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":"OFF","Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[10.0,20.0],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[6.0,16.0],"Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-09":{"Genesis_Cochran":[7,16],"Shawnee_Exit":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Laura_Gonzalez":[5.5,14.5],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[5.5,15.5],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[8.0,18.0],"Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-10":{"Genesis_Cochran":[7,16],"Shawnee_Exit":[6.75,16],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Laura_Gonzalez":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[6.0,16.0],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-11":{"Genesis_Cochran":[7,16],"Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[6.0,16.0],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-12":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":[9.0,19.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[12.0,22.0],"Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":[16.0,26],"Lauren_Kretschman":[6.0,16.0],"Ennis_MT":[6.0,16.0]},"2026-05-13":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":[16.0,26],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[12.0,22.0],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[6.0,16.0],"Ennis_MT":[6.0,16.0]},"2026-05-14":{"Genesis_Cochran":[7,16],"Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":"OFF","Carlos_Aviles":[12.0,22.0],"Caitlin_Kelsey":[5.5,15.5],"Khala_Shackleford":[12.0,22.0],"Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":[10.0,20.0],"Brittney_Francis":"OFF","Lauren_Kretschman":[6.0,16.0],"Ennis_MT":[6.0,16.0]},"2026-05-15":{"Genesis_Cochran":"OFF","Shawnee_Exit":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Laura_Gonzalez":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[10.0,20.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":"OFF","Caitlin_Kelsey":"OFF","Khala_Shackleford":[12.0,22.0],"Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[6.0,16.0],"Ennis_MT":"OFF"},"2026-05-16":{"Genesis_Cochran":"OFF","Shawnee_Exit":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Laura_Gonzalez":[5.5,14.5],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[6.0,16.0],"Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[12.0,22.0],"Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":"OFF","Ennis_MT":[6.0,16.0]},"2026-05-17":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Laura_Gonzalez":[5.5,14.5],"Ami_Lhom":[10.0,20.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[16.0,26],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[6.0,16.0]},"2026-05-18":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":"OFF","Ami_Lhom":[10.0,20.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[16.0,26],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[6.0,16.0]},"2026-05-19":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":[9.0,19.0],"Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[16.0,26],"Caitlin_Kelsey":[6.0,16.0],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[10.0,20.0]},"2026-05-20":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":[16.0,26],"Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[6.0,16.0],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[5.5,15.5],"Brittney_Francis":"OFF","Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[10.0,20.0]},"2026-05-21":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":"OFF","Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":[6.0,16.0],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":[12.0,22.0],"Lauren_Kretschman":[16.0,26],"Ennis_MT":"OFF"},"2026-05-22":{"Genesis_Cochran":"OFF","Shawnee_Exit":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Laura_Gonzalez":"OFF","Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[6.0,16.0],"Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-23":{"Genesis_Cochran":"OFF","Shawnee_Exit":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Laura_Gonzalez":[5.5,14.5],"Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[6.0,16.0],"Caitlin_Kelsey":"OFF","Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":"OFF","Lauren_Kretschman":[16.0,26],"Ennis_MT":[10.0,20.0]},"2026-05-24":{"Genesis_Cochran":[7,16],"Shawnee_Exit":[6.75,16],"Lisa_(Exit)":[16.5,36.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Laura_Gonzalez":[5.5,14.5]},"2026-05-25":{"Genesis_Cochran":[7,16],"Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":"OFF","Caitlin_Kelsey":[16.0,26],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":[12.0,22.0]},"2026-05-26":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":[17.0,25.0],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Brittney_Francis":"OFF"},"2026-05-27":{"Genesis_Cochran":"OFF","Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Laura_Gonzalez":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},"2026-05-28":{"Genesis_Cochran":[7,16],"Shawnee_Exit":[6.75,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,36.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Laura_Gonzalez":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},"2026-05-29":{"Genesis_Cochran":[7,16],"Shawnee_Exit":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Laura_Gonzalez":"OFF","Ami_Lhom":"OFF"},"2026-05-30":{"Genesis_Cochran":[7,16],"Shawnee_Exit":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Laura_Gonzalez":[5.5,14.5],"Ami_Lhom":"OFF"}}; 
+
 
 function getScheduleForDate(dateStr) {
   return MAY_SCHEDULE[dateStr] || null;
@@ -10940,6 +10917,74 @@ function printChecklist(blank) {
   </body></html>`);
   win.document.close();
   win.print();
+}
+
+
+// ── COVERAGE THRESHOLD QUIZ ────────────────────────────────────────────────
+var DEFAULT_THRESHOLDS = {
+  early:   { label:'Early (6a–8a)',    exitMin:1, exitMax:2, counterMin:0, closed:false },
+  morning: { label:'Morning (8a–12p)', exitMin:1, exitMax:3, counterMin:1, closed:false },
+  peak:    { label:'Peak (12p–6p)',    exitMin:2, exitMax:3, counterMin:2, closed:false },
+  evening: { label:'Evening (6p–9p)',  exitMin:1, exitMax:2, counterMin:2, closed:false },
+  night:   { label:'Night (9p–12:30a)',exitMin:1, exitMax:2, counterMin:1, closed:false },
+  closed:  { label:'Closed (12:30a–6a)',exitMin:0,exitMax:0, counterMin:0, closed:true  },
+  mon_peak:{ label:'Mon Peak (10a–2p)',exitMin:5, exitMax:5, counterMin:3, closed:false },
+};
+
+function openThresholdQuiz() {
+  const t = Object.assign({}, DEFAULT_THRESHOLDS, STATE.coverageThresholds||{});
+  const blocks=['early','morning','peak','midday','evening','night'];
+  const sel=(key,field,val)=>[0,1,2,3,4,5].map(n=>`<option value="${n}"${(val||0)===n?' selected':''}>${n}</option>`).join('');
+  const row=(key)=>{const b=t[key]||DEFAULT_THRESHOLDS[key];return `
+    <div style="display:grid;grid-template-columns:1fr 52px 52px 52px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bdr)">
+      <div style="font-size:12px;font-weight:600;color:var(--txt)">${b.label}</div>
+      <select onchange="updateThreshold('${key}','exitMin',+this.value)"
+        style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--green);font-size:13px;text-align:center">
+        ${sel(key,'exitMin',b.exitMin)}</select>
+      <select onchange="updateThreshold('${key}','exitMax',+this.value)"
+        style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--amber);font-size:13px;text-align:center">
+        ${sel(key,'exitMax',b.exitMax)}</select>
+      <select onchange="updateThreshold('${key}','counterMin',+this.value)"
+        style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--acc);font-size:13px;text-align:center">
+        ${sel(key,'counterMin',b.counterMin)}</select>
+    </div>`; };
+  const monB=t.mon_peak||DEFAULT_THRESHOLDS.mon_peak;
+  openModal('📊 Coverage Thresholds',`
+    <div>
+      <div style="display:grid;grid-template-columns:1fr 52px 52px 52px;gap:8px;padding:4px 0 8px;border-bottom:2px solid var(--bdr);margin-bottom:2px">
+        <div style="font-size:9px;font-weight:800;color:var(--txt3)">TIME BLOCK</div>
+        <div style="font-size:9px;font-weight:800;color:var(--green);text-align:center">EXIT<br>MIN</div>
+        <div style="font-size:9px;font-weight:800;color:var(--amber);text-align:center">EXIT<br>MAX</div>
+        <div style="font-size:9px;font-weight:800;color:var(--acc);text-align:center">CTR<br>MIN</div>
+      </div>
+      ${blocks.map(k=>row(k)).join('')}
+      <div style="margin-top:10px;padding:8px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);border-radius:6px">
+        <div style="font-size:9px;font-weight:800;color:#818cf8;margin-bottom:6px">🗓 MONDAY OVERRIDE</div>
+        <div style="display:grid;grid-template-columns:1fr 52px 52px 52px;gap:8px;align-items:center">
+          <div style="font-size:12px;font-weight:600;color:var(--txt)">${monB.label}</div>
+          <select onchange="updateThreshold('mon_peak','exitMin',+this.value)" style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--green);font-size:13px;text-align:center">${sel('mon_peak','exitMin',monB.exitMin)}</select>
+          <select onchange="updateThreshold('mon_peak','exitMax',+this.value)" style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--amber);font-size:13px;text-align:center">${sel('mon_peak','exitMax',monB.exitMax)}</select>
+          <select onchange="updateThreshold('mon_peak','counterMin',+this.value)" style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--acc);font-size:13px;text-align:center">${sel('mon_peak','counterMin',monB.counterMin)}</select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button onclick="saveThresholds()" style="flex:1;padding:11px;border-radius:6px;border:none;background:var(--green);color:#fff;font-size:13px;font-weight:700;cursor:pointer">✓ Save &amp; Apply</button>
+        <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>`);
+}
+
+function updateThreshold(blockKey, field, val) {
+  if(!STATE.coverageThresholds) STATE.coverageThresholds=JSON.parse(JSON.stringify(DEFAULT_THRESHOLDS));
+  if(!STATE.coverageThresholds[blockKey]) STATE.coverageThresholds[blockKey]=Object.assign({},DEFAULT_THRESHOLDS[blockKey]);
+  STATE.coverageThresholds[blockKey][field]=val;
+}
+
+function saveThresholds() {
+  saveState();
+  closeModal();
+  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+  toast('Coverage thresholds saved ✓');
 }
 
 </script>
