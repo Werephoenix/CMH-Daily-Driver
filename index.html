@@ -1381,15 +1381,15 @@ button { cursor: pointer; }
 ═══════════════════════════════════════════════════════════════ -->
 <div class="scr on" id="screen-opening">
 
-  <!-- Live status band -->
+  <!-- ── STATUS BAND ── -->
   <div id="status-band" class="status-band">
     <div class="status-item"><div class="status-dot" style="background:var(--txt3)"></div><span style="color:var(--txt3)">Loading...</span></div>
   </div>
 
-  <!-- KPI row -->
+  <!-- ── KPI ROW: CS · HOT · OOS · Walk-Ups ── -->
   <div class="kpi-row">
     <div class="kpi" onclick="showTab('checklist')">
-      <div class="kpi-lbl">CS Scores</div>
+      <div class="kpi-lbl">CS Score</div>
       <div class="kpi-val g" id="sum-cs">—</div>
       <div class="kpi-sub">Tap to enter</div>
     </div>
@@ -1401,19 +1401,20 @@ button { cursor: pointer; }
     <div class="kpi" onclick="showTab('checklist')">
       <div class="kpi-lbl">OOS Units</div>
       <div class="kpi-val a" id="sum-oos">—</div>
-      <div class="kpi-sub">All have claims?</div>
+      <div class="kpi-sub">All claimed?</div>
     </div>
     <div class="kpi" onclick="showTab('board')">
-      <div class="kpi-lbl">Walk-Up Status</div>
+      <div class="kpi-lbl">Walk-Ups</div>
       <div class="kpi-val b" id="sum-wu" style="font-size:14px;padding-top:4px">—</div>
       <div class="kpi-sub">Tap for board</div>
     </div>
   </div>
 
-  <!-- Manager bar (auto-filled from schedule) -->
+  <!-- ── MANAGER / OPS BAR ── -->
+  <!-- Single source of truth: Opening · Closing · Sales Leader · Walk-Up policy -->
   <div class="mgr-bar">
-    <div class="mgr-item"><div class="mgr-item-lbl">Opening Mgr</div><div class="mgr-item-val" id="db-openmgr">—</div></div>
-    <div class="mgr-item"><div class="mgr-item-lbl">Closing Mgr</div><div class="mgr-item-val" id="db-closemgr">—</div></div>
+    <div class="mgr-item"><div class="mgr-item-lbl">Opening</div><div class="mgr-item-val" id="db-openmgr">—</div></div>
+    <div class="mgr-item"><div class="mgr-item-lbl">Closing</div><div class="mgr-item-val" id="db-closemgr">—</div></div>
     <div class="mgr-item"><div class="mgr-item-lbl">Sales Leader</div><div class="mgr-item-val" id="db-sales">—</div></div>
     <div class="mgr-item" style="margin-left:auto">
       <div class="mgr-item-lbl">Walk-Ups</div>
@@ -1421,47 +1422,45 @@ button { cursor: pointer; }
     </div>
   </div>
 
-  <!-- Summary cards — tap to navigate to each section -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-    <div class="card" onclick="showTab('schedule')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">👥 Today's Team</div>
-      <div style="font-size:12px;color:var(--txt)">Opening: <b id="sum-open" style="color:var(--green)">—</b></div>
-      <div style="font-size:12px;color:var(--txt)">Closing: <b id="sum-close" style="color:var(--acc)">—</b></div>
-      <div style="font-size:10px;color:var(--acc);margin-top:4px" id="sum-staffcount">→ Schedule</div>
-    </div>
-    <div class="card" onclick="showTab('board')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
+  <!-- ── FLIGHT DELAY TOGGLE ── -->
+  <div id="flight-delay-card" style="margin-bottom:10px"></div>
+
+  <!-- ── 2-COL INFO CARDS ── -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+
+    <!-- Availability -->
+    <div class="card" onclick="showTab('board')" style="cursor:pointer;padding:12px">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">🚦 Availability</div>
       <div style="font-size:12px;color:var(--txt)">Walk-Ups: <b id="sum-wu2" style="color:var(--green)">—</b></div>
       <div style="font-size:12px;color:var(--txt)">Total Res: <b id="sum-totalres" style="color:var(--amber)">—</b></div>
       <div style="font-size:10px;color:var(--acc);margin-top:4px">→ Board</div>
     </div>
-    <div class="card" onclick="showTab('paste')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">📊 Brand Totals</div>
+
+    <!-- Brand Totals -->
+    <div class="card" onclick="showTab('paste')" style="cursor:pointer;padding:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">📊 Brands</div>
       <div id="sum-brands" style="font-size:11px;font-family:var(--ff-mono);color:var(--txt)">Nat — · Ala — · Ent —</div>
       <div style="font-size:10px;color:var(--acc);margin-top:4px">→ Paste Data</div>
     </div>
-    <!-- Hourly flow preview on dashboard -->
-    <div class="card" style="padding:10px 12px;margin-bottom:10px;cursor:pointer" onclick="showTab('board')">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:6px">
-        📊 Hourly Flow <span style="font-weight:400;color:var(--acc)">→ Board</span>
-      </div>
-      <div id="dash-hourly-flow" style="min-height:40px">
-        <div style="font-size:10px;color:var(--txt3);font-style:italic">Paste res &amp; ret data to see flow</div>
-      </div>
-    </div>
-    <div class="card" onclick="showTab('checklist')" style="cursor:pointer;padding:12px;-webkit-tap-highlight-color:transparent">
+
+    <!-- Checklist -->
+    <div class="card" onclick="showTab('checklist')" style="cursor:pointer;padding:12px">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">✅ Checklist</div>
       <div id="sum-cl-progress" style="font-size:11px;color:var(--txt2)">—</div>
       <div id="sum-cl-data" style="font-size:10px;color:var(--acc);margin-top:4px">→ Checklist</div>
     </div>
+
+    <!-- Staff count -->
+    <div class="card" onclick="showTab('schedule')" style="cursor:pointer;padding:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:6px">👥 Staff</div>
+      <div id="sum-staffcount" style="font-size:12px;color:var(--txt)">→ Schedule</div>
+      <div style="font-size:10px;color:var(--acc);margin-top:4px">→ Schedule</div>
+    </div>
+
   </div>
 
-  <!-- Assignments strip -->
-  
-  <!-- DNR / DNQ Alerts -->
-  <div id="dnr-dnq-section" style="margin-bottom:10px"></div>
-
-<div class="card" style="padding:10px 14px;margin-bottom:12px" onclick="showTab('checklist')" style="cursor:pointer">
+  <!-- ── XXAR / SXAR / PXAR strip ── -->
+  <div class="card" style="padding:10px 14px;margin-bottom:10px" onclick="showTab('checklist')">
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center">
       <span style="color:var(--txt3)">XXAR <b id="sum-xxar" style="font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--txt3)">SXAR <b id="sum-sxar" style="font-family:var(--ff-mono)">—</b></span>
@@ -1472,7 +1471,10 @@ button { cursor: pointer; }
     </div>
   </div>
 
-    <!-- Schedule mini-view on dashboard -->
+  <!-- ── DNR / DNQ ALERTS ── -->
+  <div id="dnr-dnq-section" style="margin-bottom:10px"></div>
+
+  <!-- ── TODAY'S COVERAGE MINI ── -->
   <div id="dash-sched-mini" class="card" style="margin-bottom:10px;padding:10px 12px;cursor:pointer"
     onclick="showTab('schedule')">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -1484,7 +1486,19 @@ button { cursor: pointer; }
     <div id="dash-sched-content" style="font-size:11px;color:var(--txt3)">Loading...</div>
   </div>
 
-    <!-- Quick-action links -->
+  <!-- ── HOURLY FLOW (after paste) ── -->
+  <div class="card" style="padding:10px 12px;margin-bottom:10px;cursor:pointer" onclick="showTab('board')">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">
+        📊 Hourly Flow <span style="font-weight:400;color:var(--acc)">→ Board</span>
+      </div>
+    </div>
+    <div id="dash-hourly-flow" style="min-height:40px">
+      <div style="font-size:10px;color:var(--txt3);font-style:italic">Paste res &amp; ret data to see flow</div>
+    </div>
+  </div>
+
+  <!-- ── QUICK ACTIONS ── -->
   <div class="quick-links">
     <div class="ql-btn" onclick="showTab('paste')">
       <span class="ql-icon">📋</span>
@@ -1516,16 +1530,6 @@ button { cursor: pointer; }
       </div>
       <div id="dash-flow-content"></div>
     </div>
-  </div>
-
-  <!-- Feature parity (collapsible) -->
-  <div class="card" style="background:rgba(37,99,235,.03);border-color:rgba(37,99,235,.12)">
-    <div class="ch" style="cursor:pointer;margin-bottom:0" onclick="toggleFeatureList()">
-      📋 Feature Parity vs Excel
-      <span class="badge" id="feature-badge">Loading...</span>
-      <span style="margin-left:auto;font-size:11px;color:var(--txt3)" id="feature-toggle-lbl">▼ Show</span>
-    </div>
-    <div id="feature-list" style="display:none;margin-top:14px"></div>
   </div>
 
 </div>
@@ -2115,11 +2119,12 @@ var THRESHOLDS = {
 // ── GROUP DISPLAY ORDER & FLAGS ─────────────────────────────────────────────
 // Core car codes — 5-seater sedans (Emerald Club pick pool)
 var CORE_CODES = new Set([
-  'ECAR','EDAR','ECDR',         // Economy
-  'CCAR','CDAR','CCDR','CFAR','CFDR', // Compact
-  'ICAR','IDAR','ICDR','IFAR','IFDR','IRAR', // Intermediate
-  'SCAR','SCAH','SDAR','SFAR','SFDR','SFAH', // Standard
-  'FCAR','FDAR','FCAH','FCDR','FCAR',        // Full-size
+  // 5-seater sedans — Emerald Club pick pool
+  'ECAR','EDAR','ECDR',                       // Economy
+  'CCAR','CDAR','CCDR','CFAR','CFDR',         // Compact
+  'ICAR','IDAR','ICDR','IFAR','IFDR','IRAR',  // Intermediate
+  'SCAR','SCAH','SDAR','SFAR','SFDR','SFAH',  // Standard
+  'FCAR','FDAR','FCAH','FCDR',                // Full-size
 ]);
 
 function isCoreCar(code) {
@@ -2271,78 +2276,50 @@ var ROSTER_CXR = [
    lunchCode:'30min',
    notes:'Fri/Sat confirmed. Sparse/variable schedule. 4:30p-1:00a. Part-time.'},
 
-  // ═══ EXIT AGENTS — Full shift at Exit, no counter rotation ══════════════════
-
-  {id:'genesis',  name:'Genesis Cochran',          nick:'Genesis', role:'EXIT',
-   shiftCode:'7A-400P', shiftStart:7.0, shiftEnd:16.0,
-   daysOn:[0,1,2,3,4],  // Mon-Fri (Sun-Thu pattern noted) — confirm days with AM
-   pref:'exit', exitFairness:null,
-   lunchCode:'1hr',
-   notes:'Full shift at exit — no counter rotation. Mon-Fri (appears Sun-Thu pattern). 1hr lunch floating.'},
-
-  {id:'kenneth',  name:'Kenneth Hooks',            nick:'Kenneth', role:'EXIT',
-   shiftCode:'600P-230A', shiftStart:18.0, shiftEnd:26.5,
-   daysOn:[1,2,3,4,5],  // Mon-Fri — confirmed from Excel
-   pref:'exit', exitFairness:null,
-   lunchCode:'1hr',
-   notes:'EXIT Agent. Mon-Fri 6:00p-2:30a. Evening exit.'},
-
-  {id:'lisa-e',   name:'Lisa (Exit)',              nick:'Lisa',    role:'EXIT',
-   shiftCode:'430P-1230A', shiftStart:16.5, shiftEnd:24.5,
-   daysOn:[5],           // Fri confirmed. Schedule varies.
-   pref:'exit', exitFairness:null,
-   lunchCode:'1hr',
-   notes:'Evening exit agent. Fri confirmed. Schedule varies. Last name TBD.'},
-
-  {id:'zina',     name:'Zina Kellen',            nick:'Zina',    role:'EXIT',
-   shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
-   daysOn:[0,1,4,5,6],  // Thu-Mon (Sun=0,Mon=1,Thu=4,Fri=5,Sat=6) — confirmed Apr 27 2026
-   pref:'exit', exitFairness:null,
-   lunchCode:'1hr',
-   notes:'EXIT Agent. Full name: Zina Kellen. Thu-Mon 10A-6:30P. Confirmed Apr 27 2026. No counter rotation.'},
-
-  {id:'sheronda', name:'Sheronda Whitner',         nick:'Sheronda',role:'EXIT',
-   shiftCode:'varies', shiftStart:null, shiftEnd:null,
-   active:false, daysOn:[],
-   pref:'exit', exitFairness:null,
-   lunchCode:'1hr',
-   notes:'EXIT Agent. Part time. ⚠ NOT CURRENTLY WORKING — excluded from scheduling.'},
+  // ═══ EXIT AGENTS — Full shift at Exit, no counter rotation ══════════════════,
 ];
 
 // ═══ RETURN AGENTS — Self-managing, roster reference only ═══════════════════
 // Not in DAILY_OPS. Listed here for completeness.
 var ROSTER_RETURNS = [
-  {id:'kerv',    name:'Kervin (Kerv) Cummings',  nick:'Kerv',   role:'RETURN',
-   shiftCode:'330A-1200P', shiftStart:3.5, shiftEnd:12.0,
-   daysOn:[0,1,2,3,4], notes:'Self-managing. Sun-Thu approx 3:30a-12:00p.'},
-  {id:'julian',  name:'Julian Mitchell',          nick:'Julian', role:'RETURN',
-   shiftCode:'4A-100P', shiftStart:4.0, shiftEnd:13.0,
-   daysOn:[0,1,2,3,4], notes:'Self-managing. Mon-Fri approx 4:00a-1:00p.'},
-  {id:'toney-r', name:'Toney (Returns)',          nick:'Toney',  role:'RETURN',
+  {id:'kerv',   name:'Kerv Returns',   nick:'Kerv',   role:'RETURNS',
+   daysOn:[0,1,3,4,5], shiftStart:3.5, shiftEnd:12,
+   shiftCode:'330A-12P',
+   notes:'Returns agent. Sun/Mon/Wed/Thu/Fri. Wed shift is 4a-1p, other days 3:30a-12p.', active:true},
+  {id:'julian', name:'Julian Returns', nick:'Julian', role:'RETURNS',
+   daysOn:[1,2,4,5,6], shiftStart:4, shiftEnd:13,
+   shiftCode:'4A-1P',
+   notes:'Returns agent. Mon/Tue/Thu/Fri/Sat.', active:true},
+  {id:'toney-r', name:'Toney (Returns)',          nick:'Toney',  role:'RETURNS',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
    daysOn:[1,2,3,4,5], notes:'Self-managing. Mon-Fri. Last name TBD.'},
-  {id:'robert',  name:'Robert Payne',             nick:'Robert', role:'RETURN',
+  {id:'robert',  name:'Robert Payne',             nick:'Robert', role:'RETURNS',
    shiftCode:'4P-1230A', shiftStart:16.0, shiftEnd:24.5,
    daysOn:[1,2,3,4,5], notes:'Self-managing. Mon-Fri approx 4:00p-12:30a.'},
-  {id:'nas',     name:'Nas (Returns)',            nick:'Nas',    role:'RETURN',
-   shiftCode:'2P-1100P', shiftStart:14.0, shiftEnd:23.0,
-   daysOn:[1,2,3,4], notes:'Self-managing. Mon-Thu approx. Last name TBD.'},
+  {id:'nas',    name:'Nas Returns',    nick:'Nas',    role:'RETURNS',
+   daysOn:[0,3,4,5,6], shiftStart:14, shiftEnd:23,
+   shiftCode:'2P-11P',
+   notes:'Returns agent. Sun/Wed/Thu/Fri/Sat.', active:true},
 ];
 
 
 var ROSTER_EXIT = [
   {id:'genesis',  name:'Genesis Cochran',  nick:'Genesis', role:'EXIT',
    daysOn:[0,1,4,5,6], shiftStart:7, shiftEnd:16,
-   shiftCode:'7A-4P', active:true},
-  {id:'shawnee',  name:'Shawnee', nick:'Shawnee', role:'EXIT',
-   daysOn:[0,1,2,3,4], shiftStart:6.75, shiftEnd:16,
-   shiftCode:'645A-4P', active:true},
+   shiftCode:'7A-4P',
+   notes:'Exit agent. Sun/Mon/Thu/Fri/Sat. Tue/Wed off.', active:true},
   {id:'lisa_exit', name:'Lisa (Exit)', nick:'Lisa', role:'EXIT',
-   daysOn:[0], shiftStart:16.5, shiftEnd:36.5,
-   shiftCode:'430P-1230A', active:true},
+   daysOn:[0], shiftStart:16.5, shiftEnd:24.5,
+   shiftCode:'430P-1230A',
+   notes:'Exit agent. Sunday only.', active:true},
   {id:'kenneth',  name:'Kenneth Hooks', nick:'Kenneth', role:'EXIT',
    daysOn:[0,1,2,3,4], shiftStart:18, shiftEnd:26.5,
-   shiftCode:'6P-230A', active:true},
+   shiftCode:'6P-230A',
+   notes:'Exit agent. Sun/Mon/Tue/Wed/Thu. 6p-2:30a overnight.', active:true},,
+  {id:'zina', name:'Zina Kellen', nick:'Zina', role:'EXIT',
+   daysOn:[0,1,4,5,6], shiftStart:10, shiftEnd:18.5,
+   shiftCode:'10A-630P',
+   notes:'Exit agent. Sun/Mon/Thu/Fri/Sat. 10a-6:30p. No counter rotation.', active:true}
 ];
 
 var ROSTER_MGMT = [
@@ -2379,10 +2356,7 @@ var ROSTER_MGMT = [
    notes:'MT. Typical shifts: 6A-4P / 8A-6P / 10A-8P / 12P-10P / 4P-C.'},
   {id:'lauren',  name:'Lauren Kretschman',       nick:'Lauren',  role:'MT',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'MT. Typical: 6A-4P / 8A-6P / 12P-10P / 4P-C.'},
-  {id:'elle',    name:'Elle',                   nick:'Elle',    role:'MT',
-   shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'MT (verify level). Typical: 9A-7P / 12P-10P / 4P-C. Last name TBD.'},,
+   notes:'MT. Typical: 6A-4P / 8A-6P / 12P-10P / 4P-C.'},,
   {id:'ennis_mt', name:'Ennis', nick:'Ennis', role:'MT',
    shiftCode:'varies', shiftStart:null, shiftEnd:null,
    defaultStation:'Counter Manager', active:true,
@@ -2432,8 +2406,18 @@ var COVERAGE_BY_HOUR = function(hour, dow, exitAgentCount) {
   }
 
   // ── Hardcoded rules per your specs ───────────────────────────────────────
-  // CLOSED: before 6am OR after 2:30am (hour >= 26.5 in 24+ notation or h < 6)
-  if (h < 6 || h >= 26 || hour >= 26) {
+  // CLOSED: before 6am OR after 12:30am (with optional extension up to 2:30am)
+  const ext = (STATE && STATE.closingExtension) || null;
+  const closingHour = ext && ext.until ? ext.until : 24.5; // 12:30am default
+  if (h < 6 && hour < closingHour) {
+    // Pre-6am — closed unless extension covers it
+    if (hour > 24 && hour < closingHour) {
+      // Extension active
+      return { exitMin:1, exitMax:2, counterMin:0, closed:false, label:'Extended' };
+    }
+    return { exitMin:0, exitMax:0, counterMin:0, closed:true, label:'Closed' };
+  }
+  if (hour >= closingHour || h >= 26) {
     return { exitMin:0, exitMax:0, counterMin:0, closed:true, label:'Closed' };
   }
 
@@ -2672,6 +2656,10 @@ function loadState() {
       s.adminCodes   = s.adminCodes   || [];
       s.specialBlocks = s.specialBlocks || {};
       s.closeFields  = s.closeFields  || {};
+      s.coverageThresholds = s.coverageThresholds || null;
+      s.pendingCoverage = s.pendingCoverage || null; // { staffStation, altSchedule, shiftMod, customSplits, specialBlocks } — buffer of edits before Confirm
+      s.confirmedCoverage = s.confirmedCoverage || null; // snapshot of last Confirm
+      s.closingExtension = s.closingExtension || null; // {until: hour, reason: 'unfulfilled res'}
       return s;
     }
   } catch(e) {}
@@ -2680,6 +2668,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, adminRoster:[], adminCodes:[], specialBlocks:{},
+    closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
 
@@ -2746,6 +2735,8 @@ window.onload = function() {
     }
   }
   if (typeof refreshDash === 'function') refreshDash();
+  if (typeof updatePendingIndicator === 'function') updatePendingIndicator();
+  if (typeof updateFlightDelayCard === 'function') updateFlightDelayCard();
 };
 
 // ── CLOCK ───────────────────────────────────────────────────────────────────
@@ -2756,11 +2747,13 @@ function startClock() {
       now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
     document.getElementById('topbar-time').textContent =
       now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true});
-    const h = now.getHours();
+    const h = now.getHours() + now.getMinutes()/60;
     const shiftBadge = document.getElementById('topbar-shift-badge');
-    if (h < 12) { shiftBadge.textContent = 'OPENING'; shiftBadge.style.background='#1d4ed8'; }
-    else if (h < 16) { shiftBadge.textContent = 'MID-SHIFT'; shiftBadge.style.background='#166534'; }
-    else { shiftBadge.textContent = 'CLOSING'; shiftBadge.style.background='#991b1b'; }
+    if (h < 6 || h >= 24.5) { shiftBadge.textContent = 'CLOSED';   shiftBadge.style.background = '#525252'; }
+    else if (h < 11)        { shiftBadge.textContent = 'OPENING';  shiftBadge.style.background = '#1d4ed8'; }
+    else if (h < 16)        { shiftBadge.textContent = 'MID-SHIFT'; shiftBadge.style.background = '#166534'; }
+    else if (h < 20)        { shiftBadge.textContent = 'EVENING';  shiftBadge.style.background = '#7c3aed'; }
+    else                    { shiftBadge.textContent = 'CLOSING';  shiftBadge.style.background = '#991b1b'; }
   }
   tick();
   setInterval(tick, 10000);
@@ -3020,7 +3013,11 @@ function parseStep(stepNum) {
   const isAM = result.halfDay === 'AM';
   const hourStart = isAM ? 0 : 12;
   const hourEnd   = isAM ? 12 : 24;
-  const existing  = STATE.pasteHourly[halfKey] || new Array(24).fill(0);
+  // Replace this half (AM/PM) — re-paste means fresh data, never accumulate
+  // First, zero out the slots this paste covers (AM=hours 0-11, PM=12-23)
+  if (!STATE.pasteHourly[halfKey]) STATE.pasteHourly[halfKey] = new Array(24).fill(0);
+  for (let h = hourStart; h < hourEnd; h++) STATE.pasteHourly[halfKey][h] = 0;
+  const existing = STATE.pasteHourly[halfKey];
 
   // Per code: map hourly raw values to the correct hour slots
   // GL format: AM paste covers 12am-11am (cols 0-11), PM covers 12pm-11pm (cols 12-23)
@@ -3068,6 +3065,7 @@ function parseStep(stepNum) {
 
   // Trigger chart update
   if (typeof buildHourlyFlowChart === 'function') buildHourlyFlowChart();
+  if (typeof updateFlightDelayCard === 'function') updateFlightDelayCard();
 
   // Update availability display
   updateAvailabilityFromPaste();
@@ -4279,8 +4277,11 @@ function buildSmartRotation() {
   // But weight toward counter-first (CXRs prefer counter, exit is less popular)
   // Unless exit coverage is critically short — then prioritize exit start for some
   const exitAgentCount = workingExit.length;
-  const exitNeeded     = rules.exitMin;
-  const exitGap        = Math.max(0, exitNeeded - exitAgentCount);
+  // Use COVERAGE_BY_HOUR for peak-hour exit minimum (more accurate than rules object)
+  const peakRules = (typeof COVERAGE_BY_HOUR === 'function')
+    ? COVERAGE_BY_HOUR(13, dow, exitAgentCount) : { exitMin: 2 };
+  const exitNeeded = peakRules.exitMin || 2;
+  const exitGap    = Math.max(0, exitNeeded - exitAgentCount);
 
   workingCXRs.forEach((cxr, i) => {
     if (cxr.startStation) return; // already set by manager
@@ -5201,7 +5202,10 @@ function autoLoadFromExpected(expectedToday, dow) {
   Object.entries(expectedToday).forEach(([pid,e])=>{
     if(e.person.role==='CXR') delete STATE.staffStation[pid];
   });
-  Object.entries(expectedToday).forEach(([pid,e])=>{ if(e.person.role==='EXIT') STATE.staffStation[pid]='Exit Booth'; });
+  Object.entries(expectedToday).forEach(([pid,e])=>{
+    if(e.person.role==='EXIT') STATE.staffStation[pid]='Exit Booth';
+    if(e.person.role==='RETURNS') STATE.staffStation[pid]='Returns'; // Returns agents stay at returns
+  });
   // Auto-assign managers: opener → Emerald Booth (show runner), others → Counter Manager
   const mgmtOnShift = Object.entries(expectedToday)
     .filter(([,e])=>['ARM','BRM','ABRM','MT'].includes(e.person.role))
@@ -5452,7 +5456,10 @@ function confirmToday() {
     const el = document.getElementById('f-closemgr');
     if (el) el.value = auto.closeName;
   }
+  // Snapshot confirmed state for cancel/revert
+  STATE.confirmedCoverage = snapshotCoverage();
   saveState();
+  if (typeof updatePendingIndicator === 'function') updatePendingIndicator();
 
   toast('✅ Today\'s schedule confirmed — coverage and rotation updated');
   buildMorningBriefing();
@@ -5582,7 +5589,7 @@ function showSchedSection(sec) {
 // ═══════════════════════════════════════════════════════════════════════
 var PRELOADED_MGMT_SCHEDULE = {
   startDate: "2026-04-12",
-  endDate:   "2026-05-02",
+  endDate:   "2026-05-30",
   people: {
   "Vada_Griffith": {
     "name": "Vada Griffith",
@@ -5641,31 +5648,32 @@ var PRELOADED_MGMT_SCHEDULE = {
   }
 },
   grid: {
-  "2026-05-03": {"Ami_Lhom":"6A-4P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"10A-8P","Lauren_Kretschman":"4P-C","Ennis_MT":"OFF"},
-  "2026-05-04": {"Ami_Lhom":"9A-7P","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"4P-C","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"6A-4P","Joshua_(Josh)_Osei":"10A-8P","Brittney_Francis":"OFF","Lauren_Kretschman":"4P-C","Ennis_MT":"4P-C"},
-  "2026-05-05": {"Ami_Lhom":"4P-C","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"OFF","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"10A-8P","Brittney_Francis":"6A-4P","Lauren_Kretschman":"12P-10P","Ennis_MT":"4P-C"},
-  "2026-05-06": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"6A-4P","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"10A-8P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"6A-4P","Lauren_Kretschman":"OFF","Ennis_MT":"4P-C"},
-  "2026-05-07": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"8A-6P","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"10A-8P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"4P-C"},
-  "2026-05-08": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"4A-2P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"OFF","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"10A-8P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"6A-4P","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
-  "2026-05-09": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"530A-330P","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"8A-6P","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
+  "2026-05-03": {"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"10A-8P","Lauren_Kretschman":"4P-C","Ennis_MT":"OFF"},
+  "2026-05-04": {"Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"4P-C","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"6A-4P","Joshua_(Josh)_Osei":"10A-8P","Brittney_Francis":"OFF","Lauren_Kretschman":"4P-C","Ennis_MT":"4P-C"},
+  "2026-05-05": {"Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"OFF","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"10A-8P","Brittney_Francis":"6A-4P","Lauren_Kretschman":"12P-10P","Ennis_MT":"4P-C"},
+  "2026-05-06": {"Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"6A-4P","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"10A-8P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"6A-4P","Lauren_Kretschman":"OFF","Ennis_MT":"4P-C"},
+  "2026-05-07": {"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"8A-6P","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"10A-8P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"4P-C"},
+  "2026-05-08": {"Matt_Johnson_(BRM)":"4A-2P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"OFF","Caitlin_Kelsey":"12P-10P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"10A-8P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"6A-4P","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
+  "2026-05-09": {"Matt_Johnson_(BRM)":"530A-330P","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"8A-6P","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
   "2026-05-10": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"6A-4P","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
-  "2026-05-11": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"6A-4P","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
-  "2026-05-12": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"9A-7P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"12P-10P","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"4P-C","Lauren_Kretschman":"6A-4P","Ennis_MT":"6A-4P"},
-  "2026-05-13": {"Ami_Lhom":"4P-C","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"12P-10P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"6A-4P","Ennis_MT":"6A-4P"},
-  "2026-05-14": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"OFF","Carlos_Aviles":"12P-10P","Caitlin_Kelsey":"530A-330P","Khala_Shackleford":"12P-10P","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"10A-8P","Brittney_Francis":"OFF","Lauren_Kretschman":"6A-4P","Ennis_MT":"6A-4P"},
-  "2026-05-15": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"10A-8P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"OFF","Caitlin_Kelsey":"OFF","Khala_Shackleford":"12P-10P","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"6A-4P","Ennis_MT":"OFF"},
-  "2026-05-16": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"6A-4P","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"12P-10P","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"OFF","Ennis_MT":"6A-4P"},
+  "2026-05-11": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"9A-7P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"12P-10P","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"4P-C","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"4P-C","Brittney_Francis":"4P-C","Lauren_Kretschman":"6A-4P","Ennis_MT":"6A-4P"},
+  "2026-05-12": {"Ami_Lhom":"4P-C","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"12P-10P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"6A-4P","Ennis_MT":"6A-4P"},
+  "2026-05-13": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"OFF","Carlos_Aviles":"12P-10P","Caitlin_Kelsey":"530A-330P","Khala_Shackleford":"12P-10P","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"10A-8P","Brittney_Francis":"OFF","Lauren_Kretschman":"6A-4P","Ennis_MT":"6A-4P"},
+  "2026-05-14": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"10A-8P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"OFF","Caitlin_Kelsey":"OFF","Khala_Shackleford":"12P-10P","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"6A-4P","Ennis_MT":"OFF"},
+  "2026-05-15": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"6A-4P","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"12P-10P","Madelyne_(Maddy)_Shirer":"4P-C","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"OFF","Ennis_MT":"6A-4P"},
+  "2026-05-16": {"Ami_Lhom":"10A-8P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"4P-C","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"12P-10P","Ennis_MT":"6A-4P"},
   "2026-05-17": {"Ami_Lhom":"10A-8P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"4P-C","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"12P-10P","Ennis_MT":"6A-4P"},
-  "2026-05-18": {"Ami_Lhom":"10A-8P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"530A-330P","Carlos_Aviles":"4P-C","Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"12P-10P","Ennis_MT":"6A-4P"},
-  "2026-05-19": {"Ami_Lhom":"9A-7P","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"4P-C","Carlos_Aviles":"4P-C","Caitlin_Kelsey":"6A-4P","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"12P-10P","Ennis_MT":"10A-8P"},
-  "2026-05-20": {"Ami_Lhom":"4P-C","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"6A-4P","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"530A-330P","Brittney_Francis":"OFF","Lauren_Kretschman":"12P-10P","Ennis_MT":"10A-8P"},
-  "2026-05-21": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"OFF","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"6A-4P","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"12P-10P","Lauren_Kretschman":"4P-C","Ennis_MT":"OFF"},
-  "2026-05-22": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"6A-4P","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
-  "2026-05-23": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"6A-4P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"OFF","Lauren_Kretschman":"4P-C","Ennis_MT":"10A-8P"},
-  "2026-05-25": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"OFF","Caitlin_Kelsey":"4P-C","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"12P-10P"},
-  "2026-05-26": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Brittney_Francis":"OFF"},
+  "2026-05-18": {"Ami_Lhom":"9A-7P","Matt_Johnson_(BRM)":"8A-6P","Ty_Lumpkin":"4P-C","Carlos_Aviles":"4P-C","Caitlin_Kelsey":"6A-4P","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"12P-10P","Ennis_MT":"10A-8P"},
+  "2026-05-19": {"Ami_Lhom":"4P-C","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":"6A-4P","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"530A-330P","Brittney_Francis":"OFF","Lauren_Kretschman":"12P-10P","Ennis_MT":"10A-8P"},
+  "2026-05-20": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"4P-C","Ty_Lumpkin":"OFF","Carlos_Aviles":"530A-330P","Caitlin_Kelsey":"6A-4P","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"12P-10P","Lauren_Kretschman":"4P-C","Ennis_MT":"OFF"},
+  "2026-05-21": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"6A-4P","Caitlin_Kelsey":"10A-8P","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"4P-C","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},
+  "2026-05-22": {"Ami_Lhom":"8A-6P","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"6A-4P","Caitlin_Kelsey":"OFF","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"OFF","Lauren_Kretschman":"4P-C","Ennis_MT":"10A-8P"},
+  "2026-05-23": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"OFF","Caitlin_Kelsey":"4P-C","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"12P-10P"},
+  "2026-05-24": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":"4P-C","Carlos_Aviles":"OFF","Caitlin_Kelsey":"4P-C","Khala_Shackleford":"10A-8P","Madelyne_(Maddy)_Shirer":"530A-330P","Joshua_(Josh)_Osei":"6A-4P","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"12P-10P"},
+  "2026-05-25": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Brittney_Francis":"OFF"},
+  "2026-05-26": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},
   "2026-05-27": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},
-  "2026-05-28": {"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},
+  "2026-05-28": {"Ami_Lhom":"OFF"},
   "2026-05-29": {"Ami_Lhom":"OFF"},
   "2026-05-30": {"Ami_Lhom":"OFF"}
   }
@@ -5832,8 +5840,7 @@ function refreshDash() {
   s('db-sales', f.salesLeader); s('db-wu', wlbls[pol]);
   s('sum-cs',  f.cs);  s('sum-hot', f.hot);  s('sum-oos', f.oos||f.oosFinal);
   s('sum-wu',  wlbls[pol]);
-  s('sum-open', f.openMgr||auto.open); s('sum-close', f.closeMgr||auto.close);
-  s('sum-staffcount', working ? working+' working' : '→ Schedule');
+  s('sum-staffcount', working ? working+' on duty' : '→ Schedule');
   s('sum-wu2', wlbls[pol]);
   s('sum-totalres', f.totalRes||'—');
   s('sum-brands', [
@@ -6073,11 +6080,15 @@ var FLEET_CODES = [
   {id:'julian', name:'Julian Returns', nick:'Julian', role:'RETURNS',
    daysOn:[1,2,4,5,6], shiftStart:4, shiftEnd:13,  active:true, notes:'Return agent.'},
   {id:'toney',  name:'Toney Returns',  nick:'Toney',  role:'RETURNS',
-   daysOn:[0,3,4,5,6], shiftStart:10, shiftEnd:18.5, active:true, notes:'Return agent.'},
+   daysOn:[0,3,4,5,6], shiftStart:10, shiftEnd:18.5,
+   shiftCode:'10A-630P',
+   notes:'Returns agent. Sun/Wed/Thu/Fri/Sat.', active:true},
   {id:'nas',    name:'Nas Returns',    nick:'Nas',    role:'RETURNS',
    daysOn:[0,3,4,5,6], shiftStart:14, shiftEnd:23,  active:true, notes:'Return agent.'},
   {id:'rob',    name:'Rob Returns',    nick:'Rob',    role:'RETURNS',
-   daysOn:[0,1,2,3,4], shiftStart:16, shiftEnd:36.5, active:true, notes:'Return agent.'}
+   daysOn:[0,1,2,3,4], shiftStart:16, shiftEnd:24.5,
+   shiftCode:'4P-1230A',
+   notes:'Returns agent. Sun/Mon/Tue/Wed/Thu.', active:true}
 ];
 
 // ── Build compendium UI ───────────────────────────────────────────────────────
@@ -7171,353 +7182,20 @@ function updateWUBtns() {
 // Source: Excel SCHEDULE_PLANNER sheet, CMH_Daily_Driver_v16_4.xlsx
 // Read directly from spreadsheet 2026-04-26
 // ═══════════════════════════════════════════════════════════════════════
-var PRELOADED_MGMT_SCHEDULE = {
-  startDate: "2026-04-12",
-  endDate:   "2026-04-30",
-  people: {
-  "Vada_Griffith": {
-    "name": "Vada Griffith",
-    "nick": "Vada",
-    "role": "ARM"
-  },
-  "Ami_Lhom": {
-    "name": "Ami Lhom",
-    "nick": "Ami",
-    "role": "BRM"
-  },
-  "Matt_Johnson__BRM_": {
-    "name": "Matt Johnson (BRM)",
-    "nick": "Matt B",
-    "role": "BRM"
-  },
-  "Ty_Lumpkin": {
-    "name": "Ty Lumpkin",
-    "nick": "Ty",
-    "role": "ABRM"
-  },
-  "Carlos_Aviles": {
-    "name": "Carlos Aviles",
-    "nick": "Carlos",
-    "role": "ABRM"
-  },
-  "Caitlin_Kelsey": {
-    "name": "Caitlin Kelsey",
-    "nick": "Caitlin",
-    "role": "ABRM"
-  },
-  "Khala_Shackleford": {
-    "name": "Khala Shackleford",
-    "nick": "Khala",
-    "role": "ABRM"
-  },
-  "Madelyne__Maddy__Shirer": {
-    "name": "Madelyne (Maddy) Shirer",
-    "nick": "Maddy",
-    "role": "ABRM"
-  },
-  "Joshua__Josh__Osei": {
-    "name": "Joshua (Josh) Osei",
-    "nick": "Josh",
-    "role": "MT"
-  },
-  "Brittney_Francis": {
-    "name": "Brittney Francis",
-    "nick": "Brittney",
-    "role": "MT"
-  },
-  "Lauren_Kretschman": {
-    "name": "Lauren Kretschman",
-    "nick": "Lauren",
-    "role": "MT"
-  }
-},
-  grid: {
-  "2026-04-12": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson__BRM_": "OFF",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "12P-10P",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "OFF",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-13": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson__BRM_": "530A-330P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "12P-10P",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "9A-7P",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-14": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "4P-C",
-    "Matt_Johnson__BRM_": "530A-330P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "12P-10P",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-15": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "4P-C",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-16": {
-    "Vada_Griffith": "6A-1P",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "10A-8P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-17": {
-    "Vada_Griffith": "VACA",
-    "Ami_Lhom": "8A-6P",
-    "Matt_Johnson__BRM_": "4A-2P",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "12P-10P",
-    "Caitlin_Kelsey": "VACA",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "530A-330P",
-    "Joshua__Josh__Osei": "VACA",
-    "Brittney_Francis": "99 TRAINING",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-18": {
-    "Vada_Griffith": "VACA",
-    "Ami_Lhom": "530A-330P",
-    "Matt_Johnson__BRM_": "VACA",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "9A-7P",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "OFF",
-    "Joshua__Josh__Osei": "VACA",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-19": {
-    "Vada_Griffith": "VACA",
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson__BRM_": "VACA",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "OFF",
-    "Joshua__Josh__Osei": "VACA",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "4P-C"
-  },
-  "2026-04-20": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "9A-7P",
-    "Matt_Johnson__BRM_": "VACA",
-    "Ty_Lumpkin": "12P-10P",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "10A-8P",
-    "Lauren_Kretschman": "12P-10P"
-  },
-  "2026-04-21": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "4P-C",
-    "Matt_Johnson__BRM_": "8A-6P",
-    "Ty_Lumpkin": "12P-10P",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "VACA",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "10A-8P",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-22": {
-    "Vada_Griffith": "STRONGER TOGETHER",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "4P-C",
-    "Ty_Lumpkin": "4P-C",
-    "Carlos_Aviles": "530A-330P",
-    "Caitlin_Kelsey": "STRONGER TOGETHER",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "OFF",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-23": {
-    "Vada_Griffith": "6A-4P?",
-    "Ami_Lhom": "6A-4P",
-    "Matt_Johnson__BRM_": "OFF",
-    "Ty_Lumpkin": "12P-10P",
-    "Carlos_Aviles": "530A-330P",
-    "Caitlin_Kelsey": "OFF",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "OFF",
-    "Brittney_Francis": "4P-C",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-24": {
-    "Vada_Griffith": "6A-4P?",
-    "Ami_Lhom": "6A-4P",
-    "Matt_Johnson__BRM_": "4A-2P",
-    "Ty_Lumpkin": "VACA",
-    "Carlos_Aviles": "VACA",
-    "Caitlin_Kelsey": "530A-330P",
-    "Khala_Shackleford": "10A-8P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "4P-C",
-    "Lauren_Kretschman": "99 TRAINING"
-  },
-  "2026-04-25": {
-    "Vada_Griffith": "530A-330P",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "530A-330P",
-    "Ty_Lumpkin": "VACA",
-    "Carlos_Aviles": "VACA",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "9A-7P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "6A-4P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-26": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "9A-7P",
-    "Ty_Lumpkin": "VACA",
-    "Carlos_Aviles": "VACA",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "10A-8P",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "OFF"
-  },
-  "2026-04-27": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "8A-6P",
-    "Matt_Johnson__BRM_": "9A-7P",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "10A-8P",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Madelyne__Maddy__Shirer": "4P-C",
-    "Joshua__Josh__Osei": "12P-10P",
-    "Brittney_Francis": "VACA",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-28": {
-    "Vada_Griffith": "OFF",
-    "Ami_Lhom": "530A-330P",
-    "Matt_Johnson__BRM_": "4P-C",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "10A-8P",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "OFF",
-    "Madelyne__Maddy__Shirer": "OFF",
-    "Joshua__Josh__Osei": "OFF",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-29": {
-    "Vada_Griffith": "TOP20",
-    "Ami_Lhom": "4P-C",
-    "Matt_Johnson__BRM_": "OFF",
-    "Ty_Lumpkin": "6A-4P",
-    "Carlos_Aviles": "4P-C",
-    "Caitlin_Kelsey": "OFF",
-    "Khala_Shackleford": "530A-330P",
-    "Madelyne__Maddy__Shirer": "12P-10P",
-    "Joshua__Josh__Osei": "OFF",
-    "Brittney_Francis": "OFF",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-04-30": {
-    "Vada_Griffith": "ARMS",
-    "Ami_Lhom": "OFF",
-    "Matt_Johnson__BRM_": "8A-6P",
-    "Ty_Lumpkin": "OFF",
-    "Carlos_Aviles": "OFF",
-    "Caitlin_Kelsey": "4P-C",
-    "Khala_Shackleford": "530A-330P",
-    "Madelyne__Maddy__Shirer": "12P-10P",
-    "Joshua__Josh__Osei": "4P-C",
-    "Brittney_Francis": "6A-4P",
-    "Lauren_Kretschman": "10A-8P"
-  },
-  "2026-05-01": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "12P-10P", "Josh_Osei": "4P-C", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "4P-C" },
-  "2026-05-02": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "OFF", "Lauren_Kretsc": "OFF" },
-  "2026-05-03": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" },
-  "2026-05-04": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "12P-10P", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
-  "2026-05-05": { "Ami_Lhom": "8A-6P", "Matt_Johnson_(BRM)": "4A-2P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "4P-C", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
-  "2026-05-06": { "Ami_Lhom": "6A-4P", "Matt_Johnson_(BRM)": "4A-2P", "Ty_Lumpkin": "9A-7P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "6A-4P", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "OFF" },
-  "2026-05-07": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "4P-C", "Josh_Osei": "10A-8P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "4P-C" },
-  "2026-05-08": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "7A-5P", "Josh_Osei": "10A-8P", "Brittney_Francis": "10A-8P", "Lauren_Kretsc": "4P-C" },
-  "2026-05-09": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "4P-C", "Brittney_Francis": "10A-8P", "Lauren_Kretsc": "12P-10P" },
-  "2026-05-10": { "Ami_Lhom": "OFF", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "OFF", "Lauren_Kretsc": "4P-C" },
-  "2026-05-11": { "Ami_Lhom": "OFF", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "530A-330P", "Carlos_Aviles": "530A-330P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "4P-C", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
-  "2026-05-12": { "Ami_Lhom": "8A-6P", "Matt_Johnson_(BRM)": "9A-7P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "9A-7P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "10A-8P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "4P-C" },
-  "2026-05-13": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "4P-C", "Josh_Osei": "10A-8P", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "6A-4P" },
-  "2026-05-14": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "9A-7P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" },
-  "2026-05-15": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "12P-10P", "Josh_Osei": "4P-C", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "4P-C" },
-  "2026-05-16": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "OFF", "Lauren_Kretsc": "OFF" },
-  "2026-05-17": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" },
-  "2026-05-18": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "12P-10P", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
-  "2026-05-19": { "Ami_Lhom": "8A-6P", "Matt_Johnson_(BRM)": "4A-2P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "4P-C", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
-  "2026-05-20": { "Ami_Lhom": "6A-4P", "Matt_Johnson_(BRM)": "4A-2P", "Ty_Lumpkin": "9A-7P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "6A-4P", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "OFF" },
-  "2026-05-21": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "4P-C", "Josh_Osei": "10A-8P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "4P-C" },
-  "2026-05-22": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "7A-5P", "Josh_Osei": "10A-8P", "Brittney_Francis": "10A-8P", "Lauren_Kretsc": "4P-C" },
-  "2026-05-23": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "4P-C", "Brittney_Francis": "10A-8P", "Lauren_Kretsc": "12P-10P" },
-  "2026-05-24": { "Ami_Lhom": "OFF", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "OFF", "Lauren_Kretsc": "4P-C" },
-  "2026-05-25": { "Ami_Lhom": "OFF", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "530A-330P", "Carlos_Aviles": "530A-330P", "Caitlin_Kelsey": "OFF", "Khala_Shackleford": "4P-C", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "10A-8P" },
-  "2026-05-26": { "Ami_Lhom": "8A-6P", "Matt_Johnson_(BRM)": "9A-7P", "Ty_Lumpkin": "OFF", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "9A-7P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "10A-8P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "4P-C" },
-  "2026-05-27": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "4P-C", "Ty_Lumpkin": "6A-4P", "Carlos_Aviles": "4P-C", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "10A-8P", "Maddy_Shirer": "4P-C", "Josh_Osei": "10A-8P", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "6A-4P" },
-  "2026-05-28": { "Ami_Lhom": "4P-C", "Matt_Johnson_(BRM)": "530A-330P", "Ty_Lumpkin": "9A-7P", "Carlos_Aviles": "OFF", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "530A-330P", "Maddy_Shirer": "530A-330P", "Josh_Osei": "OFF", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" },
-  "2026-05-29": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "12P-10P", "Josh_Osei": "4P-C", "Brittney_Francis": "6A-4P", "Lauren_Kretsc": "4P-C" },
-  "2026-05-30": { "Ami_Lhom": "530A-330P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "4P-C", "Khala_Shackleford": "OFF", "Maddy_Shirer": "4P-C", "Josh_Osei": "6A-4P", "Brittney_Francis": "OFF", "Lauren_Kretsc": "OFF" },
-  "2026-05-31": { "Ami_Lhom": "9A-7P", "Matt_Johnson_(BRM)": "OFF", "Ty_Lumpkin": "4P-C", "Carlos_Aviles": "10A-8P", "Caitlin_Kelsey": "530A-330P", "Khala_Shackleford": "12P-10P", "Maddy_Shirer": "OFF", "Josh_Osei": "6A-4P", "Brittney_Francis": "4P-C", "Lauren_Kretsc": "12P-10P" }
-  }
-};
-
 function initPreloadedSchedule() {
   const existing = getStoredSection('mgmt');
-  if (existing && Object.keys(existing.grid || {}).length > 0) return;
-  putStoredSection('mgmt', PRELOADED_MGMT_SCHEDULE);
-  console.log('Pre-loaded management schedule seeded: Apr 12–May 31 2026');
+  // Re-seed if: empty, or older than current PRELOADED endDate, or missing today's data
+  const today = new Date().toISOString().slice(0,10);
+  const needsReseed = !existing
+    || !existing.grid
+    || Object.keys(existing.grid).length === 0
+    || (PRELOADED_MGMT_SCHEDULE.endDate && existing.endDate !== PRELOADED_MGMT_SCHEDULE.endDate)
+    || !existing.grid[today]; // today missing → reseed
+
+  if (needsReseed) {
+    putStoredSection('mgmt', PRELOADED_MGMT_SCHEDULE);
+    console.log('Pre-loaded management schedule seeded:', PRELOADED_MGMT_SCHEDULE.startDate, '–', PRELOADED_MGMT_SCHEDULE.endDate);
+  }
 }
 
 
@@ -7920,9 +7598,16 @@ function setAltPosition(pid, posKey) {
   if (!STATE.altSchedule) STATE.altSchedule = {};
   if (posKey === 'normal') delete STATE.altSchedule[pid];
   else STATE.altSchedule[pid] = posKey;
+  // Rebuild rotation map immediately
+  try {
+    const _rot = buildSmartRotation();
+    window._lastRotations = window._lastRotations || {};
+    if (_rot && _rot.rotations) _rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
+  } catch(e) {}
   saveState();
-  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
-  buildDashSchedMini();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
+  if (typeof updatePendingIndicator === 'function') updatePendingIndicator();
   openPersonPanel(pid);
 }
 
@@ -8170,12 +7855,14 @@ function buildExpectedToday() {
       .map(p => { const o=adminOvr.find(x=>x.id===p.id&&!x._deleted); return o?Object.assign({},p,o):p; })
       .filter(p => !adminOvr.find(o=>o.id===p.id&&o._deleted));
   }
-  const _ROSTER_CXR  = applyOvr(ROSTER_CXR).concat(adminOvr.filter(o=>o._new&&!o._deleted&&['CXR','EXIT'].includes(o.role)));
-  const _ROSTER_MGMT = applyOvr(ROSTER_MGMT).concat(adminOvr.filter(o=>o._new&&!o._deleted&&['ARM','BRM','ABRM','MT'].includes(o.role)));
+  const _ROSTER_CXR     = applyOvr(ROSTER_CXR).concat(adminOvr.filter(o=>o._new&&!o._deleted&&['CXR'].includes(o.role)));
+  const _ROSTER_MGMT    = applyOvr(ROSTER_MGMT).concat(adminOvr.filter(o=>o._new&&!o._deleted&&['ARM','BRM','ABRM','MT'].includes(o.role)));
+  const _ROSTER_EXIT    = applyOvr(typeof ROSTER_EXIT    !== 'undefined' ? ROSTER_EXIT    : []);
+  const _ROSTER_RETURNS = applyOvr(typeof ROSTER_RETURNS !== 'undefined' ? ROSTER_RETURNS : []);
   const today = todayKey();
   const now   = new Date();
   const dow   = now.getDay();
-  const allRoster = [..._ROSTER_CXR, ..._ROSTER_MGMT];
+  const allRoster = [..._ROSTER_CXR, ..._ROSTER_MGMT, ..._ROSTER_EXIT, ..._ROSTER_RETURNS];
   const expected  = {};
 
   // Helper: normalize name to pid
@@ -8265,14 +7952,31 @@ function adjustSplit(pid, minutesDelta) {
   if (b1H === 4 && b2H === 4) { delete STATE.altSchedule[pid]; delete STATE.customSplits[pid]; }
   else STATE.altSchedule[pid] = b1H > b2H ? (b1St==='exit'?'exit-first':'counter-first') : (b1St==='exit'?'counter-first':'exit-first');
   saveState();
+  // Refresh visuals immediately
+  try {
+    const _rot = buildSmartRotation();
+    window._lastRotations = window._lastRotations || {};
+    if (_rot && _rot.rotations) _rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
+  } catch(e) {}
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
 }
 
 function toggleNoLunch(pid) {
+  saveCoverageSnapshot();
   if (!STATE.altSchedule) STATE.altSchedule = {};
   const key = pid + '_nolunch';
   if (STATE.altSchedule[key]) delete STATE.altSchedule[key];
   else STATE.altSchedule[key] = true;
   saveState();
+  // Refresh visuals
+  try {
+    const _rot = buildSmartRotation();
+    window._lastRotations = window._lastRotations || {};
+    if (_rot && _rot.rotations) _rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
+  } catch(e) {}
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
 }
 
 // Show time edit modal (shift start/end entry)
@@ -9216,6 +8920,7 @@ function buildCoverageTimeline() {
     }
     const st=(STATE.staffStation||{})[pid];
     if(person.role==='EXIT'||st==='Exit Booth')return'exit';
+    if(person.role==='RETURNS') return 'returns'; // Always at returns
     if(['ARM','BRM','ABRM','MT'].includes(person.role)){
       if(st&&st.toLowerCase().includes('emerald'))return'emerald';
       if(st&&st.toLowerCase().includes('return'))return'returns';
@@ -9779,138 +9484,150 @@ function suggestLunches(){
 }
 
 function autoDistributeExit(exp) {
-  // Assigns CXRs to exit rotation to fill coverage gaps.
-  // Rules:
-  // - 4-hour blocks: CXR covers exit for 4hrs then counter (or vice versa)
-  // - Even split preferred: if 4 CXRs available, 2 exit / 2 counter
-  // - Exit priority: exit gaps filled before worrying about even split
-  // - Monday: up to 5 CXRs at exit (1 per lane)
-  // - If only 1 CXR and no exit agent → that CXR goes to exit
-  // - Closed hours: no one assigned
+  // Gap-fill logic:
+  // - Count only dedicated EXIT AGENTS (role=EXIT) for gap detection
+  // - For each gap hour, assign the best CXR rotation to cover it:
+  //     * gap in FIRST half of CXR shift → assign 'exit-first'
+  //     * gap in SECOND half of CXR shift → assign 'normal' (counter→exit)
+  //     * gap spans full shift → assign 'exit-first' (most exit time)
+  // - Never over-assign: only fill real gaps, then stop
+  // - Respect manager overrides (full-counter / full-exit)
 
   const dow = new Date().getDay();
-  const HOURS = Array.from({length:24},(_,i)=>i); // 0-23
+  const OPEN_HOURS = Array.from({length:20},(_,i)=>5+i); // 5am–12am
 
-  function getCBH(h) {
-    return typeof COVERAGE_BY_HOUR==='function'
-      ? COVERAGE_BY_HOUR(h, dow, 0)
-      : { exitMin:1, counterMin:1, closed:false };
-  }
-
-  function exitAgentCoverage(h) {
-    return Object.entries(exp).filter(([pid,e])=>{
-      if(e.person.role!=='EXIT') return false;
-      if((STATE.todayOverrides||{})[pid]==='callout') return false;
-      const ov=(STATE.shiftMod||{})[pid]||{};
-      const ss=ov.start!=null?ov.start:e.person.shiftStart;
-      const se=ov.end!=null?ov.end:e.person.shiftEnd;
-      return ss!=null&&h>=ss&&(se==null||h<se%24+24*(se<ss?1:0));
+  function exitAgentCov(h) {
+    return Object.entries(exp).filter(([pid,e]) => {
+      if (e.person.role !== 'EXIT') return false;
+      if ((STATE.todayOverrides||{})[pid] === 'callout') return false;
+      const ov = (STATE.shiftMod||{})[pid]||{};
+      const ss = ov.start ?? e.person.shiftStart;
+      const se = ov.end   ?? e.person.shiftEnd;
+      if (ss == null) return false;
+      const seAdj = (se != null && se < ss) ? se + 24 : se;
+      return h >= ss && (seAdj == null || h < seAdj);
     }).length;
   }
 
-  // Get available CXRs (on shift, role=CXR, not called out)
   const cxrList = Object.entries(exp)
-    .filter(([pid,e])=>{
-      if(e.person.role!=='CXR') return false;
-      if((STATE.todayOverrides||{})[pid]==='callout') return false;
-      const ov=(STATE.shiftMod||{})[pid]||{};
-      const ss=ov.start!=null?ov.start:e.person.shiftStart;
-      const se=ov.end!=null?ov.end:e.person.shiftEnd;
-      return ss!=null&&se!=null;
+    .filter(([pid,e]) => {
+      if (e.person.role !== 'CXR') return false;
+      if ((STATE.todayOverrides||{})[pid] === 'callout') return false;
+      const ov = (STATE.shiftMod||{})[pid]||{};
+      const ss = ov.start ?? e.person.shiftStart;
+      const se = ov.end   ?? e.person.shiftEnd;
+      return ss != null && se != null;
     })
-    .map(([pid,e])=>{
-      const ov=(STATE.shiftMod||{})[pid]||{};
-      const ss=ov.start!=null?ov.start:e.person.shiftStart;
-      const se=ov.end!=null?ov.end:e.person.shiftEnd;
-      return {pid, ss, se, dur:se-ss};
+    .map(([pid,e]) => {
+      const ov = (STATE.shiftMod||{})[pid]||{};
+      const ss = ov.start ?? e.person.shiftStart;
+      const se = ov.end   ?? e.person.shiftEnd;
+      const mid = ss + (se - ss) / 2;
+      return { pid, ss, se, mid };
     })
-    .sort((a,b)=>a.ss-b.ss);
+    .sort((a,b) => a.ss - b.ss);
 
-  const totalCXR = cxrList.length;
-  if(!STATE.altSchedule) STATE.altSchedule={};
+  if (!STATE.altSchedule) STATE.altSchedule = {};
 
-  // Respect manual manager overrides — don't touch those
+  // Preserve explicit manager overrides
   const managerSet = new Set(
     Object.entries(STATE.altSchedule)
-      .filter(([,v])=>['full-counter','full-exit'].includes(v))
-      .map(([k])=>k)
+      .filter(([,v]) => ['full-counter','full-exit'].includes(v))
+      .map(([k]) => k)
   );
 
-  // ── Special case: only 1 CXR, no exit agent at all ────────────────────────
-  if(totalCXR===1) {
-    const {pid,ss,se}=cxrList[0];
-    // Check if exit agent covers the whole shift
-    const hasExitAgentAllShift=Array.from({length:Math.ceil(se-ss)},(_,i)=>Math.floor(ss)+i)
-      .every(h=>exitAgentCoverage(h)>0);
-    if(!hasExitAgentAllShift&&!managerSet.has(pid)) {
-      STATE.altSchedule[pid]='exit-first'; // solo CXR → exit first
+  // ── Special case: only 1 CXR ──────────────────────────────────────────────
+  if (cxrList.length === 1 && !managerSet.has(cxrList[0].pid)) {
+    STATE.altSchedule[cxrList[0].pid] = 'exit-first';
+    return;
+  }
+
+  // Build per-hour exit coverage (agents only to start)
+  const exitCov = {};
+  OPEN_HOURS.forEach(h => { exitCov[h] = exitAgentCov(h); });
+
+  // Get exit minimums per hour
+  function exitMin(h) {
+    const cbh = (typeof COVERAGE_BY_HOUR === 'function')
+      ? COVERAGE_BY_HOUR(h, dow, 0) : { exitMin:1, closed:false };
+    return cbh.closed ? null : cbh.exitMin;
+  }
+
+  // Clear any previously auto-assigned (but not manager-set) exit rotations
+  cxrList.forEach(({pid}) => {
+    if (!managerSet.has(pid) && (STATE.altSchedule[pid]==='exit-first')) {
+      delete STATE.altSchedule[pid];
     }
-    return;
-  }
-
-  // ── General case: distribute evenly, exit priority ────────────────────────
-  // Target: half of available CXRs at exit during open hours
-  // But first fill any hard gaps
-
-  // Find which hours need CXR exit coverage
-  const exitGapHours = HOURS.filter(h=>{
-    const cbh=getCBH(h);
-    if(cbh.closed) return false;
-    const agentCov=exitAgentCoverage(h);
-    const cxrsOnShift=cxrList.filter(c=>h>=c.ss&&h<c.se).length;
-    // Gap = exit minimum not met by agents alone, and CXRs are available
-    return agentCov < cbh.exitMin && cxrsOnShift > 0;
   });
 
-  if(!exitGapHours.length) {
-    // No gaps — still do even split during open hours
-    const openCXRs = cxrList.filter(c=>!managerSet.has(c.pid));
-    const halfExit = Math.floor(openCXRs.length/2);
-    openCXRs.slice(0,halfExit).forEach(c=>{
-      if(!STATE.altSchedule[c.pid]) STATE.altSchedule[c.pid]='exit-first';
+  // ── Assign CXRs to fill gaps ──────────────────────────────────────────────
+  const assigned = new Set();
+
+  // Gap hours sorted by priority (largest deficit first)
+  const gapHours = OPEN_HOURS
+    .filter(h => { const em=exitMin(h); return em!==null && exitCov[h] < em; })
+    .sort((a,b) => {
+      const da = (exitMin(a)||0) - exitCov[a];
+      const db = (exitMin(b)||0) - exitCov[b];
+      return db - da; // highest deficit first
     });
-    openCXRs.slice(halfExit).forEach(c=>{
-      if(!STATE.altSchedule[c.pid]) delete STATE.altSchedule[c.pid]; // counter-first (default)
-    });
-    return;
-  }
 
-  // Assign CXRs to exit-first to cover gaps (exit priority)
-  const exitAssigned = new Set();
-  const counterAssigned = new Set();
+  if (!gapHours.length) return; // agents cover everything — no CXRs needed at exit
 
-  // Per-hour: assign CXRs until exit minimum met, then balance remainder
-  exitGapHours.forEach(h=>{
-    const cbh=getCBH(h);
-    const agentCov=exitAgentCoverage(h);
-    let needed=cbh.exitMin-agentCov;
-    const available=cxrList.filter(c=>
-      h>=c.ss&&h<c.se&&!exitAssigned.has(c.pid)&&!managerSet.has(c.pid)
-    );
-    available.forEach(c=>{
-      if(needed<=0) return;
-      exitAssigned.add(c.pid);
-      needed--;
-    });
-  });
+  gapHours.forEach(gapH => {
+    const em = exitMin(gapH)||0;
+    while (exitCov[gapH] < em) {
+      // Find the best unassigned CXR for this gap
+      // Best = covers this gap hour AND maximizes exit coverage for other gaps too
+      const candidates = cxrList.filter(c =>
+        !assigned.has(c.pid) &&
+        !managerSet.has(c.pid) &&
+        STATE.altSchedule[c.pid] !== 'full-counter' &&
+        gapH >= c.ss && gapH < c.se
+      );
 
-  // Even split: fill remaining CXRs to counter-first up to half
-  const unassigned=cxrList.filter(c=>!exitAssigned.has(c.pid)&&!managerSet.has(c.pid));
-  const targetExitCount=Math.round(totalCXR/2);
-  const additionalExitNeeded=Math.max(0,targetExitCount-exitAssigned.size);
+      if (!candidates.length) break; // no more CXRs available for this gap
 
-  unassigned.slice(0,additionalExitNeeded).forEach(c=>exitAssigned.add(c.pid));
-  unassigned.slice(additionalExitNeeded).forEach(c=>counterAssigned.add(c.pid));
+      // For each candidate, determine which rotation covers this gap hour
+      // and how many additional gap hours it would also cover
+      let best = null, bestScore = -1;
+      candidates.forEach(c => {
+        // Which rotation mode covers gapH?
+        let mode;
+        if (gapH < c.mid) {
+          mode = 'exit-first'; // gap is in first half — exit-first covers it
+        } else {
+          mode = 'normal';     // gap is in second half — normal (Ctr→Exit) covers it
+        }
 
-  // Apply assignments
-  cxrList.forEach(c=>{
-    if(managerSet.has(c.pid)) return; // don't override manager
-    if(exitAssigned.has(c.pid)) {
-      STATE.altSchedule[c.pid]='exit-first';
-    } else {
-      // Counter-first (default normal rotation)
-      if(STATE.altSchedule[c.pid]==='exit-first')
-        delete STATE.altSchedule[c.pid];
+        // Score: how many total open gap hours does this rotation cover?
+        let score = 0;
+        OPEN_HOURS.forEach(h => {
+          const em2=exitMin(h);
+          if(em2===null) return;
+          const gap = exitCov[h] < em2;
+          if (!gap) return;
+          // Does this rotation cover h?
+          if (h < c.ss || h >= c.se) return;
+          if (mode === 'exit-first' && h < c.mid) score++;
+          if (mode === 'normal' && h >= c.mid) score++;
+        });
+
+        if (score > bestScore) { bestScore = score; best = {...c, mode}; }
+      });
+
+      if (!best) break;
+
+      // Assign this CXR
+      assigned.add(best.pid);
+      if (best.mode === 'exit-first') {
+        STATE.altSchedule[best.pid] = 'exit-first';
+        OPEN_HOURS.forEach(h => { if(h>=best.ss&&h<best.mid) exitCov[h]++; });
+      } else {
+        // 'normal' = counter first, exit second — don't set altSchedule (default is normal)
+        // But we need to track that this CXR will be at exit in their second half
+        OPEN_HOURS.forEach(h => { if(h>=best.mid&&h<best.se) exitCov[h]++; });
+      }
     }
   });
 }
@@ -10072,12 +9789,15 @@ function openPersonPanel(pid) {
   // ── What if…? ───────────────────────────────────────────────────────────────
   const wiEl=document.getElementById('pp-whatif-section');
   if(wiEl){
+    const pendingBadge = (typeof hasPendingChanges==='function' && hasPendingChanges())
+      ? `<span style="font-size:9px;color:var(--amber);margin-left:6px;background:rgba(245,158,11,.12);padding:2px 6px;border-radius:3px;border:1px solid var(--amber)">⏳ unsaved</span>`
+      : '';
     wiEl.innerHTML=`<button onclick="openWhatifFor('${pid}')"
       style="width:100%;padding:10px;border-radius:8px;
         border:1px solid var(--bdr2);background:var(--bg3);
         color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;
-        text-align:left">
-      What if…? →
+        text-align:left;display:flex;align-items:center">
+      What if…? →${pendingBadge}
     </button>`;
   }
 
@@ -10153,8 +9873,8 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
       </div>`;
     }
     // Rotation
-    h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin-bottom:8px">`;
-    [['normal','4hr Split','var(--acc)'],['full-counter','Full Ctr','var(--acc)'],['full-exit','Full Exit','var(--green)']].forEach(([key,lbl,col])=>{
+    h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">`;
+    [['normal','Ctr → Exit','var(--acc)'],['exit-first','Exit → Ctr','var(--green)'],['full-counter','All Counter','var(--acc)'],['full-exit','All Exit','var(--green)']].forEach(([key,lbl,col])=>{
       const on=altPos===key;
       h+=`<button onclick="setAltPosition('${pid}','${key}');openPersonPanel('${pid}')"
         style="padding:6px 4px;border-radius:4px;border:1px solid;font-size:10px;font-weight:600;cursor:pointer;
@@ -10389,6 +10109,7 @@ function parseGLFull(text) {
 function parseBrandSection(text) {
   if (!text) return null;
   const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
+  // Standard 11-column GL brand format
   const headers = ['totalRes','schRes','lateRes','rented','newToday','walkUp','prewrite','totRet','schRet','lateRet','returned'];
   const brandNames = ['ALAMO','ENTERPRISE','NATIONAL','TOTAL'];
   const result = {};
@@ -10401,7 +10122,13 @@ function parseBrandSection(text) {
     const nums=[];
     while (i<lines.length && /^\d+$/.test(lines[i])) { nums.push(parseInt(lines[i])); i++; }
     const obj={};
+    // If column count is unusual, log it for diagnosis but still try to map sensibly
+    if (nums.length !== headers.length && nums.length > 0) {
+      console.warn(`Brand ${brand}: got ${nums.length} numbers, expected ${headers.length}`);
+    }
+    // Map by position; missing tail values default to 0
     headers.forEach((h,idx)=>{ obj[h]=nums[idx]??0; });
+    obj._raw = nums; // preserve raw for debugging
     result[brand.toLowerCase()]=obj;
   }
   return result;
@@ -10864,6 +10591,8 @@ function buildHourlyFlowChart() {
   }
 }
 
+// ── MAY 2026 SCHEDULE — full schedule data (read by Reset & Reload) ─────
+var MAY_SCHEDULE = {"2026-05-03":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":[16.5,24.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[10.0,20.0],"Lauren_Kretschman":[16.0,26],"Ennis_MT":"OFF"},"2026-05-04":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[6.0,16.0],"Joshua_(Josh)_Osei":[10.0,20.0],"Brittney_Francis":"OFF","Lauren_Kretschman":[16.0,26],"Ennis_MT":[16.0,26]},"2026-05-05":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":"OFF","Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":[10.0,20.0],"Brittney_Francis":[6.0,16.0],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[16.0,26]},"2026-05-06":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":[6.0,16.0],"Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":[10.0,20.0],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[6.0,16.0],"Lauren_Kretschman":"OFF","Ennis_MT":[16.0,26]},"2026-05-07":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[8.0,18.0],"Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[10.0,20.0],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":[16.0,26]},"2026-05-08":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Matt_Johnson_(BRM)":[4.0,14.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":"OFF","Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[10.0,20.0],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[6.0,16.0],"Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-09":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":[5.5,15.5],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[8.0,18.0],"Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-10":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":[16.5,24.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[6.0,16.0],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-11":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":[9.0,19.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[12.0,22.0],"Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":[16.0,26],"Lauren_Kretschman":[6.0,16.0],"Ennis_MT":[6.0,16.0]},"2026-05-12":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":[16.0,26],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[12.0,22.0],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[6.0,16.0],"Ennis_MT":[6.0,16.0]},"2026-05-13":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":"OFF","Carlos_Aviles":[12.0,22.0],"Caitlin_Kelsey":[5.5,15.5],"Khala_Shackleford":[12.0,22.0],"Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":[10.0,20.0],"Brittney_Francis":"OFF","Lauren_Kretschman":[6.0,16.0],"Ennis_MT":[6.0,16.0]},"2026-05-14":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[10.0,20.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":"OFF","Caitlin_Kelsey":"OFF","Khala_Shackleford":[12.0,22.0],"Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[6.0,16.0],"Ennis_MT":"OFF"},"2026-05-15":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[6.0,16.0],"Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[12.0,22.0],"Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":"OFF","Ennis_MT":[6.0,16.0]},"2026-05-16":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":[10.0,20.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[16.0,26],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[6.0,16.0]},"2026-05-17":{"Genesis_Cochran":"OFF","Lisa_(Exit)":[16.5,24.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":[10.0,20.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[16.0,26],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[6.0,16.0]},"2026-05-18":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":[9.0,19.0],"Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[16.0,26],"Caitlin_Kelsey":[6.0,16.0],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[10.0,20.0]},"2026-05-19":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":"OFF","Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":[16.0,26],"Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[6.0,16.0],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[5.5,15.5],"Brittney_Francis":"OFF","Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[10.0,20.0]},"2026-05-20":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":"OFF","Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":[6.0,16.0],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":[12.0,22.0],"Lauren_Kretschman":[16.0,26],"Ennis_MT":"OFF"},"2026-05-21":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[6.0,16.0],"Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-22":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[6.0,16.0],"Caitlin_Kelsey":"OFF","Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":"OFF","Lauren_Kretschman":[16.0,26],"Ennis_MT":[10.0,20.0]},"2026-05-23":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":"OFF","Caitlin_Kelsey":[16.0,26],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":[12.0,22.0]},"2026-05-24":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":[16.5,24.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":"OFF","Caitlin_Kelsey":[16.0,26],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":[12.0,22.0]},"2026-05-25":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Brittney_Francis":"OFF"},"2026-05-26":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},"2026-05-27":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},"2026-05-28":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Ami_Lhom":"OFF"},"2026-05-29":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Ami_Lhom":"OFF"},"2026-05-30":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":"OFF","Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF"}}; 
 function getScheduleForDate(dateStr) {
   return MAY_SCHEDULE[dateStr] || null;
 }
@@ -11141,6 +10870,269 @@ function resetAndReloadToday() {
   showAdminSection('staff');
   refreshDash();
   if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+}
+
+
+
+// ─── PENDING/CONFIRMED COVERAGE BUFFER ─────────────────────────────────────
+// Edits in Manager Mode go to a pending buffer. Confirm publishes, Cancel discards.
+function getPendingFields() {
+  return ['staffStation', 'altSchedule', 'shiftMod', 'customSplits', 'specialBlocks', 'todayOverrides'];
+}
+
+function snapshotCoverage() {
+  const snap = {};
+  getPendingFields().forEach(k => { snap[k] = JSON.parse(JSON.stringify(STATE[k] || {})); });
+  return snap;
+}
+
+function applyCoverageSnapshot(snap) {
+  if (!snap) return;
+  getPendingFields().forEach(k => {
+    if (snap[k] !== undefined) STATE[k] = JSON.parse(JSON.stringify(snap[k]));
+  });
+}
+
+function hasPendingChanges() {
+  if (!STATE.confirmedCoverage) return false;
+  const cur = snapshotCoverage();
+  return JSON.stringify(cur) !== JSON.stringify(STATE.confirmedCoverage);
+}
+
+function cancelPendingChanges() {
+  if (!STATE.confirmedCoverage) {
+    toast('Nothing to revert — no confirmed snapshot yet');
+    return;
+  }
+  if (!confirm('Discard all unsaved changes since last Confirm?')) return;
+  applyCoverageSnapshot(STATE.confirmedCoverage);
+  saveState();
+  // Rebuild rotations + UI
+  try {
+    const _rot = buildSmartRotation();
+    window._lastRotations = {};
+    if (_rot && _rot.rotations) _rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
+  } catch(e) {}
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
+  if (typeof refreshDash === 'function') refreshDash();
+  updatePendingIndicator();
+  toast('Changes reverted to last Confirm ↩');
+}
+
+function updatePendingIndicator() {
+  const el = document.getElementById('pending-indicator');
+  if (!el) return;
+  if (hasPendingChanges()) {
+    el.style.display = 'inline-flex';
+    el.innerHTML = '⏳ Unsaved changes <button onclick="cancelPendingChanges()" style="margin-left:6px;padding:2px 8px;border-radius:3px;border:1px solid var(--amber);background:transparent;color:var(--amber);font-size:9px;font-weight:700;cursor:pointer">Cancel</button>';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+
+
+// ─── CLOSING BUFFER (extended hours when unfulfilled res past midnight) ────
+function checkClosingExtension() {
+  const ph = STATE.pasteHourly || {};
+  const res = ph.res || [];
+  // Hours after midnight (0-2am) — index 0,1,2
+  const earlyAM = (res[0]||0) + (res[1]||0) + (res[2]||0);
+  // Hours 22-23 (10pm-12am) for context
+  const lateNight = (res[22]||0) + (res[23]||0);
+
+  // If significant late/early reservations exist, suggest extension
+  if (earlyAM > 0 || lateNight > 5) {
+    return {
+      suggest: true,
+      until: earlyAM > 0 ? 26.5 : 25, // 2:30am or 1am
+      reason: earlyAM > 0 ? `${earlyAM} reservation(s) after midnight` : `Heavy late-night demand`,
+      autoCount: earlyAM,
+    };
+  }
+  return { suggest: false };
+}
+
+function applyClosingExtension(until, reason) {
+  STATE.closingExtension = { until, reason, setAt: new Date().toISOString() };
+  saveState();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  toast(`Hours extended to ${formatHourLabel(until)} — ${reason}`);
+}
+
+function clearClosingExtension() {
+  STATE.closingExtension = null;
+  saveState();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  toast('Closing extension cleared');
+}
+
+function formatHourLabel(h) {
+  const hh = Math.floor(h % 24);
+  const mn = Math.round((h % 1) * 60);
+  const ap = hh < 12 ? 'a' : 'p';
+  const hh12 = hh % 12 || 12;
+  return mn ? `${hh12}:${String(mn).padStart(2,'0')}${ap}` : `${hh12}${ap}`;
+}
+
+
+
+// ─── FLIGHT DELAY TOGGLE ────────────────────────────────────────────────────
+// Manual toggle: manager activates when flights are delayed past closing.
+// Sets STATE.closingExtension with reason='flight_delays'.
+// Auto-suggests when paste data shows late-night reservations.
+
+var FLIGHT_CLOSING_BUFFER = 1.5; // hours after midnight = 1:30am default extension
+
+function toggleFlightDelayMode() {
+  if (STATE.closingExtension && STATE.closingExtension.reason === 'flight_delays') {
+    // Already active — clear it
+    STATE.closingExtension = null;
+    saveState();
+    updateFlightDelayCard();
+    if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+    toast('Flight delay mode cleared — normal closing hours restored');
+  } else {
+    // Activate — extend hours to 1:30am (26.5 in 24+ notation)
+    const until = 24 + FLIGHT_CLOSING_BUFFER; // 1:30am
+    STATE.closingExtension = {
+      until,
+      reason: 'flight_delays',
+      setAt: new Date().toISOString(),
+      label: 'Flight Delays Active',
+    };
+    saveState();
+    updateFlightDelayCard();
+    if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+    toast('✈ Flight delay mode on — closing extended to 1:30am');
+  }
+}
+
+function setFlightDelayHours(until) {
+  // Called from the modal when user picks a custom close time
+  STATE.closingExtension = {
+    until,
+    reason: 'flight_delays',
+    setAt: new Date().toISOString(),
+    label: 'Flight Delays Active',
+  };
+  saveState();
+  updateFlightDelayCard();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  closeModal();
+  const h = until % 24;
+  const hh = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  const mn = Math.round((h % 1) * 60);
+  const ap = h >= 12 && h < 24 ? 'am' : 'am'; // past midnight = am
+  const lbl = mn ? `${hh}:${String(mn).padStart(2,'0')}am` : `${hh}am`;
+  toast(`✈ Extended to ${lbl}`);
+}
+
+function openFlightDelayModal() {
+  // Let manager pick how late to stay open
+  const opts = [
+    { label: '12:30am (default close)',  until: 24.5  },
+    { label: '1:00am',                   until: 25    },
+    { label: '1:30am',                   until: 25.5  },
+    { label: '2:00am',                   until: 26    },
+    { label: '2:30am (max)',             until: 26.5  },
+  ];
+
+  const isActive = STATE.closingExtension?.reason === 'flight_delays';
+  const currentUntil = STATE.closingExtension?.until;
+
+  openModal('✈ Flight Delays', `
+    <div>
+      <p style="font-size:12px;color:var(--txt3);margin:0 0 12px">
+        Extend operating hours for customers on delayed flights.
+        Coverage tab will show these hours as open.
+      </p>
+      <div style="display:grid;gap:6px;margin-bottom:14px">
+        ${opts.map(o=>`
+          <button onclick="setFlightDelayHours(${o.until})"
+            style="padding:10px 14px;border-radius:6px;border:1px solid;
+              font-size:12px;font-weight:700;cursor:pointer;text-align:left;
+              background:${currentUntil===o.until?'rgba(99,102,241,.15)':'var(--bg3)'};
+              border-color:${currentUntil===o.until?'#6366f1':'var(--bdr2)'};
+              color:${currentUntil===o.until?'#a5b4fc':'var(--txt2)'}">
+            ${currentUntil===o.until?'✓ ':''}${o.label}
+          </button>`).join('')}
+      </div>
+      ${isActive ? `
+        <button onclick="toggleFlightDelayMode()"
+          style="width:100%;padding:10px;border-radius:6px;border:1px solid var(--red);
+            background:rgba(248,113,113,.1);color:var(--red);font-size:12px;
+            font-weight:700;cursor:pointer">
+          ✕ Clear Flight Delay Mode
+        </button>` : ''}
+    </div>
+  `);
+}
+
+function updateFlightDelayCard() {
+  const el = document.getElementById('flight-delay-card');
+  if (!el) return;
+
+  const ext = STATE.closingExtension;
+  const isActive = ext && ext.reason === 'flight_delays';
+
+  if (isActive) {
+    // Active state — show prominent card with clear option
+    const h = ext.until % 24;
+    const hh = h === 0 ? 12 : h > 12 ? h - 12 : h;
+    const mn = Math.round((h % 1) * 60);
+    const timeStr = mn ? `${hh}:${String(mn).padStart(2,'0')}am` : `${hh}am`;
+
+    el.innerHTML = `
+      <div style="border-radius:8px;padding:10px 12px;
+        background:rgba(99,102,241,.12);border:1px solid rgba(99,102,241,.4);
+        display:flex;align-items:center;gap:10px">
+        <span style="font-size:18px">✈</span>
+        <div style="flex:1">
+          <div style="font-size:11px;font-weight:800;color:#a5b4fc;line-height:1.2">
+            FLIGHT DELAYS ACTIVE
+          </div>
+          <div style="font-size:10px;color:var(--txt3);margin-top:1px">
+            Extended to ${timeStr} — reservations with flights
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button onclick="openFlightDelayModal()"
+            style="padding:5px 10px;border-radius:5px;border:1px solid rgba(99,102,241,.4);
+              background:rgba(99,102,241,.2);color:#a5b4fc;font-size:10px;
+              font-weight:700;cursor:pointer">
+            Edit
+          </button>
+          <button onclick="toggleFlightDelayMode()"
+            style="padding:5px 10px;border-radius:5px;border:1px solid rgba(248,113,113,.4);
+              background:rgba(248,113,113,.1);color:var(--red);font-size:10px;
+              font-weight:700;cursor:pointer">
+            Clear
+          </button>
+        </div>
+      </div>`;
+  } else {
+    // Inactive state — subtle button to activate
+    // Also check if paste data suggests late-night demand
+    const ph = STATE.pasteHourly || {};
+    const res = ph.res || [];
+    const lateRes = (res[22]||0) + (res[23]||0) + (res[0]||0) + (res[1]||0);
+    const suggestion = lateRes > 0
+      ? `<span style="font-size:9px;color:var(--amber);margin-left:6px">⚠ ${lateRes} late reservations</span>`
+      : '';
+
+    el.innerHTML = `
+      <button onclick="openFlightDelayModal()"
+        style="width:100%;padding:8px 12px;border-radius:8px;
+          border:1px dashed var(--bdr2);background:transparent;
+          color:var(--txt3);font-size:11px;font-weight:600;cursor:pointer;
+          display:flex;align-items:center;gap:8px;text-align:left">
+        <span style="font-size:14px;opacity:.6">✈</span>
+        <span>Flight Delays${suggestion}</span>
+        <span style="margin-left:auto;font-size:10px;opacity:.5">tap to extend hours</span>
+      </button>`;
+  }
 }
 
 </script>
