@@ -3214,9 +3214,14 @@ function getGroupNetData() {
   const result = {};
 
   GROUP_META.forEach(g => {
-    // Support both old format (group totals) and new format (code-level)
-    const res = (pd['res-am']?.[g.name]||0) + (pd['res-pm']?.[g.name]||0);
-    const ret = (pd['ret-am']?.[g.name]||0) + (pd['ret-pm']?.[g.name]||0);
+    // Use -remaining keys: the 'Remaining' column per group from parseStep.
+    // AM and PM pastes both reflect the full-day remaining — take MAX, never SUM.
+    const resAM = (pd['res-am-remaining']?.[g.name]||0);
+    const resPM = (pd['res-pm-remaining']?.[g.name]||0);
+    const retAM = (pd['ret-am-remaining']?.[g.name]||0);
+    const retPM = (pd['ret-pm-remaining']?.[g.name]||0);
+    const res = Math.max(resAM, resPM);
+    const ret = Math.max(retAM, retPM);
     const net = ret - res;
     const has = !!(res || ret);
     result[g.name] = {res, ret, net, has, hasData: has};
@@ -3327,17 +3332,23 @@ function toggleGroupOverride(groupName) {
 
 function updateBoardTotals() {
   const data = getGroupNetData();
-  let totalRes = 0, totalRet = 0, groupsOpen = 0;
+  let groupsOpen = 0, groupsUp = 0;
   let hasAnyData = false;
 
+  // Count WU-open groups from threshold logic
   Object.entries(data).forEach(([name, d]) => {
     if (!d.hasData) return;
     hasAnyData = true;
-    totalRes += d.res;
-    totalRet += d.ret;
-    if (getGroupStatus(name, d.net) === 'wu') groupsOpen++;
+    const st = getGroupStatus(name, d.net);
+    if (st === 'wu') groupsOpen++;
+    if (st === 'up') groupsUp++;
   });
 
+  // For total res/ret: prefer brands data (actual totals) over group remainders
+  const brands = (STATE.pasteData||{}).brands||{};
+  const tot = brands.total||{};
+  const totalRes = tot.totalRes || (()=>{ let s=0; Object.values(data).forEach(d=>{if(d.has)s+=d.res;}); return s||0; })();
+  const totalRet = tot.totRet  || (()=>{ let s=0; Object.values(data).forEach(d=>{if(d.has)s+=d.ret;}); return s||0; })();
   const net = totalRet - totalRes;
   const netEl = document.getElementById('board-total-net');
 
@@ -6013,9 +6024,13 @@ function refreshDash() {
   const gd2=typeof getGroupNetData==='function'?getGroupNetData():{};
   let calcRes=0,calcRet=0,hasCalc=false;
   Object.values(gd2).forEach(d=>{if(d&&d.has){calcRes+=d.res;calcRet+=d.ret;hasCalc=true;}});
+  // Use brands total res/ret (actual totals, not group remainders)
   const showRes=tBrands.totalRes||f.totalRes||(hasCalc?calcRes:null);
   const showRet=tBrands.totRet||f.totalRet||(hasCalc?calcRet:null);
-  const showNet=showRes&&showRet?(showRet-showRes):null;
+  // Net is ret-remaining minus res-remaining (what's left of the day)
+  let calcResRem=0,calcRetRem=0,hasRem=false;
+  Object.values(gd2).forEach(d=>{if(d&&d.has){calcResRem+=d.res;calcRetRem+=d.ret;hasRem=true;}});
+  const showNet=hasRem?(calcRetRem-calcResRem):null;
   const netEl2=document.getElementById('db-totalnet');
   s('db-totalres', showRes||'—'); s('db-totalret', showRet||'—');
   if(netEl2){
