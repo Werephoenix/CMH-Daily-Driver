@@ -10222,10 +10222,20 @@ function parseGLFull(text) {
 
   function save() {
     if (!cur || nums.length===0) return;
-    const total     = nums[nums.length-1];
-    const remaining = nums.length >= 2 ? nums[nums.length-2] : nums[0];
-    const hourlyRaw = nums.slice(0, Math.max(0, nums.length-2));
-    codes[cur] = { remaining, total, hourlySum: hourlyRaw.reduce((s,n)=>s+n,0), hourlyRaw, halfDay: isAM?'AM':'PM' };
+    // GL "Remaining"/"Completed"/"Total" tab paste format:
+    //   code → [sparse hourly values for non-blank hours] → summary value (last number)
+    // Empty hour cells from GL are dropped during Excel/email paste, so we cannot
+    // map values to specific hours. The LAST number is always the day summary
+    // (Remaining count when on Remaining tab — which is what the board needs).
+    const remaining = nums[nums.length-1];
+    const hourlyRaw = nums.slice(0, nums.length-1);
+    codes[cur] = {
+      remaining,
+      total: remaining,                                    // alias: same value, kept for backward compat
+      hourlyRaw,
+      hourlySum: hourlyRaw.reduce((s,n)=>s+n,0),
+      halfDay: isAM?'AM':'PM'
+    };
   }
 
   for (; i<dataLines.length; i++) {
