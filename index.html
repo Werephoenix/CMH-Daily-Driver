@@ -1405,9 +1405,6 @@ button { cursor: pointer; }
     </div>
   </div>
 
-  <!-- FLIGHT DELAY TOGGLE -->
-  <div id="flight-delay-card" style="margin-bottom:8px"></div>
-
   <!-- HOURLY FLOW -->
   <div class="card" style="padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="showTab('board')">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
@@ -1728,9 +1725,18 @@ button { cursor: pointer; }
   <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
     gap:6px;margin-bottom:10px"></div>
 
-  <!-- Coverage action bar (manager mode only) -->
+  <!-- Auto Schedule button — always visible (the rotation engine is the core value of this tab) -->
+  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Distribute Exit & Counter rotations based on coverage rules">
+      📅 Auto-Distribute
+    </button>
+    <span style="font-size:9px;color:var(--txt3)">
+      Fills exit gaps using available CXRs · respects manager overrides
+    </span>
+  </div>
+
+  <!-- Coverage action bar (manager mode — undo/redo only) -->
   <div id="cov-action-bar" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-    <button class="btn btn-g btn-sm" onclick="autoSchedule()">📅 Auto Schedule</button>
     <button class="btn btn-gh btn-sm" onclick="undoCoverage()" title="Undo">↩ Undo</button>
     <button class="btn btn-gh btn-sm" onclick="redoCoverage()" title="Redo">↪ Redo</button>
     
@@ -1809,6 +1815,8 @@ button { cursor: pointer; }
   </div>
   <div class="prog-wrap"><div class="prog" id="cl-prog" style="width:0"></div></div>
   <div class="prog-lbl" id="cl-prog-lbl">0 / 0 completed</div>
+  <!-- Flight delay toggle — only shown on Closing tab via showChecklist() -->
+  <div id="flight-delay-card" style="margin:8px 0;display:none"></div>
   <div id="cl-body"></div>
 </div>
   <!-- Inline email output -->
@@ -2085,7 +2093,7 @@ var CODE_MAP = {
   // Crossovers
   SGDR:'Crossovers',SGAR:'Crossovers',
   // Standard Elite SUV
-  SXAR:'Standard Elite SUV',
+  // SXAR removed — daily-set special code (like XXAR/PXAR), unmapped
   // Premium SUV
   PFAR:'Premium SUV',PFDR:'Premium SUV',PFAR2:'Premium SUV',
   // Fullsize SUV
@@ -2104,8 +2112,7 @@ var CODE_MAP = {
   FVAR:'Passenger Van',UVAR:'Passenger Van',RVAR:'Passenger Van',
   // Standard Pickup
   SPAR:'Standard Pickup',SPDR:'Standard Pickup',SPBR:'Standard Pickup',
-  PXAR:'No Supply',
-    PXAR:'No Supply',
+  // PXAR removed — daily-set code (Premium Special), unmapped like XXAR
 // Large Pickup
   FXAR:'Large Pickup',FPAR:'Large Pickup',
   // Exotic
@@ -2117,18 +2124,16 @@ var CODE_MAP = {
   // Premium Elite SUV
   PRAR:'Premium SUV',
   // ── NEW CODES FROM EMAIL EXAMPLES ─────────────────────────────────────
-  PGAR:'Premium Crossover',  PGDR:'Premium Crossover',
+  PGAR:'Crossovers',         PGDR:'Crossovers',
   FJAR:'Jeep Wrangler',      FJDR:'Jeep Wrangler',
   LFAR:'Luxury SUV',         LFDR:'Luxury SUV',
   UXAR:'Luxury Elite SUV',   UXDR:'Luxury Elite SUV',
   WCAR:'Luxury Car',         WDAR:'Luxury Elite SUV',
-  PXAR:'No Supply',
   PPAR:'Large Pickup',       PPBR:'Large Pickup',  PPDR:'Large Pickup',
   UDAR:'Luxury SUV',
   WFAR:'Luxury Elite SUV',   WFDR:'Luxury Elite SUV',
   PRAR:'Premium SUV',  BFAR:'⚠ Possible GL Error',
   SPBR:'Standard Pickup',
-  PXAR:'No Supply',
 
 };
 
@@ -2831,7 +2836,22 @@ function showTab(id) {
   if (btn) btn.classList.add('on');
 
   if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); }
-  if (id === 'schedule')  { buildCoverageTimeline(); updateManagerModeUI(); }
+  if (id === 'schedule')  {
+    // Auto-distribute on first entry: if there are no rotations yet but CXRs
+    // are scheduled, run autoSchedule once so Matt sees real Exit/Counter
+    // blocks instead of an undifferentiated counter wall. Manager edits
+    // (full-counter, full-exit, etc.) are preserved across this call.
+    try {
+      const hasRotations = window._lastRotations && Object.keys(window._lastRotations).length > 0;
+      const exp = (typeof buildExpectedToday === 'function') ? buildExpectedToday() : {};
+      const hasScheduledCXRs = Object.values(exp).some(e => e.person && e.person.role === 'CXR');
+      if (!hasRotations && hasScheduledCXRs && typeof autoSchedule === 'function') {
+        autoSchedule();
+      }
+    } catch (e) { /* never block tab entry on rotation errors */ }
+    buildCoverageTimeline();
+    updateManagerModeUI();
+  }
   if (id === 'checklist') { renderChecklist(window._curCLMode || 'opening'); }
   if (id === 'closing')   { restoreClosingFields(); genTeamText(); buildDaySummary(); }
   if (id === 'reference') { buildCodeCompendium(); }
@@ -3035,11 +3055,17 @@ function parseStep(stepNum) {
   if (!STATE.pasteData) STATE.pasteData = {};
   STATE.pasteData[key] = result;
 
-  // Also try to parse brand section if present
-  const brands = parseBrandSection(text);
-  if (brands && Object.keys(brands).length) {
-    STATE.pasteData.brands = brands;
-    updateBrandTotalsDisplay();
+  // Also try to parse brand section if present.
+  // GUARD: GL hourly paste has a "Total" aggregate row at the top, which
+  // parseBrandSection would misread as brand=TOTAL — corrupting calcBoard's
+  // totalRes/totRet with hourly values. Only run when text is actually a
+  // brand summary (contains a "Brands" / "BRANDS" header).
+  if (detectPasteType(text) === 'brands') {
+    const brands = parseBrandSection(text);
+    if (brands && Object.keys(brands).length) {
+      STATE.pasteData.brands = brands;
+      updateBrandTotalsDisplay();
+    }
   }
 
   // Aggregate into groups for board — use total for res/ret counts
@@ -3355,13 +3381,25 @@ function updateBoardTotals() {
     if (getGroupStatus(name, d.net) === 'wu') groupsOpen++;
   });
 
-  // Use brands actual totals for header (not group remainders)
+  // Use brands actual totals for header (not group remainders).
+  // Fallback: sum directly from paste data so codes mapping to groups
+  // outside GROUP_META (e.g. orphan "Premium Crossover", "No Supply")
+  // still count toward the totals — otherwise data silently leaks.
   const brands = (STATE.pasteData||{}).brands||{};
   const tot = brands.total||{};
-  let calcRes=0, calcRet=0;
-  Object.values(data).forEach(d=>{if(d.has){calcRes+=d.res;calcRet+=d.ret;}});
+  const pd  = STATE.pasteData||{};
+  const sumOfMaxAcrossHalves = (amKey, pmKey) => {
+    const am = pd[amKey] || {};
+    const pm = pd[pmKey] || {};
+    const allGroups = new Set([...Object.keys(am), ...Object.keys(pm)]);
+    let s = 0;
+    for (const g of allGroups) s += Math.max(am[g]||0, pm[g]||0);
+    return s;
+  };
+  const calcRes = sumOfMaxAcrossHalves('res-am-remaining','res-pm-remaining');
+  const calcRet = sumOfMaxAcrossHalves('ret-am-remaining','ret-pm-remaining');
   const totalRes = tot.totalRes || calcRes;
-  const totalRet = tot.totRet || calcRet;
+  const totalRet = tot.totRet   || calcRet;
   const net = totalRet - totalRes;
   const netEl = document.getElementById('board-total-net');
 
@@ -4330,13 +4368,32 @@ function buildSmartRotation() {
   const workingCXRs  = [];
   const workingExit  = [];
 
+  // SOURCE OF TRUTH: anyone scheduled today per buildExpectedToday is on duty
+  // unless explicitly marked off (staffDuty===false) or called out.
+  // Previously this used `STATE.staffDuty[pid] === true` — but that flag is
+  // never set automatically, so the function silently produced zero rotations.
+  // (autoDistributeExit uses buildExpectedToday for its source, so the two
+  // functions had different "who's working today" answers — the disconnect.)
+  const expToday = (typeof buildExpectedToday === 'function') ? buildExpectedToday() : {};
+
   ROSTER_CXR.forEach(person => {
     const pid   = person.name.replace(/\s/g,'_');
-    const duty  = STATE.staffDuty[pid];
-    if (duty !== true) return;
+    const duty  = STATE.staffDuty ? STATE.staffDuty[pid] : undefined;
+    const inExpected = expToday[pid] != null;
+    // Include if explicitly on duty OR scheduled today (and not explicitly off)
+    if (duty === false) return;
+    if (!inExpected && duty !== true) return;
+    if ((STATE.todayOverrides||{})[pid] === 'callout') return;
 
     const shift = getPersonShiftToday(person);
     if (!shift) return;
+    // Normalize overnight shifts: "4P-1A" parses as start=16.5 end=1, which
+    // breaks the (end-start)/2 midpoint math. Closers like Leslie and Feven
+    // need end+24 so b1/lunch/b2 calculations are sensible. The timeline
+    // renderer already handles hours up to 26 (2am next day).
+    if (shift.end != null && shift.start != null && shift.end < shift.start) {
+      shift.end += 24;
+    }
 
     if (person.role === 'EXIT') {
       workingExit.push({ ...person, shift });
@@ -4447,12 +4504,13 @@ function buildSmartRotation() {
     const shiftEnd   = shift.end;
 
     const b1Station = startStation || 'counter';
-    // b2Station: only flip to exit if this person is assigned Exit Booth
-    // (meaning we actually need them there). Otherwise stay at counter.
-    const assignedExit = (STATE.staffStation||{})[pid] === 'Exit Booth';
-    const b2Station = assignedExit
-      ? (b1Station === 'counter' ? 'exit' : 'counter')  // normal exit rotation
-      : 'counter';  // counter all day unless assigned to exit
+    // CMH rule: default rotation is balanced or exit-heavy. Counter→Exit
+    // is the standard pattern (counter first half, exit second half) — this
+    // gives every CXR ~half their time at exit and matches what
+    // autoDistributeExit assumes when scoring "normal" CXRs for gap coverage.
+    // Full-counter is the exception, only set explicitly via altPos
+    // 'full-counter' (handled in its own branch above).
+    const b2Station = b1Station === 'counter' ? 'exit' : 'counter';
 
     // Check if block2 (exit) would exceed 4 hours
     const exitBlock = b1Station === 'exit' ? block1H : block2H;
@@ -6128,7 +6186,7 @@ var FLEET_CODES = [
   {code:'SGDR', group:'Crossovers',         core:false, desc:'Crossover SUV — Nissan Murano, Ford Edge or similar. Between compact and midsize.'},
   {code:'SGAR', group:'Crossovers',         core:false, desc:'Crossover — alternate rate.'},
   // ── STANDARD ELITE SUV ──────────────────────────────────────────────
-  {code:'SXAR', group:'Standard Elite SUV', core:false, desc:'Standard Elite SUV — Elevated SUV class. Sport-trim or higher-spec standard SUV.'},
+  {code:'SXAR', group:'(daily-set, no supply)', core:false, desc:'Standard Special — daily-set code like XXAR/PXAR. Manager-assigned, not from inventory. Configure daily in DAILY_OPS.'},
   // ── PREMIUM SUV ─────────────────────────────────────────────────────
   {code:'PFAR', group:'Premium SUV',        core:false, desc:'Premium SUV — Cadillac XT5, Lincoln Corsair or similar.'},
   {code:'PFDR', group:'Premium SUV',        core:false, desc:'Premium SUV — CDW variant.'},
@@ -6173,8 +6231,8 @@ var FLEET_CODES = [
   {code:'WDAR', group:'Luxury Elite SUV',   core:false, desc:'Midsize Elite Luxury SUV — confirmed CMH. Maps to Luxury Elite SUV group.'},
   {code:'UDAR', group:'Luxury SUV',         core:false, desc:'Midsize Luxury SUV — confirmed CMH. Maps to Luxury SUV group.'},
   // ── ADDITIONAL CODES FROM EMAIL EXAMPLES ──────────────────────────────────
-  {code:'PGAR', group:'Premium Crossover',  core:false, desc:'Premium Crossover — Buick Envision, Acura RDX or similar. Above standard crossover.'},
-  {code:'PGDR', group:'Premium Crossover',  core:false, desc:'Premium Crossover — CDW variant.'},
+  {code:'PGAR', group:'Crossovers',         core:false, desc:'Premium Crossover — Buick Envision, Acura RDX or similar. Counts toward Crossovers group at CMH.'},
+  {code:'PGDR', group:'Crossovers',         core:false, desc:'Premium Crossover CDW variant. Counts toward Crossovers group at CMH.'},
   {code:'FJAR', group:'Jeep Wrangler',      core:false, desc:'Jeep Wrangler — alternate rate code. Same vehicle, different billing.'},
   {code:'LFAR', group:'Luxury SUV',         core:false, desc:'Luxury SUV — alternate code. Cadillac Escalade, Lincoln Navigator or similar.'},
   {code:'UXAR', group:'Luxury Elite SUV',   core:false, desc:'Luxury Elite SUV — top tier. Range Rover, BMW X7 or similar.'},
@@ -6472,6 +6530,14 @@ function showChecklist(mode) {
     const b = document.getElementById('clt-' + m);
     if (b) b.className = 'cl-tab' + (m===mode?' on':'');
   });
+  // Flight delay card lives only on the Closing tab — show/hide it here
+  const fdCard = document.getElementById('flight-delay-card');
+  if (fdCard) {
+    fdCard.style.display = (mode === 'closing') ? '' : 'none';
+    if (mode === 'closing' && typeof updateFlightDelayCard === 'function') {
+      updateFlightDelayCard();
+    }
+  }
   renderChecklist(mode);
 }
 
@@ -9004,6 +9070,17 @@ function buildCoverageTimeline() {
     return;
   }
 
+  // AUTO-DISTRIBUTE: if no rotations exist yet but CXRs are scheduled, run
+  // autoSchedule once so the user sees a sensible default distribution
+  // without having to find and click the Auto Schedule button.
+  // Manager-set 'full-counter'/'full-exit' values are preserved by
+  // autoDistributeExit (it only auto-clears 'exit-first').
+  const hasRotations = window._lastRotations && Object.keys(window._lastRotations).length > 0;
+  const hasCXRs = Object.values(exp).some(e => e.person.role === 'CXR');
+  if (!hasRotations && hasCXRs && typeof autoSchedule === 'function') {
+    try { autoSchedule(); } catch(e) { /* fall through to render whatever we have */ }
+  }
+
   const H_START=5, H_END=26;
   const HOURS=Array.from({length:H_END-H_START},(_,i)=>H_START+i);
   const hLbl=h=>{const hh=h%24,d=hh>12?hh-12:hh===0?12:hh,s=hh>=12?'p':'a';return d+s;};
@@ -9129,32 +9206,33 @@ function buildCoverageTimeline() {
 
   // ── Coverage chart ──────────────────────────────────────────────────────────
   const W=26;
+  const LABEL_W=72; // staff name column width — used by chart header AND timeline rows so they align
   const exitCts=HOURS.map(h=>people.filter(([pid,e])=>getZone(pid,e.person,h)==='exit').length);
   const ctrCts =HOURS.map(h=>people.filter(([pid,e])=>{const z=getZone(pid,e.person,h);return z==='counter'||z==='mgmt';}).length);
   const maxC=Math.max(...exitCts,...ctrCts,4);
   const chEl=document.getElementById('coverage-chart');
   if(chEl){
     const barH=28;
-    let c=`<div style="position:relative;padding-left:40px">`;
+    let c=`<div style="position:relative;padding-left:${LABEL_W}px">`;
     c+=`<div style="display:flex;margin-bottom:1px">`;
-    HOURS.forEach(h=>{const isNow=Math.floor(nowH)===h%24;c+=`<div style="width:${W}px;flex-shrink:0;text-align:center;font-size:7px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:400}">${hLbl(h)}</div>`;});
+    HOURS.forEach((h,i)=>{const isNow=Math.floor(nowH)===h%24;c+=`<div style="width:${W}px;flex-shrink:0;text-align:center;font-size:7px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:400};border-right:1px solid rgba(255,255,255,.05)">${hLbl(h)}</div>`;});
     c+=`</div>`;
-    c+=`<div style="position:absolute;left:0;top:10px;font-size:8px;font-weight:700;color:var(--green)">Exit</div>`;
+    c+=`<div style="position:absolute;left:0;top:10px;font-size:8px;font-weight:700;color:var(--green);width:${LABEL_W-4}px;text-align:right;padding-right:4px">Exit</div>`;
     c+=`<div style="display:flex;align-items:flex-end;height:${barH}px;margin-bottom:2px">`;
     HOURS.forEach((h,i)=>{
       const ct=exitCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{exitMin:1};
       const pct=Math.min(100,ct/maxC*100);
       const col=ct===0?'var(--red)':ct<r.exitMin?'var(--amber)':'var(--green)';
-      c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
+      c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px;border-right:1px solid rgba(255,255,255,.04)"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
     });
     c+=`</div>`;
-    c+=`<div style="position:absolute;left:0;top:${10+barH+2}px;font-size:8px;font-weight:700;color:var(--acc)">Ctr</div>`;
+    c+=`<div style="position:absolute;left:0;top:${10+barH+2}px;font-size:8px;font-weight:700;color:var(--acc);width:${LABEL_W-4}px;text-align:right;padding-right:4px">Ctr</div>`;
     c+=`<div style="display:flex;align-items:flex-end;height:${barH}px">`;
     HOURS.forEach((h,i)=>{
       const ct=ctrCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{counterMin:2};
       const pct=Math.min(100,ct/maxC*100);
       const col=ct===0?'transparent':ct<r.counterMin?'var(--amber)':'var(--acc)';
-      c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
+      c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px;border-right:1px solid rgba(255,255,255,.04)"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
     });
     c+=`</div></div>`;
     chEl.innerHTML=c;
@@ -9163,8 +9241,14 @@ function buildCoverageTimeline() {
   // ── Person timeline bars ────────────────────────────────────────────────────
   const tlEl=document.getElementById('coverage-timeline');
   if(!tlEl)return;
-  const totalW=46+HOURS.length*W;
-  let htm=`<div style="min-width:${totalW}px">`;let _mgmtHeaderShown=false;let _groupHeaders={};
+  const totalW=LABEL_W+HOURS.length*W;
+  // Render chart (c) and rows in the SAME scroll container so they stay aligned
+  // when the user scrolls horizontally on mobile.
+  const chartHtml = chEl ? chEl.innerHTML : '';
+  if (chEl) chEl.innerHTML = ''; // hide standalone chart — it's now duplicated inside the timeline below
+  let htm=`<div style="min-width:${totalW}px">`;
+  if (chartHtml) htm += `<div style="margin-bottom:8px">${chartHtml}</div>`;
+  let _mgmtHeaderShown=false;let _groupHeaders={};
 
   // Gap row
   const hasGap=HOURS.some((h,i)=>{
@@ -9202,17 +9286,49 @@ function buildCoverageTimeline() {
       }
     }
     htm+=`<div style="display:flex;align-items:center;margin-bottom:3px">`;
-    htm+=`<div style="width:46px;flex-shrink:0;font-size:8px;color:var(--red);text-align:right;padding-right:4px;line-height:14px">⚠ exit</div>`;
+    htm+=`<div style="width:${LABEL_W}px;flex-shrink:0;font-size:8px;color:var(--red);text-align:right;padding-right:4px;line-height:14px">⚠ exit</div>`;
     HOURS.forEach((h,i)=>{
       const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{exitMin:1};
       const eg=exitCts[i]<r.exitMin;
-      const isPast=h%24<Math.floor(nowH%24)&&h<24;htm+=`<div style="width:${W}px;flex-shrink:0;height:14px;background:${eg&&!isPast?'rgba(248,113,113,.3)':'transparent'};border-radius:2px"></div>`;
+      const isPast=h%24<Math.floor(nowH%24)&&h<24;htm+=`<div style="width:${W}px;flex-shrink:0;height:14px;background:${eg&&!isPast?'rgba(248,113,113,.3)':'transparent'};border-right:1px solid rgba(255,255,255,.05);border-radius:2px"></div>`;
     });
     htm+=`</div>`;
     if(fillSuggestion){
-      htm+=`<div style="font-size:9px;color:var(--amber);padding:2px 0 4px 50px">
+      htm+=`<div style="font-size:9px;color:var(--amber);padding:2px 0 4px ${LABEL_W+4}px">
         ⚑ Suggest ${fillSuggestion} cover exit gap</div>`;
     }
+  }
+
+  // ── Counter gap row (informational — auto-distribute does NOT auto-fix
+  //    counter shortages per CMH rule that no one is full-counter unless
+  //    exit is overstaffed. If counter is short, the manager decides what
+  //    to do — typically pull an MT/ABRM in or cut a less-busy hour). ─────
+  const ctrCounts = HOURS.map(h => people.filter(([pid,e]) => {
+    const z = getZone(pid, e.person, h);
+    return z === 'counter' || z === 'mgmt';
+  }).length);
+  const hasCtrGap = HOURS.some((h,i) => {
+    if (h%24 < Math.floor(nowH%24) && h < 24) return false;
+    const r = typeof COVERAGE_BY_HOUR === 'function'
+      ? COVERAGE_BY_HOUR(h%24, dow, exitAgentCount)
+      : {counterMin:2};
+    if (r.closed) return false;
+    return ctrCounts[i] < r.counterMin;
+  });
+  if (hasCtrGap) {
+    htm += `<div style="display:flex;align-items:center;margin-bottom:3px">`;
+    htm += `<div style="width:${LABEL_W}px;flex-shrink:0;font-size:8px;color:var(--amber);text-align:right;padding-right:4px;line-height:14px">⚠ counter</div>`;
+    HOURS.forEach((h,i) => {
+      const r = typeof COVERAGE_BY_HOUR === 'function'
+        ? COVERAGE_BY_HOUR(h%24, dow, exitAgentCount)
+        : {counterMin:2};
+      const cg = !r.closed && ctrCounts[i] < r.counterMin;
+      const isPast = h%24 < Math.floor(nowH%24) && h < 24;
+      htm += `<div style="width:${W}px;flex-shrink:0;height:14px;background:${cg && !isPast ? 'rgba(251,191,36,.25)' : 'transparent'};border-right:1px solid rgba(255,255,255,.05);border-radius:2px"></div>`;
+    });
+    htm += `</div>`;
+    htm += `<div style="font-size:9px;color:var(--amber);padding:2px 0 4px ${LABEL_W+4}px">
+      ⚑ Counter short — pull MT/ABRM or accept reduced coverage (no auto-fix)</div>`;
   }
 
   // Person rows — the bar IS the control
@@ -9244,14 +9360,14 @@ function buildCoverageTimeline() {
       const ghLabel = {cxr:'CXR / Counter',exit:'Exit Agents',returns:'Returns',mgmt:'Management'};
       const ghColor = {cxr:'var(--acc)',exit:'var(--green)',returns:'#06b6d4',mgmt:'#a5b4fc'};
       const ghBdr   = {cxr:'rgba(37,99,235,.3)',exit:'rgba(22,163,74,.3)',returns:'rgba(6,182,212,.3)',mgmt:'rgba(99,102,241,.3)'};
-      htm+=`<div style="display:flex;margin:${roleGroup==='cxr'?0:8}px 0 3px"><div style="width:46px;flex-shrink:0"></div><div style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${ghColor[roleGroup]};border-bottom:1px solid ${ghBdr[roleGroup]};padding-bottom:2px;flex:1">— ${ghLabel[roleGroup]} —</div></div>`;
+      htm+=`<div style="display:flex;margin:${roleGroup==='cxr'?0:8}px 0 3px"><div style="width:${LABEL_W}px;flex-shrink:0"></div><div style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${ghColor[roleGroup]};border-bottom:1px solid ${ghBdr[roleGroup]};padding-bottom:2px;flex:1">— ${ghLabel[roleGroup]} —</div></div>`;
     }
     if(isMgmt&&!_mgmtHeaderShown){
       _mgmtHeaderShown=true;
     }
     const isReturns=p.role==='RETURNS',isExit=p.role==='EXIT';
     const nameCol=isOff?'var(--red)':isReturns?'#67e8f9':isExit?'var(--green)':isMgmt?'#c4b5fd':'var(--txt)';
-    htm+=`<div style="width:46px;flex-shrink:0;font-size:${isMgmt?9:isReturns?9:10}px;
+    htm+=`<div style="width:${LABEL_W}px;flex-shrink:0;font-size:${isMgmt?9:isReturns?9:10}px;
       font-weight:${isMgmt?500:700};
       color:${nameCol};
       text-align:right;padding-right:5px;
@@ -9300,8 +9416,15 @@ function buildCoverageTimeline() {
       specs.forEach(b=>{if(b.from<b.to)addSeg(b.from,b.to,b.key);});
     }
 
-    // Render as absolute-positioned overlapping divs
-    htm+=`<div style="position:relative;height:22px;width:${totalW2}px;flex-shrink:0">`;
+    // Render as absolute-positioned overlapping divs.
+    // Background: subtle vertical grid lines every W pixels (one per hour) so
+    // the eye can follow a column down through the timeline.
+    htm+=`<div style="position:relative;height:22px;width:${totalW2}px;flex-shrink:0;
+      background-image:repeating-linear-gradient(to right,
+        rgba(255,255,255,.06) 0,
+        rgba(255,255,255,.06) 1px,
+        transparent 1px,
+        transparent ${W}px);">`;
     segments.filter(s=>s.zone!=='bg').forEach(s=>{
       const col=zColor[s.zone]||'rgba(255,255,255,.08)';
       const lbl=s.zone==='counter'?'Ctr':s.zone==='exit'?'Exit':
@@ -9509,9 +9632,106 @@ function autoSchedule() {
     window._lastRotations={};
     if(rot&&rot.rotations)rot.rotations.forEach(r=>{window._lastRotations[r.pid]=r;});
   } catch(e){}
-  // 3. Assign lunches for everyone
+  // 3. Balance counter coverage — DISABLED.
+  //    CMH rule (Matt, 2026-05-05): "No one should ever be full counter
+  //    unless too many people at exit. Exit/counter should be balanced
+  //    or lean heavier at exit." The previous balanceCounterCoverage()
+  //    auto-demoted CXRs to full-counter (8hrs) whenever counter was below
+  //    minimum, even if exit was just at minimum. That's the wrong default —
+  //    it burns half a CXR's exit time to fix a counter shortage that may
+  //    not actually be operational. Counter shortages are now surfaced as a
+  //    visible warning in the timeline (see hasCounterGap in
+  //    buildCoverageTimeline) instead of being silently "fixed". Managers
+  //    can still manually set full-counter per CXR via the switchboard.
+  // try { balanceCounterCoverage(); } catch(e){}
+  // 4. Assign lunches for everyone
   suggestLunches();
   // Toast handled by suggestLunches
+}
+
+// Pulls "normal" CXRs back to full-counter ONLY when their exit time would
+// over-staff exit while leaving counter under-staffed. Iterative — at most
+// 5 passes; usually settles in 1–2.
+function balanceCounterCoverage() {
+  const exp = typeof buildExpectedToday === 'function' ? buildExpectedToday() : {};
+  const dow = new Date().getDay();
+  const exitAgentCount = Object.values(exp).filter(e => e.person.role === 'EXIT').length;
+  const HOURS = Array.from({length:20},(_,i) => i+5); // 5am–1am
+
+  function rebuildRotations() {
+    try {
+      const r = buildSmartRotation();
+      window._lastRotations = {};
+      if (r && r.rotations) r.rotations.forEach(rot => { window._lastRotations[rot.pid] = rot; });
+    } catch(e){}
+  }
+
+  function countAt(h, station) {
+    let n = 0;
+    Object.entries(window._lastRotations || {}).forEach(([pid, r]) => {
+      if (r.lunch && h >= r.lunch.from && h < r.lunch.to) return;
+      if (r.b1 && h >= r.b1.from && h < r.b1.to && r.b1.station === station) n++;
+      else if (r.b2 && h >= r.b2.from && h < r.b2.to && r.b2.station === station) n++;
+    });
+    if (station === 'exit') {
+      Object.values(exp).forEach(e => {
+        if (e.person.role !== 'EXIT') return;
+        const ss = e.person.shiftStart, se = e.person.shiftEnd;
+        if (ss != null && se != null && h >= ss && h < se) n++;
+      });
+    }
+    return n;
+  }
+
+  // One demotion per iteration, then rebuild. Keeps coverage counts accurate
+  // as we go and prevents over-pulling from exit. Cap iterations defensively.
+  for (let iter = 0; iter < 12; iter++) {
+    // Find the worst counter gap that can be fixed without breaking exit.
+    let worstHour = null, worstShort = 0;
+    HOURS.forEach(h => {
+      const r = (typeof COVERAGE_BY_HOUR === 'function')
+        ? COVERAGE_BY_HOUR(h % 24, dow, exitAgentCount)
+        : { exitMin:1, counterMin:1, closed:false };
+      if (r.closed) return;
+      const ctrCt = countAt(h, 'counter');
+      const exitCt = countAt(h, 'exit');
+      const ctrShort = r.counterMin - ctrCt;
+      if (ctrShort <= 0) return;          // counter ok at this hour
+      if (exitCt <= r.exitMin) return;    // exit can't lose anyone
+      if (ctrShort > worstShort) { worstShort = ctrShort; worstHour = h; }
+    });
+    if (worstHour == null) break;          // no fixable gap remains
+
+    // Find candidates whose b2 (exit) covers worstHour AND who are still un-flagged.
+    const candidates = Object.entries(window._lastRotations).filter(([pid, rot]) => {
+      if (!rot.b2 || rot.b2.station !== 'exit') return false;
+      if (worstHour < rot.b2.from || worstHour >= rot.b2.to) return false;
+      const altPos = (STATE.altSchedule || {})[pid];
+      return !altPos || altPos === 'normal';
+    });
+    if (!candidates.length) break;          // nobody to demote
+
+    // Best candidate: the one whose b2 fixes the most counter-gap hours
+    // without taking exit below min in any of them.
+    let best = null, bestScore = -1;
+    candidates.forEach(([pid, rot]) => {
+      let score = 0, blocked = false;
+      for (let bh = Math.floor(rot.b2.from); bh < Math.ceil(rot.b2.to); bh++) {
+        const r2 = COVERAGE_BY_HOUR(bh % 24, dow, exitAgentCount);
+        if (r2.closed) continue;
+        const ec = countAt(bh, 'exit');
+        if (ec - 1 < r2.exitMin) { blocked = true; break; } // demoting drops exit too low
+        if (countAt(bh, 'counter') < r2.counterMin) score++;
+      }
+      if (blocked) return;
+      if (score > bestScore) { bestScore = score; best = [pid, rot]; }
+    });
+    if (!best) break;                       // every candidate would break exit somewhere
+
+    if (!STATE.altSchedule) STATE.altSchedule = {};
+    STATE.altSchedule[best[0]] = 'full-counter';
+    rebuildRotations();
+  }
 }
 
 
@@ -10198,6 +10418,15 @@ function saveExitFairnessForToday() {
 
 function parseGLFull(text) {
   if (!text || !text.trim()) return null;
+
+  // ── TSV branch ─────────────────────────────────────────────────────────
+  // If any line contains a tab, treat as tab-separated rows (from HTML paste
+  // interception). Empty cells are preserved as empty strings, so cell
+  // positions map 1:1 to hours and we can build accurate hourly arrays.
+  if (text.includes('\t')) {
+    return parseGLFullTSV(text);
+  }
+
   const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
 
   const isAM = lines.some(l=>/^(12am|1am|6am)$/i.test(l));
@@ -10246,6 +10475,65 @@ function parseGLFull(text) {
   save();
 
   return { codes, halfDay: isAM?'AM':'PM' };
+}
+
+// TSV parser — used when paste preserves cell positions (HTML clipboard).
+// Each line is a row of tab-separated cells. First non-empty cell is the
+// row label (vehicle code). Empty cells are real zeros (blank hours).
+// Last non-empty cell is the Remaining count.
+function parseGLFullTSV(text) {
+  const lines = text.split('\n').filter(l => l.length > 0);
+  if (!lines.length) return null;
+
+  const isCode = s => /^[A-Z]{2,5}[0-9]?$/.test(s)
+    && !['AM','PM','TOTAL','REMAINING','BRANDS','ALAMO','ENTERPRISE','NATIONAL'].includes(s.toUpperCase());
+
+  // Detect AM vs PM from header row (look for '12am' or '12pm' as a cell)
+  let isAM = false, isPM = false;
+  for (const line of lines) {
+    const cells = line.split('\t').map(c => c.trim().toLowerCase());
+    if (cells.some(c => c === '12am' || c === '1am' || c === '6am')) { isAM = true; break; }
+    if (cells.some(c => c === '12pm' || c === '1pm')) { isPM = true; break; }
+  }
+  const halfDay = isAM ? 'AM' : (isPM ? 'PM' : 'AM');
+
+  const codes = {};
+
+  for (const line of lines) {
+    const cells = line.split('\t').map(c => c.trim());
+    if (!cells.length) continue;
+    const label = cells[0];
+    if (!label || !isCode(label)) continue; // skip header/total/blank rows
+
+    // Convert each cell after the code: empty → 0, numeric → int, otherwise skip row
+    const dataCells = cells.slice(1);
+    // Find the LAST non-empty cell — that's Remaining
+    let remainingIdx = -1;
+    for (let j = dataCells.length - 1; j >= 0; j--) {
+      if (dataCells[j] !== '') { remainingIdx = j; break; }
+    }
+    if (remainingIdx < 0) continue;
+
+    const remainingRaw = dataCells[remainingIdx].replace(/,/g, '');
+    if (!/^\d+$/.test(remainingRaw)) continue;
+    const remaining = parseInt(remainingRaw);
+
+    // Hourly cells = everything before remaining; empty → 0
+    const hourlyRaw = dataCells.slice(0, remainingIdx).map(c => {
+      const clean = c.replace(/,/g, '');
+      return /^\d+$/.test(clean) ? parseInt(clean) : 0;
+    });
+
+    codes[label] = {
+      remaining,
+      total: remaining,
+      hourlyRaw,
+      hourlySum: hourlyRaw.reduce((s,n) => s + n, 0),
+      halfDay,
+    };
+  }
+
+  return { codes, halfDay };
 }
 
 function parseBrandSection(text) {
@@ -11525,6 +11813,80 @@ function updateFlightDelayCard() {
         <span style="margin-left:auto;font-size:10px;opacity:.5">tap to extend hours</span>
       </button>`;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HTML PASTE INTERCEPTION — preserves cell positions when pasting from
+// Game Plan or Excel. Without this, blank cells get dropped during paste,
+// forcing the parser to guess. With this, TSV preserves every cell.
+// ═══════════════════════════════════════════════════════════════════════
+
+// Convert an HTML <table> string to tab-separated rows.
+// Empty cells stay empty (preserved as adjacent tabs), so cell positions
+// map 1:1 to the original spreadsheet/table layout.
+function htmlTableToTSV(html) {
+  try {
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    const rows = div.querySelectorAll('tr');
+    if (!rows.length) return null;
+    const out = [];
+    rows.forEach(tr => {
+      const cells = tr.querySelectorAll('td, th');
+      if (!cells.length) return;
+      // Normalize cell text: trim, collapse whitespace, keep empty as ''
+      const rowText = Array.from(cells).map(c => {
+        const t = (c.textContent || '').replace(/\s+/g, ' ').trim();
+        return t;
+      }).join('\t');
+      out.push(rowText);
+    });
+    return out.length ? out.join('\n') : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Attach a paste handler to a textarea by id. On paste, if the clipboard
+// has an HTML table, convert it to TSV and insert that instead of the
+// browser's default plain-text paste (which loses blank cells).
+function attachExcelPasteHandler(taId) {
+  const ta = document.getElementById(taId);
+  if (!ta) return;
+  // Avoid double-attaching
+  if (ta.dataset.excelPaste === '1') return;
+  ta.dataset.excelPaste = '1';
+  ta.addEventListener('paste', (e) => {
+    const cd = e.clipboardData || window.clipboardData;
+    if (!cd) return; // let default happen
+    const html = cd.getData ? cd.getData('text/html') : '';
+    if (!html || !/<table/i.test(html)) return; // no table in clipboard, default paste fine
+    const tsv = htmlTableToTSV(html);
+    if (!tsv) return;
+    e.preventDefault();
+    // Replace selection (or insert at cursor) with TSV
+    const start = ta.selectionStart || 0;
+    const end   = ta.selectionEnd || 0;
+    const before = ta.value.slice(0, start);
+    const after  = ta.value.slice(end);
+    ta.value = before + tsv + after;
+    const newCursor = start + tsv.length;
+    ta.selectionStart = ta.selectionEnd = newCursor;
+    // Notify any input listeners (e.g. live preview)
+    try { ta.dispatchEvent(new Event('input', { bubbles: true })); } catch(_) {}
+  });
+}
+
+// Attach to all 5 Game Plan paste textareas + brand paste box.
+function attachAllExcelPasteHandlers() {
+  ['pa1','pa2','pa3','pa4','pa5','brand-paste-box'].forEach(attachExcelPasteHandler);
+}
+
+// Run on load + whenever paste tab is shown (in case textareas re-render)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', attachAllExcelPasteHandlers);
+} else {
+  attachAllExcelPasteHandlers();
 }
 
 </script>
