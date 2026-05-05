@@ -8645,10 +8645,6 @@ function promptManagerMode() {
   if (!unlockManagerMode(pin)) toast('Incorrect PIN');
 }
 
-function getAdminPin() {
-  return localStorage.getItem(ADMIN_PIN_KEY) || DEFAULT_PIN;
-}
-
 function checkAdminPin() {
   const input = document.getElementById('admin-pin-input');
   const err   = document.getElementById('admin-pin-error');
