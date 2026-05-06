@@ -1475,8 +1475,8 @@ button { cursor: pointer; }
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <div class="card" style="padding:10px 14px;margin-bottom:8px;cursor:pointer" onclick="showTab('checklist')">
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center">
-      <span title="Customer Service receipts received"># CS Rcvd: <b id="sum-cs" style="color:var(--green);font-family:var(--ff-mono)">—</b></span>
-      <span title="Hot returns awaiting prep">HOT: <b id="sum-hot" style="color:var(--red);font-family:var(--ff-mono)">—</b></span>
+      <span title="Customer Service receipts received">Completely Satisfied: <b id="sum-cs" style="color:var(--green);font-family:var(--ff-mono)">—</b></span>
+      <span title="Hot returns awaiting prep">Hot Alerts: <b id="sum-hot" style="color:var(--red);font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--bdr2)">│</span>
       <span style="color:var(--txt3);font-size:10px;font-weight:700">Specials:</span>
       <span style="color:var(--txt3)">XXAR <b id="sum-xxar" style="font-family:var(--ff-mono)">—</b></span>
@@ -1593,7 +1593,7 @@ button { cursor: pointer; }
 
   <!-- Ops header -->
   <div class="mgr-bar" style="margin-bottom:12px">
-    <span id="bh-cs-hot" style="font-size:12px;color:var(--txt2)"># CS Rcvd —  |  HOT —</span>
+    <span id="bh-cs-hot" style="font-size:12px;color:var(--txt2)">Completely Satisfied —  |  Hot Alerts —</span>
     <span id="bh-mgrs" style="font-size:12px;color:var(--txt2)">Opening: —  |  Closing: —</span>
     <span id="bh-classnotes" style="font-size:11px;color:var(--txt3);font-style:italic;margin-left:auto"></span>
     <button class="btn btn-gh btn-sm" onclick="showTab('board');setTimeout(()=>window.print(),100)"
@@ -1604,7 +1604,7 @@ button { cursor: pointer; }
   <div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:8px;padding:8px 12px;margin-bottom:10px">
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
       <span style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">🚦 Walk-Ups</span>
-      <button class="wubtn on g" id="wu-open-b"    onclick="setWU('open')">✅ All Open</button>
+      <button class="wubtn" id="wu-open-b"    onclick="setWU('open')">✅ All Open</button>
       <button class="wubtn"      id="wu-core-b"    onclick="setWU('core')">🔵 Core Only</button>
       <button class="wubtn"      id="wu-noncore-b" onclick="setWU('noncore')">🔶 Non-Core</button>
       <button class="wubtn"      id="wu-closed-b"  onclick="setWU('closed')">🔴 Closed</button>
@@ -1741,6 +1741,9 @@ button { cursor: pointer; }
   <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
     <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Distribute Exit & Counter rotations based on coverage rules">
       📅 Auto-Distribute
+    </button>
+    <button class="btn btn-gh btn-sm" onclick="printScheduleMap()" title="Print full-day schedule for everyone">
+      🖨 Print Schedule Map
     </button>
     <span style="font-size:9px;color:var(--txt3)">
       Fills exit gaps using available CXRs · respects manager overrides
@@ -2525,10 +2528,10 @@ var SPECIAL_ASSIGNMENTS = [
 var CL_DATA = {
   opening: [
     {s:'📊 Morning Data', items:[
-      {t:'# of CS Received + HOT Alerts', p:false,
+      {t:'# of Completely Satisfied + Hot Alerts', p:false,
         fields:[
-          {key:'cs',  label:'CS Count',   type:'number', ph:'e.g. 91'},
-          {key:'hot', label:'HOT Alerts', type:'number', ph:'e.g. 1'},
+          {key:'cs',  label:'Completely Satisfied',   type:'number', ph:'e.g. 91'},
+          {key:'hot', label:'Hot Alerts', type:'number', ph:'e.g. 1'},
         ]},
       {t:'OOS Units — all have claims?', p:false,
         fields:[{key:'oos', label:'OOS Count', type:'text', ph:'e.g. 3 or "All claimed"'}]},
@@ -2724,6 +2727,7 @@ function loadState() {
       s.adminRoster  = s.adminRoster  || [];
       s.adminCodes   = s.adminCodes   || [];
       s.specialBlocks = s.specialBlocks || {};
+      s.mgmtBlocks   = s.mgmtBlocks   || {}; // {pid: [{from, to, station}]} — manager multi-station time blocks
       s.closeFields  = s.closeFields  || {};
       s.coverageThresholds = s.coverageThresholds || null;
       s.pendingCoverage = s.pendingCoverage || null; // { staffStation, altSchedule, shiftMod, customSplits, specialBlocks } — buffer of edits before Confirm
@@ -2736,7 +2740,7 @@ function loadState() {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
-    stationPref:{}, shiftMod:{}, customSplits:{}, adminRoster:[], adminCodes:[], specialBlocks:{},
+    stationPref:{}, shiftMod:{}, customSplits:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{},
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -2783,6 +2787,16 @@ window.onload = function() {
   // Initialize schedule engine with pre-loaded data
   if (typeof initScheduleEngine === 'function') initScheduleEngine();
   if (typeof initSync === 'function') initSync();
+  // Auto-load today's MAY_SCHEDULE on startup. The roster has each person's
+  // DEFAULT shift (e.g. Laura's hardcoded 5:30a–2:30p AM portion), but
+  // Laura's actual schedule varies by day — Wednesdays she works 5p–1a only.
+  // MAY_SCHEDULE has the correct day-of-week data; loadScheduleForToday()
+  // applies it to STATE.shiftMod, which buildExpectedToday respects.
+  // Without this auto-call, users have to manually press "Reset & Reload Today"
+  // in admin every morning. force=false preserves any manual edits already made.
+  if (typeof loadScheduleForToday === 'function') {
+    try { loadScheduleForToday(false); } catch(e) {}
+  }
   // Auto-load from roster on startup so Coverage tab shows immediately
   if (typeof buildExpectedToday === 'function') {
     const _startExp = buildExpectedToday();
@@ -2954,18 +2968,22 @@ function setWalkUp(val) {
 }
 
 function updateWalkUpButtons() {
-  const p = STATE.walkUpPolicy;
+  const p = STATE.walkUpPolicy || 'open';
+  // Map: button id → policy value → CSS color suffix used by .wubtn.on.{g|b|a|r}
+  // ('g'reen=open, 'b'lue=core, 'a'mber=noncore, 'r'ed=closed)
   const btns = [
-    ['wu-open','open','wu'],['wu-core','core','up'],
-    ['wu-noncore','noncore','up'],['wu-closed','closed','na'],
-    ['wu-open-b','open','wu'],['wu-core-b','core','up'],
-    ['wu-noncore-b','noncore','up'],['wu-closed-b','closed','na'],
+    ['wu-open','open','g'],['wu-core','core','b'],
+    ['wu-noncore','noncore','a'],['wu-closed','closed','r'],
+    ['wu-open-b','open','g'],['wu-core-b','core','b'],
+    ['wu-noncore-b','noncore','a'],['wu-closed-b','closed','r'],
   ];
-  btns.forEach(([id,val,cls]) => {
+  btns.forEach(([id,val,colorCls]) => {
     const el = document.getElementById(id);
     if (!el) return;
-    el.classList.remove('active','wu','up','na');
-    if (p === val) el.classList.add('active', cls);
+    // Remove ALL highlight-related classes so previous selection clears
+    el.classList.remove('on','g','b','a','r','active','wu','up','na');
+    // Add highlight to the active button only
+    if (p === val) el.classList.add('on', colorCls);
   });
 }
 
@@ -3483,7 +3501,7 @@ function generateTeamText() {
 
   let text = `🚗 CMH SHIFT HANDOFF — ${today} @ ${now}\n`;
   text += `━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-  text += `📊 CS: ${f.cs||'—'}  |  🔥 HOT: ${f.hot||'—'}  |  🔧 OOS: ${f.oosFinal||f.oos||'—'}\n`;
+  text += `📊 Completely Satisfied: ${f.cs||'—'}  |  🔥 Hot Alerts: ${f.hot||'—'}  |  🔧 OOS: ${f.oosFinal||f.oos||'—'}\n`;
   text += `👤 Outgoing: ${f.openMgr||'—'}  →  Incoming: ${f.closeMgr||'—'}\n`;
   text += `\n🚦 Walk-Ups: ${pol}\n`;
 
@@ -3543,7 +3561,7 @@ function buildDaySummary() {
   (document.getElementById('day-summary')||{}).innerHTML = `
     <b>${today}</b><br><br>
     <b>Daily Data</b><br>
-    CS Scores: ${f.cs||'—'}  ·  HOT Alerts: ${f.hot||'—'}  ·  OOS: ${f.oosFinal||f.oos||'—'}<br>
+    Completely Satisfied: ${f.cs||'—'}  ·  Hot Alerts: ${f.hot||'—'}  ·  OOS: ${f.oosFinal||f.oos||'—'}<br>
     Opening Mgr: ${f.openMgr||'—'}  ·  Closing Mgr: ${f.closeMgr||'—'}<br>
     Sales Leader: ${f.salesLeader||'—'}<br><br>
     <b>Availability</b><br>
@@ -3828,7 +3846,7 @@ function buildEmailData(type) {
 
     // ── TODAY AT A GLANCE ──
     body += '📊 TODAY AT A GLANCE\n';
-    body += `CS Scores: ${f.cs||'—'}   HOT Alerts: ${f.hot||'—'}   OOS: ${f.oos||'—'}\n`;
+    body += `Completely Satisfied: ${f.cs||'—'}   Hot Alerts: ${f.hot||'—'}   OOS: ${f.oos||'—'}\n`;
     body += `Opening: ${omgr}   Closing: ${cmgr}\n`;
     if (f.salesLeader) body += `Sales Leader (Yesterday): ${f.salesLeader}\n`;
     if (f.invAgent)    body += `Inventory Agent: ${f.invAgent}\n`;
@@ -3906,7 +3924,7 @@ function buildEmailData(type) {
     body += '─────────────────────────────────\n\n';
 
     body += '📊 FINAL METRICS\n';
-    body += `CS Scores: ${f.cs||'—'}   HOT Alerts: ${f.hot||'—'}   Final OOS: ${f.oosFinal||f.oos||'—'}\n`;
+    body += `Completely Satisfied: ${f.cs||'—'}   Hot Alerts: ${f.hot||'—'}   Final OOS: ${f.oosFinal||f.oos||'—'}\n`;
     body += `FBO's: ${f.fboCount||'—'}${f.fboNotes?' — '+f.fboNotes:''}\n\n`;
 
     body += '✅ CHECKLISTS\n';
@@ -3940,8 +3958,8 @@ function buildEmailData(type) {
 
     let body = '🚗 CMH SHIFT HANDOFF — ' + dateStr + ' @ ' + timeStr + '\n';
     body += '━━━━━━━━━━━━━━━━━━━━━━━\n';
-    body += '📊 CS: '  + (f.cs||'—') +
-            '  🔥 HOT: ' + (f.hot||'—') +
+    body += '📊 Completely Satisfied: '  + (f.cs||'—') +
+            '  🔥 Hot Alerts: ' + (f.hot||'—') +
             '  OOS: '  + (f.oosFinal||f.oos||'—') + '\n';
     body += '👤 ' + omgr + ' → ' + cmgr + '\n';
     body += '\n🚦 Walk-Ups: ' + polLabel + '\n';
@@ -3998,7 +4016,7 @@ function buildFullSummaryText() {
   let t = `CMH DAILY SUMMARY — ${today}\n`;
   t += `${'═'.repeat(40)}\n`;
   t += `Opening Mgr: ${omgr}  |  Closing Mgr: ${cmgr}\n`;
-  t += `CS: ${f.cs||'—'}  |  HOT: ${f.hot||'—'}  |  OOS: ${f.oosFinal||f.oos||'—'}\n`;
+  t += `Completely Satisfied: ${f.cs||'—'}  |  Hot Alerts: ${f.hot||'—'}  |  OOS: ${f.oosFinal||f.oos||'—'}\n`;
   t += `Sales Leader: ${f.salesLeader||'—'}\n\n`;
   t += `AVAILABILITY\n`;
   t += `Walk-Up Policy: ${polLbl[STATE.walkUpPolicy]||'—'}\n`;
@@ -4123,7 +4141,7 @@ function buildHistoryScreen() {
         <div class="hist-date">${day.dateLabel}</div>
         <div class="hist-badges">
           ${day.cs!=null?`<span class="hbadge g">CS ${day.cs}</span>`:''}
-          ${day.hot!=null?`<span class="hbadge ${day.hot>0?'r':'g'}">HOT ${day.hot}</span>`:''}
+          ${day.hot!=null?`<span class="hbadge ${day.hot>0?'r':'g'}`+`">Hot Alerts ${day.hot}</span>`:''}
           ${day.oos!=null?`<span class="hbadge a">OOS ${day.oos}</span>`:''}
           <span class="hbadge b">${wuEmoji} ${day.walkUpPolicy||'—'}</span>
           ${clMax>0?`<span class="hbadge g">${clTotal}/${clMax} checks</span>`:''}
@@ -5892,6 +5910,386 @@ function setStation(key, val) {
   if(typeof buildCoverageTimeline==="function")buildCoverageTimeline();
   buildStaffGrid();
   buildCoverageUI();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  MANAGER TIME BLOCKS (multi-station scheduling for managers)
+// ═══════════════════════════════════════════════════════════════════════
+// Lets ARM/BRM/ABRM/MT bounce between stations through their shift, e.g.
+//   Maddy: Emerald 8a–11a → Counter 11a–lunch → Returns 1p–close
+// Each block is {from, to, station} where station matches MGMT_STATIONS or
+// 'Exit Booth' (so a manager can be credited toward exit coverage).
+// Stored in STATE.mgmtBlocks[pid] = [...]. When non-empty, the timeline
+// renders these blocks INSTEAD of the single staffStation.
+
+// Add a new time block for a manager. Validates from < to and clips overlap
+// with existing blocks (later block trims earlier ones at the boundary,
+// matching how managers usually re-assign in real time).
+function addMgmtBlock(pid, from, to, station) {
+  if (typeof from !== 'number' || typeof to !== 'number' || from >= to) {
+    return { ok:false, error:'Invalid time range' };
+  }
+  if (!station) return { ok:false, error:'Station required' };
+  if (!STATE.mgmtBlocks) STATE.mgmtBlocks = {};
+  if (!STATE.mgmtBlocks[pid]) STATE.mgmtBlocks[pid] = [];
+  // Clip overlapping blocks: when a new block overlaps an existing one,
+  // shorten the existing block to end at new.from (or split it). This
+  // matches how a manager pivoting stations mid-shift naturally truncates
+  // their previous assignment.
+  const next = [];
+  STATE.mgmtBlocks[pid].forEach(b => {
+    // No overlap — keep as-is
+    if (b.to <= from || b.from >= to) { next.push(b); return; }
+    // Existing block fully consumed by new one — drop it
+    if (b.from >= from && b.to <= to) return;
+    // New block in middle — split existing into two pieces
+    if (b.from < from && b.to > to) {
+      next.push({...b, to: from});
+      next.push({...b, from: to});
+      return;
+    }
+    // Existing block trims at start
+    if (b.from < from && b.to > from && b.to <= to) {
+      next.push({...b, to: from});
+      return;
+    }
+    // Existing block trims at end
+    if (b.from >= from && b.from < to && b.to > to) {
+      next.push({...b, from: to});
+      return;
+    }
+  });
+  next.push({ from, to, station });
+  next.sort((a,b)=>a.from - b.from);
+  STATE.mgmtBlocks[pid] = next;
+  saveState();
+  return { ok:true };
+}
+
+// Remove block at index `idx` from manager's block list.
+function removeMgmtBlock(pid, idx) {
+  if (!STATE.mgmtBlocks || !STATE.mgmtBlocks[pid]) return;
+  STATE.mgmtBlocks[pid].splice(idx, 1);
+  if (!STATE.mgmtBlocks[pid].length) delete STATE.mgmtBlocks[pid];
+  saveState();
+  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+  if(typeof openPersonPanel==='function') openPersonPanel(pid);
+}
+
+// Modal-based block editor. Triggered by "+ Add Block" button on manager
+// person panel. Pre-fills from/to with current shift bounds and Counter
+// Manager as default station.
+function addMgmtBlockPrompt(pid) {
+  const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const entry = exp[pid]; if (!entry) return;
+  const p = entry.person;
+  const mods = STATE.shiftMod||{}, ov = mods[pid]||{};
+  const ss = ov.start!=null ? ov.start : p.shiftStart;
+  const se = ov.end!=null   ? ov.end   : p.shiftEnd;
+  // Format hour as "8.5" → "8:30" for input value
+  const hToInput = (h) => {
+    if (h==null) return '';
+    const hh = Math.floor(h);
+    const mm = Math.round((h - hh) * 60);
+    return `${hh}:${String(mm).padStart(2,'0')}`;
+  };
+  const stations = ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling'];
+  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌'};
+
+  const html = `
+    <div style="display:grid;gap:10px">
+      <div style="font-size:11px;color:var(--txt3)">
+        Add a station block for <b>${p.nick||p.name}</b>'s shift.
+        Times in 24-hour format (e.g. 8.5 = 8:30am, 14 = 2pm, 22 = 10pm).
+        Overlapping existing blocks will be auto-trimmed.
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <label style="font-size:11px;color:var(--txt2)">From
+          <input type="number" id="mgb-from" step="0.5" min="0" max="26" value="${ss!=null?ss:8}"
+            style="width:100%;padding:6px 8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);margin-top:4px"/>
+        </label>
+        <label style="font-size:11px;color:var(--txt2)">To
+          <input type="number" id="mgb-to" step="0.5" min="0" max="26" value="${se!=null?se:16}"
+            style="width:100%;padding:6px 8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);margin-top:4px"/>
+        </label>
+      </div>
+      <label style="font-size:11px;color:var(--txt2)">Station
+        <select id="mgb-station"
+          style="width:100%;padding:7px 8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);margin-top:4px">
+          ${stations.map(s=>`<option value="${s}">${stIcons[s]||''} ${s}</option>`).join('')}
+        </select>
+      </label>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">
+        <button onclick="closeModal()"
+          style="padding:7px 14px;border-radius:5px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:11px;cursor:pointer">
+          Cancel
+        </button>
+        <button onclick="submitMgmtBlock('${pid}')"
+          style="padding:7px 14px;border-radius:5px;border:1px solid var(--green);background:rgba(22,163,74,.12);color:var(--green);font-size:11px;font-weight:700;cursor:pointer">
+          Add Block
+        </button>
+      </div>
+    </div>`;
+  if (typeof openModal === 'function') openModal('+ Add Time Block', html);
+}
+
+// Submit handler for the addMgmtBlockPrompt modal.
+function submitMgmtBlock(pid) {
+  const fromEl = document.getElementById('mgb-from');
+  const toEl   = document.getElementById('mgb-to');
+  const stEl   = document.getElementById('mgb-station');
+  if (!fromEl || !toEl || !stEl) return;
+  const from = parseFloat(fromEl.value);
+  const to   = parseFloat(toEl.value);
+  const st   = stEl.value;
+  if (isNaN(from) || isNaN(to) || from >= to) {
+    if (typeof toast === 'function') toast('From must be before To');
+    return;
+  }
+  const r = addMgmtBlock(pid, from, to, st);
+  if (!r.ok) {
+    if (typeof toast === 'function') toast(r.error || 'Could not add block');
+    return;
+  }
+  if (typeof closeModal === 'function') closeModal();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof openPersonPanel === 'function') openPersonPanel(pid);
+  if (typeof toast === 'function') toast(`Added: ${st}`);
+}
+
+// ───────────────────────────────────────────────────────────────────────
+//  Manager block — TAP TO EDIT + DRAG TO RESIZE
+// ───────────────────────────────────────────────────────────────────────
+// Touch-friendly editing of manager time blocks directly on the timeline.
+//   - Tap a block → opens edit modal pre-filled with current values
+//   - Drag left edge → resize from
+//   - Drag right edge → resize to
+//   - Drag middle → move whole block
+// Drag snaps to 30-min grid (W/2 pixels). Uses pointer events so it works
+// on both touch (iOS/Android) and mouse (desktop). On touch devices, the
+// browser's tap-vs-drag detection is automatic — small movements stay as
+// taps; movements > 6px count as drags.
+//
+// The `_mgmtDragState` object lives on window so subsequent timeline
+// re-renders during drag don't lose the drag in progress.
+
+window._mgmtDragState = null;
+
+function setupMgmtBlockHandlers() {
+  const tlEl = document.getElementById('coverage-timeline');
+  if (!tlEl || tlEl._mgmtHandlersAttached) return;
+  tlEl._mgmtHandlersAttached = true; // attach once per element
+
+  const HOUR_W = 26; // matches W in buildCoverageTimeline
+  const H_START_PX = 5; // matches H_START
+  const SNAP = 0.5; // 30-min grid
+
+  // Convert pixel offset within bar container to hour value, snapped.
+  // The bar container starts at 72px (LABEL_W) from the left of the row.
+  const pxToHour = (px) => {
+    const h = H_START_PX + px / HOUR_W;
+    return Math.round(h / SNAP) * SNAP;
+  };
+
+  // Find the bar container for a manager block element so we can compute
+  // pointer position relative to it (block is absolute-positioned inside).
+  const getBarContainer = (blockEl) => blockEl.parentElement;
+
+  tlEl.addEventListener('pointerdown', (e) => {
+    const blockEl = e.target.closest('.mgmt-block-draggable');
+    if (!blockEl) return;
+    const pid  = blockEl.getAttribute('data-mgmt-pid');
+    const bidx = parseInt(blockEl.getAttribute('data-mgmt-bidx'), 10);
+    if (!pid || isNaN(bidx)) return;
+    const block = (STATE.mgmtBlocks||{})[pid] && STATE.mgmtBlocks[pid][bidx];
+    if (!block) return;
+
+    const container = getBarContainer(blockEl);
+    if (!container) return;
+    const containerRect = container.getBoundingClientRect();
+    const blockRect = blockEl.getBoundingClientRect();
+
+    // Determine drag mode based on where the pointer landed:
+    //  - Within EDGE_PX of left edge → resize 'from'
+    //  - Within EDGE_PX of right edge → resize 'to'
+    //  - Otherwise → move whole block (only if block is wide enough to
+    //    have a meaningful middle; for narrow blocks, default to tap-edit)
+    const EDGE_PX = 12; // generous touch target
+    const offsetInBlock = e.clientX - blockRect.left;
+    let mode = null;
+    if (offsetInBlock < EDGE_PX && blockRect.width > EDGE_PX * 2) mode = 'resize-from';
+    else if (offsetInBlock > blockRect.width - EDGE_PX && blockRect.width > EDGE_PX * 2) mode = 'resize-to';
+    else mode = 'move';
+
+    window._mgmtDragState = {
+      pid, bidx, mode,
+      origFrom: block.from, origTo: block.to, station: block.station,
+      startX: e.clientX,
+      containerLeft: containerRect.left,
+      blockEl,
+      moved: false,
+    };
+
+    // Capture pointer so move/up events fire even if pointer leaves the bar
+    try { blockEl.setPointerCapture(e.pointerId); } catch(err) {}
+  });
+
+  tlEl.addEventListener('pointermove', (e) => {
+    const st = window._mgmtDragState;
+    if (!st) return;
+    const dx = e.clientX - st.startX;
+    if (Math.abs(dx) < 6 && !st.moved) return; // ignore micro-movements (allow tap)
+    st.moved = true;
+    e.preventDefault();
+    // Compute new from/to in HOUR units, snapped.
+    const dHours = Math.round((dx / HOUR_W) / SNAP) * SNAP;
+    let newFrom = st.origFrom, newTo = st.origTo;
+    if (st.mode === 'resize-from') newFrom = Math.min(st.origTo - SNAP, st.origFrom + dHours);
+    else if (st.mode === 'resize-to') newTo = Math.max(st.origFrom + SNAP, st.origTo + dHours);
+    else if (st.mode === 'move') { newFrom = st.origFrom + dHours; newTo = st.origTo + dHours; }
+    // Clamp to reasonable hour range (5–26 = 5am to 2am)
+    newFrom = Math.max(5, Math.min(25.5, newFrom));
+    newTo   = Math.max(5.5, Math.min(26, newTo));
+    // Update visual immediately (don't commit to STATE yet)
+    const newLeftPx = (newFrom - H_START_PX) * HOUR_W;
+    const newWidthPx = Math.max(2, (newTo - newFrom) * HOUR_W - 2);
+    st.blockEl.style.left = newLeftPx + 'px';
+    st.blockEl.style.width = newWidthPx + 'px';
+    st.previewFrom = newFrom;
+    st.previewTo   = newTo;
+  });
+
+  tlEl.addEventListener('pointerup', (e) => {
+    const st = window._mgmtDragState;
+    if (!st) return;
+    window._mgmtDragState = null;
+    try { st.blockEl.releasePointerCapture(e.pointerId); } catch(err) {}
+
+    if (!st.moved) {
+      // Pure tap (no drag) → open edit modal for this block
+      e.preventDefault();
+      e.stopPropagation();
+      openEditMgmtBlockModal(st.pid, st.bidx);
+      return;
+    }
+    // Drag completed — commit new from/to via direct STATE edit
+    // (addMgmtBlock would auto-trim adjacent blocks, which is wrong here:
+    // the user just resized one block, they didn't add a new overlapping
+    // one. So we edit in place.)
+    const blocks = STATE.mgmtBlocks && STATE.mgmtBlocks[st.pid];
+    if (!blocks || !blocks[st.bidx]) return;
+    const newFrom = st.previewFrom != null ? st.previewFrom : st.origFrom;
+    const newTo   = st.previewTo   != null ? st.previewTo   : st.origTo;
+    if (newFrom >= newTo) {
+      if (typeof toast === 'function') toast('Block must end after it starts');
+      // Restore original visual
+      st.blockEl.style.left = ((st.origFrom - H_START_PX) * HOUR_W) + 'px';
+      st.blockEl.style.width = Math.max(2, (st.origTo - st.origFrom) * HOUR_W - 2) + 'px';
+      return;
+    }
+    blocks[st.bidx].from = newFrom;
+    blocks[st.bidx].to   = newTo;
+    saveState();
+    if (typeof saveCoverageSnapshot === 'function') saveCoverageSnapshot();
+    if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+    if (typeof toast === 'function') toast(`Block: ${blocks[st.bidx].station}`);
+  });
+
+  // If pointer is cancelled (e.g. user scrolls instead of dragging), revert
+  tlEl.addEventListener('pointercancel', () => {
+    const st = window._mgmtDragState;
+    if (!st) return;
+    window._mgmtDragState = null;
+    if (st.moved && st.blockEl) {
+      st.blockEl.style.left  = ((st.origFrom - 5) * 26) + 'px';
+      st.blockEl.style.width = Math.max(2, (st.origTo - st.origFrom) * 26 - 2) + 'px';
+    }
+  });
+}
+
+// Edit modal for an existing manager block. Opened by tap-to-edit.
+// Lets manager change station, adjust times, or delete the block.
+function openEditMgmtBlockModal(pid, bidx) {
+  const blocks = (STATE.mgmtBlocks||{})[pid];
+  if (!blocks || !blocks[bidx]) return;
+  const block = blocks[bidx];
+  const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const entry = exp[pid];
+  const nick = entry?.person?.nick || entry?.person?.name?.split(' ')[0] || pid;
+  const stations = ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling'];
+  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌'};
+
+  const html = `
+    <div style="display:grid;gap:10px">
+      <div style="font-size:11px;color:var(--txt3)">
+        Edit ${nick}'s time block. Use 24-hour times (e.g. 8.5 = 8:30am, 14 = 2pm).
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <label style="font-size:11px;color:var(--txt2)">From
+          <input type="number" id="emb-from" step="0.5" min="0" max="26" value="${block.from}"
+            style="width:100%;padding:6px 8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);margin-top:4px"/>
+        </label>
+        <label style="font-size:11px;color:var(--txt2)">To
+          <input type="number" id="emb-to" step="0.5" min="0" max="26" value="${block.to}"
+            style="width:100%;padding:6px 8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);margin-top:4px"/>
+        </label>
+      </div>
+      <label style="font-size:11px;color:var(--txt2)">Station
+        <select id="emb-station"
+          style="width:100%;padding:7px 8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);margin-top:4px">
+          ${stations.map(s=>`<option value="${s}"${s===block.station?' selected':''}>${stIcons[s]||''} ${s}</option>`).join('')}
+        </select>
+      </label>
+      <div style="display:flex;gap:6px;justify-content:space-between;margin-top:6px">
+        <button onclick="deleteMgmtBlockFromModal('${pid}',${bidx})"
+          style="padding:7px 14px;border-radius:5px;border:1px solid var(--red);background:rgba(220,38,38,.1);color:var(--red);font-size:11px;font-weight:700;cursor:pointer">
+          🗑 Delete
+        </button>
+        <div style="display:flex;gap:6px">
+          <button onclick="closeModal()"
+            style="padding:7px 14px;border-radius:5px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:11px;cursor:pointer">
+            Cancel
+          </button>
+          <button onclick="saveEditMgmtBlock('${pid}',${bidx})"
+            style="padding:7px 14px;border-radius:5px;border:1px solid var(--green);background:rgba(22,163,74,.12);color:var(--green);font-size:11px;font-weight:700;cursor:pointer">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>`;
+  if (typeof openModal === 'function') openModal(`✏ Edit Block — ${nick}`, html);
+}
+
+function saveEditMgmtBlock(pid, bidx) {
+  const fromEl = document.getElementById('emb-from');
+  const toEl   = document.getElementById('emb-to');
+  const stEl   = document.getElementById('emb-station');
+  if (!fromEl || !toEl || !stEl) return;
+  const from = parseFloat(fromEl.value);
+  const to   = parseFloat(toEl.value);
+  const st   = stEl.value;
+  if (isNaN(from) || isNaN(to) || from >= to) {
+    if (typeof toast === 'function') toast('From must be before To');
+    return;
+  }
+  const blocks = STATE.mgmtBlocks && STATE.mgmtBlocks[pid];
+  if (!blocks || !blocks[bidx]) return;
+  blocks[bidx].from = from;
+  blocks[bidx].to = to;
+  blocks[bidx].station = st;
+  // Re-sort
+  STATE.mgmtBlocks[pid] = blocks.slice().sort((a,b)=>a.from-b.from);
+  saveState();
+  if (typeof saveCoverageSnapshot === 'function') saveCoverageSnapshot();
+  if (typeof closeModal === 'function') closeModal();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof toast === 'function') toast(`Updated: ${st}`);
+}
+
+function deleteMgmtBlockFromModal(pid, bidx) {
+  removeMgmtBlock(pid, bidx);
+  if (typeof closeModal === 'function') closeModal();
+  if (typeof toast === 'function') toast('Block removed');
 }
 
 function toggleDuty(key) {
@@ -9373,11 +9771,11 @@ function buildCoverageTimeline() {
       if(hoursUntil>2||hoursUntil<-0.5)return;
     }
 
-    htm+=`<div style="display:flex;align-items:center;margin-bottom:2px;cursor:pointer"
-      onclick="openPersonPanel('${pid}')">`;
-    const mgmtSt=isMgmt?(STATE.staffStation||{})[pid]||'':'' ;
-    const mgmtBadge=isMgmt&&mgmtSt?`<span style="font-size:7px;color:#a5b4fc;display:block;line-height:1;margin-top:1px">${mgmtSt.replace(' Booth','').replace(' Manager','')}</span>`:'';
-    // Section headers between role groups
+    // Section headers must be rendered BEFORE the person row opens,
+    // not inside it. When nested inside the person flex row, the
+    // header took up flex space and pushed the first person's name
+    // (Matt, Kerv, Carlos) to the right of where it should sit —
+    // out of alignment with subsequent rows.
     const roleGroup = p.role==='EXIT'?'exit' :
                      p.role==='RETURNS'?'returns' :
                      ['ARM','BRM','ABRM','MT'].includes(p.role)?'mgmt':'cxr';
@@ -9388,6 +9786,11 @@ function buildCoverageTimeline() {
       const ghBdr   = {cxr:'rgba(37,99,235,.3)',exit:'rgba(22,163,74,.3)',returns:'rgba(6,182,212,.3)',mgmt:'rgba(99,102,241,.3)'};
       htm+=`<div style="display:flex;margin:${roleGroup==='cxr'?0:8}px 0 3px"><div style="width:${LABEL_W}px;flex-shrink:0"></div><div style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${ghColor[roleGroup]};border-bottom:1px solid ${ghBdr[roleGroup]};padding-bottom:2px;flex:1">— ${ghLabel[roleGroup]} —</div></div>`;
     }
+
+    htm+=`<div style="display:flex;align-items:center;margin-bottom:2px;cursor:pointer"
+      onclick="openPersonPanel('${pid}')">`;
+    const mgmtSt=isMgmt?(STATE.staffStation||{})[pid]||'':'' ;
+    const mgmtBadge=isMgmt&&mgmtSt?`<span style="font-size:7px;color:#a5b4fc;display:block;line-height:1;margin-top:1px">${mgmtSt.replace(' Booth','').replace(' Manager','')}</span>`:'';
     if(isMgmt&&!_mgmtHeaderShown){
       _mgmtHeaderShown=true;
     }
@@ -9432,11 +9835,50 @@ function buildCoverageTimeline() {
         if(rot.b2)addSeg(rot.lunch?rot.lunch.to:rot.b2.from,rot.b2.to,rot.b2.station==='exit'?'exit':'counter');
         if(rot.b3)addSeg(rot.b3.from,rot.b3.to,rot.b3.station==='exit'?'exit':'counter');
       } else {
-        // No rotation — use station
-        const st2=(STATE.staffStation||{})[pid];
-        const z2=p.role==='EXIT'||st2==='Exit Booth'?'exit':
-          (['ARM','BRM','ABRM','MT'].includes(p.role)?'mgmt':'counter');
-        addSeg(ss2,se2,z2);
+        // No rotation — use station-based fallback.
+        // RETURNS role agents are intentionally skipped from buildSmartRotation
+        // (they don't rotate — they stay at Returns all shift), so they always
+        // hit this branch. Must explicitly assign 'returns' zone here, or they
+        // fall through to 'counter' default and render as blue "Ctr" bars
+        // even though they're under the RETURNS section header.
+        // MANAGER MULTI-STATION BLOCKS: if STATE.mgmtBlocks[pid] is populated
+        // for a manager (ARM/BRM/ABRM/MT), each block renders as its own
+        // station-colored segment. Otherwise falls through to single-station.
+        const mblocks = isMgmt ? ((STATE.mgmtBlocks||{})[pid]||[]) : [];
+        if (mblocks.length) {
+          // Sort blocks chronologically and render each as its own colored segment.
+          // Stations map to existing zones for color/label consistency.
+          const stationToZone = (st) => {
+            if (st === 'Exit Booth') return 'exit';
+            if (st === 'Counter Manager' || st === 'Counter') return 'counter';
+            if (st === 'Returns' || st === 'Returns Manager') return 'returns';
+            if (st === 'Emerald Booth' || st === 'Emerald Booth Manager') return 'emerald';
+            if (st === 'Shuttling') return 'shuttling';
+            return 'mgmt'; // Floater, At 99, Outfield, etc. → generic mgmt purple
+          };
+          // Sort but track ORIGINAL array index so drag/edit handlers can find
+          // the block in STATE.mgmtBlocks[pid] without disturbing the order.
+          const sortedWithIdx = mblocks.map((b,i)=>({b,i})).sort((a,b)=>a.b.from-b.b.from);
+          sortedWithIdx.forEach(({b, i: bidx}) => {
+            const fromClamped = Math.max(b.from, ss2);
+            const toClamped   = Math.min(b.to,   se2);
+            if (fromClamped < toClamped) {
+              const seg = {x:Math.max(0,(fromClamped-H_S)*W), w:0, zone:stationToZone(b.station)};
+              seg.w = Math.max(0,Math.min((H_E-H_S)*W,(toClamped-H_S)*W)-seg.x);
+              if (seg.w >= 1) {
+                seg.mgmtPid = pid;
+                seg.mgmtBidx = bidx; // index in original mgmtBlocks[pid] array
+                segments.push(seg);
+              }
+            }
+          });
+        } else {
+          const st2=(STATE.staffStation||{})[pid];
+          const z2=p.role==='RETURNS' ? 'returns' :
+            (p.role==='EXIT'||st2==='Exit Booth') ? 'exit' :
+            (['ARM','BRM','ABRM','MT'].includes(p.role) ? 'mgmt' : 'counter');
+          addSeg(ss2,se2,z2);
+        }
       }
       // Special blocks overlay (on top of rotation)
       specs.forEach(b=>{if(b.from<b.to)addSeg(b.from,b.to,b.key);});
@@ -9460,13 +9902,21 @@ function buildCoverageTimeline() {
                  s.zone==='training'?'📚':'';
       const isNow=nowH>=s.x/W+H_S&&nowH<(s.x+s.w)/W+H_S;
       const wHrs=s.w/W;
-      htm+=`<div style="position:absolute;left:${s.x}px;top:2px;
+      // Manager blocks get data attributes for drag/edit handlers (set up
+      // by setupMgmtBlockHandlers below). Plus a faint dashed border on
+      // the block edges as a visual hint that the block is draggable.
+      const isMgmtBlock = s.mgmtPid != null;
+      const mgmtAttrs = isMgmtBlock
+        ? ` data-mgmt-pid="${s.mgmtPid}" data-mgmt-bidx="${s.mgmtBidx}" class="mgmt-block-draggable"`
+        : '';
+      const dragHint = isMgmtBlock && wHrs > 0.6 ? ';cursor:ew-resize' : '';
+      htm+=`<div${mgmtAttrs} style="position:absolute;left:${s.x}px;top:2px;
         width:${s.w-2}px;height:18px;
         background:${col};border-radius:4px;
         display:flex;align-items:center;justify-content:center;
         font-size:${wHrs>1?'9':'7'}px;font-weight:700;color:#fff;opacity:.92;
-        ${isNow?'box-shadow:0 0 0 2px white,0 0 8px rgba(255,255,255,.3);':''}"
-        title="${nick}: ${s.zone} ${hLbl(s.x/W+H_S)}–${hLbl((s.x+s.w)/W+H_S)}">
+        ${isNow?'box-shadow:0 0 0 2px white,0 0 8px rgba(255,255,255,.3);':''}${dragHint}"
+        title="${nick}: ${s.zone} ${hLbl(s.x/W+H_S)}–${hLbl((s.x+s.w)/W+H_S)}${isMgmtBlock?' · tap to edit':''}">
         ${wHrs>0.4?lbl:''}
       </div>`;
     });
@@ -9478,17 +9928,246 @@ function buildCoverageTimeline() {
   });
   htm+=`</div>`;
   tlEl.innerHTML=htm;
+  // Wire up tap-to-edit + drag-to-resize for manager blocks. Called every
+  // render so freshly-added blocks get handlers automatically.
+  if (typeof setupMgmtBlockHandlers === 'function') setupMgmtBlockHandlers();
 }
 
+// ───────────────────────────────────────────────────────────────────────
+//  Schedule Map — Printable
+// ───────────────────────────────────────────────────────────────────────
+// Opens a new window with a print-formatted view of today's schedule.
+// Each person gets a row with their name, hour-scaled timeline, station
+// blocks, and lunch markers. Designed for letter landscape print.
+// Matches the live timeline's data sources (rotations, mgmtBlocks,
+// staffStation, specialBlocks) so what you see is what you print.
+function printScheduleMap() {
+  const exp = typeof buildExpectedToday === 'function' ? buildExpectedToday() : {};
+  if (!Object.keys(exp).length) {
+    if (typeof toast === 'function') toast('No schedule loaded');
+    return;
+  }
+  const today = new Date();
+  const dateLabel = today.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+
+  // Match live timeline ranges
+  const H_S = 5, H_E = 26; // 5am to 2am
+  const HOURS = Array.from({length: H_E - H_S}, (_, i) => H_S + i);
+  const HOUR_PX = 38; // bigger than screen W=26 so print is legible
+  const NAME_PX = 110;
+  const ROW_H = 22;
+
+  const hLbl = (h) => {
+    const hh = h % 24;
+    const d = hh > 12 ? hh - 12 : hh === 0 ? 12 : hh;
+    return d + (hh >= 12 ? 'p' : 'a');
+  };
+  const fmtH = (h) => {
+    if (h == null) return '—';
+    const hh = Math.floor(h), mn = Math.round((h - hh) * 60);
+    const d = hh > 12 ? hh - 12 : hh === 0 ? 12 : hh;
+    return d + (mn ? ':' + String(mn).padStart(2,'0') : '') + (hh >= 12 ? 'p' : 'a');
+  };
+
+  // Group people by role for sections
+  const sections = [
+    {label: 'CXR / COUNTER', filter: e => e.person.role === 'CXR'},
+    {label: 'EXIT AGENTS', filter: e => e.person.role === 'EXIT'},
+    {label: 'RETURNS',      filter: e => e.person.role === 'RETURNS'},
+    {label: 'MANAGEMENT',   filter: e => ['ARM','BRM','ABRM','MT'].includes(e.person.role)},
+  ];
+
+  // Station → print colors. Print-friendly (slightly muted vs screen so
+  // they stay readable on B&W printers as gray gradients).
+  const zoneStyle = {
+    counter:  { bg: '#3b82f6', label: 'Ctr'  },
+    exit:     { bg: '#16a34a', label: 'Exit' },
+    returns:  { bg: '#06b6d4', label: 'Ret'  },
+    emerald:  { bg: '#6366f1', label: 'EB'   },
+    mgmt:     { bg: '#7c3aed', label: ''     },
+    shuttling:{ bg: '#f59e0b', label: 'Shuttle' },
+    lunch:    { bg: '#fbbf24', label: '🍽'   },
+    break:    { bg: '#9ca3af', label: '☕'    },
+    training: { bg: '#a78bfa', label: '📚'   },
+  };
+
+  const stationToZone = (st) => {
+    if (st === 'Exit Booth') return 'exit';
+    if (st === 'Counter Manager' || st === 'Counter') return 'counter';
+    if (st === 'Returns' || st === 'Returns Manager') return 'returns';
+    if (st === 'Emerald Booth' || st === 'Emerald Booth Manager') return 'emerald';
+    if (st === 'Shuttling') return 'shuttling';
+    return 'mgmt';
+  };
+
+  // Build segment list for a person, mirroring the live timeline logic
+  const segmentsFor = (pid, e) => {
+    const p = e.person;
+    const isMgmt = ['ARM','BRM','ABRM','MT'].includes(p.role);
+    const ov = (STATE.shiftMod||{})[pid] || {};
+    const ss = ov.start != null ? ov.start : p.shiftStart;
+    const se = ov.end != null ? ov.end : p.shiftEnd;
+    if (ss == null || se == null) return [];
+    const segs = [];
+
+    const rot = window._lastRotations && window._lastRotations[pid];
+    const mblocks = isMgmt ? ((STATE.mgmtBlocks||{})[pid] || []) : [];
+
+    if (rot) {
+      // CXR with rotation blocks
+      if (rot.b1) segs.push({from:rot.b1.from, to:(rot.lunch?rot.lunch.from:rot.b1.to), zone:rot.b1.station==='exit'?'exit':'counter'});
+      if (rot.lunch) segs.push({from:rot.lunch.from, to:rot.lunch.to, zone:'lunch'});
+      if (rot.b2) segs.push({from:(rot.lunch?rot.lunch.to:rot.b2.from), to:rot.b2.to, zone:rot.b2.station==='exit'?'exit':'counter'});
+      if (rot.b3) segs.push({from:rot.b3.from, to:rot.b3.to, zone:rot.b3.station==='exit'?'exit':'counter'});
+    } else if (mblocks.length) {
+      // Manager with multi-station blocks
+      mblocks.slice().sort((a,b)=>a.from-b.from).forEach(b => {
+        const f = Math.max(b.from, ss);
+        const t = Math.min(b.to, se);
+        if (f < t) segs.push({from: f, to: t, zone: stationToZone(b.station)});
+      });
+    } else {
+      // Single-station fallback
+      const st2 = (STATE.staffStation||{})[pid];
+      const z = p.role === 'RETURNS' ? 'returns' :
+                (p.role === 'EXIT' || st2 === 'Exit Booth') ? 'exit' :
+                isMgmt ? 'mgmt' : 'counter';
+      segs.push({from: ss, to: se, zone: z});
+    }
+    // Special blocks overlay
+    const specs = (STATE.specialBlocks||{})[pid] || [];
+    specs.forEach(b => { if (b.from < b.to) segs.push({from:b.from, to:b.to, zone:b.key}); });
+    return segs;
+  };
+
+  // ── Build HTML rows ─────────────────────────────────────────────────────
+  let rowsHtml = '';
+  sections.forEach(sec => {
+    const peeps = Object.entries(exp).filter(([,e]) => sec.filter(e));
+    if (!peeps.length) return;
+    rowsHtml += `<tr><td colspan="2" class="section-header">— ${sec.label} —</td></tr>`;
+    peeps.sort((a,b) => (a[1].person.shiftStart||0) - (b[1].person.shiftStart||0));
+    peeps.forEach(([pid, e]) => {
+      const p = e.person;
+      const nick = p.nick || p.name.split(' ')[0];
+      const ov = (STATE.shiftMod||{})[pid] || {};
+      const ss = ov.start != null ? ov.start : p.shiftStart;
+      const se = ov.end != null ? ov.end : p.shiftEnd;
+      const isCallout = (STATE.todayOverrides||{})[pid] === 'callout';
+      if (ss == null || se == null) return;
+
+      const segs = segmentsFor(pid, e);
+      const totalW = HOURS.length * HOUR_PX;
+      let barHtml = `<div class="bar-track" style="width:${totalW}px">`;
+      // Hour grid lines as background
+      for (let h = 0; h < HOURS.length; h++) {
+        barHtml += `<div class="hour-line" style="left:${h * HOUR_PX}px"></div>`;
+      }
+      // Segments
+      segs.forEach(s => {
+        const left = (s.from - H_S) * HOUR_PX;
+        const width = (s.to - s.from) * HOUR_PX - 1;
+        if (width < 1) return;
+        const sty = zoneStyle[s.zone] || {bg:'#999', label:''};
+        const wHrs = s.to - s.from;
+        const lbl = wHrs > 0.45 ? sty.label : '';
+        const sublbl = wHrs > 1.2 ? `<div class="sublbl">${fmtH(s.from)}–${fmtH(s.to)}</div>` : '';
+        barHtml += `<div class="seg" style="left:${left}px;width:${width}px;background:${sty.bg}">
+          <div class="lbl">${lbl}</div>${sublbl}
+        </div>`;
+      });
+      barHtml += `</div>`;
+
+      const nameHtml = `<div class="name${isCallout?' callout':''}">${nick}<div class="shift-time">${fmtH(ss)}–${fmtH(se)}</div></div>`;
+      rowsHtml += `<tr><td class="name-col">${nameHtml}</td><td class="bar-col">${barHtml}</td></tr>`;
+    });
+  });
+
+  // ── Hour scale header ───────────────────────────────────────────────────
+  let hoursHtml = `<div class="hour-scale" style="width:${HOURS.length * HOUR_PX}px">`;
+  HOURS.forEach((h, i) => {
+    hoursHtml += `<div class="hour-tick" style="left:${i * HOUR_PX}px;width:${HOUR_PX}px">${hLbl(h)}</div>`;
+  });
+  hoursHtml += `</div>`;
+
+  // ── Legend ──────────────────────────────────────────────────────────────
+  const legend = [
+    ['exit','Exit'],['counter','Counter'],['returns','Returns'],
+    ['emerald','Emerald Booth'],['mgmt','Mgmt'],['lunch','Lunch']
+  ];
+  let legendHtml = '<div class="legend">';
+  legend.forEach(([z,lbl]) => {
+    legendHtml += `<span class="leg-item"><span class="leg-dot" style="background:${zoneStyle[z].bg}"></span>${lbl}</span>`;
+  });
+  legendHtml += '</div>';
+
+  // ── Open window ─────────────────────────────────────────────────────────
+  const win = window.open('', '_blank', 'width=1200,height=800');
+  if (!win) { if (typeof toast === 'function') toast('Allow popups to print'); return; }
+  win.document.write(`<!DOCTYPE html><html><head>
+    <title>CMH Schedule Map — ${dateLabel}</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: -apple-system, BlinkMacSystemFont, Arial, sans-serif; padding: 14px; font-size: 11px; color: #111; }
+      .header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 10px; padding-bottom:8px; border-bottom:2px solid #111; }
+      .title { font-size: 16px; font-weight: 800; }
+      .subtitle { font-size: 10px; color: #555; margin-top: 2px; }
+      .legend { display:flex; gap: 12px; font-size: 9px; color: #444; }
+      .leg-item { display:inline-flex; align-items:center; gap: 4px; }
+      .leg-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+      table { border-collapse: collapse; width: 100%; table-layout: fixed; }
+      td { padding: 0; vertical-align: middle; }
+      .name-col { width: ${NAME_PX}px; padding-right: 6px; text-align: right; vertical-align: middle; }
+      .name { font-size: 11px; font-weight: 700; line-height: 1.1; }
+      .name.callout { text-decoration: line-through; color: #999; }
+      .name .shift-time { font-size: 8px; color: #888; font-weight: 400; margin-top: 1px; }
+      .section-header { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555; padding: 8px 0 3px; border-bottom: 1px solid #ccc; }
+
+      .hour-scale { position: relative; height: 16px; margin-left: ${NAME_PX + 4}px; margin-bottom: 4px; }
+      .hour-tick { position: absolute; top: 0; font-size: 8px; color: #555; text-align: left; padding-left: 1px; border-left: 1px solid #ddd; height: 16px; }
+
+      .bar-col { padding: 2px 0; }
+      .bar-track { position: relative; height: ${ROW_H}px; background: #f6f6f6; border-radius: 3px; }
+      .hour-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #e5e7eb; }
+      .seg { position: absolute; top: 1px; height: ${ROW_H - 2}px; border-radius: 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 10px; overflow: hidden; }
+      .seg .lbl { line-height: 1.1; }
+      .seg .sublbl { font-size: 7px; opacity: 0.85; line-height: 1; margin-top: 1px; font-weight: 500; }
+
+      @media print {
+        @page { margin: 0.4in; size: letter landscape; }
+        body { padding: 0; }
+        .no-print { display: none; }
+      }
+    </style>
+  </head><body>
+    <div class="header">
+      <div>
+        <div class="title">🚗 CMH Daily Driver — Schedule Map</div>
+        <div class="subtitle">${dateLabel}</div>
+      </div>
+      ${legendHtml}
+    </div>
+    ${hoursHtml}
+    <table>${rowsHtml}</table>
+    <div class="no-print" style="margin-top:14px;text-align:center">
+      <button onclick="window.print()" style="padding:8px 18px;font-size:12px;cursor:pointer">🖨 Print</button>
+      <button onclick="window.close()" style="padding:8px 18px;font-size:12px;margin-left:8px;cursor:pointer">Close</button>
+    </div>
+  </body></html>`);
+  win.document.close();
+}
+
+
 function saveCoverageSnapshot() {
-  _coverageHistory.push(JSON.stringify({staffStation:STATE.staffStation,altSchedule:STATE.altSchedule,shiftMod:STATE.shiftMod,customSplits:STATE.customSplits,specialBlocks:STATE.specialBlocks}));
+  _coverageHistory.push(JSON.stringify({staffStation:STATE.staffStation,altSchedule:STATE.altSchedule,shiftMod:STATE.shiftMod,customSplits:STATE.customSplits,specialBlocks:STATE.specialBlocks,mgmtBlocks:STATE.mgmtBlocks}));
   if(_coverageHistory.length>20)_coverageHistory.shift();
   _coverageRedoStack=[];
 }
 var _coverageHistory=[], _coverageRedoStack=[];
 function undoCoverage() {
   if(!_coverageHistory.length){toast('Nothing to undo');return;}
-  const redoSnap=JSON.stringify({staffStation:STATE.staffStation,altSchedule:STATE.altSchedule,shiftMod:STATE.shiftMod,customSplits:STATE.customSplits,specialBlocks:STATE.specialBlocks});
+  const redoSnap=JSON.stringify({staffStation:STATE.staffStation,altSchedule:STATE.altSchedule,shiftMod:STATE.shiftMod,customSplits:STATE.customSplits,specialBlocks:STATE.specialBlocks,mgmtBlocks:STATE.mgmtBlocks});
   _coverageRedoStack.push(redoSnap);
   const undoSnap=_coverageHistory.pop();
   if(!undoSnap){toast('Nothing to undo');return;}
@@ -9875,7 +10554,8 @@ function autoDistributeExit(exp) {
   const OPEN_HOURS = Array.from({length:20},(_,i)=>5+i); // 5am–12am
 
   function exitAgentCov(h) {
-    return Object.entries(exp).filter(([pid,e]) => {
+    // Count dedicated EXIT agents currently on shift at hour h
+    let count = Object.entries(exp).filter(([pid,e]) => {
       if (e.person.role !== 'EXIT') return false;
       if ((STATE.todayOverrides||{})[pid] === 'callout') return false;
       const ov = (STATE.shiftMod||{})[pid]||{};
@@ -9885,6 +10565,20 @@ function autoDistributeExit(exp) {
       const seAdj = (se != null && se < ss) ? se + 24 : se;
       return h >= ss && (seAdj == null || h < seAdj);
     }).length;
+    // ADD: Count managers with mgmtBlocks station='Exit Booth' active at h.
+    // This is the link that makes manager flexibility help exit coverage —
+    // when a manager assigns themselves to Exit for a time block, the
+    // engine sees the gap shrink and won't over-assign CXRs to fill it.
+    const mb = STATE.mgmtBlocks || {};
+    Object.entries(mb).forEach(([pid, blocks]) => {
+      const e = exp[pid]; if (!e) return;
+      if ((STATE.todayOverrides||{})[pid] === 'callout') return;
+      if (!['ARM','BRM','ABRM','MT'].includes(e.person.role)) return;
+      if ((blocks||[]).some(b => b.station === 'Exit Booth' && h >= b.from && h < b.to)) {
+        count++;
+      }
+    });
+    return count;
   }
 
   const cxrList = Object.entries(exp)
@@ -10218,6 +10912,61 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
     // Station buttons — different options for mgmt vs CXR
     const isMgrRole=['ARM','BRM','ABRM','MT'].includes(person.role);
     if (isMgrRole) {
+      // ── Time Blocks (multi-station scheduling) ─────────────────────────────
+      // Lets a manager bounce between stations through the day, e.g.:
+      //   Maddy: Emerald 8a–11a → Counter 11a–lunch → Returns 1p–close
+      // If any blocks exist for this manager, the timeline renders THEM
+      // instead of the single staffStation across whole shift. This is the
+      // mechanism behind manager flexibility and exit-coverage credit.
+      const mblocks = (STATE.mgmtBlocks||{})[pid]||[];
+      h+=`<div style="margin-bottom:10px;padding:8px;border:1px solid var(--bdr2);border-radius:6px;background:var(--bg3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">
+            ✨ Time Blocks ${mblocks.length?`(${mblocks.length})`:''}
+          </div>
+          <button onclick="addMgmtBlockPrompt('${pid}')"
+            style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--acc);background:rgba(37,99,235,.1);color:var(--acc);font-weight:700;cursor:pointer">
+            + Add Block
+          </button>
+        </div>`;
+      if (mblocks.length) {
+        const stColor = {
+          'Emerald Booth':'#6366f1','Emerald Booth Manager':'#6366f1',
+          'Counter Manager':'var(--acc)','Counter':'var(--acc)',
+          'Exit Booth':'var(--green)',
+          'Returns':'#06b6d4','Returns Manager':'#06b6d4',
+          'Floater':'#7c3aed','Shuttling':'#f59e0b',
+        };
+        const stIcon = {
+          'Emerald Booth':'🌟','Emerald Booth Manager':'🌟',
+          'Counter Manager':'🟦','Counter':'🟦',
+          'Exit Booth':'🟩',
+          'Returns':'↩','Returns Manager':'↩',
+          'Floater':'🚗','Shuttling':'🚌',
+        };
+        const sorted = [...mblocks].sort((a,b)=>a.from-b.from);
+        sorted.forEach((b,idx) => {
+          const realIdx = mblocks.indexOf(b); // index in original array for delete
+          const col = stColor[b.station]||'var(--txt3)';
+          const ic  = stIcon[b.station]||'•';
+          h+=`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bdr);font-size:11px">
+            <span style="color:${col};font-weight:700;min-width:90px">${ic} ${b.station}</span>
+            <span style="font-family:var(--ff-mono);color:var(--txt3);font-size:10px;flex:1">${fmtH(b.from)} → ${fmtH(b.to)}</span>
+            <button onclick="removeMgmtBlock('${pid}',${realIdx})"
+              style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:0 4px;line-height:1" title="Remove block">×</button>
+          </div>`;
+        });
+        h+=`<div style="font-size:9px;color:var(--txt3);font-style:italic;margin-top:4px">
+          Blocks override the single station above. Exit Booth blocks count toward exit coverage.
+        </div>`;
+      } else {
+        h+=`<div style="font-size:10px;color:var(--txt3);font-style:italic;padding:4px 0">
+          No blocks set — manager stays at single station all shift (above).
+        </div>`;
+      }
+      h+=`</div>`;
+
+      // Single-station picker (default — used when no blocks set)
       // Managers get: Emerald Booth, Counter, Exit, Returns, Floater
       const mgmtStations = [
         {key:'Emerald Booth',   label:'🌟 Emerald',   col:'#6366f1'},
@@ -10565,27 +11314,99 @@ function parseGLFullTSV(text) {
 function parseBrandSection(text) {
   if (!text) return null;
   const lines = text.split('\n').map(l=>l.trim()).filter(Boolean);
-  // Standard 11-column GL brand format
-  const headers = ['totalRes','schRes','lateRes','rented','newToday','walkUp','prewrite','totRet','schRet','lateRet','returned'];
+  // Default header order — matches the standard GL "Brands" tab format.
+  const DEFAULT_HEADERS = ['totalRes','schRes','lateRes','rented','newToday','walkUp','prewrite','totRet','schRet','lateRet','returned'];
+  // Map of common GL header text → our canonical field key.
+  // Both spaced and unspaced variants supported (GL paste can vary).
+  const HEADER_MAP = {
+    'totalres':'totalRes','total res':'totalRes','total':'totalRes',
+    'schres':'schRes','sch res':'schRes','scheduled res':'schRes','scheduled':'schRes',
+    'lateres':'lateRes','late res':'lateRes','late':'lateRes',
+    'rented':'rented','rentals':'rented',
+    'newtoday':'newToday','new today':'newToday','new':'newToday',
+    'walkup':'walkUp','walk up':'walkUp','walks':'walkUp',
+    'prewrite':'prewrite','pre write':'prewrite','pre-write':'prewrite',
+    'totret':'totRet','tot ret':'totRet','total ret':'totRet','total return':'totRet',
+    'schret':'schRet','sch ret':'schRet','scheduled ret':'schRet',
+    'lateret':'lateRet','late ret':'lateRet',
+    'returned':'returned','returns':'returned',
+    'overdue':'overdue', // optional 12th column some GL versions emit
+  };
   const brandNames = ['ALAMO','ENTERPRISE','NATIONAL','TOTAL'];
   const result = {};
-  let i=0;
-  while (i<lines.length && !brandNames.includes(lines[i].toUpperCase())) i++;
-  while (i<lines.length) {
-    const brand = lines[i].toUpperCase();
-    if (!brandNames.includes(brand)) { i++; continue; }
-    i++;
-    const nums=[];
-    while (i<lines.length && /^\d+$/.test(lines[i])) { nums.push(parseInt(lines[i])); i++; }
-    const obj={};
-    // If column count is unusual, log it for diagnosis but still try to map sensibly
-    if (nums.length !== headers.length && nums.length > 0) {
-      console.warn(`Brand ${brand}: got ${nums.length} numbers, expected ${headers.length}`);
+
+  // ── Attempt to parse a header row to learn column positions ─────────────────
+  // Some GL pastes include a header row above the data. If we find one,
+  // we map columns by NAME (resilient to inserted/removed/renamed columns
+  // in future GL versions). If we don't find one, we fall back to positional.
+  let columnMap = null;
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i].toLowerCase();
+    // A header line typically contains "total res" or starts with "brands"
+    if (ln.startsWith('brands') || ln.includes('total res') || ln.includes('totalres')) {
+      // Tokenize: split on tab OR 2+ spaces (handles both TSV paste and
+      // copy-paste from rendered table that has multiple spaces).
+      const tokens = lines[i].split(/\t|\s{2,}/).map(t=>t.trim().toLowerCase()).filter(Boolean);
+      // Skip first token if it's literally "brands" (the corner header label)
+      const dataTokens = tokens[0] === 'brands' ? tokens.slice(1) : tokens;
+      const map = [];
+      let recognized = 0;
+      dataTokens.forEach(tok => {
+        const field = HEADER_MAP[tok];
+        if (field) recognized++;
+        map.push(field || null);
+      });
+      if (recognized >= 4) { // require at least 4 recognized headers to trust this row
+        columnMap = map;
+        break;
+      }
     }
-    // Map by position; missing tail values default to 0
-    headers.forEach((h,idx)=>{ obj[h]=nums[idx]??0; });
+  }
+
+  // ── Find first brand-data line ──────────────────────────────────────────────
+  let i = 0;
+  while (i < lines.length && !brandNames.includes(lines[i].toUpperCase().split(/\s+/)[0])) i++;
+
+  // ── Parse each brand row ────────────────────────────────────────────────────
+  // Two GL paste formats supported:
+  //  (a) BRAND alone on line, followed by N lines each containing a single number.
+  //  (b) BRAND followed by inline numbers on the same line (whitespace/tab-separated).
+  while (i < lines.length) {
+    const ln = lines[i];
+    // Tokenize the line — first token is brand name, rest may be inline numbers.
+    const tokens = ln.split(/\t|\s+/).filter(Boolean);
+    const brand = (tokens[0]||'').toUpperCase();
+    if (!brandNames.includes(brand)) { i++; continue; }
+    const nums = [];
+    // Format (b): inline numbers on same line as brand name
+    for (let k = 1; k < tokens.length; k++) {
+      if (/^\d+$/.test(tokens[k])) nums.push(parseInt(tokens[k],10));
+    }
+    i++;
+    // Format (a): if no inline numbers were found, scan following lines for
+    // single-number rows until we hit a non-number line.
+    if (nums.length === 0) {
+      while (i < lines.length && /^\d+$/.test(lines[i])) {
+        nums.push(parseInt(lines[i],10));
+        i++;
+      }
+    }
+    const obj = {};
+    if (columnMap) {
+      // Header-based mapping — robust to varying column counts
+      columnMap.forEach((field, idx) => { if (field) obj[field] = nums[idx] ?? 0; });
+    } else {
+      // Positional fallback (legacy 11-column behavior)
+      DEFAULT_HEADERS.forEach((h, idx) => { obj[h] = nums[idx] ?? 0; });
+      // If GL emitted 12+ columns, log so we can investigate but don't drop totalRes
+      if (nums.length > DEFAULT_HEADERS.length) {
+        console.warn(`Brand ${brand}: ${nums.length} numbers but only ${DEFAULT_HEADERS.length} mapped — extra trailing numbers ignored: ${nums.slice(DEFAULT_HEADERS.length).join(',')}. Add a header row to the paste to map them automatically.`);
+      } else if (nums.length < DEFAULT_HEADERS.length && nums.length > 0) {
+        console.warn(`Brand ${brand}: only ${nums.length} numbers (expected ${DEFAULT_HEADERS.length}) — tail fields default to 0.`);
+      }
+    }
     obj._raw = nums; // preserve raw for debugging
-    result[brand.toLowerCase()]=obj;
+    result[brand.toLowerCase()] = obj;
   }
   return result;
 }
@@ -11205,8 +12026,8 @@ function printAllChecklists(blank) {
     ${[
       ['Opening Mgr', f.openMgr||auto.open||'_______________'],
       ['Closing Mgr', f.closeMgr||auto.close||'_______________'],
-      ['CS Received', f.cs||'___'],
-      ['HOT Alerts',  f.hot||'___'],
+      ['Completely Satisfied', f.cs||'___'],
+      ['Hot Alerts',  f.hot||'___'],
     ].map(([lbl,val])=>`<div style="border:1px solid #ccc;border-radius:4px;padding:6px 8px">
       <div style="font-size:8px;font-weight:800;text-transform:uppercase;color:#888">${lbl}</div>
       <div style="font-size:13px;font-weight:700">${val}</div>
@@ -11374,8 +12195,8 @@ function printDashboardSummary() {
     <div class="grid4">
       <div class="box"><div class="lbl">Opening Mgr</div><div class="val" style="font-size:13px">${f.openMgr||auto.open||'—'}</div></div>
       <div class="box"><div class="lbl">Closing Mgr</div><div class="val" style="font-size:13px">${f.closeMgr||auto.close||'—'}</div></div>
-      <div class="box"><div class="lbl"># CS Received</div><div class="val" style="color:#16a34a">${f.cs||'—'}</div></div>
-      <div class="box"><div class="lbl">HOT Alerts</div><div class="val" style="color:#dc2626">${f.hot||'—'}</div></div>
+      <div class="box"><div class="lbl">Completely Satisfied</div><div class="val" style="color:#16a34a">${f.cs||'—'}</div></div>
+      <div class="box"><div class="lbl">Hot Alerts</div><div class="val" style="color:#dc2626">${f.hot||'—'}</div></div>
     </div>
     <div class="sec">Fleet Totals · Walk-Up Policy: ${polLabel[pol]||pol.toUpperCase()}</div>
     <div class="grid4" style="margin-bottom:10px">
@@ -11446,7 +12267,7 @@ function printChecklist(blank) {
         <div style="font-size:14px;font-weight:700">${blank?'___________':f.cs||'—'}</div>
       </div>
       <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
-        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">HOT Alerts</div>
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Hot Alerts</div>
         <div style="font-size:14px;font-weight:700">${blank?'___________':f.hot||'—'}</div>
       </div>
       <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
