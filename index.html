@@ -5509,6 +5509,28 @@ function toggleCallout(pid) {
   }
 }
 
+// Reinstate a person who was previously marked called off.
+// Used by the called-off banner at the top of the coverage timeline,
+// where a one-tap pill restores anyone marked callout — important
+// because once marked off they're filtered out of the rest of the
+// timeline and can no longer be tapped to undo via the person panel.
+function reinstatePerson(pid) {
+  if (!STATE.todayOverrides) STATE.todayOverrides = {};
+  if (STATE.todayOverrides[pid] !== 'callout') return;
+  delete STATE.todayOverrides[pid];
+  if (STATE.staffDuty) STATE.staffDuty[pid] = true;
+  saveState();
+  if (typeof saveCoverageSnapshot === 'function') saveCoverageSnapshot();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildMorningBriefing === 'function') buildMorningBriefing();
+  if (typeof buildCoverageUI === 'function') buildCoverageUI();
+  if (typeof toast === 'function') {
+    const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
+    const nick = exp[pid]?.person?.nick || exp[pid]?.person?.name?.split(' ')[0] || pid;
+    toast(`${nick} reinstated ↩`);
+  }
+}
+
 function showCalloutSuggestion(calledOutPid) {
   const person = [...ROSTER_CXR, ...ROSTER_MGMT].find(p => p.name.replace(/\s/g,'_') === calledOutPid);
   const personName = person ? (person.nick || person.name.split(' ')[0]) : calledOutPid;
@@ -9672,6 +9694,36 @@ function buildCoverageTimeline() {
   if (chEl) chEl.innerHTML = ''; // hide standalone chart — it's now duplicated inside the timeline below
   let htm=`<div style="min-width:${totalW}px">`;
   if (chartHtml) htm += `<div style="margin-bottom:8px">${chartHtml}</div>`;
+
+  // ── Called-off banner ───────────────────────────────────────────────────
+  // When a person is marked called off they're filtered out of the rest of
+  // the timeline render, so without this banner there's no way to undo a
+  // mistaken callout — the row they used to occupy is gone. The banner
+  // gives every called-off person a quick "↩ Reinstate" pill that restores
+  // them to the schedule with one tap.
+  const calledOff = Object.entries(exp).filter(([pid]) =>
+    (STATE.todayOverrides||{})[pid] === 'callout'
+  );
+  if (calledOff.length) {
+    htm += `<div style="margin-bottom:8px;padding:8px 10px;border-radius:6px;
+      background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.3);
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <span style="font-size:10px;font-weight:800;color:var(--red);text-transform:uppercase;letter-spacing:.06em">
+        ❌ Called Off (${calledOff.length})
+      </span>`;
+    calledOff.forEach(([pid, e]) => {
+      const nick = e.person.nick || e.person.name.split(' ')[0];
+      htm += `<button onclick="reinstatePerson('${pid}')"
+        style="font-size:10px;font-weight:700;padding:4px 10px;border-radius:14px;
+          border:1px solid var(--red);background:var(--bg3);color:var(--red);cursor:pointer;
+          display:inline-flex;align-items:center;gap:4px"
+        title="Reinstate ${nick}">
+        ${nick} <span style="font-size:11px">↩</span>
+      </button>`;
+    });
+    htm += `</div>`;
+  }
+
   let _mgmtHeaderShown=false;let _groupHeaders={};
 
   // Gap row
@@ -10040,12 +10092,20 @@ function printScheduleMap() {
     return segs;
   };
 
-  // ── Build HTML rows ─────────────────────────────────────────────────────
+  // ── Build HTML rows (flexbox, NOT table) ────────────────────────────────
+  // Why flex: in the prior table-based version, `table-layout:fixed` on a
+  // table whose first row was a `colspan=2` section header caused the
+  // browser to allocate column widths unpredictably — the name column
+  // ended up far wider than 110px, pushing bars off the right edge so
+  // they no longer aligned with the hour ticks at the top.
+  // Flex rows guarantee fixed name width + fixed bar width, with the bar
+  // box always starting at exactly NAME_PX from the left edge of the row,
+  // matching the hour scale header's `margin-left: NAME_PX`.
   let rowsHtml = '';
   sections.forEach(sec => {
     const peeps = Object.entries(exp).filter(([,e]) => sec.filter(e));
     if (!peeps.length) return;
-    rowsHtml += `<tr><td colspan="2" class="section-header">— ${sec.label} —</td></tr>`;
+    rowsHtml += `<div class="section-header" style="margin-left:${NAME_PX + 4}px">— ${sec.label} —</div>`;
     peeps.sort((a,b) => (a[1].person.shiftStart||0) - (b[1].person.shiftStart||0));
     peeps.forEach(([pid, e]) => {
       const p = e.person;
@@ -10079,7 +10139,7 @@ function printScheduleMap() {
       barHtml += `</div>`;
 
       const nameHtml = `<div class="name${isCallout?' callout':''}">${nick}<div class="shift-time">${fmtH(ss)}–${fmtH(se)}</div></div>`;
-      rowsHtml += `<tr><td class="name-col">${nameHtml}</td><td class="bar-col">${barHtml}</td></tr>`;
+      rowsHtml += `<div class="prow"><div class="name-col">${nameHtml}</div><div class="bar-col">${barHtml}</div></div>`;
     });
   });
 
@@ -10116,18 +10176,23 @@ function printScheduleMap() {
       .leg-item { display:inline-flex; align-items:center; gap: 4px; }
       .leg-dot { width: 10px; height: 10px; border-radius: 2px; }
 
-      table { border-collapse: collapse; width: 100%; table-layout: fixed; }
-      td { padding: 0; vertical-align: middle; }
-      .name-col { width: ${NAME_PX}px; padding-right: 6px; text-align: right; vertical-align: middle; }
+      /* Flexbox row layout — each row is a horizontal flex container with
+         a fixed-width name column and a bar column whose width is exactly
+         HOURS.length * HOUR_PX. The hour scale at top has the same
+         margin-left as the name column width so its ticks align perfectly
+         with the bar tracks below. */
+      .schedule-rows { width: ${NAME_PX + HOURS.length * HOUR_PX + 8}px; }
+      .prow { display: flex; align-items: center; margin-bottom: 1px; page-break-inside: avoid; }
+      .name-col { width: ${NAME_PX}px; flex-shrink: 0; padding-right: 6px; text-align: right; }
       .name { font-size: 11px; font-weight: 700; line-height: 1.1; }
       .name.callout { text-decoration: line-through; color: #999; }
       .name .shift-time { font-size: 8px; color: #888; font-weight: 400; margin-top: 1px; }
-      .section-header { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555; padding: 8px 0 3px; border-bottom: 1px solid #ccc; }
+      .section-header { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555; padding: 8px 0 3px; border-bottom: 1px solid #ccc; margin-top: 4px; }
 
-      .hour-scale { position: relative; height: 16px; margin-left: ${NAME_PX + 4}px; margin-bottom: 4px; }
+      .hour-scale { position: relative; height: 16px; margin-left: ${NAME_PX + 4}px; margin-bottom: 4px; width: ${HOURS.length * HOUR_PX}px; }
       .hour-tick { position: absolute; top: 0; font-size: 8px; color: #555; text-align: left; padding-left: 1px; border-left: 1px solid #ddd; height: 16px; }
 
-      .bar-col { padding: 2px 0; }
+      .bar-col { flex: 0 0 auto; padding: 2px 0; }
       .bar-track { position: relative; height: ${ROW_H}px; background: #f6f6f6; border-radius: 3px; }
       .hour-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #e5e7eb; }
       .seg { position: absolute; top: 1px; height: ${ROW_H - 2}px; border-radius: 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 10px; overflow: hidden; }
@@ -10149,7 +10214,7 @@ function printScheduleMap() {
       ${legendHtml}
     </div>
     ${hoursHtml}
-    <table>${rowsHtml}</table>
+    <div class="schedule-rows">${rowsHtml}</div>
     <div class="no-print" style="margin-top:14px;text-align:center">
       <button onclick="window.print()" style="padding:8px 18px;font-size:12px;cursor:pointer">🖨 Print</button>
       <button onclick="window.close()" style="padding:8px 18px;font-size:12px;margin-left:8px;cursor:pointer">Close</button>
@@ -11890,11 +11955,23 @@ function loadScheduleForToday(force) {
     if (shift === 'OFF' || shift === 'VACA') {
       STATE.staffDuty[pid]      = false;
       STATE.todayOverrides[pid] = 'off';
-      if (force) delete STATE.shiftMod[pid]; // clear any cached override
+      // Always clear stale shiftMod when person is OFF today — otherwise
+      // a previous day's shift override could linger and cause them to
+      // appear on the wrong shift.
+      delete STATE.shiftMod[pid];
     } else if (Array.isArray(shift) && shift.length === 2) {
       STATE.staffDuty[pid] = true;
-      // Always overwrite shiftMod when force=true, or when no override exists
-      if (force || !STATE.shiftMod[pid]) {
+      // Clear any prior 'off' override from a previous day, otherwise
+      // a stale 'off' value could mark an active person as called off.
+      if (STATE.todayOverrides[pid] === 'off') delete STATE.todayOverrides[pid];
+      // ALWAYS overwrite shiftMod when MAY_SCHEDULE has data for this
+      // person today. Prior behavior preserved any existing value when
+      // force=false, which left stale values from previous days lingering
+      // (e.g. Laura's morning shift from a Sun/Sat staying applied on
+      // a Wed/Thu when she's actually on nights). The MAY_SCHEDULE
+      // entry IS the authoritative shift for this date.
+      const existing = STATE.shiftMod[pid];
+      if (force || !existing || existing.start !== shift[0] || existing.end !== shift[1]) {
         STATE.shiftMod[pid] = { start: shift[0], end: shift[1] };
       }
     }
