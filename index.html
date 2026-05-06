@@ -1390,22 +1390,37 @@ button { cursor: pointer; }
     </div>
   </div>
 
-  <!-- OPS BAR: Opening · Closing · Yesterday's Sales · Walk-Ups · 24hr -->
-  <div class="mgr-bar" style="flex-wrap:wrap;gap:6px">
-    <div class="mgr-item"><div class="mgr-item-lbl">Opening</div><div class="mgr-item-val" id="db-openmgr">—</div></div>
-    <div class="mgr-item"><div class="mgr-item-lbl">Closing</div><div class="mgr-item-val" id="db-closemgr">—</div></div>
-    <div class="mgr-item"><div class="mgr-item-lbl">Yesterday's Sales</div><div class="mgr-item-val" id="db-sales">—</div></div>
-    <div class="mgr-item" style="border-left:1px solid var(--bdr2);padding-left:8px">
-      <div class="mgr-item-lbl">Walk-Ups</div>
-      <div class="mgr-item-val" id="db-wu" style="font-size:12px">—</div>
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       HERO: Demand at a glance — Res / Ret / Net + brand split.
+       This is the number Matt looks at first; it lives at the top.
+       Brand strip (Nat·Ala·Ent + 2.0 Res) folded inline so the bar
+       stays one row tall on most screens.
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <div class="mgr-bar" style="flex-wrap:wrap;gap:6px;margin-bottom:8px;cursor:pointer" onclick="showTab('board')" id="dash-res-bar" title="Tap to open Availability Board">
+    <div class="mgr-item">
+      <div class="mgr-item-lbl">Total Res</div>
+      <div class="mgr-item-val" id="db-totalres" style="font-size:22px;color:var(--amber)">—</div>
     </div>
     <div class="mgr-item">
-      <div class="mgr-item-lbl">24hr Booking</div>
-      <div class="mgr-item-val" id="db-book24" style="font-size:12px">Open</div>
+      <div class="mgr-item-lbl">Total Ret</div>
+      <div class="mgr-item-val" id="db-totalret" style="font-size:22px;color:var(--green)">—</div>
+    </div>
+    <div class="mgr-item">
+      <div class="mgr-item-lbl">Net</div>
+      <div class="mgr-item-val" id="db-totalnet" style="font-size:22px">—</div>
+    </div>
+    <div class="mgr-item" style="border-left:1px solid var(--bdr2);padding-left:8px;flex:1;min-width:0">
+      <div class="mgr-item-lbl">Brands · 2.0 Res</div>
+      <div style="display:flex;align-items:center;gap:8px;font-family:var(--ff-mono);font-size:11px;font-weight:700">
+        <span id="db-brands" style="color:var(--txt2);white-space:nowrap">— · — · —</span>
+        <span style="color:var(--bdr2)">|</span>
+        <span style="color:var(--txt3);font-size:10px">2.0:</span>
+        <span id="db-brand20" style="color:var(--txt2)">—</span>
+      </div>
     </div>
   </div>
 
-  <!-- HOURLY FLOW -->
+  <!-- HOURLY FLOW — visual context for the numbers above -->
   <div class="card" style="padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="showTab('board')">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
       <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">
@@ -1418,36 +1433,32 @@ button { cursor: pointer; }
     </div>
   </div>
 
-  <!-- RES / RET / NET + BRAND TOTALS BAR -->
-  <div class="mgr-bar" style="flex-wrap:wrap;gap:6px;margin-bottom:8px;cursor:pointer" onclick="showTab('board')" id="dash-res-bar">
-    <div class="mgr-item">
-      <div class="mgr-item-lbl">Total Res</div>
-      <div class="mgr-item-val" id="db-totalres" style="font-size:20px;color:var(--amber)">—</div>
-    </div>
-    <div class="mgr-item">
-      <div class="mgr-item-lbl">Total Ret</div>
-      <div class="mgr-item-val" id="db-totalret" style="font-size:20px;color:var(--green)">—</div>
-    </div>
-    <div class="mgr-item">
-      <div class="mgr-item-lbl">Net</div>
-      <div class="mgr-item-val" id="db-totalnet" style="font-size:20px">—</div>
-    </div>
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       OPERATIONS STRIP: who's running the day + policy state.
+       Re-labeled for clarity: "Walk-Up Policy" (the rule) is distinct
+       from "Walk-Ups Open" (the count of currently-open car groups,
+       shown below).
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <div class="mgr-bar" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
+    <div class="mgr-item"><div class="mgr-item-lbl">Opening Mgr</div><div class="mgr-item-val" id="db-openmgr">—</div></div>
+    <div class="mgr-item"><div class="mgr-item-lbl">Closing Mgr</div><div class="mgr-item-val" id="db-closemgr">—</div></div>
+    <div class="mgr-item"><div class="mgr-item-lbl">Yesterday's Sales</div><div class="mgr-item-val" id="db-sales">—</div></div>
     <div class="mgr-item" style="border-left:1px solid var(--bdr2);padding-left:8px">
-      <div class="mgr-item-lbl">Nat · Ala · Ent</div>
-      <div id="db-brands" style="font-size:11px;font-weight:700;font-family:var(--ff-mono);color:var(--txt2)">— · — · —</div>
+      <div class="mgr-item-lbl">Walk-Up Policy</div>
+      <div class="mgr-item-val" id="db-wu" style="font-size:12px">—</div>
     </div>
-    <div class="mgr-item" style="margin-left:auto">
-      <div class="mgr-item-lbl">2.0 Res</div>
-      <div class="mgr-item-val" id="db-brand20" style="font-size:14px;color:var(--txt2)">—</div>
+    <div class="mgr-item">
+      <div class="mgr-item-lbl">24hr Booking</div>
+      <div class="mgr-item-val" id="db-book24" style="font-size:12px">Open</div>
     </div>
   </div>
 
-  <!-- 2-COL: Walk-Ups · Checklist -->
+  <!-- 2-COL: Walk-Ups Open · Checklist Progress -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
     <div class="card" onclick="showTab('board')" style="cursor:pointer;padding:12px">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">🚦 Walk-Ups</div>
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">🚦 Walk-Ups Open</div>
       <div style="font-size:24px;font-weight:800;font-family:var(--ff-mono)" id="db-wucount">—</div>
-      <div id="db-wulabel" style="font-size:10px;color:var(--txt3)">groups open</div>
+      <div id="db-wulabel" style="font-size:10px;color:var(--txt3)">car groups</div>
       <div style="font-size:9px;color:var(--acc);margin-top:4px">→ Availability</div>
     </div>
     <div class="card" onclick="showTab('checklist')" style="cursor:pointer;padding:12px">
@@ -1457,16 +1468,21 @@ button { cursor: pointer; }
     </div>
   </div>
 
-  <!-- CS RECEIVED / HOT / OOS / FIELD STRIP -->
-  <div class="card" style="padding:10px 14px;margin-bottom:8px" onclick="showTab('checklist')">
-    <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;align-items:center">
-      <span># CS Rcvd: <b id="sum-cs" style="color:var(--green);font-family:var(--ff-mono)">—</b></span>
-      <span>HOT: <b id="sum-hot" style="color:var(--red);font-family:var(--ff-mono)">—</b></span>
-      <span style="color:var(--bdr2)">|</span>
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       OPS COUNTERS: CS / HOT (left), Specials (middle), OOS / FBO /
+       Inv (right). Visual separators between groups so the eye sees
+       three logical sections instead of one long line.
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <div class="card" style="padding:10px 14px;margin-bottom:8px;cursor:pointer" onclick="showTab('checklist')">
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center">
+      <span title="Customer Service receipts received"># CS Rcvd: <b id="sum-cs" style="color:var(--green);font-family:var(--ff-mono)">—</b></span>
+      <span title="Hot returns awaiting prep">HOT: <b id="sum-hot" style="color:var(--red);font-family:var(--ff-mono)">—</b></span>
+      <span style="color:var(--bdr2)">│</span>
+      <span style="color:var(--txt3);font-size:10px;font-weight:700">Specials:</span>
       <span style="color:var(--txt3)">XXAR <b id="sum-xxar" style="font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--txt3)">SXAR <b id="sum-sxar" style="font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--txt3)">PXAR <b id="sum-pxar" style="font-family:var(--ff-mono)">—</b></span>
-      <span style="color:var(--bdr2)">|</span>
+      <span style="color:var(--bdr2)">│</span>
       <span style="color:var(--txt3)">OOS: <b id="sum-oos" style="font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--txt3)">FBOs: <b id="sum-fbo" style="font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--txt3)">Inv: <b id="sum-invagent" style="font-family:var(--ff-mono)">—</b></span>
@@ -1474,7 +1490,7 @@ button { cursor: pointer; }
     </div>
   </div>
 
-  <!-- DNR/DNQ ALERTS -->
+  <!-- DNR/DNQ ALERTS — slot reserved for future banner-style new-alert UI -->
   <div id="dnr-dnq-section" style="margin-bottom:8px"></div>
 
   <!-- TODAY'S COVERAGE MINI -->
@@ -1486,7 +1502,8 @@ button { cursor: pointer; }
     <div id="dash-sched-content" style="font-size:11px;color:var(--txt3)">Loading...</div>
   </div>
 
-  <!-- QUICK ACTIONS -->
+  <!-- QUICK ACTIONS — Coverage button removed (the mini above already
+       links to it; redundant entry point added clutter) -->
   <div class="quick-links">
     <div class="ql-btn" onclick="showTab('paste')">
       <span class="ql-icon">📋</span>
@@ -1497,11 +1514,6 @@ button { cursor: pointer; }
       <span class="ql-icon">📊</span>
       <div class="ql-label">Availability</div>
       <div class="ql-stat g" id="dl-board">—</div>
-    </div>
-    <div class="ql-btn" onclick="showTab('schedule')">
-      <span class="ql-icon">👥</span>
-      <div class="ql-label">Coverage</div>
-      <div class="ql-stat b" id="dl-sched">—</div>
     </div>
     <div class="ql-btn" onclick="showTab('checklist')">
       <span class="ql-icon">✅</span>
@@ -6000,8 +6012,14 @@ function refreshDash() {
   const gd2=typeof getGroupNetData==='function'?getGroupNetData():{};
   let calcResRem=0,calcRetRem=0,hasRem=false;
   Object.values(gd2).forEach(d=>{if(d&&d.has){calcResRem+=d.res;calcRetRem+=d.ret;hasRem=true;}});
-  const showRes = tBrands.totalRes || f.totalRes || '—';
-  const showRet = tBrands.totRet || f.totalRet || '—';
+  // Total Res / Ret tile: prefer calculated remaining from inventory paste
+  // (the source of truth), fall back to brand summary, then to manual field.
+  // Mirrors the v42 board fix — without this, a stale brand total of 34 from
+  // a prior session permanently overrode fresh inventory paste of 360+.
+  const calcRes = hasRem ? calcResRem : 0;
+  const calcRet = hasRem ? calcRetRem : 0;
+  const showRes = calcRes > 0 ? calcRes : (tBrands.totalRes || f.totalRes || '—');
+  const showRet = calcRet > 0 ? calcRet : (tBrands.totRet   || f.totalRet || '—');
   const showNet = hasRem ? (calcRetRem - calcResRem) : null;
   s('db-totalres', showRes); s('db-totalret', showRet);
   const netEl2=document.getElementById('db-totalnet');
