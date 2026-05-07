@@ -330,8 +330,8 @@ select option { background: var(--bg3); }
   gap: 8px;
 }
 .group-tile {
-  border-radius: 7px;
-  padding: 10px 12px;
+  border-radius: 6px;
+  padding: 7px 9px 6px;
   cursor: pointer;
   transition: transform 0.1s, box-shadow 0.1s;
   border: 1px solid;
@@ -358,30 +358,33 @@ select option { background: var(--bg3); }
 .tile-flag {
   font-size: 10px;
   opacity: 0.7;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
 }
 .tile-name {
   font-family: var(--font-hd);
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 1.2;
-  margin-bottom: 6px;
+  line-height: 1.15;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .tile-net {
   font-family: var(--font-mono);
-  font-size: 20px;
+  font-size: 17px;
   font-weight: 500;
   line-height: 1;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 .tile-net.positive { color: var(--wu); }
 .tile-net.negative { color: var(--na); }
 .tile-net.zero { color: var(--text3); }
-.tile-net.no-data { color: var(--text3); font-size: 14px; }
+.tile-net.no-data { color: var(--text3); font-size: 13px; }
 .tile-status {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 .tile-status.wu { color: var(--wu); }
@@ -1536,6 +1539,17 @@ button { cursor: pointer; }
       Game Plan → By Hour view. Copy each export and paste below. App parses all car codes automatically.
     </p>
 
+    <!-- Brand Totals — first because Game Plan navigates here first.
+         Same .pstep / .ps-hdr / .paste-area structure as the other 4 cards
+         so it visually aligns with them in the stack. The `id="pstep-5"`
+         and `parseStep(5)` are preserved for backward compatibility with
+         downstream parsers; only the DOM order and styling are unified. -->
+    <div class="pstep" id="pstep-5">
+      <div class="ps-hdr"><div class="ps-num" id="psn5">B</div><div><div class="ps-title">Brand Totals</div><div class="ps-hint">Agent Sales Summary → select all rows including headers → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(5)" style="margin-left:auto">Parse ✓</button></div>
+      <textarea class="paste-area" id="pa5" oninput="autoParseOnPaste(5, this)" placeholder="Paste the Brands table (Alamo / Enterprise / National rows)..." rows="4"></textarea>
+      <div class="parse-ok" id="pr5" style="display:none"></div>
+    </div>
+
     <div class="pstep active" id="pstep-1">
       <div class="ps-hdr"><div class="ps-num" id="psn1">1</div><div><div class="ps-title">Reservations — AM (12a–11a)</div><div class="ps-hint">Game Plan → Reservations → By Hour → AM → Select All → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(1)" style="margin-left:auto">Parse ✓</button></div>
       <textarea class="paste-area" id="pa1" oninput="autoParseOnPaste(1, this)" placeholder="Paste AM reservations here..." rows="4"></textarea>
@@ -1561,24 +1575,8 @@ button { cursor: pointer; }
     </div>
   </div>
 
-  <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
-    
-    <!-- Step 5: Brand Totals -->
-    <div id="pstep-5" class="pstep">
-      <div class="pstep-head">
-        <div class="psn" id="psn5">5</div>
-        <div>
-          <div class="pstep-title">Brand Totals</div>
-          <div class="pstep-sub">Agent Sales Summary → select all rows including headers → Copy</div>
-        </div>
-        <button class="btn btn-g btn-sm" onclick="parseStep(5)">Parse ✓</button>
-      </div>
-      <textarea id="pa5" class="paste-ta" rows="4"
-        placeholder="Paste the Brands table (Alamo / Enterprise / National rows)..."></textarea>
-      <div id="pr5" class="pr" style="display:none"></div>
-    </div>
-
-<div id="paste-overall-status" style="font-size:12px;color:var(--txt3)">0 of 4 completed</div>
+  <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:10px">
+<div id="paste-overall-status" style="font-size:12px;color:var(--txt3)">0 of 4 completed (Brand Totals optional)</div>
     <div class="row">
       <button class="btn btn-gh btn-sm" onclick="clearPaste()">Clear All</button>
       <button class="btn btn-p btn-lg" onclick="calcBoard();showTab('board')">→ View Live Board</button>
@@ -1611,23 +1609,26 @@ button { cursor: pointer; }
     </div>
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <span style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">📅 24hr Booking</span>
-      <select id="f-24hr-board" onchange="sf('book24hr',this.value);refreshDash()"
-        style="font-size:11px;padding:4px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt)">
-        <option value="open">Open (default)</option>
-        <option value="restricted">Restricted</option>
-        <option value="closed">Closed</option>
-        <option value="emerald-only">Emerald Only</option>
-      </select>
+      <button class="wubtn" id="b24-open-b"       onclick="set24hr('open')">✅ Open</button>
+      <button class="wubtn" id="b24-restricted-b" onclick="set24hr('restricted')">🟡 Restricted</button>
+      <button class="wubtn" id="b24-emerald-b"    onclick="set24hr('emerald-only')">🌟 Emerald Only</button>
+      <button class="wubtn" id="b24-closed-b"     onclick="set24hr('closed')">🔴 Closed</button>
     </div>
   </div>
 
-  <!-- Core/Non-Core filter strip -->
-  <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-    <span style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">Filter:</span>
-    <button id="av-filter-all"  onclick="setAvailFilter('all')"  style="font-size:10px;padding:4px 10px;border-radius:4px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer;font-weight:700">All</button>
-    <button id="av-filter-core" onclick="setAvailFilter('core')" style="font-size:10px;padding:4px 10px;border-radius:4px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer;font-weight:700">◆ Core Only</button>
-    <button id="av-filter-non"  onclick="setAvailFilter('noncore')" style="font-size:10px;padding:4px 10px;border-radius:4px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer;font-weight:700">Non-Core</button>
-    <span style="font-size:9px;color:var(--txt3);margin-left:auto">Tap tile for details · tap ⚙ to override</span>
+  <!-- Core/Non-Core filter strip — given its own bordered container and
+       larger buttons in v50 because it was getting overlooked in the
+       prior thin-line layout. Matt: "I don't see where to filter those." -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;
+       background:var(--bg2);border:1px solid var(--bdr2);border-radius:6px;flex-wrap:wrap">
+    <span style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.05em">🔍 Show:</span>
+    <button id="av-filter-all"  onclick="setAvailFilter('all')"
+      style="font-size:11px;padding:6px 14px;border-radius:5px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer;font-weight:700">All Groups</button>
+    <button id="av-filter-core" onclick="setAvailFilter('core')"
+      style="font-size:11px;padding:6px 14px;border-radius:5px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);cursor:pointer;font-weight:700">◆ Core Only</button>
+    <button id="av-filter-non"  onclick="setAvailFilter('noncore')"
+      style="font-size:11px;padding:6px 14px;border-radius:5px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);cursor:pointer;font-weight:700">Non-Core</button>
+    <span style="font-size:10px;color:var(--txt3);margin-left:auto">Tap tile for details · tap ⚙ to override</span>
   </div>
 
   <!-- Board totals -->
@@ -1655,9 +1656,10 @@ button { cursor: pointer; }
       <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
         <select id="board-flow-type" onchange="buildBoardFlow()"
           style="font-size:11px;padding:4px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt)">
+          <option value="overlay" selected>Res ⊕ Ret (overlay)</option>
           <option value="net">Net (Ret − Res)</option>
-          <option value="res">Reservations</option>
-          <option value="ret">Returns</option>
+          <option value="res">Reservations only</option>
+          <option value="ret">Returns only</option>
         </select>
         <label style="font-size:11px;color:var(--txt2);display:flex;align-items:center;gap:4px;cursor:pointer">
           <input type="checkbox" id="board-flow-core-only" onchange="buildBoardFlow()"> Core only
@@ -2910,6 +2912,7 @@ function restoreFields() {
   // Restore walk-up buttons
   if (typeof updateWalkUpButtons === 'function') updateWalkUpButtons();
   if (typeof updateWUBtns === 'function') updateWUBtns();
+  if (typeof update24hrButtons === 'function') update24hrButtons();
 }
 
 function restoreClosingFields() {
@@ -3359,13 +3362,12 @@ function buildBoardGrid() {
                   : '⚙ Override';
     const ovCls = override==='open'?'open':override==='close'?'close':'auto';
 
-    html += `<div class="group-tile ${st}" style="padding-bottom:28px">
+    html += `<div class="group-tile ${st}" style="padding-bottom:24px">
       ${coreTag}
-      <div class="tile-flag" style="font-size:9px;color:var(--text3)">${g.flag}</div>
       <div class="tile-name">${g.name}</div>
       <div class="tile-net ${netClass}">${netDisplay}</div>
       <div class="tile-status ${st}">${stLbls[st]||'—'}</div>
-      ${has ? `<div style="font-size:9px;color:var(--text3);margin-top:2px">R${d.res} ↩${d.ret}</div>` : ''}
+      ${has ? `<div style="font-size:9px;color:var(--text3);margin-top:1px;font-family:var(--font-mono)">R${d.res} · ↩${d.ret}</div>` : ''}
       <button class="tile-override-btn ${ovCls}" onclick="event.stopPropagation();cycleGroupOverride('${g.name}')">${ovLabel}</button>
     </div>`;
   });
@@ -4603,6 +4605,82 @@ function buildSmartRotation() {
 
   // Merge exit rotations into main rotations array for _lastRotations
   const allRotations = [...rotations, ...exitRotations];
+
+  // ── LUNCH STAGGER PASS (v50) ──────────────────────────────────────
+  // Goal: when 2+ CXRs scheduled at the EXIT side both take lunch in
+  // the same 30-min window (creating an exit coverage gap), push the
+  // later CXR's lunch by 30 min so they don't overlap. Conservative:
+  // only nudges by ±30 min, only when overlap actually causes an exit
+  // shortfall. Doesn't touch counter-only lunches.
+  //
+  // Matt asked: "Not sure if the current ±4h bar does anything or is
+  // effective" — that bar adjusts a single CXR's split; this stagger
+  // pass coordinates lunches across CXRs automatically.
+  function lunchSpansExit(rot) {
+    if (!rot.lunch) return false;
+    // Was the CXR at exit when lunch started, OR will they go to exit
+    // right after? Either way, their lunch creates exit absence.
+    return (rot.b1 && rot.b1.station === 'exit') ||
+           (rot.b2 && rot.b2.station === 'exit');
+  }
+  function lunchOverlap(a, b) {
+    if (!a.lunch || !b.lunch) return false;
+    return a.lunch.from < b.lunch.to && b.lunch.from < a.lunch.to;
+  }
+  // Build hour-bucketed exit-coverage estimate at 30-min granularity.
+  // Each CXR contributes +1 to exit when their current block is exit
+  // AND they're not on lunch. Plus dedicated EXIT agents always +1.
+  function exitAtHalfHour(h) {
+    let cnt = 0;
+    workingExit.forEach(ex => {
+      if (ex.shift.start <= h && ex.shift.end > h) cnt++;
+    });
+    allRotations.forEach(r => {
+      if (r.fullShift === 'exit') {
+        // Full-exit CXRs: at exit unless on lunch
+        if (r.lunch && r.lunch.from <= h && r.lunch.to > h) return;
+        if (r.shiftStart <= h && r.shiftEnd > h) cnt++;
+        return;
+      }
+      // Block-based CXRs
+      if (r.b1 && r.b1.station === 'exit' && r.b1.from <= h && (r.lunch ? r.lunch.from : r.b1.to) > h) cnt++;
+      else if (r.b2 && r.b2.station === 'exit' && (r.lunch ? r.lunch.to : r.b2.from) <= h && r.b2.to > h) cnt++;
+    });
+    return cnt;
+  }
+  // Find pairs of overlapping exit-side lunches and stagger the later
+  // one by +30 min if doing so improves exit coverage at that half-hour.
+  const exitSideRotations = allRotations.filter(lunchSpansExit);
+  exitSideRotations.sort((a,b) => (a.lunch?.from || 99) - (b.lunch?.from || 99));
+  for (let i = 0; i < exitSideRotations.length; i++) {
+    for (let j = i + 1; j < exitSideRotations.length; j++) {
+      const ra = exitSideRotations[i], rb = exitSideRotations[j];
+      if (!lunchOverlap(ra, rb)) continue;
+      // Try shifting rb's lunch by +0.5
+      const newFrom = rb.lunch.from + 0.5, newTo = rb.lunch.to + 0.5;
+      if (newTo > rb.shiftEnd) continue; // can't push past shift end
+      if (rb.b2 && newFrom >= rb.b2.from && newTo <= rb.b2.to) {
+        // Lunch fits within b2 — apply shift
+        const beforeCov = exitAtHalfHour(ra.lunch.from);
+        // Tentatively apply
+        const oldLunchFrom = rb.lunch.from, oldLunchTo = rb.lunch.to;
+        const oldB2From = rb.b2.from;
+        rb.lunch.from = newFrom; rb.lunch.to = newTo;
+        if (rb.b2.from < newFrom) rb.b2.from = newTo; // adjust b2 boundary if needed
+        // Also fix b1 end if it abutted lunch
+        if (rb.b1 && Math.abs(rb.b1.to - oldLunchFrom) < 0.01) {
+          rb.b1.to = newFrom;
+        }
+        const afterCov = exitAtHalfHour(ra.lunch.from);
+        if (afterCov <= beforeCov) {
+          // No improvement — revert
+          rb.lunch.from = oldLunchFrom; rb.lunch.to = oldLunchTo;
+          rb.b2.from = oldB2From;
+          if (rb.b1 && Math.abs(rb.b1.to - newFrom) < 0.01) rb.b1.to = oldLunchFrom;
+        }
+      }
+    }
+  }
 
   return { rotations: allRotations, workingExit, coverage, rules, exitGap, dow };
 }
@@ -6008,15 +6086,15 @@ function addMgmtBlockPrompt(pid) {
   const mods = STATE.shiftMod||{}, ov = mods[pid]||{};
   const ss = ov.start!=null ? ov.start : p.shiftStart;
   const se = ov.end!=null   ? ov.end   : p.shiftEnd;
-  // Format hour as "8.5" → "8:30" for input value
-  const hToInput = (h) => {
-    if (h==null) return '';
-    const hh = Math.floor(h);
-    const mm = Math.round((h - hh) * 60);
-    return `${hh}:${String(mm).padStart(2,'0')}`;
-  };
-  const stations = ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling'];
-  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌'};
+  const isMgmt = ['ARM','BRM','ABRM','MT'].includes(p.role);
+  // Station options are role-aware. Managers get the full list (they
+  // bounce between Emerald, Counter, Exit, Returns, Floater, Shuttle).
+  // CXRs get a smaller list (Counter, Exit, Returns, Shuttle) since they
+  // don't typically work the Emerald booth or float positions.
+  const stations = isMgmt
+    ? ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling']
+    : ['Counter','Exit Booth','Returns','Shuttling'];
+  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Counter':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌'};
 
   const html = `
     <div style="display:grid;gap:10px">
@@ -6238,8 +6316,11 @@ function openEditMgmtBlockModal(pid, bidx) {
   const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
   const entry = exp[pid];
   const nick = entry?.person?.nick || entry?.person?.name?.split(' ')[0] || pid;
-  const stations = ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling'];
-  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌'};
+  const isMgmt = entry?.person && ['ARM','BRM','ABRM','MT'].includes(entry.person.role);
+  const stations = isMgmt
+    ? ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling']
+    : ['Counter','Exit Booth','Returns','Shuttling'];
+  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Counter':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌'};
 
   const html = `
     <div style="display:grid;gap:10px">
@@ -7771,6 +7852,38 @@ function setWU(v) {
   else { STATE.walkUpPolicy=v; if(!STATE.fields)STATE.fields={}; STATE.fields.wuSetManually='1'; saveState(); updateWUBtns(); buildBoardGrid(); }
 }
 
+// 24-hour booking policy — same UX pattern as walk-up policy buttons.
+// Stores in STATE.fields.book24hr (one of 'open', 'restricted',
+// 'emerald-only', 'closed'). Drives the badge shown on emails/print
+// when restrictions are active.
+function set24hr(v) {
+  if (!STATE.fields) STATE.fields = {};
+  STATE.fields.book24hr = v;
+  saveState();
+  update24hrButtons();
+  if (typeof refreshDash === 'function') refreshDash();
+  if (typeof toast === 'function') toast('24hr Booking: '+v);
+}
+
+// Toggle the visual highlight on the 24hr buttons. Same .on + color-suffix
+// pattern as updateWalkUpButtons. 'g' green = open, 'a' amber = restricted,
+// 'b' blue = emerald-only, 'r' red = closed.
+function update24hrButtons() {
+  const v = (STATE.fields && STATE.fields.book24hr) || 'open';
+  const btns = [
+    ['b24-open-b',       'open',         'g'],
+    ['b24-restricted-b', 'restricted',   'a'],
+    ['b24-emerald-b',    'emerald-only', 'b'],
+    ['b24-closed-b',     'closed',       'r'],
+  ];
+  btns.forEach(([id, val, colorCls]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('on','g','b','a','r');
+    if (v === val) el.classList.add('on', colorCls);
+  });
+}
+
 function calcBoard() {
   buildBoardGrid();
   if (typeof updateBoardTotals === 'function') updateBoardTotals();
@@ -7984,7 +8097,7 @@ function buildBoardFlow() {
     return;
   }
 
-  const type     = typeEl ? typeEl.value : 'net';
+  const type     = typeEl ? typeEl.value : 'overlay';
   const coreOnlyChecked = coreOnly ? coreOnly.checked : false;
 
   function getVal(d) {
@@ -8021,6 +8134,96 @@ function buildBoardFlow() {
       `<div><div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px">Net</div>
         <div style="font-family:var(--ff-mono);font-size:20px;font-weight:700;color:${netColor}">${netTotal>0?'+':''}${netTotal}</div></div>` +
       `<div style="margin-left:auto;align-self:center;font-size:10px;color:var(--txt3)">AM + PM combined</div>`;
+  }
+
+  // ── OVERLAY MODE (v51) ─────────────────────────────────────────────
+  // When type === 'overlay', show res AND ret bars per group with the
+  // net underneath. Semi-transparent layered bars so you can SEE the
+  // differential at a glance: where the green ret bar extends past the
+  // amber res bar, that's surplus; where amber extends past green,
+  // that's a shortfall. This is what Matt asked for: "Overlay the res
+  // and ret bars to see the differential."
+  if (type === 'overlay') {
+    // Sort by demand magnitude (max of res or ret) so biggest bars are at top
+    const sortedGroups = GROUP_META.filter(g => {
+      if (coreOnlyChecked && !CORE_GROUPS.has(g.n)) return false;
+      const d = data[g.n];
+      return d && d.has;
+    }).sort((a, b) => {
+      const da = data[a.n], db = data[b.n];
+      const va = Math.max(da.res, da.ret);
+      const vb = Math.max(db.res, db.ret);
+      return vb - va;
+    });
+    // Scale all bars to the largest single value across all groups
+    const maxVal = Math.max(...sortedGroups.map(g => {
+      const d = data[g.n];
+      return Math.max(d.res, d.ret);
+    }), 1);
+
+    let out2 = '<div style="display:grid;grid-template-columns:140px 1fr 60px;gap:6px 10px;align-items:center">';
+    sortedGroups.forEach(g => {
+      const d = data[g.n];
+      const isCore = CORE_GROUPS.has(g.n);
+      const st = typeof getGroupStatus === 'function' ? getGroupStatus(g.n, d.net) : 'na';
+      const stDot = st === 'wu' ? '●' : st === 'up' ? '◐' : '○';
+      const dotCol = st === 'wu' ? 'var(--green)' : st === 'up' ? 'var(--amber)' : 'var(--red)';
+      const resPct = (d.res / maxVal) * 100;
+      const retPct = (d.ret / maxVal) * 100;
+      const netStr = (d.net > 0 ? '+' : '') + d.net;
+      const netCol = d.net > 0 ? 'var(--green)' : d.net < 0 ? 'var(--red)' : 'var(--txt3)';
+
+      out2 +=
+        `<div style="font-size:10px;font-weight:${isCore?700:400};
+          color:${isCore?'var(--acc)':'var(--txt2)'};
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+          display:flex;align-items:center;gap:5px">
+          <span style="font-size:7px;color:${dotCol}">${stDot}</span>${g.n}
+        </div>
+        <div style="position:relative;height:22px;background:var(--bg3);border-radius:3px;overflow:hidden">
+          <!-- Res bar (amber, semi-transparent so overlap shows) -->
+          <div style="position:absolute;top:0;left:0;height:100%;
+            width:${resPct}%;background:rgba(217,119,6,.55);
+            border-right:1px solid var(--amber);
+            transition:width .25s" title="Reservations: ${d.res}"></div>
+          <!-- Ret bar (green, semi-transparent so overlap shows) -->
+          <div style="position:absolute;top:0;left:0;height:100%;
+            width:${retPct}%;background:rgba(22,163,74,.45);
+            border-right:1px solid var(--green);
+            transition:width .25s" title="Returns: ${d.ret}"></div>
+          <!-- Inline tiny labels for res and ret -->
+          <div style="position:absolute;top:0;left:0;height:100%;
+            display:flex;align-items:center;padding-left:5px;gap:6px;
+            font-family:var(--ff-mono);font-size:9px;font-weight:700;
+            color:#fff;text-shadow:0 0 2px rgba(0,0,0,.7);pointer-events:none">
+            <span style="color:#fbbf24">R${d.res}</span>
+            <span style="color:#86efac">↩${d.ret}</span>
+          </div>
+        </div>
+        <div style="font-family:var(--ff-mono);font-size:12px;font-weight:700;
+          color:${netCol};text-align:right" title="Net (Ret − Res)">${netStr}</div>`;
+    });
+    out2 += '</div>';
+    // Mini legend below the chart so the colors are obvious without
+    // hovering the bars
+    out2 += `<div style="display:flex;gap:14px;justify-content:flex-end;
+      margin-top:8px;font-size:10px;color:var(--txt3)">
+      <span style="display:inline-flex;align-items:center;gap:4px">
+        <span style="display:inline-block;width:10px;height:10px;background:rgba(217,119,6,.55);border:1px solid var(--amber);border-radius:2px"></span>
+        Res (Reservations)
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:4px">
+        <span style="display:inline-block;width:10px;height:10px;background:rgba(22,163,74,.45);border:1px solid var(--green);border-radius:2px"></span>
+        Ret (Returns)
+      </span>
+      <span style="display:inline-flex;align-items:center;gap:4px">
+        <span style="font-family:var(--ff-mono);font-weight:700">±N</span>
+        Net (Ret − Res)
+      </span>
+    </div>`;
+    chartEl.innerHTML = out2;
+    buildDashFlowStrip();
+    return;
   }
 
   const maxAbs = Math.max(...groups.map(g => Math.abs(getVal(data[g.n]) || 0)), 1);
@@ -8217,6 +8420,15 @@ function setAltPosition(pid, posKey) {
   if (!STATE.altSchedule) STATE.altSchedule = {};
   if (posKey === 'normal') delete STATE.altSchedule[pid];
   else STATE.altSchedule[pid] = posKey;
+  // Clear any previously-set specialBlocks lunch for this person — the
+  // rotation engine generates rot.lunch fresh based on the new altPosition,
+  // so stale specialBlocks lunches just create double-stamps and confuse
+  // the dashboard's "next lunch" lookup. Other specialBlocks (break,
+  // training, shuttling) persist.
+  if (STATE.specialBlocks && STATE.specialBlocks[pid]) {
+    STATE.specialBlocks[pid] = STATE.specialBlocks[pid].filter(b => b.key !== 'lunch');
+    if (!STATE.specialBlocks[pid].length) delete STATE.specialBlocks[pid];
+  }
   // Rebuild rotation map immediately
   try {
     const _rot = buildSmartRotation();
@@ -8884,7 +9096,7 @@ function buildDashSchedMini() {
           text-decoration:${callout?'line-through':'none'};
           white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
           ${nick}${isMgmt&&mgmtStation?` <span style="font-size:9px;color:${info.color};font-weight:600">· ${mgmtStation}</span>`:''}
-          ${info.zone==='lunch'?'<span style="color:var(--amber);font-size:9px"> · Lunch</span>':''}
+          ${info.zone==='lunch' && !(isMgmt && /lunch/i.test(mgmtStation))?'<span style="color:var(--amber);font-size:9px"> · Lunch</span>':''}
         </div>
         ${!isMgmt?`<div style="font-size:9px;color:var(--txt3);display:flex;gap:6px;align-items:center">
           <span style="color:${info.color};font-weight:600">${info.label}</span>
@@ -9880,23 +10092,32 @@ function buildCoverageTimeline() {
     if(ss2!=null&&se2!=null){
       // Background: off (full shift width)
       addSeg(H_S,H_E,'bg');
+      // ASSIGNMENT BLOCKS PRECEDENCE (v50): if this person has any
+      // STATE.mgmtBlocks entries, those override the auto-rotation.
+      // Manual assignment by a manager always wins over the engine's
+      // auto-distribute. This applies to CXRs as well as managers
+      // (Matt's request to extend the assignment block pattern to CXRs
+      // — "less commonly done, but do happen").
+      const hasManualBlocks = !!((STATE.mgmtBlocks||{})[pid] || []).length;
       // Main rotation blocks
-      if(rot){
+      if(rot && !hasManualBlocks){
         if(rot.b1)addSeg(rot.b1.from,rot.lunch?rot.lunch.from:rot.b1.to,rot.b1.station==='exit'?'exit':'counter');
         if(rot.lunch)addSeg(rot.lunch.from,rot.lunch.to,'lunch');
         if(rot.b2)addSeg(rot.lunch?rot.lunch.to:rot.b2.from,rot.b2.to,rot.b2.station==='exit'?'exit':'counter');
         if(rot.b3)addSeg(rot.b3.from,rot.b3.to,rot.b3.station==='exit'?'exit':'counter');
       } else {
-        // No rotation — use station-based fallback.
+        // No rotation OR rotation overridden by manual assignment blocks.
         // RETURNS role agents are intentionally skipped from buildSmartRotation
         // (they don't rotate — they stay at Returns all shift), so they always
         // hit this branch. Must explicitly assign 'returns' zone here, or they
         // fall through to 'counter' default and render as blue "Ctr" bars
         // even though they're under the RETURNS section header.
-        // MANAGER MULTI-STATION BLOCKS: if STATE.mgmtBlocks[pid] is populated
-        // for a manager (ARM/BRM/ABRM/MT), each block renders as its own
-        // station-colored segment. Otherwise falls through to single-station.
-        const mblocks = isMgmt ? ((STATE.mgmtBlocks||{})[pid]||[]) : [];
+        // ASSIGNMENT BLOCKS (mgmtBlocks): if STATE.mgmtBlocks[pid] is
+        // populated for ANYONE (manager OR CXR — v50 expanded coverage),
+        // each block renders as its own station-colored segment; gaps fill
+        // with the role's default station. Otherwise falls through to
+        // single-station.
+        const mblocks = ((STATE.mgmtBlocks||{})[pid]||[]);
         if (mblocks.length) {
           // Sort blocks chronologically and render each as its own colored segment.
           // Stations map to existing zones for color/label consistency.
@@ -9908,22 +10129,65 @@ function buildCoverageTimeline() {
             if (st === 'Shuttling') return 'shuttling';
             return 'mgmt'; // Floater, At 99, Outfield, etc. → generic mgmt purple
           };
+          // ── Determine the default station for gap-fill ─────────────────
+          // mgmtBlocks act as EXCEPTIONS to the default station. So if Carlos
+          // is staffStation='Emerald Booth' all day with one block 12-2p at
+          // Counter, we want: Emerald 8a-12p → Counter 12p-2p → Emerald
+          // 2p-end. Without this, the gaps before/after the 12-2p block
+          // would render BLANK and look like Carlos vanished from the
+          // schedule. That's the "blocks aren't synced up" bug Matt reported.
+          //
+          // The default depends on role: CXR → counter, EXIT → exit,
+          // RETURNS → returns, MANAGER → staffStation or floater. This
+          // way each role falls back to a sensible station when the user
+          // hasn't picked one manually.
+          const stOverride = (STATE.staffStation||{})[pid];
+          let defaultZone;
+          if (stOverride) {
+            defaultZone = stationToZone(stOverride);
+          } else if (p.role === 'EXIT') {
+            defaultZone = 'exit';
+          } else if (p.role === 'RETURNS') {
+            defaultZone = 'returns';
+          } else if (isMgmt) {
+            defaultZone = 'mgmt';
+          } else {
+            defaultZone = 'counter'; // CXR default
+          }
           // Sort but track ORIGINAL array index so drag/edit handlers can find
           // the block in STATE.mgmtBlocks[pid] without disturbing the order.
-          const sortedWithIdx = mblocks.map((b,i)=>({b,i})).sort((a,b)=>a.b.from-b.b.from);
+          const sortedWithIdx = mblocks
+            .map((b,i)=>({b,i}))
+            .filter(({b}) => b.from < b.to) // skip degenerate blocks
+            .sort((a,b)=>a.b.from-b.b.from);
+          // ── Walk the shift from ss2 → se2, filling gaps with default ─────
+          let cursor = ss2;
           sortedWithIdx.forEach(({b, i: bidx}) => {
             const fromClamped = Math.max(b.from, ss2);
             const toClamped   = Math.min(b.to,   se2);
-            if (fromClamped < toClamped) {
-              const seg = {x:Math.max(0,(fromClamped-H_S)*W), w:0, zone:stationToZone(b.station)};
-              seg.w = Math.max(0,Math.min((H_E-H_S)*W,(toClamped-H_S)*W)-seg.x);
-              if (seg.w >= 1) {
-                seg.mgmtPid = pid;
-                seg.mgmtBidx = bidx; // index in original mgmtBlocks[pid] array
-                segments.push(seg);
-              }
+            if (fromClamped >= toClamped) return; // block fully outside shift
+            // Gap before this block — fill with default station
+            if (cursor < fromClamped) {
+              addSeg(cursor, fromClamped, defaultZone);
             }
+            // The block itself — drawn with mgmt drag/edit attributes
+            const seg = {
+              x: Math.max(0, (fromClamped - H_S) * W),
+              w: 0,
+              zone: stationToZone(b.station),
+            };
+            seg.w = Math.max(0, Math.min((H_E - H_S) * W, (toClamped - H_S) * W) - seg.x);
+            if (seg.w >= 1) {
+              seg.mgmtPid = pid;
+              seg.mgmtBidx = bidx; // index in original mgmtBlocks[pid] array
+              segments.push(seg);
+            }
+            cursor = Math.max(cursor, toClamped);
           });
+          // Trailing gap after last block — fill to shift end
+          if (cursor < se2) {
+            addSeg(cursor, se2, defaultZone);
+          }
         } else {
           const st2=(STATE.staffStation||{})[pid];
           const z2=p.role==='RETURNS' ? 'returns' :
@@ -9932,8 +10196,20 @@ function buildCoverageTimeline() {
           addSeg(ss2,se2,z2);
         }
       }
-      // Special blocks overlay (on top of rotation)
-      specs.forEach(b=>{if(b.from<b.to)addSeg(b.from,b.to,b.key);});
+      // Special blocks overlay (on top of rotation).
+      // EXCEPT lunch — if the rotation engine already produced a lunch
+      // segment, don't render specialBlocks lunch on top (would create
+      // visible double-stamp / two orange pills side-by-side, which is
+      // also the cause of "lunch not pulling through" — when both
+      // exist, the second overlay covers the first and the visible
+      // result depends on order). Other special block types (break,
+      // training, shuttling) still overlay normally.
+      const rotHasLunch = !!(rot && rot.lunch);
+      specs.forEach(b=>{
+        if(b.from>=b.to)return;
+        if(rotHasLunch && b.key==='lunch')return;
+        addSeg(b.from,b.to,b.key);
+      });
     }
 
     // Render as absolute-positioned overlapping divs.
@@ -10063,21 +10339,43 @@ function printScheduleMap() {
     const segs = [];
 
     const rot = window._lastRotations && window._lastRotations[pid];
-    const mblocks = isMgmt ? ((STATE.mgmtBlocks||{})[pid] || []) : [];
+    const mblocks = ((STATE.mgmtBlocks||{})[pid] || []);
+    // Manual assignment blocks override auto-rotation (v50)
+    const hasManualBlocks = mblocks.length > 0;
 
-    if (rot) {
+    if (rot && !hasManualBlocks) {
       // CXR with rotation blocks
       if (rot.b1) segs.push({from:rot.b1.from, to:(rot.lunch?rot.lunch.from:rot.b1.to), zone:rot.b1.station==='exit'?'exit':'counter'});
       if (rot.lunch) segs.push({from:rot.lunch.from, to:rot.lunch.to, zone:'lunch'});
       if (rot.b2) segs.push({from:(rot.lunch?rot.lunch.to:rot.b2.from), to:rot.b2.to, zone:rot.b2.station==='exit'?'exit':'counter'});
       if (rot.b3) segs.push({from:rot.b3.from, to:rot.b3.to, zone:rot.b3.station==='exit'?'exit':'counter'});
     } else if (mblocks.length) {
-      // Manager with multi-station blocks
-      mblocks.slice().sort((a,b)=>a.from-b.from).forEach(b => {
+      // Anyone with multi-station assignment blocks (v50: extended from
+      // managers to all roles). Same model as live timeline: blocks are
+      // EXCEPTIONS to the default station, gaps filled with role-aware
+      // default. CXR → counter, EXIT → exit, RETURNS → returns,
+      // MANAGER → staffStation or floater.
+      const stOverride = (STATE.staffStation||{})[pid];
+      let defaultZone;
+      if (stOverride) defaultZone = stationToZone(stOverride);
+      else if (p.role === 'EXIT') defaultZone = 'exit';
+      else if (p.role === 'RETURNS') defaultZone = 'returns';
+      else if (isMgmt) defaultZone = 'mgmt';
+      else defaultZone = 'counter';
+      const sorted = mblocks
+        .slice()
+        .filter(b => b.from < b.to)
+        .sort((a,b)=>a.from-b.from);
+      let cursor = ss;
+      sorted.forEach(b => {
         const f = Math.max(b.from, ss);
         const t = Math.min(b.to, se);
-        if (f < t) segs.push({from: f, to: t, zone: stationToZone(b.station)});
+        if (f >= t) return;
+        if (cursor < f) segs.push({from: cursor, to: f, zone: defaultZone});
+        segs.push({from: f, to: t, zone: stationToZone(b.station)});
+        cursor = Math.max(cursor, t);
       });
+      if (cursor < se) segs.push({from: cursor, to: se, zone: defaultZone});
     } else {
       // Single-station fallback
       const st2 = (STATE.staffStation||{})[pid];
@@ -10193,16 +10491,49 @@ function printScheduleMap() {
       .hour-tick { position: absolute; top: 0; font-size: 8px; color: #555; text-align: left; padding-left: 1px; border-left: 1px solid #ddd; height: 16px; }
 
       .bar-col { flex: 0 0 auto; padding: 2px 0; }
-      .bar-track { position: relative; height: ${ROW_H}px; background: #f6f6f6; border-radius: 3px; }
+      .bar-track {
+        position: relative; height: ${ROW_H}px;
+        background: #fff;
+        border: 1px solid #d1d5db;
+        border-radius: 3px;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
       .hour-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #e5e7eb; }
-      .seg { position: absolute; top: 1px; height: ${ROW_H - 2}px; border-radius: 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 10px; overflow: hidden; }
+      /* Each station-colored bar. Borders + filled background + bold white
+         text. -webkit-print-color-adjust:exact tells the browser to PRINT
+         the background color rather than strip it. Even if the printer or
+         browser overrides that, the dark border + bold text keep each bar
+         identifiable on plain white paper. */
+      .seg {
+        position: absolute; top: 1px; height: ${ROW_H - 2}px;
+        border-radius: 3px;
+        border: 1.5px solid rgba(0,0,0,.45);
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center;
+        color: #fff;
+        font-weight: 800; font-size: 10px;
+        text-shadow: 0 0 2px rgba(0,0,0,.6);
+        overflow: hidden;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
       .seg .lbl { line-height: 1.1; }
-      .seg .sublbl { font-size: 7px; opacity: 0.85; line-height: 1; margin-top: 1px; font-weight: 500; }
+      .seg .sublbl { font-size: 7px; opacity: 0.95; line-height: 1; margin-top: 1px; font-weight: 600; }
+
+      /* Legend dots — same print-color treatment */
+      .leg-dot {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        border: 1px solid rgba(0,0,0,.4);
+      }
 
       @media print {
         @page { margin: 0.4in; size: letter landscape; }
-        body { padding: 0; }
+        body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .no-print { display: none; }
+        /* Ensure backgrounds print on every browser */
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       }
     </style>
   </head><body>
@@ -10630,15 +10961,18 @@ function autoDistributeExit(exp) {
       const seAdj = (se != null && se < ss) ? se + 24 : se;
       return h >= ss && (seAdj == null || h < seAdj);
     }).length;
-    // ADD: Count managers with mgmtBlocks station='Exit Booth' active at h.
+    // ADD: Count ANYONE with mgmtBlocks station='Exit Booth' active at h.
     // This is the link that makes manager flexibility help exit coverage —
     // when a manager assigns themselves to Exit for a time block, the
     // engine sees the gap shrink and won't over-assign CXRs to fill it.
+    // v50: extended to CXRs as well — a CXR with an Exit Booth assignment
+    // block also counts toward exit coverage at that hour.
     const mb = STATE.mgmtBlocks || {};
     Object.entries(mb).forEach(([pid, blocks]) => {
       const e = exp[pid]; if (!e) return;
       if ((STATE.todayOverrides||{})[pid] === 'callout') return;
-      if (!['ARM','BRM','ABRM','MT'].includes(e.person.role)) return;
+      // Skip dedicated EXIT agents — already counted in the loop above.
+      if (e.person.role === 'EXIT') return;
       if ((blocks||[]).some(b => b.station === 'Exit Booth' && h >= b.from && h < b.to)) {
         count++;
       }
@@ -11050,19 +11384,56 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
       });
       h+=`</div>`;
     } else {
-      // CXRs get: Counter, Exit
-      h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-        <button onclick="setStation('${pid}','Counter');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
-          style="padding:8px;border-radius:6px;border:1px solid;font-size:12px;font-weight:700;cursor:pointer;
-            background:${station==='Counter'?'rgba(37,99,235,.15)':'var(--bg3)'};
-            border-color:${station==='Counter'?'var(--acc)':'var(--bdr2)'};
-            color:${station==='Counter'?'var(--acc)':'var(--txt3)'}">🟦 Counter</button>
-        <button onclick="setStation('${pid}','Exit Booth');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
-          style="padding:8px;border-radius:6px;border:1px solid;font-size:12px;font-weight:700;cursor:pointer;
-            background:${station==='Exit Booth'?'rgba(52,211,153,.15)':'var(--bg3)'};
-            border-color:${station==='Exit Booth'?'var(--green)':'var(--bdr2)'};
-            color:${station==='Exit Booth'?'var(--green)':'var(--txt3)'}">🟩 Exit</button>
-      </div>`;
+      // CXRs (and EXIT, RETURNS) — assignment blocks (v50). Top
+      // Counter/Exit buttons removed in v50 (covered by rotation row).
+      // Time Blocks panel works the same as managers but with fewer
+      // station options (Counter / Exit / Returns / Lunch / Break /
+      // Training).
+      const mblocks = (STATE.mgmtBlocks||{})[pid]||[];
+      h+=`<div style="margin-bottom:10px;padding:8px;border:1px solid var(--bdr2);border-radius:6px;background:var(--bg3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">
+            ✨ Assignment Blocks ${mblocks.length?`(${mblocks.length})`:''}
+          </div>
+          <button onclick="addMgmtBlockPrompt('${pid}')"
+            style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--acc);background:rgba(37,99,235,.1);color:var(--acc);font-weight:700;cursor:pointer">
+            + Add Block
+          </button>
+        </div>`;
+      if (mblocks.length) {
+        const stColor = {
+          'Counter':'var(--acc)','Counter Manager':'var(--acc)',
+          'Exit Booth':'var(--green)',
+          'Returns':'#06b6d4',
+          'Shuttling':'#f59e0b',
+        };
+        const stIcon = {
+          'Counter':'🟦','Counter Manager':'🟦',
+          'Exit Booth':'🟩',
+          'Returns':'↩',
+          'Shuttling':'🚌',
+        };
+        const sorted = [...mblocks].sort((a,b)=>a.from-b.from);
+        sorted.forEach(b => {
+          const realIdx = mblocks.indexOf(b);
+          const col = stColor[b.station]||'var(--txt3)';
+          const ic  = stIcon[b.station]||'•';
+          h+=`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--bdr);font-size:11px">
+            <span style="color:${col};font-weight:700;min-width:90px">${ic} ${b.station}</span>
+            <span style="font-family:var(--ff-mono);color:var(--txt3);font-size:10px;flex:1">${fmtH(b.from)} → ${fmtH(b.to)}</span>
+            <button onclick="removeMgmtBlock('${pid}',${realIdx})"
+              style="background:none;border:none;color:var(--red);font-size:14px;cursor:pointer;padding:0 4px;line-height:1" title="Remove block">×</button>
+          </div>`;
+        });
+        h+=`<div style="font-size:9px;color:var(--txt3);font-style:italic;margin-top:4px">
+          Blocks override auto-rotation. Exit Booth blocks count toward exit coverage.
+        </div>`;
+      } else {
+        h+=`<div style="font-size:10px;color:var(--txt3);font-style:italic;padding:4px 0">
+          No blocks set — auto-rotation applies (above buttons).
+        </div>`;
+      }
+      h+=`</div>`;
     }
     // Rotation
     h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px">`;
