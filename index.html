@@ -11,47 +11,52 @@
 
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
-  --bg:        #0a0e14;
-  --bg2:       #111820;
-  --bg3:       #1a2535;
-  --border:    #243044;
-  --border2:   #2e3f58;
-  --text:      #e8edf5;
-  --text2:     #8fa3bf;
-  --text3:     #4e6480;
-  --accent:    #3b82f6;
-  --accent2:   #1d4ed8;
+  /* Theme palette — v52 brightened across the board for the airport's
+     low-contrast monitors. Backgrounds lifted so cards separate from the
+     page; mid-tone text shades pushed brighter so var(--text3) / var(--txt3)
+     are still legible on washed-out screens. Pure black removed
+     entirely (--bg was #0a0e14, now #131b2a). */
+  --bg:        #131b2a;
+  --bg2:       #1c2841;
+  --bg3:       #2a3a55;
+  --border:    #3a4d6e;
+  --border2:   #4a6088;
+  --text:      #f0f5fc;
+  --text2:     #d0dff2;
+  --text3:     #95a8c0;
+  --accent:    #5b9aff;
+  --accent2:   #2563eb;
 
   /* status colors */
-  --wu:        #16a34a;  /* walk-up open — green */
-  --wu-bg:     #052e16;
+  --wu:        #22c55e;  /* walk-up open — green (brightened from #16a34a) */
+  --wu-bg:     #062e1f;
   --wu-border: #15803d;
-  --up:        #ca8a04;  /* upgrade only — amber */
+  --up:        #eab308;  /* upgrade only — amber (brightened from #ca8a04) */
   --up-bg:     #1c1400;
   --up-border: #a16207;
-  --na:        #dc2626;  /* not available — red */
+  --na:        #ef4444;  /* not available — red (brightened from #dc2626) */
   --na-bg:     #1c0505;
   --na-border: #991b1b;
 
   /* station colors */
-  --counter:   #3b82f6;
-  --exit:      #16a34a;
-  --eb:        #7c3aed;
-  --returns:   #ea580c;
-  --off:       #4e6480;
+  --counter:   #5b9aff;
+  --exit:      #22c55e;
+  --eb:        #8b5cf6;
+  --returns:   #f97316;
+  --off:       #6b7d99;
 
   /* font stack */
   --font-ui:   'Barlow', sans-serif;
   --font-mono: 'DM Mono', monospace;
   --font-hd:   'Barlow Condensed', sans-serif;
   /* ── Aliases — both naming schemes work ── */
-  --txt:    #f0f7ff;  --txt2: #b8d4ef;  --txt3: #7aaac8;
-  --acc:    #4d9fff;  --acc2: #2563eb;
-  --bdr:    #1e3a5f;  --bdr2: #2a5080;
-  --green:  #34d399;  --green2:#052e16;  --green3:#10b981;
-  --amber:  #d97706;  --amber2:#1c1200;  --amber3:#92400e;
-  --red:    #f87171;  --red2:  #1c0505;  --red3:  #991b1b;
-  --purple: #7c3aed;  --orange:#ea580c;  --teal:  #0891b2;
+  --txt:    #f0f5fc;  --txt2: #dbe8f8;  --txt3: #a5c0db;
+  --acc:    #6bafff;  --acc2: #2563eb;
+  --bdr:    #2e4a73;  --bdr2: #4a6088;
+  --green:  #4ade80;  --green2:#062e1f;  --green3:#22c55e;
+  --amber:  #f59e0b;  --amber2:#1c1200;  --amber3:#b45309;
+  --red:    #fca5a5;  --red2:  #1c0505;  --red3:  #b91c1c;
+  --purple: #a78bfa;  --orange:#fb923c;  --teal:  #22d3ee;
   --ff-ui:  'Barlow',sans-serif;
   --ff-mono:'DM Mono',monospace;
   --ff-hd:  'Barlow Condensed',sans-serif;
@@ -1478,8 +1483,12 @@ button { cursor: pointer; }
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <div class="card" style="padding:10px 14px;margin-bottom:8px;cursor:pointer" onclick="showTab('checklist')">
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center">
-      <span title="Customer Service receipts received">Completely Satisfied: <b id="sum-cs" style="color:var(--green);font-family:var(--ff-mono)">—</b></span>
-      <span title="Hot returns awaiting prep">Hot Alerts: <b id="sum-hot" style="color:var(--red);font-family:var(--ff-mono)">—</b></span>
+      <!-- v52: CS / Hot bumped to 14px+bold so they read on dim monitors.
+           Previously 12px regular, lost in the row of small specials. -->
+      <span title="Customer Service receipts received" style="font-size:14px;font-weight:700;color:var(--text2)">
+        Completely Satisfied: <b id="sum-cs" style="color:var(--green);font-family:var(--ff-mono);font-size:16px">—</b></span>
+      <span title="Hot returns awaiting prep" style="font-size:14px;font-weight:700;color:var(--text2)">
+        Hot Alerts: <b id="sum-hot" style="color:var(--red);font-family:var(--ff-mono);font-size:16px">—</b></span>
       <span style="color:var(--bdr2)">│</span>
       <span style="color:var(--txt3);font-size:10px;font-weight:700">Specials:</span>
       <span style="color:var(--txt3)">XXAR <b id="sum-xxar" style="font-family:var(--ff-mono)">—</b></span>
@@ -1589,13 +1598,15 @@ button { cursor: pointer; }
 ═══════════════════════════════════════════════════════════════ -->
 <div class="scr" id="screen-board">
 
-  <!-- Ops header -->
-  <div class="mgr-bar" style="margin-bottom:12px">
-    <span id="bh-cs-hot" style="font-size:12px;color:var(--txt2)">Completely Satisfied —  |  Hot Alerts —</span>
-    <span id="bh-mgrs" style="font-size:12px;color:var(--txt2)">Opening: —  |  Closing: —</span>
-    <span id="bh-classnotes" style="font-size:11px;color:var(--txt3);font-style:italic;margin-left:auto"></span>
-    <button class="btn btn-gh btn-sm" onclick="showTab('board');setTimeout(()=>window.print(),100)"
-      style="margin-left:8px;flex-shrink:0">🖨 Print</button>
+  <!-- Ops header — v52: stripped down to just the print button.
+       The "Completely Satisfied / Hot Alerts / Opening / Closing"
+       summary that lived here was redundant with the same info on the
+       dashboard; Matt: "unnecessary, just the print is needed." The
+       fields and update calls (set('bh-cs', ...), set('bh-hot', ...))
+       are kept harmless: setEl no-ops if the element isn't present, so
+       removing the spans here is safe without touching update logic. -->
+  <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+    <button class="btn btn-gh btn-sm" onclick="showTab('board');setTimeout(()=>window.print(),100)">🖨 Print Board</button>
   </div>
 
   <!-- Combined Walk-Up + 24hr panel -->
@@ -10024,6 +10035,14 @@ function buildCoverageTimeline() {
     const p=entry.person,nick=p.nick||p.name.split(' ')[0];
     const isMgmt=['ARM','BRM','ABRM','MT'].includes(p.role);
     const isOff=(STATE.todayOverrides||{})[pid]==='callout';
+    // Called-off people are hidden from the timeline entirely (the
+    // CALLED OFF (n) badge at the top is the single place they appear).
+    // Without this, called-off folks whose shift starts within 2 hours
+    // would still render a row because the "upcoming shift" exception
+    // below didn't know about callout status. Symptom: Zina marked
+    // called-off at 9:24am for a 10a shift still showed an Exit bar
+    // on the timeline.
+    if (isOff) return;
     const cells=HOURS.map(h=>getZone(pid,p,h));
     const onShift=cells.some(z=>z!=='off');
     // Hide off-shift people unless they start within 2 hours
@@ -10401,7 +10420,12 @@ function printScheduleMap() {
   // matching the hour scale header's `margin-left: NAME_PX`.
   let rowsHtml = '';
   sections.forEach(sec => {
-    const peeps = Object.entries(exp).filter(([,e]) => sec.filter(e));
+    // v52: filter out called-off from print, same as the live timeline.
+    // Without this, a called-off person prints with their bar visible —
+    // managers would think they're working.
+    const peeps = Object.entries(exp).filter(([pid, e]) =>
+      sec.filter(e) && (STATE.todayOverrides||{})[pid] !== 'callout'
+    );
     if (!peeps.length) return;
     rowsHtml += `<div class="section-header" style="margin-left:${NAME_PX + 4}px">— ${sec.label} —</div>`;
     peeps.sort((a,b) => (a[1].person.shiftStart||0) - (b[1].person.shiftStart||0));
