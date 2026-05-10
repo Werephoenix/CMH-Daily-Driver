@@ -11,52 +11,64 @@
 
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
-  /* Theme palette — v52 brightened across the board for the airport's
-     low-contrast monitors. Backgrounds lifted so cards separate from the
-     page; mid-tone text shades pushed brighter so var(--text3) / var(--txt3)
-     are still legible on washed-out screens. Pure black removed
-     entirely (--bg was #0a0e14, now #131b2a). */
-  --bg:        #131b2a;
-  --bg2:       #1c2841;
-  --bg3:       #2a3a55;
-  --border:    #3a4d6e;
-  --border2:   #4a6088;
-  --text:      #f0f5fc;
-  --text2:     #d0dff2;
-  --text3:     #95a8c0;
-  --accent:    #5b9aff;
+  /* Theme palette — v53 brightened AGAIN per Matt: "still tooooo dark
+     overall." This is the second pass. Backgrounds are now mid-slate
+     so cards have real contrast against the page; text colors all
+     pushed brighter; status colors saturated harder. */
+  --bg:        #1a2540;   /* was #131b2a */
+  --bg2:       #243456;   /* was #1c2841 */
+  --bg3:       #324769;   /* was #2a3a55 */
+  --border:    #4a6388;   /* was #3a4d6e */
+  --border2:   #5d78a3;   /* was #4a6088 */
+  --text:      #ffffff;   /* was #f0f5fc */
+  --text2:     #e0eaf5;   /* was #d0dff2 */
+  --text3:     #b0c4de;   /* was #95a8c0 — significantly brighter */
+  --accent:    #74b3ff;   /* was #5b9aff */
   --accent2:   #2563eb;
 
-  /* status colors */
-  --wu:        #22c55e;  /* walk-up open — green (brightened from #16a34a) */
-  --wu-bg:     #062e1f;
-  --wu-border: #15803d;
-  --up:        #eab308;  /* upgrade only — amber (brightened from #ca8a04) */
+  /* status colors — saturated harder */
+  --wu:        #34d399;  /* was #22c55e */
+  --wu-bg:     #064e3b;
+  --wu-border: #10b981;
+  --up:        #fbbf24;  /* was #eab308 */
   --up-bg:     #1c1400;
-  --up-border: #a16207;
-  --na:        #ef4444;  /* not available — red (brightened from #dc2626) */
-  --na-bg:     #1c0505;
-  --na-border: #991b1b;
+  --up-border: #d97706;
+  --na:        #f87171;  /* was #ef4444 */
+  --na-bg:     #2a0606;
+  --na-border: #dc2626;
 
   /* station colors */
-  --counter:   #5b9aff;
-  --exit:      #22c55e;
-  --eb:        #8b5cf6;
-  --returns:   #f97316;
-  --off:       #6b7d99;
+  --counter:   #74b3ff;
+  --exit:      #34d399;
+  --eb:        #a78bfa;
+  --returns:   #fb923c;
+  --off:       #8090a8;
+
+  /* per-tab accent color — used on tab buttons + page accent strip
+     so each section has a distinct "color identity" you can use to
+     navigate by glance. Matt: "color code pages and sections for
+     easy visual identification and navigation at a glance." */
+  --tab-dashboard:   #74b3ff;  /* blue */
+  --tab-paste:       #fbbf24;  /* amber */
+  --tab-board:       #34d399;  /* green */
+  --tab-coverage:    #a78bfa;  /* purple */
+  --tab-checklist:   #fb923c;  /* orange */
+  --tab-reference:   #b0c4de;  /* light blue-grey */
+  --tab-history:     #22d3ee;  /* cyan */
+  --tab-admin:       #f87171;  /* red */
 
   /* font stack */
   --font-ui:   'Barlow', sans-serif;
   --font-mono: 'DM Mono', monospace;
   --font-hd:   'Barlow Condensed', sans-serif;
   /* ── Aliases — both naming schemes work ── */
-  --txt:    #f0f5fc;  --txt2: #dbe8f8;  --txt3: #a5c0db;
-  --acc:    #6bafff;  --acc2: #2563eb;
-  --bdr:    #2e4a73;  --bdr2: #4a6088;
-  --green:  #4ade80;  --green2:#062e1f;  --green3:#22c55e;
-  --amber:  #f59e0b;  --amber2:#1c1200;  --amber3:#b45309;
-  --red:    #fca5a5;  --red2:  #1c0505;  --red3:  #b91c1c;
-  --purple: #a78bfa;  --orange:#fb923c;  --teal:  #22d3ee;
+  --txt:    #ffffff;  --txt2: #ecf3fc;  --txt3: #b9cee3;
+  --acc:    #82bcff;  --acc2: #2563eb;
+  --bdr:    #3d5a8a;  --bdr2: #5d78a3;
+  --green:  #5eead4;  --green2:#064e3b;  --green3:#34d399;
+  --amber:  #fbbf24;  --amber2:#1c1200;  --amber3:#d97706;
+  --red:    #fca5a5;  --red2:  #2a0606;  --red3:  #dc2626;
+  --purple: #c4b5fd;  --orange:#fb923c;  --teal:  #67e8f9;
   --ff-ui:  'Barlow',sans-serif;
   --ff-mono:'DM Mono',monospace;
   --ff-hd:  'Barlow Condensed',sans-serif;
@@ -77,6 +89,28 @@ html {
 .scr { display: none !important; padding: 14px; max-width: 1100px; margin: 0 auto; width: 100%; }
 .scr.on { display: block !important; }
 @media (max-width: 600px) { .scr { padding: 10px; } }
+
+/* v53: per-tab accent strip at the top of each screen — quick visual
+   cue of what page you're on without reading the tab text. The strip
+   color matches each tab's --tab-* variable. */
+.scr.on::before {
+  content: '';
+  display: block;
+  height: 3px;
+  margin: -14px -14px 12px -14px;
+  border-radius: 0 0 6px 6px;
+  background: var(--tab-dashboard); /* default; per-screen overrides below */
+}
+@media (max-width: 600px) { .scr.on::before { margin: -10px -10px 10px -10px; } }
+#screen-dashboard.on::before { background: var(--tab-dashboard); }
+#screen-paste.on::before     { background: var(--tab-paste); }
+#screen-board.on::before     { background: var(--tab-board); }
+#screen-schedule.on::before  { background: var(--tab-coverage); }
+#screen-checklist.on::before { background: var(--tab-checklist); }
+#screen-reference.on::before { background: var(--tab-reference); }
+#screen-history.on::before   { background: var(--tab-history); }
+#screen-admin.on::before     { background: var(--tab-admin); }
+#screen-inventory.on::before { background: var(--tab-history); }
 
 /* Nav */
 #nav {
@@ -1399,92 +1433,99 @@ button { cursor: pointer; }
   </div>
 
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       HERO: Demand at a glance — Res / Ret / Net + brand split.
-       This is the number Matt looks at first; it lives at the top.
-       Brand strip (Nat·Ala·Ent + 2.0 Res) folded inline so the bar
-       stays one row tall on most screens.
+       HERO BAR (v53 restructure): Res / Ret / Net + brand split (now
+       sized to match the left side, was 11px lost in the corner) + WU
+       and 24hr policy indicators (consolidated from the separate
+       Walk-Ups Open card + Walk-Up Policy / 24hr pills below — Matt:
+       "consolidate and eliminate the need for the walk-ups open box").
+       Indicators are colored pills, tap to jump to their setter.
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <div class="mgr-bar" style="flex-wrap:wrap;gap:6px;margin-bottom:8px;cursor:pointer" onclick="showTab('board')" id="dash-res-bar" title="Tap to open Availability Board">
-    <div class="mgr-item">
+  <div class="mgr-bar" style="flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:stretch" id="dash-res-bar" title="Tap a section to navigate">
+    <div class="mgr-item" onclick="showTab('board')" style="cursor:pointer">
       <div class="mgr-item-lbl">Total Res</div>
       <div class="mgr-item-val" id="db-totalres" style="font-size:22px;color:var(--amber)">—</div>
     </div>
-    <div class="mgr-item">
+    <div class="mgr-item" onclick="showTab('board')" style="cursor:pointer">
       <div class="mgr-item-lbl">Total Ret</div>
       <div class="mgr-item-val" id="db-totalret" style="font-size:22px;color:var(--green)">—</div>
     </div>
-    <div class="mgr-item">
+    <div class="mgr-item" onclick="showTab('board')" style="cursor:pointer">
       <div class="mgr-item-lbl">Net</div>
       <div class="mgr-item-val" id="db-totalnet" style="font-size:22px">—</div>
     </div>
-    <div class="mgr-item" style="border-left:1px solid var(--bdr2);padding-left:8px;flex:1;min-width:0">
-      <div class="mgr-item-lbl">Brands · 2.0 Res</div>
-      <div style="display:flex;align-items:center;gap:8px;font-family:var(--ff-mono);font-size:11px;font-weight:700">
-        <span id="db-brands" style="color:var(--txt2);white-space:nowrap">— · — · —</span>
-        <span style="color:var(--bdr2)">|</span>
-        <span style="color:var(--txt3);font-size:10px">2.0:</span>
-        <span id="db-brand20" style="color:var(--txt2)">—</span>
-      </div>
+    <!-- Brand split — sized up to match Res/Ret/Net. Three brand totals
+         stacked compactly so they fit in one mgr-item width. -->
+    <div class="mgr-item" onclick="showTab('paste')"
+         style="cursor:pointer;border-left:1px solid var(--bdr2);padding-left:10px">
+      <div class="mgr-item-lbl">Brands</div>
+      <div id="db-brands" style="font-size:18px;font-family:var(--ff-mono);font-weight:700;color:var(--txt2);line-height:1.05;white-space:nowrap">— · — · —</div>
+      <div style="font-size:8px;color:var(--txt3);font-weight:700;letter-spacing:.04em;margin-top:1px">ALA · ENT · NAT</div>
+    </div>
+    <div class="mgr-item" onclick="showTab('checklist')" style="cursor:pointer">
+      <div class="mgr-item-lbl">2.0 Res</div>
+      <div class="mgr-item-val" id="db-brand20" style="font-size:22px;color:var(--purple)">—</div>
+    </div>
+    <!-- Walk-up indicator — colored pill showing current policy at a
+         glance. Tap to jump to Availability tab where the buttons live. -->
+    <div class="mgr-item" onclick="showTab('board')"
+         style="cursor:pointer;border-left:1px solid var(--bdr2);padding-left:10px">
+      <div class="mgr-item-lbl">Walk-Ups</div>
+      <div id="db-wu-indicator" style="font-size:14px;font-weight:800;line-height:1.05">—</div>
+      <div id="db-wucount-mini" style="font-size:9px;color:var(--txt3);margin-top:1px">— groups open</div>
+    </div>
+    <div class="mgr-item" onclick="showTab('board')" style="cursor:pointer">
+      <div class="mgr-item-lbl">24hr Booking</div>
+      <div id="db-book24-indicator" style="font-size:14px;font-weight:800;line-height:1.05">—</div>
     </div>
   </div>
 
-  <!-- HOURLY FLOW — visual context for the numbers above -->
-  <div class="card" style="padding:10px 12px;margin-bottom:8px;cursor:pointer" onclick="showTab('board')">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">
-        📊 Hourly Flow — Res vs Ret
+  <!-- HOURLY FLOW (v53: full-width, with hour numbers and inline counts;
+       hover a column to see exact res/ret for that hour). -->
+  <div class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer" onclick="showTab('board')">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2)">
+        📊 Hourly Flow — Reservations vs Returns
       </div>
-      <span style="font-size:9px;color:var(--acc)">→ Board</span>
+      <span style="font-size:10px;color:var(--acc)">→ Board</span>
     </div>
-    <div id="dash-hourly-flow" style="min-height:36px">
+    <div id="dash-hourly-flow" style="min-height:64px">
       <div style="font-size:10px;color:var(--txt3);font-style:italic">Paste data to see hourly flow</div>
     </div>
   </div>
 
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       OPERATIONS STRIP: who's running the day + policy state.
-       Re-labeled for clarity: "Walk-Up Policy" (the rule) is distinct
-       from "Walk-Ups Open" (the count of currently-open car groups,
-       shown below).
+       OPS BAR (v53 consolidation): Open Mgr · Close Mgr · Yesterday's
+       Sales · OOS · FBOs · Inv · Checklist progress. Combines what was
+       previously THREE bars (mgrs+policy, walk-ups+checklist cards,
+       and the OOS/FBO/Inv inline strip) into one row.
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <div class="mgr-bar" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
     <div class="mgr-item"><div class="mgr-item-lbl">Opening Mgr</div><div class="mgr-item-val" id="db-openmgr">—</div></div>
     <div class="mgr-item"><div class="mgr-item-lbl">Closing Mgr</div><div class="mgr-item-val" id="db-closemgr">—</div></div>
     <div class="mgr-item"><div class="mgr-item-lbl">Yesterday's Sales</div><div class="mgr-item-val" id="db-sales">—</div></div>
-    <div class="mgr-item" style="border-left:1px solid var(--bdr2);padding-left:8px">
-      <div class="mgr-item-lbl">Walk-Up Policy</div>
-      <div class="mgr-item-val" id="db-wu" style="font-size:12px">—</div>
+    <div class="mgr-item" onclick="showTab('checklist')"
+         style="cursor:pointer;border-left:1px solid var(--bdr2);padding-left:10px">
+      <div class="mgr-item-lbl">OOS</div><div class="mgr-item-val" id="db-oos" style="font-size:16px;font-family:var(--ff-mono)">—</div>
     </div>
-    <div class="mgr-item">
-      <div class="mgr-item-lbl">24hr Booking</div>
-      <div class="mgr-item-val" id="db-book24" style="font-size:12px">Open</div>
+    <div class="mgr-item" onclick="showTab('checklist')" style="cursor:pointer">
+      <div class="mgr-item-lbl">FBOs</div><div class="mgr-item-val" id="db-fbo" style="font-size:16px;font-family:var(--ff-mono)">—</div>
     </div>
-  </div>
-
-  <!-- 2-COL: Walk-Ups Open · Checklist Progress -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-    <div class="card" onclick="showTab('board')" style="cursor:pointer;padding:12px">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">🚦 Walk-Ups Open</div>
-      <div style="font-size:24px;font-weight:800;font-family:var(--ff-mono)" id="db-wucount">—</div>
-      <div id="db-wulabel" style="font-size:10px;color:var(--txt3)">car groups</div>
-      <div style="font-size:9px;color:var(--acc);margin-top:4px">→ Availability</div>
+    <div class="mgr-item" onclick="showTab('checklist')" style="cursor:pointer">
+      <div class="mgr-item-lbl">Inv Agent</div><div class="mgr-item-val" id="db-invagent" style="font-size:14px">—</div>
     </div>
-    <div class="card" onclick="showTab('checklist')" style="cursor:pointer;padding:12px">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">✅ Checklist</div>
-      <div id="sum-cl-progress" style="font-size:11px;color:var(--txt2)">—</div>
-      <div id="sum-cl-data" style="font-size:9px;color:var(--acc);margin-top:4px">→ Checklist</div>
+    <div class="mgr-item" onclick="showTab('checklist')"
+         style="cursor:pointer;border-left:1px solid var(--bdr2);padding-left:10px">
+      <div class="mgr-item-lbl">Checklist</div><div class="mgr-item-val" id="db-cl-progress" style="font-size:13px;color:var(--green)">—</div>
     </div>
   </div>
 
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-       OPS COUNTERS: CS / HOT (left), Specials (middle), OOS / FBO /
-       Inv (right). Visual separators between groups so the eye sees
-       three logical sections instead of one long line.
+       SURVEYS + SPECIALS: CS / Hot Alerts on the left (the two
+       numbers managers most want at a glance), Specials on the right.
+       OOS / FBOs / Inv moved up to the ops bar in v53.
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
   <div class="card" style="padding:10px 14px;margin-bottom:8px;cursor:pointer" onclick="showTab('checklist')">
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center">
-      <!-- v52: CS / Hot bumped to 14px+bold so they read on dim monitors.
-           Previously 12px regular, lost in the row of small specials. -->
       <span title="Customer Service receipts received" style="font-size:14px;font-weight:700;color:var(--text2)">
         Completely Satisfied: <b id="sum-cs" style="color:var(--green);font-family:var(--ff-mono);font-size:16px">—</b></span>
       <span title="Hot returns awaiting prep" style="font-size:14px;font-weight:700;color:var(--text2)">
@@ -1494,10 +1535,6 @@ button { cursor: pointer; }
       <span style="color:var(--txt3)">XXAR <b id="sum-xxar" style="font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--txt3)">SXAR <b id="sum-sxar" style="font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--txt3)">PXAR <b id="sum-pxar" style="font-family:var(--ff-mono)">—</b></span>
-      <span style="color:var(--bdr2)">│</span>
-      <span style="color:var(--txt3)">OOS: <b id="sum-oos" style="font-family:var(--ff-mono)">—</b></span>
-      <span style="color:var(--txt3)">FBOs: <b id="sum-fbo" style="font-family:var(--ff-mono)">—</b></span>
-      <span style="color:var(--txt3)">Inv: <b id="sum-invagent" style="font-family:var(--ff-mono)">—</b></span>
       <span style="color:var(--acc);font-size:10px;margin-left:auto">→ Checklist</span>
     </div>
   </div>
@@ -6510,12 +6547,17 @@ function refreshDash() {
   const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v!==undefined&&v!==null&&v!==''?String(v):'—';};
   const sh=(id,v)=>{const e=document.getElementById(id);if(e)e.innerHTML=v||'—';};
 
-  // Ops bar
+  // Ops bar (Open Mgr / Close Mgr / Yesterday's Sales / OOS / FBO / Inv / Checklist)
   s('db-openmgr', f.openMgr||auto.open); s('db-closemgr', f.closeMgr||auto.close);
   s('db-sales', f.salesLeader);
+  s('db-oos', f.oos);
+  s('db-fbo', f.fboCount||(f.fboNotes?'✎':'—'));
+  s('db-invagent', f.invAgent);
+  // Condensed checklist progress for ops bar — single line "1/24 · 0/10 · 0/25"
+  s('db-cl-progress', clO.done+'/'+clO.total+' · '+clM.done+'/'+clM.total+' · '+clC.done+'/'+clC.total);
+  // Old labels (legacy bar) — set in case the old elements still exist
   s('db-wu', wlbls[pol]);
   s('db-book24', f.book24hr==='restricted'?'Restricted':f.book24hr==='closed'?'Closed':f.book24hr==='emerald-only'?'Emerald Only':'Open');
-  // Strip
   // Res/Ret/Net + brands
   const pd2=STATE.pasteData||{};
   const brands2=pd2.brands||{};
@@ -6524,10 +6566,6 @@ function refreshDash() {
   const gd2=typeof getGroupNetData==='function'?getGroupNetData():{};
   let calcResRem=0,calcRetRem=0,hasRem=false;
   Object.values(gd2).forEach(d=>{if(d&&d.has){calcResRem+=d.res;calcRetRem+=d.ret;hasRem=true;}});
-  // Total Res / Ret tile: prefer calculated remaining from inventory paste
-  // (the source of truth), fall back to brand summary, then to manual field.
-  // Mirrors the v42 board fix — without this, a stale brand total of 34 from
-  // a prior session permanently overrode fresh inventory paste of 360+.
   const calcRes = hasRem ? calcResRem : 0;
   const calcRet = hasRem ? calcRetRem : 0;
   const showRes = calcRes > 0 ? calcRes : (tBrands.totalRes || f.totalRes || '—');
@@ -6539,13 +6577,45 @@ function refreshDash() {
     netEl2.textContent = showNet!==null ? (showNet>0?'+':'')+showNet : '—';
     netEl2.style.color = showNet===null ? 'var(--txt)' : showNet>0 ? 'var(--green)' : 'var(--red)';
   }
+  // Brand split — Ala / Ent / Nat (matches the brand strip header label
+  // ALA · ENT · NAT shown beneath the numbers for visual consistency).
   if(natB.totalRes||alaB.totalRes||entB.totalRes){
     const el2=document.getElementById('db-brands');
-    if(el2)el2.textContent='Nat '+(natB.totalRes||'—')+' · Ala '+(alaB.totalRes||'—')+' · Ent '+(entB.totalRes||'—');
+    if(el2)el2.textContent=(alaB.totalRes||'—')+' · '+(entB.totalRes||'—')+' · '+(natB.totalRes||'—');
   }
   s('db-brand20', f.brand20||'—');
-  // Walk-up count
+
+  // Walk-up + 24hr indicator pills (v53). Color reflects the policy
+  // state at a glance — green=permissive, amber=restricted, red=closed.
+  const wuColors={open:'var(--green)',core:'var(--acc)',noncore:'var(--amber)',closed:'var(--red)'};
+  const wuLabels={open:'✅ All Open',core:'🔵 Core Only',noncore:'🔶 Non-Core',closed:'🔴 Closed'};
+  const wuInd=document.getElementById('db-wu-indicator');
+  if(wuInd){
+    wuInd.textContent=wuLabels[pol]||'—';
+    wuInd.style.color=wuColors[pol]||'var(--txt)';
+  }
+  const b24Pol=f.book24hr||'open';
+  const b24Colors={open:'var(--green)',restricted:'var(--amber)','emerald-only':'var(--acc)',closed:'var(--red)'};
+  const b24Labels={open:'✅ Open',restricted:'🟡 Restricted','emerald-only':'🌟 Emerald Only',closed:'🔴 Closed'};
+  const b24Ind=document.getElementById('db-book24-indicator');
+  if(b24Ind){
+    b24Ind.textContent=b24Labels[b24Pol]||'—';
+    b24Ind.style.color=b24Colors[b24Pol]||'var(--txt)';
+  }
+  // Walk-up count under the indicator
   const wuCount2=Object.entries(gd2).filter(([n,d])=>d&&d.has&&typeof getGroupStatus==='function'&&getGroupStatus(n,d.net)==='wu').length;
+  const wuMini=document.getElementById('db-wucount-mini');
+  if(wuMini){
+    if(hasRem){
+      wuMini.textContent=wuCount2+' group'+(wuCount2===1?'':'s')+' open';
+      wuMini.style.color=wuCount2>0?'var(--green)':'var(--red)';
+    } else {
+      wuMini.textContent='— groups open';
+      wuMini.style.color='var(--txt3)';
+    }
+  }
+  // Legacy elements still on the page (not removed): keep them updated
+  // so any view that still references them shows correct values.
   const wuEl2=document.getElementById('db-wucount');
   const wuLbl=document.getElementById('db-wulabel');
   if(wuEl2){
@@ -6554,8 +6624,10 @@ function refreshDash() {
   }
   if(wuLbl)wuLbl.textContent=pol==='open'?'groups walk-up open':pol==='core'?'core only':pol==='noncore'?'non-core only':'CLOSED';
   s('sum-xxar', f.xxar); s('sum-sxar', f.sxar); s('sum-pxar', f.pxar);
+  // Legacy strip (still present elsewhere — keep updated)
   s('sum-invagent', f.invAgent);
   s('sum-fbo', f.fboCount||(f.fboNotes?'see notes':'—'));
+  s('sum-oos', f.oos);
   const totalDone=clO.done+clM.done+clC.done, totalItems=clO.total+clM.total+clC.total;
   s('sum-cl-progress', 'Opening '+clO.done+'/'+clO.total+' · Mid '+clM.done+'/'+clM.total+' · Closing '+clC.done+'/'+clC.total);
   s('sum-cl-data', totalDone===totalItems&&totalItems>0?'All complete! ✅':'→ Checklist');
@@ -8923,6 +8995,27 @@ function applyTimeEdit(pid) {
     display: fmtDisp(start||baseStart) + '–' + fmtDisp(end||baseEnd),
   };
   saveState();
+  // v53: shift change must propagate everywhere or it looks broken to the
+  // user. Previously this only called buildSwitchboard() which redrew the
+  // person panel — but lunches, rotation blocks, the timeline bar, and
+  // dashboard were all stale because:
+  //   - buildSmartRotation reads STATE.shiftMod for shift bounds → must re-run
+  //   - rotation results live in window._lastRotations → must update
+  //   - timeline reads _lastRotations to draw bars → must rebuild
+  //   - dashboard mini-schedule reads shiftMod for "X left" countdowns
+  // Without all these, the user sees: shift hours in the modal change,
+  // but bar stays the same, lunch stays at old time, coverage doesn't
+  // recompute. Matt: "doesn't reflect anywhere once entered."
+  try {
+    if (typeof buildSmartRotation === 'function') {
+      const _rot = buildSmartRotation();
+      window._lastRotations = window._lastRotations || {};
+      if (_rot && _rot.rotations) _rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
+    }
+  } catch(e) {}
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildDashSchedMini === 'function')   buildDashSchedMini();
+  if (typeof refreshDash === 'function')          refreshDash();
   closeModal();
   buildSwitchboard();
   toast('Shift time updated ✓');
@@ -8931,6 +9024,18 @@ function applyTimeEdit(pid) {
 function clearTimeEdit(pid) {
   if (STATE.shiftMod) delete STATE.shiftMod[pid];
   saveState();
+  // Same rebuild cascade as applyTimeEdit — clearing a custom shift
+  // returns to the roster default, which still affects rotation/lunch/timeline.
+  try {
+    if (typeof buildSmartRotation === 'function') {
+      const _rot = buildSmartRotation();
+      window._lastRotations = window._lastRotations || {};
+      if (_rot && _rot.rotations) _rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
+    }
+  } catch(e) {}
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildDashSchedMini === 'function')   buildDashSchedMini();
+  if (typeof refreshDash === 'function')          refreshDash();
   buildSwitchboard();
 }
 
@@ -12304,26 +12409,45 @@ function buildHourlyFlowChart() {
   </div>`;
   el.innerHTML=out;
 
-  // Update dashboard mini
+  // Update dashboard mini (v53: now full-width with overlaid numbers
+  // and a hover-detail tile. Bars are taller so individual hour values
+  // are visible. Each column has a title attribute showing res/ret
+  // counts. The "now" hour is highlighted in accent color.)
   const dashEl=document.getElementById('dash-hourly-flow');
   if(dashEl){
     const maxV2=Math.max(...res,...ret,1);
-    const W2=11, H2=32;
-    let out2=`<div style="display:flex;align-items:flex-end;gap:1px;height:${H2+10}px;overflow:hidden">`;
-    HOURS.forEach(h=>{
+    const H2=44;  // taller than v51 mini (was 32)
+    // Open hours only (5am to 1am next day, mapped 5..24 with 0 wrapping)
+    // Use full 24h to keep simplicity — small hours just have empty bars
+    let out2=`<div style="position:relative">
+      <!-- Detail readout above the chart, updated by hover via :hover sibling
+           selector won't work because we generate per-bar; instead each bar
+           sets a data attribute and inline title. -->
+      <div style="display:flex;align-items:flex-end;gap:0;height:${H2+22}px;width:100%">`;
+    HOURS.forEach((h, idx)=>{
       const r=res[h]||0,t=ret[h]||0;
       const rH=Math.round(r/maxV2*H2),tH=Math.round(t/maxV2*H2);
       const isNow=new Date().getHours()===h;
-      const showLbl=h===6||h===12||h===18||h===0||isNow;
-      out2+=`<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;width:${W2}px">
-        <div style="display:flex;align-items:flex-end;gap:1px;height:${H2}px">
-          <div style="width:4px;height:${Math.max(rH,r>0?1:0)}px;background:var(--acc);border-radius:1px 1px 0 0;opacity:.85"></div>
-          <div style="width:4px;height:${Math.max(tH,t>0?1:0)}px;background:var(--green);border-radius:1px 1px 0 0;opacity:.85"></div>
+      const showLbl=h%2===0 || isNow; // every 2 hours
+      // Inline numbers on top of bars when value > 0
+      const showNum = (r > 0 || t > 0);
+      out2+=`<div style="display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;padding:0 1px"
+             title="${hLbl(h)}  ·  Res ${r}  ·  Ret ${t}  ·  Net ${(t-r>0?'+':'')+(t-r)}">
+        ${showNum ? `<div style="font-size:8px;color:var(--txt3);font-family:var(--ff-mono);font-weight:700;height:11px;line-height:11px;white-space:nowrap">${t-r>0?'+':''}${t-r||''}</div>` : `<div style="height:11px"></div>`}
+        <div style="display:flex;align-items:flex-end;gap:1px;height:${H2}px;width:100%;justify-content:center">
+          <div style="flex:1;max-width:8px;height:${Math.max(rH,r>0?2:0)}px;background:var(--acc);border-radius:2px 2px 0 0;opacity:.9"></div>
+          <div style="flex:1;max-width:8px;height:${Math.max(tH,t>0?2:0)}px;background:var(--green);border-radius:2px 2px 0 0;opacity:.9"></div>
         </div>
-        <div style="font-size:5px;color:${isNow?'var(--acc)':'var(--txt3)'};">${showLbl?(h===0?'12a':h>12?h-12+'p':h+'a'):''}</div>
+        <div style="font-size:8px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:600};margin-top:2px;height:11px;line-height:11px">${showLbl?(h===0?'12a':h===12?'12p':h>12?h-12+'p':h+'a'):''}</div>
       </div>`;
     });
-    out2+=`</div>`;
+    out2+=`</div>
+      <div style="display:flex;gap:14px;margin-top:4px;font-size:9px;color:var(--txt3)">
+        <span><span style="color:var(--acc);font-size:14px;line-height:1">▪</span> Reservations</span>
+        <span><span style="color:var(--green);font-size:14px;line-height:1">▪</span> Returns</span>
+        <span style="margin-left:auto;font-style:italic">Hover an hour for exact res/ret counts</span>
+      </div>
+    </div>`;
     dashEl.innerHTML=out2;
   }
 }
@@ -12695,80 +12819,105 @@ function printChecklist(blank) {
   const auto = typeof getAutoManagers==='function' ? getAutoManagers() : {};
   const today = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
 
-  // Collect checklist items
+  // Collect checklist items into compact section blocks. v53 redesign:
+  // single-page output via 2-column layout. Each section is a self-
+  // contained block that flows column-fill so columns balance. Item
+  // rows are tighter (5px vertical padding instead of dynamic), font
+  // dropped from 11px to 10px. Header summary cells sized to fit
+  // alongside checklist columns rather than above.
   const clSections = ['opening','mid','closing'];
+  const sectionColors = { opening:'#3b82f6', mid:'#f97316', closing:'#7c3aed' };
+  const sectionLabels = { opening:'OPENING', mid:'MID-SHIFT', closing:'CLOSING' };
   let clHtml = '';
   clSections.forEach(sec => {
     const items = typeof CHECKLIST_ITEMS !== 'undefined' ? (CHECKLIST_ITEMS[sec]||[]) : [];
     if (!items.length) return;
     const done = blank ? 0 : items.filter(it => (STATE.clDone||{})[sec+':'+it.id]).length;
-    clHtml += `<div style="margin-bottom:16px">
-      <div style="font-size:11px;font-weight:800;text-transform:uppercase;
-        letter-spacing:.08em;color:#666;border-bottom:1px solid #ccc;
-        padding-bottom:4px;margin-bottom:8px">
-        ${sec.charAt(0).toUpperCase()+sec.slice(1)} (${blank?'___':done}/${items.length})
+    const col = sectionColors[sec] || '#666';
+    clHtml += `<div style="break-inside:avoid;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;
+        letter-spacing:.06em;color:${col};border-bottom:1.5px solid ${col};
+        padding-bottom:2px;margin-bottom:4px;display:flex;justify-content:space-between">
+        <span>${sectionLabels[sec]}</span>
+        <span style="color:#888;font-weight:600">${blank?'___':done}/${items.length}</span>
       </div>`;
     items.forEach(it => {
       const checked = !blank && (STATE.clDone||{})[sec+':'+it.id];
-      const val = blank ? '________' : ((STATE.fields||{})[it.fieldId] || (checked ? '✓' : '___'));
-      clHtml += `<div style="display:flex;align-items:flex-start;gap:8px;
-        padding:3px 0;border-bottom:1px solid #eee;font-size:11px">
-        <span style="font-size:14px;color:${checked?'#16a34a':'#999'};flex-shrink:0">
+      const val = blank ? '_____' : ((STATE.fields||{})[it.fieldId] || (checked ? '✓' : '_____'));
+      clHtml += `<div style="display:flex;align-items:flex-start;gap:5px;
+        padding:1.5px 0;font-size:9px;line-height:1.25">
+        <span style="font-size:11px;color:${checked?'#16a34a':'#aaa'};flex-shrink:0;line-height:1">
           ${checked?'☑':'☐'}
         </span>
-        <span style="flex:1;color:${checked?'#333':'#555'}">${it.label||it.id}</span>
-        <span style="color:#333;font-family:monospace">${it.fieldId?val:''}</span>
+        <span style="flex:1;color:${checked?'#222':'#444'};
+          ${it.fieldId ? '' : 'padding-right:0'}">${it.label||it.id}</span>
+        ${it.fieldId ? `<span style="color:#000;font-family:monospace;
+          font-size:9px;border-bottom:1px dotted #999;min-width:40px;
+          text-align:right;padding:0 2px">${val}</span>` : ''}
       </div>`;
     });
     clHtml += '</div>';
   });
 
-  // Dashboard summary
+  // Compact 5-cell summary header (was 6 in 2x3, now 1x5 horizontal).
+  // Includes Walk-Up policy because Matt looks at it on every shift.
+  const pol = STATE.walkUpPolicy || 'open';
+  const wlbls = {open:'All Open', core:'Core Only', noncore:'Non-Core', closed:'Closed'};
   const summaryHtml = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
-        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Opening Mgr</div>
-        <div style="font-size:14px;font-weight:700">${blank?'___________':f.openMgr||auto.open||'—'}</div>
-      </div>
-      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
-        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Closing Mgr</div>
-        <div style="font-size:14px;font-weight:700">${blank?'___________':f.closeMgr||auto.close||'—'}</div>
-      </div>
-      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
-        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">CS Score</div>
-        <div style="font-size:14px;font-weight:700">${blank?'___________':f.cs||'—'}</div>
-      </div>
-      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
-        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Hot Alerts</div>
-        <div style="font-size:14px;font-weight:700">${blank?'___________':f.hot||'—'}</div>
-      </div>
-      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
-        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Total Res</div>
-        <div style="font-size:14px;font-weight:700">${blank?'___________':f.totalRes||'—'}</div>
-      </div>
-      <div style="border:1px solid #ccc;border-radius:4px;padding:8px">
-        <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#666">Total Ret</div>
-        <div style="font-size:14px;font-weight:700">${blank?'___________':f.totalRet||'—'}</div>
-      </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:8px">
+      ${[
+        ['Open Mgr', blank?'_______':f.openMgr||auto.open||'—'],
+        ['Close Mgr', blank?'_______':f.closeMgr||auto.close||'—'],
+        ['CS Score', blank?'____':f.cs||'—'],
+        ['Hot Alerts', blank?'____':f.hot||'—'],
+        ['Walk-Ups', blank?'_______':wlbls[pol]],
+      ].map(([lbl,val]) => `
+        <div style="border:1px solid #bbb;border-radius:3px;padding:4px 6px">
+          <div style="font-size:7px;font-weight:800;text-transform:uppercase;
+            letter-spacing:.06em;color:#666;line-height:1">${lbl}</div>
+          <div style="font-size:11px;font-weight:700;line-height:1.2;margin-top:1px">${val}</div>
+        </div>
+      `).join('')}
     </div>`;
 
-  const win = window.open('','_blank','width=800,height=900');
+  const win = window.open('','_blank','width=900,height=900');
   if (!win) { toast('Allow popups to print'); return; }
   win.document.write(`<!DOCTYPE html><html><head>
     <title>CMH Daily Driver — ${blank?'Blank Checklist':today}</title>
     <style>
-      body{font-family:Arial,sans-serif;margin:24px;color:#333;font-size:12px}
-      h1{font-size:18px;margin:0 0 4px}
-      h2{font-size:13px;color:#666;margin:0 0 16px;font-weight:400}
-      @media print{body{margin:12px}}
+      @page { size: letter portrait; margin: 0.4in; }
+      *{box-sizing:border-box}
+      body{font-family:Arial,sans-serif;margin:0;color:#222;font-size:11px;line-height:1.3}
+      h1{font-size:14px;margin:0;font-weight:800}
+      h2{font-size:10px;color:#666;margin:0 0 8px;font-weight:500}
+      .header{display:flex;justify-content:space-between;align-items:flex-end;
+        border-bottom:1.5px solid #333;padding-bottom:4px;margin-bottom:8px}
+      /* The grid: 2 columns flowing; columns auto-balance content height. */
+      .checklist-grid {
+        column-count: 2;
+        column-gap: 14px;
+        column-fill: balance;
+      }
+      .checklist-grid > div {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      @media print{
+        body{margin:0}
+        .no-print{display:none}
+      }
     </style>
   </head><body>
-    <h1>🚗 CMH Daily Driver${blank?' — Blank Checklist':''}</h1>
-    <h2>${blank?'Fill in and enter into app later':today}</h2>
+    <div class="header">
+      <div>
+        <h1>🚗 CMH Daily Driver${blank?' — Blank Checklist':''}</h1>
+        <h2>${blank?'Fill in and enter into app later':today}</h2>
+      </div>
+      <div style="font-size:8px;color:#999">Printed ${new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</div>
+    </div>
     ${summaryHtml}
-    ${clHtml || '<p style="color:#999">No checklist items found</p>'}
-    <div style="margin-top:24px;border-top:1px solid #ccc;padding-top:8px;font-size:9px;color:#999">
-      Printed ${new Date().toLocaleString()} · CMH Daily Driver
+    <div class="checklist-grid">
+      ${clHtml || '<p style="color:#999">No checklist items found</p>'}
     </div>
   </body></html>`);
   win.document.close();
