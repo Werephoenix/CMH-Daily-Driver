@@ -993,8 +993,28 @@ input.autofill{background:rgba(22,163,74,.06);border-color:var(--green3);color:v
 .kpi-val.g{color:var(--green)}.kpi-val.r{color:var(--red)}.kpi-val.a{color:var(--amber)}.kpi-val.b{color:var(--acc)}
 
 /* ── MANAGER BAR ── */
-.mgr-bar{display:flex;gap:16px;flex-wrap:wrap;padding:10px 14px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;margin-bottom:14px;font-size:12px;align-items:center}
-.mgr-item{display:flex;flex-direction:column;gap:2px}
+.mgr-bar{display:flex;gap:8px;flex-wrap:wrap;padding:0;background:transparent;border:none;border-radius:0;margin-bottom:14px;font-size:12px;align-items:stretch}
+/* v56: each .mgr-item is now a small card — visual separation without
+   taking more space. Cards have hover lift, subtle border, and accent
+   color stripe on the left for instant scannability. Replaces flat
+   flex-row layout where items blended together. */
+.mgr-item{
+  display:flex;flex-direction:column;gap:2px;
+  background:var(--bg2);
+  border:1px solid var(--bdr);
+  border-radius:6px;
+  padding:8px 12px;
+  min-width:90px;
+  flex:1 1 auto;
+  transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease;
+  position:relative;
+}
+.mgr-item:hover{
+  transform:translateY(-1px);
+  border-color:var(--bdr2);
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+.mgr-item[onclick]{cursor:pointer}
 .mgr-item-lbl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
 .mgr-item-val{font-weight:700;font-size:13px;color:var(--txt)}
 
@@ -1456,7 +1476,7 @@ button { cursor: pointer; }
     <!-- Brand split — sized up to match Res/Ret/Net. Three brand totals
          stacked compactly so they fit in one mgr-item width. -->
     <div class="mgr-item" onclick="showTab('paste')"
-         style="cursor:pointer;border-left:1px solid var(--bdr2);padding-left:10px">
+         style="cursor:pointer;">
       <div class="mgr-item-lbl">Brands</div>
       <div id="db-brands" style="font-size:18px;font-family:var(--ff-mono);font-weight:700;color:var(--txt2);line-height:1.05;white-space:nowrap">— · — · —</div>
       <div style="font-size:8px;color:var(--txt3);font-weight:700;letter-spacing:.04em;margin-top:1px">ALA · ENT · NAT</div>
@@ -1468,7 +1488,7 @@ button { cursor: pointer; }
     <!-- Walk-up indicator — colored pill showing current policy at a
          glance. Tap to jump to Availability tab where the buttons live. -->
     <div class="mgr-item" onclick="showTab('board')"
-         style="cursor:pointer;border-left:1px solid var(--bdr2);padding-left:10px">
+         style="cursor:pointer;">
       <div class="mgr-item-lbl">Walk-Ups</div>
       <div id="db-wu-indicator" style="font-size:14px;font-weight:800;line-height:1.05">—</div>
       <div id="db-wucount-mini" style="font-size:9px;color:var(--txt3);margin-top:1px">— groups open</div>
@@ -1480,15 +1500,32 @@ button { cursor: pointer; }
   </div>
 
   <!-- HOURLY FLOW (v53: full-width, with hour numbers and inline counts;
-       hover a column to see exact res/ret for that hour). -->
-  <div class="card" style="padding:12px 14px;margin-bottom:8px;cursor:pointer" onclick="showTab('board')">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2)">
+       hover a column to see exact res/ret for that hour. v56: All/Core/
+       Non-Core filter pills moved here from the now-removed lower chart
+       so users can filter the dashboard view directly.) -->
+  <div class="card" style="padding:12px 14px;margin-bottom:8px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2);cursor:pointer"
+           onclick="showTab('board')">
         📊 Hourly Flow — Reservations vs Returns
       </div>
-      <span style="font-size:10px;color:var(--acc)">→ Board</span>
+      <div style="display:flex;gap:5px;align-items:center">
+        <!-- v56: stopPropagation on the buttons so tapping them doesn't
+             also fire the card's onclick (which would jump to the Board
+             tab and lose the filter selection). -->
+        <button id="flow-all-btn" onclick="event.stopPropagation();setFlowFilter('all')"
+          style="font-size:9px;padding:3px 9px;border-radius:4px;border:1px solid var(--bdr2);
+            background:var(--acc);color:#fff;cursor:pointer;font-weight:700">All</button>
+        <button id="flow-core-btn" onclick="event.stopPropagation();setFlowFilter('core')"
+          style="font-size:9px;padding:3px 9px;border-radius:4px;border:1px solid var(--bdr2);
+            background:var(--bg3);color:var(--txt3);cursor:pointer;font-weight:700">Core</button>
+        <button id="flow-noncore-btn" onclick="event.stopPropagation();setFlowFilter('noncore')"
+          style="font-size:9px;padding:3px 9px;border-radius:4px;border:1px solid var(--bdr2);
+            background:var(--bg3);color:var(--txt3);cursor:pointer;font-weight:700">Non-Core</button>
+        <span style="font-size:10px;color:var(--acc);margin-left:6px;cursor:pointer" onclick="showTab('board')">→ Board</span>
+      </div>
     </div>
-    <div id="dash-hourly-flow" style="min-height:64px">
+    <div id="dash-hourly-flow" style="min-height:64px;cursor:pointer" onclick="showTab('board')">
       <div style="font-size:10px;color:var(--txt3);font-style:italic">Paste data to see hourly flow</div>
     </div>
   </div>
@@ -1504,7 +1541,7 @@ button { cursor: pointer; }
     <div class="mgr-item"><div class="mgr-item-lbl">Closing Mgr</div><div class="mgr-item-val" id="db-closemgr">—</div></div>
     <div class="mgr-item"><div class="mgr-item-lbl">Yesterday's Sales</div><div class="mgr-item-val" id="db-sales">—</div></div>
     <div class="mgr-item" onclick="showTab('checklist')"
-         style="cursor:pointer;border-left:1px solid var(--bdr2);padding-left:10px">
+         style="cursor:pointer;">
       <div class="mgr-item-lbl">OOS</div><div class="mgr-item-val" id="db-oos" style="font-size:16px;font-family:var(--ff-mono)">—</div>
     </div>
     <div class="mgr-item" onclick="showTab('checklist')" style="cursor:pointer">
@@ -1514,7 +1551,7 @@ button { cursor: pointer; }
       <div class="mgr-item-lbl">Inv Agent</div><div class="mgr-item-val" id="db-invagent" style="font-size:14px">—</div>
     </div>
     <div class="mgr-item" onclick="showTab('checklist')"
-         style="cursor:pointer;border-left:1px solid var(--bdr2);padding-left:10px">
+         style="cursor:pointer;">
       <div class="mgr-item-lbl">Checklist</div><div class="mgr-item-val" id="db-cl-progress" style="font-size:13px;color:var(--green)">—</div>
     </div>
   </div>
@@ -1719,28 +1756,11 @@ button { cursor: pointer; }
   </div>
 
 </div>
-  <!-- Hourly Flow Chart -->
-  <div class="card" style="margin-top:12px;padding:10px 12px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">
-        📊 Hourly Flow — Reservations vs Returns
-      </div>
-      <div style="display:flex;gap:6px">
-        <button id="flow-all-btn" onclick="setFlowFilter('all')"
-          style="font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid var(--bdr2);
-            background:var(--acc);color:#fff;cursor:pointer;font-weight:700">All</button>
-        <button id="flow-core-btn" onclick="setFlowFilter('core')"
-          style="font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid var(--bdr2);
-            background:var(--bg3);color:var(--txt3);cursor:pointer;font-weight:700">Core</button>
-        <button id="flow-noncore-btn" onclick="setFlowFilter('noncore')"
-          style="font-size:9px;padding:3px 8px;border-radius:4px;border:1px solid var(--bdr2);
-            background:var(--bg3);color:var(--txt3);cursor:pointer;font-weight:700">Non-Core</button>
-      </div>
-    </div>
-    <div id="hourly-flow-chart" style="min-height:60px">
-      <div style="font-size:11px;color:var(--txt3);font-style:italic">Paste data to see hourly flow</div>
-    </div>
-  </div>
+  <!-- v56: removed redundant floating "Hourly Flow" card. It was outside
+       any tab screen so it appeared on every page including the
+       dashboard. The dashboard already has its own hourly flow card and
+       the filter buttons have been moved up there. -->
+
 
 
 
@@ -1935,6 +1955,7 @@ button { cursor: pointer; }
       <!-- Section tabs -->
       <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
         <button class="btn btn-g btn-sm" id="adm-tab-staff" onclick="showAdminSection('staff')">👥 Staff</button>
+        <button class="btn btn-gh btn-sm" id="adm-tab-edit" onclick="showAdminSection('edit')">✏️ Edit Schedule</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
@@ -1964,6 +1985,44 @@ button { cursor: pointer; }
 
 
           <div id="adm-staff-list"></div>
+        </div>
+      </div>
+
+      <!-- ═══ EDIT SCHEDULE section (v54) ═══════════════════════════════
+           Per-date schedule editor. Pick a date, see everyone scheduled,
+           edit any person's hours or mark them OFF without re-pasting the
+           whole grid. Stored in STATE.scheduleOverrides[date][pid] and
+           merged on top of MAY_SCHEDULE by getScheduleForDate. -->
+      <div id="adm-edit" class="adm-section" style="display:none">
+        <div class="card" style="margin-bottom:10px">
+          <div class="ch">✏️ Edit Day Schedule
+            <span class="sub">Pick a date, edit any person's shift</span>
+          </div>
+          <div style="font-size:11px;color:var(--txt3);background:var(--bg3);padding:8px 10px;border-radius:4px;border-left:3px solid var(--acc);margin-bottom:10px;line-height:1.5">
+            <b style="color:var(--txt2)">How this works:</b> Pick a date, then edit any person's
+            shift in place. Type <span style="font-family:var(--ff-mono);color:var(--green)">530A-200P</span>
+            for hours, <span style="font-family:var(--ff-mono);color:var(--red)">OFF</span> for time off,
+            or leave empty to revert to the base schedule. Today's edits take effect immediately on the
+            timeline and dashboard.<br>
+            <b style="color:var(--txt2)">Adding new people:</b> Add them via the Staff tab first, then
+            assign their shifts here for each working day.
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+            <label style="font-size:11px;color:var(--txt3)">Date:</label>
+            <input type="date" id="sched-edit-date" onchange="buildScheduleEditor()"
+              style="padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:12px">
+            <button class="btn btn-gh btn-sm" onclick="setSchedEditDate(0)">Today</button>
+            <button class="btn btn-gh btn-sm" onclick="setSchedEditDate(1)">Tomorrow</button>
+            <button class="btn btn-gh btn-sm" onclick="setSchedEditDate(-1)">Yesterday</button>
+            <span id="sched-edit-source" style="font-size:10px;color:var(--txt3);margin-left:auto;font-style:italic"></span>
+          </div>
+          <div id="sched-edit-list" style="margin-bottom:8px">
+            <p style="font-size:12px;color:var(--txt3);font-style:italic">Pick a date to edit.</p>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;border-top:1px solid var(--bdr);padding-top:10px">
+            <button class="btn btn-gh btn-sm" onclick="resetDayOverrides()">↶ Reset Day to Default</button>
+            <button class="btn btn-gh btn-sm" style="margin-left:auto" onclick="addOneOffPerson()">+ Add Person to This Day</button>
+          </div>
         </div>
       </div>
 
@@ -2485,6 +2544,63 @@ var ROSTER_MGMT = [
    notes:'MT. Added May 2026.'}
 ];
 
+// ═══════════════════════════════════════════════════════════════════════
+// LIVE ROSTER REBUILD — admin overrides (v54)
+// The codebase has ~60 direct references to ROSTER_CXR / ROSTER_MGMT /
+// ROSTER_EXIT / ROSTER_RETURNS. Rather than rewrite every site, we take
+// a snapshot of the original arrays at load time, then rebuild the
+// arrays in-place after each admin save by merging STATE.adminRoster
+// overrides on top of the snapshot. Existing references automatically
+// see edits, deletes, and new people without code changes.
+// ═══════════════════════════════════════════════════════════════════════
+var _ROSTER_CXR_BASE     = ROSTER_CXR.slice();
+var _ROSTER_MGMT_BASE    = ROSTER_MGMT.slice();
+var _ROSTER_EXIT_BASE    = ROSTER_EXIT.slice();
+var _ROSTER_RETURNS_BASE = ROSTER_RETURNS.slice();
+
+function rebuildRosters() {
+  const overrides = (typeof STATE !== 'undefined' && STATE.adminRoster) ? STATE.adminRoster : [];
+  if (!overrides.length) {
+    // No admin changes — restore base snapshots
+    ROSTER_CXR     = _ROSTER_CXR_BASE.slice();
+    ROSTER_MGMT    = _ROSTER_MGMT_BASE.slice();
+    ROSTER_EXIT    = _ROSTER_EXIT_BASE.slice();
+    ROSTER_RETURNS = _ROSTER_RETURNS_BASE.slice();
+    return;
+  }
+
+  // Apply edits + filter deletes from each base array
+  const applyTo = (base) => base
+    .filter(Boolean)  // guard against any null/undefined entries
+    .map(p => {
+      const ov = overrides.find(o => o.id === p.id);
+      return ov ? Object.assign({}, p, ov) : p;
+    })
+    .filter(p => {
+      const ov = overrides.find(o => o.id === p.id);
+      return !(ov && ov._deleted);
+    });
+
+  ROSTER_CXR     = applyTo(_ROSTER_CXR_BASE);
+  ROSTER_MGMT    = applyTo(_ROSTER_MGMT_BASE);
+  ROSTER_EXIT    = applyTo(_ROSTER_EXIT_BASE);
+  ROSTER_RETURNS = applyTo(_ROSTER_RETURNS_BASE);
+
+  // Append new people (not in any base) to the matching role array
+  overrides.filter(o => o._new && !o._deleted).forEach(o => {
+    // Skip if already in a base array (shouldn't happen with _new flag)
+    const inBase = [..._ROSTER_CXR_BASE, ..._ROSTER_MGMT_BASE,
+                    ..._ROSTER_EXIT_BASE, ..._ROSTER_RETURNS_BASE]
+                   .filter(Boolean)  // guard against any null/undefined entries
+                   .some(p => p && p.id === o.id);
+    if (inBase) return;
+    if (o.role === 'CXR')                         ROSTER_CXR.push(o);
+    else if (o.role === 'EXIT')                   ROSTER_EXIT.push(o);
+    else if (o.role === 'RETURNS')                ROSTER_RETURNS.push(o);
+    else if (['ARM','BRM','ABRM','MT'].includes(o.role)) ROSTER_MGMT.push(o);
+  });
+}
+
 
 // ═══════════════════════════════════════════════════════════════════════
 // COVERAGE RULES BY DAY OF WEEK
@@ -2826,6 +2942,10 @@ function saveField(key, val) {
 window.onload = function() {
   startClock();
   restoreFields();
+  // v54: rebuild live rosters from stored admin overrides BEFORE any UI
+  // builders run. Without this, admin add/edit/remove changes from prior
+  // sessions wouldn't take effect until a save action triggered the rebuild.
+  if (typeof rebuildRosters === 'function') rebuildRosters();
   buildStaffGrid();
   buildBoardGrid();
   showChecklist('opening');
@@ -4422,15 +4542,52 @@ function parseShiftTime(code) {
   return { start, end: end || start + ROTATION.shiftLength };
 }
 
+// Format decimal hours as an AM/PM shift code, e.g. 5.5,14 → "530A-200P".
+// Used to construct readable codes for per-date schedule overrides.
+function formatHoursAsCode(start, end) {
+  const fmt = (h) => {
+    const wrapped = h >= 24 ? h - 24 : h;
+    const hr = Math.floor(wrapped);
+    const mn = Math.round((wrapped - hr) * 60);
+    const ampm = wrapped >= 12 ? 'P' : 'A';
+    const disp = hr === 0 ? 12 : (hr > 12 ? hr - 12 : hr);
+    const mnStr = mn === 0 ? '00' : String(mn).padStart(2, '0');
+    return disp + (mn === 0 ? '' : mnStr) + ampm;
+  };
+  return fmt(start) + '-' + fmt(end);
+}
+
 function getPersonShiftToday(person) {
   // Get hours from stored schedule first, then shiftTimes override, then roster default
   const pid = person.name.replace(/\s/g,'_');
   const storedShift = STATE.shiftTimes ? STATE.shiftTimes[pid] : null;
 
+  // v54: per-date schedule overrides set in admin Schedule Editor.
+  // Stored as STATE.scheduleOverrides[YYYY-MM-DD][pid] = [start,end] | 'OFF'.
+  // Highest priority — represents an explicit "today, this person works
+  // these hours" decision and overrides MAY_SCHEDULE/roster defaults.
+  const todayKeyStr = (typeof todayKey === 'function')
+    ? todayKey()
+    : (() => {
+        const d = new Date();
+        return d.getFullYear()+'-'+
+          String(d.getMonth()+1).padStart(2,'0')+'-'+
+          String(d.getDate()).padStart(2,'0');
+      })();
+  const dateOverride = (STATE.scheduleOverrides || {})[todayKeyStr];
+  if (dateOverride && dateOverride[pid] !== undefined) {
+    const ov = dateOverride[pid];
+    if (ov === 'OFF' || ov === 'VACA') return null;
+    if (Array.isArray(ov) && ov.length === 2) {
+      const code = formatHoursAsCode(ov[0], ov[1]);
+      return { start: ov[0], end: ov[1], code };
+    }
+  }
+
   // Try stored schedule sections
   const mgmtSched = getStoredSection ? getStoredSection('mgmt') : null;
   const cxrSched  = getStoredSection ? getStoredSection('cxr')  : null;
-  const today = typeof todayKey === 'function' ? todayKey() : new Date().toISOString().slice(0,10);
+  const today = todayKeyStr;
 
   let shiftCode = storedShift;
   if (!shiftCode && cxrSched && cxrSched.grid[today]) {
@@ -4464,7 +4621,25 @@ function buildSmartRotation() {
   // functions had different "who's working today" answers — the disconnect.)
   const expToday = (typeof buildExpectedToday === 'function') ? buildExpectedToday() : {};
 
-  ROSTER_CXR.forEach(person => {
+  // v56: iterate ALL roster arrays, not just ROSTER_CXR. Previously this
+  // function looped only ROSTER_CXR and bucketed by `person.role`, which
+  // meant the EXIT agents living in ROSTER_EXIT (Genesis, Zina, Lisa,
+  // Kenneth) and the management staff in ROSTER_MGMT were never picked
+  // up. Symptom: `workingExit` was always [] regardless of who was
+  // actually scheduled, so the rotation engine treated every day as
+  // having zero dedicated exit agents — coverage math was wrong and
+  // the lunch-stagger pass had nothing to schedule around.
+  const allRosterPeople = [
+    ...(typeof ROSTER_CXR     !== 'undefined' ? ROSTER_CXR     : []),
+    ...(typeof ROSTER_EXIT    !== 'undefined' ? ROSTER_EXIT    : []),
+    ...(typeof ROSTER_RETURNS !== 'undefined' ? ROSTER_RETURNS : []),
+    // Management is intentionally NOT iterated here — managers don't
+    // appear in CXR/exit rotation buckets. They're rendered separately
+    // via mgmtBlocks on the timeline.
+  ];
+
+  allRosterPeople.forEach(person => {
+    if (!person || !person.name) return;
     const pid   = person.name.replace(/\s/g,'_');
     const duty  = STATE.staffDuty ? STATE.staffDuty[pid] : undefined;
     const inExpected = expToday[pid] != null;
@@ -4696,36 +4871,196 @@ function buildSmartRotation() {
     });
     return cnt;
   }
-  // Find pairs of overlapping exit-side lunches and stagger the later
-  // one by +30 min if doing so improves exit coverage at that half-hour.
-  const exitSideRotations = allRotations.filter(lunchSpansExit);
-  exitSideRotations.sort((a,b) => (a.lunch?.from || 99) - (b.lunch?.from || 99));
-  for (let i = 0; i < exitSideRotations.length; i++) {
-    for (let j = i + 1; j < exitSideRotations.length; j++) {
-      const ra = exitSideRotations[i], rb = exitSideRotations[j];
-      if (!lunchOverlap(ra, rb)) continue;
-      // Try shifting rb's lunch by +0.5
-      const newFrom = rb.lunch.from + 0.5, newTo = rb.lunch.to + 0.5;
-      if (newTo > rb.shiftEnd) continue; // can't push past shift end
-      if (rb.b2 && newFrom >= rb.b2.from && newTo <= rb.b2.to) {
-        // Lunch fits within b2 — apply shift
-        const beforeCov = exitAtHalfHour(ra.lunch.from);
-        // Tentatively apply
-        const oldLunchFrom = rb.lunch.from, oldLunchTo = rb.lunch.to;
-        const oldB2From = rb.b2.from;
-        rb.lunch.from = newFrom; rb.lunch.to = newTo;
-        if (rb.b2.from < newFrom) rb.b2.from = newTo; // adjust b2 boundary if needed
-        // Also fix b1 end if it abutted lunch
-        if (rb.b1 && Math.abs(rb.b1.to - oldLunchFrom) < 0.01) {
-          rb.b1.to = newFrom;
+  // ─── LUNCH STAGGER (v56 rewrite) ────────────────────────────────────
+  // Previous logic only nudged ONE pair by +30 min and used a wrong-
+  // window coverage check (it asked "did ra's lunch slot improve?"
+  // but the actual problem was the overlap window where BOTH were on
+  // lunch). Result: 3+ concurrent lunches stayed overlapping, exit
+  // coverage dropped below COVERAGE_BY_HOUR.exitMin during the dip.
+  //
+  // New approach: iterative multi-pass. For each half-hour from open
+  // to close, check whether exit coverage meets the rule's exitMin.
+  // If not, find a CXR currently on lunch whose lunch could shift
+  // earlier or later (still within their rotation window) and try
+  // shifts in increasing magnitude until the gap closes. Repeat until
+  // either no gap remains or no shift helps.
+  function exitMinAt(h) {
+    if (typeof COVERAGE_BY_HOUR === 'function') {
+      const r = COVERAGE_BY_HOUR(h % 24, dow, workingExit.length);
+      return r ? (r.exitMin || 0) : 1;
+    }
+    return 1;
+  }
+  function shiftLunch(r, deltaH) {
+    // Shift r's lunch by deltaH hours in-place. Fail (return false) if
+    // the shift would push lunch outside the [shiftStart+0.5, shiftEnd-0.5]
+    // window. The flanking blocks (b1, b2) are adjusted to abut the new
+    // lunch boundaries.
+    if (!r.lunch) return false;
+    const newFrom = r.lunch.from + deltaH;
+    const newTo   = r.lunch.to   + deltaH;
+    // Lunch must stay at least 30min into shift on both sides
+    if (newFrom < r.shiftStart + 0.5) return false;
+    if (newTo   > r.shiftEnd   - 0.5) return false;
+    // Apply
+    if (r.b1 && Math.abs(r.b1.to - r.lunch.from) < 0.01) r.b1.to = newFrom;
+    if (r.b2 && Math.abs(r.b2.from - r.lunch.to) < 0.01) r.b2.from = newTo;
+    if (r.b1) r.b1.hours = Math.max(0, r.b1.to - r.b1.from);
+    if (r.b2) r.b2.hours = Math.max(0, r.b2.to - r.b2.from);
+    r.lunch.from = newFrom;
+    r.lunch.to   = newTo;
+    return true;
+  }
+  // Try to fix an exit-coverage gap at hour `h` by moving someone's lunch.
+  // Returns true if a shift was applied that closed the gap, false otherwise.
+  function tryFixGapAt(h) {
+    const need = exitMinAt(h);
+    const have = exitAtHalfHour(h);
+    if (have >= need) return false;  // no gap
+    // Find candidate lunches at this slot — exit-side CXRs whose lunch
+    // covers h. They're the ones causing the dip.
+    const candidates = allRotations
+      .filter(r => r.lunch && r.lunch.from <= h && r.lunch.to > h)
+      .filter(r => (r.b1 && r.b1.station === 'exit') ||
+                   (r.b2 && r.b2.station === 'exit') ||
+                   r.fullShift === 'exit');
+    if (!candidates.length) return false;
+    // Try shifts in increasing magnitude: -1.5h, +1.5h, -1h, +1h, -0.5h, +0.5h.
+    // Earlier shifts preferred over later (they move the lunch out of the
+    // gap window faster). Apply the FIRST shift that makes the gap close.
+    const deltas = [-1.5, 1.5, -1, 1, -0.5, 0.5];
+    for (const cand of candidates) {
+      const orig = {
+        lunchFrom: cand.lunch.from, lunchTo: cand.lunch.to,
+        b1To: cand.b1 ? cand.b1.to : null,
+        b2From: cand.b2 ? cand.b2.from : null,
+      };
+      for (const d of deltas) {
+        // Snap to half-hour grid
+        if (!shiftLunch(cand, d)) continue;
+        const newHave = exitAtHalfHour(h);
+        if (newHave >= need) {
+          // Verify this didn't create a NEW gap somewhere else in the
+          // window the lunch moved through. If it did, revert and try
+          // the next delta.
+          let createdNewGap = false;
+          for (let probe = orig.lunchFrom; probe < orig.lunchTo + Math.abs(d) + 0.01; probe += 0.5) {
+            const minNeed = exitMinAt(probe);
+            if (exitAtHalfHour(probe) < minNeed && probe !== h) {
+              createdNewGap = true; break;
+            }
+          }
+          if (!createdNewGap) return true;
         }
-        const afterCov = exitAtHalfHour(ra.lunch.from);
-        if (afterCov <= beforeCov) {
-          // No improvement — revert
-          rb.lunch.from = oldLunchFrom; rb.lunch.to = oldLunchTo;
-          rb.b2.from = oldB2From;
-          if (rb.b1 && Math.abs(rb.b1.to - newFrom) < 0.01) rb.b1.to = oldLunchFrom;
+        // Revert and try next delta
+        cand.lunch.from = orig.lunchFrom;
+        cand.lunch.to   = orig.lunchTo;
+        if (cand.b1) cand.b1.to = orig.b1To;
+        if (cand.b2) cand.b2.from = orig.b2From;
+        if (cand.b1) cand.b1.hours = Math.max(0, cand.b1.to - cand.b1.from);
+        if (cand.b2) cand.b2.hours = Math.max(0, cand.b2.to - cand.b2.from);
+      }
+    }
+    return false;
+  }
+  // Iterate from open to close, fixing gaps. Cap iterations so we can't
+  // loop forever if the schedule is genuinely under-staffed.
+  let safety = 0;
+  for (let h = 6; h < 24 && safety < 60; h += 0.5) {
+    if (tryFixGapAt(h)) {
+      // A shift was applied; restart this half-hour's check in case
+      // there's a deeper gap (need >= 2). Cap with safety counter.
+      h -= 0.5;
+      safety++;
+    }
+  }
+
+  // ── PASS 2: proactive lunch spread (v56) ────────────────────────────
+  // The gap-fix pass above only acts when coverage drops below exitMin.
+  // In practice CMH often runs with coverage at or just above the
+  // minimum, so the gap-fix has nothing to do — yet you'll still see 3+
+  // CXRs going to lunch within the same 30-min slot, leaving exit
+  // covered only by the bare minimum. This second pass smooths that
+  // out: if 2+ exit-side CXRs are on lunch at the same half-hour, try
+  // shifting one of them so the lunches don't fully overlap. Verifies
+  // each shift doesn't drop coverage below exitMin anywhere in the
+  // affected window.
+  function concurrentExitLunchesAt(h) {
+    return allRotations.filter(r =>
+      r.lunch && r.lunch.from <= h && r.lunch.to > h &&
+      ((r.b1 && r.b1.station === 'exit') ||
+       (r.b2 && r.b2.station === 'exit') ||
+       r.fullShift === 'exit')
+    );
+  }
+  function totalConcurrentLunches() {
+    // Count the worst-case concurrent exit-side lunches across the day.
+    let worst = 0;
+    for (let h = 6; h < 24; h += 0.5) {
+      const cnt = concurrentExitLunchesAt(h).length;
+      if (cnt > worst) worst = cnt;
+    }
+    return worst;
+  }
+  function coverageOkInWindow(fromH, toH) {
+    // Verify exit coverage meets exitMin across [fromH, toH] at half-hour grid.
+    for (let h = fromH; h < toH + 0.01; h += 0.5) {
+      if (exitAtHalfHour(h) < exitMinAt(h)) return false;
+    }
+    return true;
+  }
+
+  // Greedy spread: walk the day, find slots with 2+ concurrent exit-side
+  // lunches, try shifting one. Limited iterations so we converge.
+  let spreadPass = 0;
+  let improved = true;
+  while (improved && spreadPass < 30) {
+    improved = false;
+    spreadPass++;
+    for (let h = 6; h < 24 && !improved; h += 0.5) {
+      const concurrent = concurrentExitLunchesAt(h);
+      if (concurrent.length < 2) continue;
+      // Try to spread: shift one of them so it no longer overlaps with the others.
+      // Sort by shift start so we prefer shifting later-shift people (less disruption).
+      concurrent.sort((a,b) => a.shiftStart - b.shiftStart);
+      // Try the last one first (latest shift), then earlier.
+      for (let ci = concurrent.length - 1; ci >= 0; ci--) {
+        const cand = concurrent[ci];
+        const orig = {
+          lunchFrom: cand.lunch.from, lunchTo: cand.lunch.to,
+          b1To: cand.b1 ? cand.b1.to : null,
+          b2From: cand.b2 ? cand.b2.from : null,
+        };
+        // Try ±30, ±60, ±90 — increasing magnitude. Prefer earlier shifts
+        // (people prefer earlier lunch) but try later if earlier blocked.
+        const spreadDeltas = [-0.5, 0.5, -1, 1, -1.5, 1.5];
+        let applied = false;
+        for (const d of spreadDeltas) {
+          if (!shiftLunch(cand, d)) continue;
+          // Check that this shift doesn't create a coverage gap in the
+          // window from min(orig, new) to max(orig, new) plus lunch duration.
+          const probeFrom = Math.min(orig.lunchFrom, cand.lunch.from) - 0.01;
+          const probeTo   = Math.max(orig.lunchTo,   cand.lunch.to)   + 0.01;
+          if (!coverageOkInWindow(Math.max(6, probeFrom), Math.min(24, probeTo))) {
+            // Revert
+            cand.lunch.from = orig.lunchFrom; cand.lunch.to = orig.lunchTo;
+            if (cand.b1) { cand.b1.to = orig.b1To; cand.b1.hours = Math.max(0, cand.b1.to - cand.b1.from); }
+            if (cand.b2) { cand.b2.from = orig.b2From; cand.b2.hours = Math.max(0, cand.b2.to - cand.b2.from); }
+            continue;
+          }
+          // Did this actually reduce concurrency at h?
+          const newConcurrent = concurrentExitLunchesAt(h).length;
+          if (newConcurrent < concurrent.length) {
+            applied = true;
+            improved = true;
+            break;
+          }
+          // Revert
+          cand.lunch.from = orig.lunchFrom; cand.lunch.to = orig.lunchTo;
+          if (cand.b1) { cand.b1.to = orig.b1To; cand.b1.hours = Math.max(0, cand.b1.to - cand.b1.from); }
+          if (cand.b2) { cand.b2.from = orig.b2From; cand.b2.hours = Math.max(0, cand.b2.to - cand.b2.from); }
         }
+        if (applied) break;
       }
     }
   }
@@ -6849,22 +7184,12 @@ var FLEET_CODES = [
   {code:'WCAR', group:'Luxury Car',         core:false, desc:'Luxury Car — alternate code. Cadillac CT5, Lincoln Continental or similar.'},
   
   {code:'PPAR', group:'Large Pickup',       core:false, desc:'Large Pickup — F-150 SuperCrew, Ram 1500 or similar. Crew cab full-size.'},
-  {code:'PPBR', group:'Large Pickup',       core:false, desc:'Large Pickup — alternate billing rate. Same class as PPAR.'},
-  ,
-  {id:'kerv',   name:'Kerv Returns',   nick:'Kerv',   role:'RETURNS',
-   daysOn:[3,5,6,0], shiftStart:3.5, shiftEnd:12,  active:true, notes:'Return agent.'},
-  {id:'julian', name:'Julian Returns', nick:'Julian', role:'RETURNS',
-   daysOn:[1,2,4,5,6], shiftStart:4, shiftEnd:13,  active:true, notes:'Return agent.'},
-  {id:'toney',  name:'Toney Returns',  nick:'Toney',  role:'RETURNS',
-   daysOn:[0,3,4,5,6], shiftStart:10, shiftEnd:18.5,
-   shiftCode:'10A-630P',
-   notes:'Returns agent. Sun/Wed/Thu/Fri/Sat.', active:true},
-  {id:'nas',    name:'Nas Returns',    nick:'Nas',    role:'RETURNS',
-   daysOn:[0,3,4,5,6], shiftStart:14, shiftEnd:23,  active:true, notes:'Return agent.'},
-  {id:'rob',    name:'Rob Returns',    nick:'Rob',    role:'RETURNS',
-   daysOn:[0,1,2,3,4], shiftStart:16, shiftEnd:24.5,
-   shiftCode:'4P-1230A',
-   notes:'Returns agent. Sun/Mon/Tue/Wed/Thu.', active:true}
+  {code:'PPBR', group:'Large Pickup',       core:false, desc:'Large Pickup — alternate billing rate. Same class as PPAR.'}
+  // v56: removed 5 stray ROSTER_RETURNS entries (Kerv/Julian/Toney/Nas/Rob)
+  // that had ended up here. They lacked code/group/desc and crashed the
+  // search ("Cannot read properties of undefined (reading 'toLowerCase')")
+  // any time the user typed a query. The actual roster entries live in
+  // ROSTER_RETURNS at the top of the file — these were pure duplicates.
 ];
 
 // ── Build compendium UI ───────────────────────────────────────────────────────
@@ -6892,14 +7217,18 @@ function filterCodes() {
   const core   = document.getElementById('code-filter-core')?.value || '';
 
   const filtered = FLEET_CODES.filter(c => {
-    const matchQ = !q ||
-      c.code.toLowerCase().includes(q) ||
-      c.group.toLowerCase().includes(q) ||
-      c.desc.toLowerCase().includes(q);
-    const matchG = !grp || c.group === grp;
+    // v56: defensive guards — if a fleet code entry is malformed (missing
+    // code/group/desc), `(c.code).toLowerCase()` would throw and the
+    // filter aborts silently, leaving the user with what looks like a
+    // broken search box. Coerce to empty string instead.
+    const code = (c && c.code  ? String(c.code).toLowerCase()  : '');
+    const grpL = (c && c.group ? String(c.group).toLowerCase() : '');
+    const desc = (c && c.desc  ? String(c.desc).toLowerCase()  : '');
+    const matchQ = !q || code.includes(q) || grpL.includes(q) || desc.includes(q);
+    const matchG = !grp || (c && c.group === grp);
     const matchC = !core ||
-      (core === 'core' && c.core) ||
-      (core === 'noncore' && !c.core);
+      (core === 'core' && c && c.core) ||
+      (core === 'noncore' && c && !c.core);
     return matchQ && matchG && matchC;
   });
 
@@ -9528,13 +9857,19 @@ function changeAdminPin() {
 }
 
 function showAdminSection(sec) {
-  ['staff','codes','pin','sched'].forEach(s => {
+  ['staff','edit','codes','pin','sched'].forEach(s => {
     const el  = document.getElementById('adm-'+s);
     const btn = document.getElementById('adm-tab-'+s);
     if(el)  el.style.display  = s===sec ? 'block' : 'none';
     if(btn) { btn.className = s===sec ? 'btn btn-g btn-sm' : 'btn btn-gh btn-sm'; }
   });
   if (sec==='staff') buildAdminStaffList();
+  if (sec==='edit')  {
+    // Default to today on first open
+    const dEl = document.getElementById('sched-edit-date');
+    if (dEl && !dEl.value) setSchedEditDate(0);
+    else buildScheduleEditor();
+  }
   if (sec==='codes') buildAdminCodeList();
   if (sec==='sched') {
     if(typeof updateStoredStatus==='function') updateStoredStatus();
@@ -9690,6 +10025,7 @@ function saveStaff(id) {
   }
 
   saveState();
+  rebuildRosters();   // v54: propagate edit to live rosters so timeline/dashboard see it
   closeModal();
   buildAdminStaffList();
   toast((id?'Updated: ':'Added: ') + name);
@@ -9702,8 +10038,274 @@ function removeStaff(id) {
   if (idx>=0) STATE.adminRoster[idx]._deleted = true;
   else STATE.adminRoster.push({ id, _deleted:true });
   saveState();
+  rebuildRosters();   // v54: propagate removal to live rosters
   buildAdminStaffList();
+  // Also refresh schedule/timeline since removed person should no longer appear
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof refreshDash === 'function') refreshDash();
   toast('Removed from roster');
+}
+
+// ── SCHEDULE EDITOR (v54) ───────────────────────────────────────────────
+// Per-date editor for shift hours. Lets the user pick a date and edit
+// any person's shift without re-pasting the whole grid. Edits are stored
+// in STATE.scheduleOverrides[date][pid] and merged on top of MAY_SCHEDULE
+// by getScheduleForDate. Today's edits also apply immediately.
+
+// Set the date input to today + offset days, then rebuild the editor list
+function setSchedEditDate(dayOffset) {
+  const d = new Date();
+  d.setDate(d.getDate() + (dayOffset || 0));
+  const key = d.getFullYear()+'-'+
+    String(d.getMonth()+1).padStart(2,'0')+'-'+
+    String(d.getDate()).padStart(2,'0');
+  const el = document.getElementById('sched-edit-date');
+  if (el) el.value = key;
+  buildScheduleEditor();
+}
+
+// Format hours [start, end] as a readable code string
+function _fmtShiftPair(arr) {
+  if (!Array.isArray(arr) || arr.length !== 2) return '';
+  return formatHoursAsCode(arr[0], arr[1]);
+}
+
+// Parse a shift string ("530A-200P" or "5:30A-2:00P") into [start, end]
+// or 'OFF'. Returns null on invalid input.
+function _parseShiftString(s) {
+  if (!s) return null;
+  const trimmed = s.trim();
+  if (!trimmed) return null;
+  const upper = trimmed.toUpperCase();
+  if (upper === 'OFF' || upper === 'VACA' || upper === 'OUT') return 'OFF';
+  // Accept "5:30A-2:00P", "530A-200P", "5a-2p", etc.
+  const parts = trimmed.split(/\s*[-–]\s*/);
+  if (parts.length !== 2) return null;
+  function parseOne(piece) {
+    const m = piece.trim().match(/^(\d{1,2}):?(\d{2})?\s*([APap])\.?[Mm]?\.?$/);
+    if (!m) return null;
+    let h = parseInt(m[1], 10);
+    const mn = m[2] ? parseInt(m[2], 10) : 0;
+    const ap = m[3].toUpperCase();
+    if (ap === 'P' && h !== 12) h += 12;
+    if (ap === 'A' && h === 12) h = 0;
+    return h + mn / 60;
+  }
+  const start = parseOne(parts[0]);
+  let end = parseOne(parts[1]);
+  if (start === null || end === null) return null;
+  // Overnight handling — if end <= start, it crossed midnight
+  if (end <= start) end += 24;
+  return [start, end];
+}
+
+// Build the editor row list for the selected date
+function buildScheduleEditor() {
+  const dEl = document.getElementById('sched-edit-date');
+  const listEl = document.getElementById('sched-edit-list');
+  const srcEl = document.getElementById('sched-edit-source');
+  if (!dEl || !listEl) return;
+  const dateKey = dEl.value;
+  if (!dateKey) {
+    listEl.innerHTML = '<p style="font-size:12px;color:var(--txt3);font-style:italic">Pick a date to edit.</p>';
+    return;
+  }
+
+  // Combine sources: hardcoded MAY_SCHEDULE + user overrides
+  const baseSched = MAY_SCHEDULE[dateKey] || {};
+  const overrides = (STATE.scheduleOverrides || {})[dateKey] || {};
+  const merged    = Object.assign({}, baseSched, overrides);
+
+  // Show source indicator
+  if (srcEl) {
+    const baseCount = Object.keys(baseSched).length;
+    const ovrCount  = Object.keys(overrides).length;
+    if (!baseCount && !ovrCount) {
+      srcEl.textContent = 'No schedule for this date — start fresh by adding people below';
+    } else if (ovrCount) {
+      srcEl.textContent = `${baseCount} from base · ${ovrCount} edited`;
+    } else {
+      srcEl.textContent = `${baseCount} from base schedule (no edits yet)`;
+    }
+  }
+
+  // Get current effective roster (so admin-added people are included).
+  // Order people by role then nickname.
+  const allRoster = getEffectiveRoster();
+  const roleOrder = { CXR:0, EXIT:1, RETURNS:2, ARM:3, BRM:3, ABRM:3, MT:3 };
+  // Build a list combining: people in merged schedule + everyone in roster
+  const allPids = new Set([
+    ...Object.keys(merged),
+    ...allRoster.map(p => p.name.replace(/\s/g, '_')),
+  ]);
+  const rows = [...allPids].map(pid => {
+    const person = allRoster.find(p => p.name.replace(/\s/g, '_') === pid);
+    const shiftRaw = merged[pid];
+    const isOff   = shiftRaw === 'OFF' || shiftRaw === 'VACA';
+    const isEdited = overrides[pid] !== undefined;
+    const baseRaw = baseSched[pid];
+    const role = person ? person.role : 'UNK';
+    const nick = person ? (person.nick || person.name.split(' ')[0]) : pid.replace(/_/g, ' ');
+    const fullName = person ? person.name : pid.replace(/_/g, ' ');
+    const shiftDisplay = isOff
+      ? 'OFF'
+      : (Array.isArray(shiftRaw) ? _fmtShiftPair(shiftRaw) : (shiftRaw || ''));
+    return { pid, person, nick, fullName, role, shiftRaw, shiftDisplay, isOff, isEdited, baseRaw };
+  });
+  rows.sort((a, b) => {
+    const oa = roleOrder[a.role] ?? 9, ob = roleOrder[b.role] ?? 9;
+    if (oa !== ob) return oa - ob;
+    return a.nick.localeCompare(b.nick);
+  });
+
+  // Group headers
+  const groupLabels = { CXR:'CXR / Counter', EXIT:'Exit Agents', RETURNS:'Returns', ARM:'Management', BRM:'Management', ABRM:'Management', MT:'Management' };
+  const groupColors = { CXR:'var(--acc)', EXIT:'var(--green)', RETURNS:'var(--teal)', ARM:'var(--purple)', BRM:'var(--purple)', ABRM:'var(--purple)', MT:'var(--purple)' };
+  let html = '';
+  let lastGroup = '';
+  rows.forEach(r => {
+    const grp = groupLabels[r.role] || 'Other';
+    if (grp !== lastGroup) {
+      html += `<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+        color:${groupColors[r.role] || 'var(--txt3)'};margin:10px 0 4px;
+        border-bottom:1px solid var(--bdr)">— ${grp} —</div>`;
+      lastGroup = grp;
+    }
+    const editedBadge = r.isEdited ? '<span style="font-size:8px;color:var(--amber);font-weight:700;margin-left:4px">EDITED</span>' : '';
+    const offCls = r.isOff ? 'color:var(--red);font-weight:700' : '';
+    html += `<div style="display:grid;grid-template-columns:120px 1fr 100px 70px;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--bdr)">
+      <div style="font-size:11px;color:var(--txt2)">
+        <div style="font-weight:700">${r.nick}${editedBadge}</div>
+        <div style="font-size:9px;color:var(--txt3)">${r.fullName}</div>
+      </div>
+      <input type="text" id="se-${r.pid}" value="${r.shiftDisplay}"
+        placeholder="OFF or 530A-200P"
+        style="padding:5px 7px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:3px;
+          color:var(--txt);font-family:var(--ff-mono);font-size:11px;${offCls}">
+      <button onclick="saveScheduleEdit('${r.pid}')"
+        style="padding:5px 8px;border-radius:3px;border:1px solid var(--green);background:rgba(22,163,74,.1);
+          color:var(--green);font-size:10px;font-weight:700;cursor:pointer">✓ Save</button>
+      <button onclick="setScheduleOff('${r.pid}')"
+        style="padding:5px 8px;border-radius:3px;border:1px solid var(--bdr2);background:var(--bg3);
+          color:var(--txt3);font-size:10px;cursor:pointer" title="Mark OFF for this day">OFF</button>
+    </div>`;
+  });
+  if (!rows.length) {
+    html = '<p style="font-size:12px;color:var(--txt3);font-style:italic">No people in schedule. Add a person via the Staff tab first.</p>';
+  }
+  listEl.innerHTML = html;
+}
+
+// Save a single person's edit
+function saveScheduleEdit(pid) {
+  const dEl = document.getElementById('sched-edit-date');
+  const inEl = document.getElementById('se-' + pid);
+  if (!dEl || !inEl) return;
+  const dateKey = dEl.value;
+  if (!dateKey) { toast('Pick a date first'); return; }
+  const raw = inEl.value;
+  const parsed = _parseShiftString(raw);
+  if (parsed === null && raw.trim() !== '') {
+    toast('Invalid format. Try "530A-200P" or "OFF"');
+    return;
+  }
+  if (!STATE.scheduleOverrides) STATE.scheduleOverrides = {};
+  if (!STATE.scheduleOverrides[dateKey]) STATE.scheduleOverrides[dateKey] = {};
+  if (parsed === null) {
+    // Empty input — remove override (revert to base)
+    delete STATE.scheduleOverrides[dateKey][pid];
+  } else {
+    STATE.scheduleOverrides[dateKey][pid] = parsed;
+  }
+  saveState();
+  // If editing today, propagate to live state
+  const todayK = (typeof todayKey === 'function') ? todayKey()
+    : (() => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+  if (dateKey === todayK) {
+    if (typeof loadScheduleForToday === 'function') loadScheduleForToday(false);
+  }
+  buildScheduleEditor();
+  toast('Saved ✓');
+}
+
+// Quick-action: mark person OFF for the date
+function setScheduleOff(pid) {
+  const inEl = document.getElementById('se-' + pid);
+  if (inEl) inEl.value = 'OFF';
+  saveScheduleEdit(pid);
+}
+
+// Reset all overrides for the selected day (revert to MAY_SCHEDULE base)
+function resetDayOverrides() {
+  const dEl = document.getElementById('sched-edit-date');
+  if (!dEl || !dEl.value) return;
+  if (!confirm('Reset this day to its base schedule? Removes all edits for this date.')) return;
+  if (STATE.scheduleOverrides) delete STATE.scheduleOverrides[dEl.value];
+  saveState();
+  buildScheduleEditor();
+  toast('Day reset to base ✓');
+}
+
+// Add a person to a specific day who isn't in the base schedule
+function addOneOffPerson() {
+  const dEl = document.getElementById('sched-edit-date');
+  if (!dEl || !dEl.value) { toast('Pick a date first'); return; }
+  const roster = getEffectiveRoster();
+  // Find people NOT already in the merged schedule for this date
+  const baseSched = MAY_SCHEDULE[dEl.value] || {};
+  const overrides = (STATE.scheduleOverrides || {})[dEl.value] || {};
+  const known = new Set([...Object.keys(baseSched), ...Object.keys(overrides)]);
+  const available = roster.filter(p => !known.has(p.name.replace(/\s/g, '_')));
+  if (!available.length) {
+    toast('Everyone in the roster is already on this date.');
+    return;
+  }
+  const optsHtml = available.map(p =>
+    `<option value="${p.name.replace(/\s/g, '_')}">${p.nick || p.name.split(' ')[0]} — ${p.role}</option>`
+  ).join('');
+  const body = `
+    <p style="font-size:12px;color:var(--txt3);margin-bottom:10px">
+      Add a person to <b>${dEl.value}</b>. They'll show up on this date with the shift you enter.
+    </p>
+    <div style="display:grid;gap:10px">
+      <div>
+        <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Person</label>
+        <select id="aop-pid" style="width:100%;padding:7px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
+          ${optsHtml}
+        </select>
+      </div>
+      <div>
+        <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Shift (e.g. 530A-200P)</label>
+        <input id="aop-shift" placeholder="530A-200P or OFF"
+          style="width:100%;padding:7px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:13px">
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="btn btn-g" style="flex:1" onclick="confirmAddOneOff()">✓ Add to ${dEl.value}</button>
+        <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>`;
+  openModal('Add Person to Date', body);
+}
+
+function confirmAddOneOff() {
+  const dEl = document.getElementById('sched-edit-date');
+  const pidEl = document.getElementById('aop-pid');
+  const shiftEl = document.getElementById('aop-shift');
+  if (!dEl || !pidEl || !shiftEl) return;
+  const dateKey = dEl.value, pid = pidEl.value, raw = shiftEl.value;
+  const parsed = _parseShiftString(raw);
+  if (parsed === null) { toast('Invalid shift format'); return; }
+  if (!STATE.scheduleOverrides) STATE.scheduleOverrides = {};
+  if (!STATE.scheduleOverrides[dateKey]) STATE.scheduleOverrides[dateKey] = {};
+  STATE.scheduleOverrides[dateKey][pid] = parsed;
+  saveState();
+  // If today, propagate
+  const todayK = (typeof todayKey === 'function') ? todayKey()
+    : (() => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); })();
+  if (dateKey === todayK && typeof loadScheduleForToday === 'function') loadScheduleForToday(false);
+  closeModal();
+  buildScheduleEditor();
+  toast('Added ✓');
 }
 
 // ── CAR CODES ─────────────────────────────────────────────────────────
@@ -12322,8 +12924,12 @@ function setFlowFilter(filter) {
 }
 
 function buildHourlyFlowChart() {
+  // v56: don't bail if hourly-flow-chart is missing — that element used
+  // to live on a card outside any tab screen and was removed because it
+  // showed up on every page (Matt: "redundant hourly flow at the bottom
+  // of the dashboard"). The dashboard's dash-hourly-flow chart still
+  // gets updated below regardless.
   const el = document.getElementById('hourly-flow-chart');
-  if (!el) return;
 
   // Build filtered hourly arrays from raw paste data
   const pd = STATE.pasteData || {};
@@ -12377,7 +12983,7 @@ function buildHourlyFlowChart() {
   }
 
   if (!res.some(v=>v>0) && !ret.some(v=>v>0)) {
-    el.innerHTML = '<div style="font-size:11px;color:var(--txt3);font-style:italic">Paste data to see hourly flow</div>';
+    if (el) el.innerHTML = '<div style="font-size:11px;color:var(--txt3);font-style:italic">Paste data to see hourly flow</div>';
     // Also clear dashboard
     const dashEl=document.getElementById('dash-hourly-flow');
     if(dashEl) dashEl.innerHTML='<div style="font-size:10px;color:var(--txt3);font-style:italic">Paste res & ret data to see flow</div>';
@@ -12389,25 +12995,28 @@ function buildHourlyFlowChart() {
   const maxV  = Math.max(...res,...ret,1);
   const W=18, H=50;
 
-  let out=`<div style="display:flex;align-items:flex-end;gap:1px;height:${H+16}px;overflow-x:auto">`;
-  HOURS.forEach(h=>{
-    const r=res[h]||0, t=ret[h]||0;
-    const rH=Math.round(r/maxV*H), tH=Math.round(t/maxV*H);
-    const isNow=new Date().getHours()===h;
-    out+=`<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;width:${W}px">
-      <div style="display:flex;align-items:flex-end;gap:1px;height:${H}px">
-        <div title="Res ${r}" style="width:7px;height:${Math.max(rH,r>0?1:0)}px;background:var(--acc);border-radius:2px 2px 0 0;opacity:.85"></div>
-        <div title="Ret ${t}" style="width:7px;height:${Math.max(tH,t>0?1:0)}px;background:var(--green);border-radius:2px 2px 0 0;opacity:.85"></div>
-      </div>
-      <div style="font-size:6px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:400}">${hLbl(h)}</div>
+  // Only render the lower chart if its element still exists
+  if (el) {
+    let out=`<div style="display:flex;align-items:flex-end;gap:1px;height:${H+16}px;overflow-x:auto">`;
+    HOURS.forEach(h=>{
+      const r=res[h]||0, t=ret[h]||0;
+      const rH=Math.round(r/maxV*H), tH=Math.round(t/maxV*H);
+      const isNow=new Date().getHours()===h;
+      out+=`<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;width:${W}px">
+        <div style="display:flex;align-items:flex-end;gap:1px;height:${H}px">
+          <div title="Res ${r}" style="width:7px;height:${Math.max(rH,r>0?1:0)}px;background:var(--acc);border-radius:2px 2px 0 0;opacity:.85"></div>
+          <div title="Ret ${t}" style="width:7px;height:${Math.max(tH,t>0?1:0)}px;background:var(--green);border-radius:2px 2px 0 0;opacity:.85"></div>
+        </div>
+        <div style="font-size:6px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:400}">${hLbl(h)}</div>
+      </div>`;
+    });
+    out+=`</div>`;
+    out+=`<div style="display:flex;gap:12px;margin-top:4px;font-size:9px;color:var(--txt3)">
+      <span><span style="color:var(--acc)">▪</span> Reservations</span>
+      <span><span style="color:var(--green)">▪</span> Returns</span>
     </div>`;
-  });
-  out+=`</div>`;
-  out+=`<div style="display:flex;gap:12px;margin-top:4px;font-size:9px;color:var(--txt3)">
-    <span><span style="color:var(--acc)">▪</span> Reservations</span>
-    <span><span style="color:var(--green)">▪</span> Returns</span>
-  </div>`;
-  el.innerHTML=out;
+    el.innerHTML=out;
+  }
 
   // Update dashboard mini (v53: now full-width with overlaid numbers
   // and a hover-detail tile. Bars are taller so individual hour values
@@ -12455,7 +13064,15 @@ function buildHourlyFlowChart() {
 // ── MAY 2026 SCHEDULE — full schedule data (read by Reset & Reload) ─────
 var MAY_SCHEDULE = {"2026-05-03":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":[16.5,24.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[10.0,20.0],"Lauren_Kretschman":[16.0,26],"Ennis_MT":"OFF"},"2026-05-04":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[6.0,16.0],"Joshua_(Josh)_Osei":[10.0,20.0],"Brittney_Francis":"OFF","Lauren_Kretschman":[16.0,26],"Ennis_MT":[16.0,26]},"2026-05-05":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":"OFF","Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":[10.0,20.0],"Brittney_Francis":[6.0,16.0],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[16.0,26]},"2026-05-06":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":[6.0,16.0],"Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":[10.0,20.0],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[6.0,16.0],"Lauren_Kretschman":"OFF","Ennis_MT":[16.0,26]},"2026-05-07":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[8.0,18.0],"Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[10.0,20.0],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":[16.0,26]},"2026-05-08":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Matt_Johnson_(BRM)":[4.0,14.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":"OFF","Caitlin_Kelsey":[12.0,22.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[10.0,20.0],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[6.0,16.0],"Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-09":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Matt_Johnson_(BRM)":[5.5,15.5],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[8.0,18.0],"Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-10":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":[16.5,24.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[6.0,16.0],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-11":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":[9.0,19.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[12.0,22.0],"Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[16.0,26],"Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":[16.0,26],"Brittney_Francis":[16.0,26],"Lauren_Kretschman":[6.0,16.0],"Ennis_MT":[6.0,16.0]},"2026-05-12":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":[16.0,26],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[12.0,22.0],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[6.0,16.0],"Ennis_MT":[6.0,16.0]},"2026-05-13":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":"OFF","Carlos_Aviles":[12.0,22.0],"Caitlin_Kelsey":[5.5,15.5],"Khala_Shackleford":[12.0,22.0],"Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":[10.0,20.0],"Brittney_Francis":"OFF","Lauren_Kretschman":[6.0,16.0],"Ennis_MT":[6.0,16.0]},"2026-05-14":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[10.0,20.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":"OFF","Caitlin_Kelsey":"OFF","Khala_Shackleford":[12.0,22.0],"Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[6.0,16.0],"Ennis_MT":"OFF"},"2026-05-15":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[6.0,16.0],"Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":[12.0,22.0],"Madelyne_(Maddy)_Shirer":[16.0,26],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":"OFF","Ennis_MT":[6.0,16.0]},"2026-05-16":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":[10.0,20.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[16.0,26],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[6.0,16.0]},"2026-05-17":{"Genesis_Cochran":"OFF","Lisa_(Exit)":[16.5,24.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":[10.0,20.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[5.5,15.5],"Carlos_Aviles":[16.0,26],"Caitlin_Kelsey":"OFF","Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[6.0,16.0]},"2026-05-18":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":[9.0,19.0],"Matt_Johnson_(BRM)":[8.0,18.0],"Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[16.0,26],"Caitlin_Kelsey":[6.0,16.0],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[10.0,20.0]},"2026-05-19":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":"OFF","Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":[16.0,26],"Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":"OFF","Carlos_Aviles":"OFF","Caitlin_Kelsey":[6.0,16.0],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[5.5,15.5],"Brittney_Francis":"OFF","Lauren_Kretschman":[12.0,22.0],"Ennis_MT":[10.0,20.0]},"2026-05-20":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":[16.0,26],"Ty_Lumpkin":"OFF","Carlos_Aviles":[5.5,15.5],"Caitlin_Kelsey":[6.0,16.0],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":"OFF","Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":[12.0,22.0],"Lauren_Kretschman":[16.0,26],"Ennis_MT":"OFF"},"2026-05-21":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[6.0,16.0],"Caitlin_Kelsey":[10.0,20.0],"Khala_Shackleford":"OFF","Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":"OFF","Brittney_Francis":[16.0,26],"Lauren_Kretschman":"OFF","Ennis_MT":"OFF"},"2026-05-22":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Ami_Lhom":[8.0,18.0],"Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":[6.0,16.0],"Caitlin_Kelsey":"OFF","Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":"OFF","Lauren_Kretschman":[16.0,26],"Ennis_MT":[10.0,20.0]},"2026-05-23":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":"OFF","Caitlin_Kelsey":[16.0,26],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":[12.0,22.0]},"2026-05-24":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":[16.5,24.5],"Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Ty_Lumpkin":[16.0,26],"Carlos_Aviles":"OFF","Caitlin_Kelsey":[16.0,26],"Khala_Shackleford":[10.0,20.0],"Madelyne_(Maddy)_Shirer":[5.5,15.5],"Joshua_(Josh)_Osei":[6.0,16.0],"Brittney_Francis":"OFF","Lauren_Kretschman":"OFF","Ennis_MT":[12.0,22.0]},"2026-05-25":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":"OFF","Guenther_Meyer":[8.5,17],"Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF","Brittney_Francis":"OFF"},"2026-05-26":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":"OFF","Nas_Returns":"OFF","Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},"2026-05-27":{"Genesis_Cochran":"OFF","Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[4,13],"Julian_Returns":"OFF","Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":"OFF","Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":"OFF","Zina_Kellen":"OFF","Tighisty_(TT)_Haile":"OFF","Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":"OFF","Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF","Matt_Johnson_(BRM)":"OFF"},"2026-05-28":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":[18,26.5],"Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":[16,24.5],"Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":[5.5,14],"Laura_Gonzalez":[17,25],"Guenther_Meyer":[8.5,17],"Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":"OFF","JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":"OFF","Leslie_Brown":"OFF","Ami_Lhom":"OFF"},"2026-05-29":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":[3.5,12],"Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":"OFF","Guenther_Meyer":"OFF","Lily_Tesfaye":[8.5,17],"Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":[10,18.5],"Umesh_Acharya":[16.5,25],"Feven_Dubale":[18,25],"Hamda_Wais":[16.5,25],"Leslie_Brown":"OFF","Ami_Lhom":"OFF"},"2026-05-30":{"Genesis_Cochran":[7,16],"Lisa_(Exit)":"OFF","Kenneth_Hooks":"OFF","Kerv_Returns":"OFF","Julian_Returns":[4,13],"Toney_Returns":[10,18.5],"Nas_Returns":[14,23],"Rob_Returns":"OFF","Rukmini_(Mini)_Carr":[5.5,14.5],"Matthew_Johnson":"OFF","Laura_Gonzalez":[5.5,14.5],"Guenther_Meyer":"OFF","Lily_Tesfaye":"OFF","Ceandra_(CeCe)_Smith":[8.5,17],"Mariam_Mbye":[10,18.5],"Zina_Kellen":[10,18.5],"Tighisty_(TT)_Haile":[10,18.5],"Samantha_(Sammi)_Smith":[10,18.5],"JaJuantae_(Jay)_Young":"OFF","Umesh_Acharya":[16.5,25],"Feven_Dubale":"OFF","Hamda_Wais":[16.5,25],"Leslie_Brown":[16.5,25],"Ami_Lhom":"OFF"}}; 
 function getScheduleForDate(dateStr) {
-  return MAY_SCHEDULE[dateStr] || null;
+  // Merge per-date admin overrides on top of MAY_SCHEDULE so the schedule
+  // editor's edits flow through to loadScheduleForToday and everything
+  // downstream. Both sources are person-keyed objects so a shallow merge
+  // is sufficient (override wins on key collision).
+  const base = MAY_SCHEDULE[dateStr] || null;
+  const overrides = (STATE && STATE.scheduleOverrides) ? STATE.scheduleOverrides[dateStr] : null;
+  if (!base && !overrides) return null;
+  if (!overrides) return base;
+  return Object.assign({}, base || {}, overrides);
 }
 
 function loadScheduleForToday(force) {
@@ -12463,7 +13080,8 @@ function loadScheduleForToday(force) {
   const key = today.getFullYear()+'-'+
     String(today.getMonth()+1).padStart(2,'0')+'-'+
     String(today.getDate()).padStart(2,'0');
-  const sched = MAY_SCHEDULE[key];
+  // v54: use getScheduleForDate so per-date admin overrides take effect
+  const sched = getScheduleForDate(key);
   if (!sched) { toast('No schedule found for '+key); return false; }
 
   if (!STATE.shiftMod)      STATE.shiftMod      = {};
@@ -12569,86 +13187,121 @@ function printAllChecklists(blank) {
   const auto  = typeof getAutoManagers==='function' ? getAutoManagers() : {};
   const f     = blank ? {} : (STATE.fields || {});
   const modes = ['opening','mid','closing'];
-  const modeLabels = {opening:'🌅 Opening Checklist',mid:'🔄 Mid-Shift Checklist',closing:'🌙 Closing Checklist'};
 
-  let sectionsHtml = '';
+  // v55: compact all-3 checklists onto a single page using a 2-column
+  // CSS column-fill flow layout. Each mode gets a color-coded section
+  // header (blue/orange/purple) instead of a bulky dark banner. Item
+  // rows are tight (9px font, 1.5px row padding). Field values inline
+  // on the same row as the item label with a dotted underline.
+  // The previous version printed each mode as its own "panel" with a
+  // ~30px tall solid-dark header — across 3 modes + 60 items, the page
+  // budget didn't add up.
+
+  // Per-mode config: color + label
+  const modeConfig = {
+    opening: { col:'#2563eb', label:'OPENING' },
+    mid:     { col:'#ea580c', label:'MID-SHIFT' },
+    closing: { col:'#7c3aed', label:'CLOSING' }
+  };
+
+  let allHtml = '';
   modes.forEach(mode => {
+    const cfg  = modeConfig[mode];
     const data = (typeof getCLDataForToday==='function' ? getCLDataForToday()[mode] : null) ||
                  (typeof CL_DATA!=='undefined' ? CL_DATA[mode] : []) || [];
     const cl = blank ? {} : ((STATE.checklist||{})['cl-'+mode]||{});
-    let secHtml = '';
+    const total = data.reduce((a,s)=>a+(s.items||[]).length,0);
+    const done  = Object.values(cl).filter(Boolean).length;
+
+    // Mode block — entire mode tries to stay together to keep groups intact
+    let modeHtml = `<div style="break-inside:avoid-column;margin-bottom:6px">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+        color:${cfg.col};border-bottom:1.5px solid ${cfg.col};padding-bottom:1px;margin-bottom:3px;
+        display:flex;justify-content:space-between;align-items:baseline">
+        <span>${cfg.label}</span>
+        <span style="font-size:8px;color:#888;font-weight:600">${blank?'___':done}/${total}</span>
+      </div>`;
+
     data.forEach(sec => {
-      secHtml += `<div style="margin-bottom:10px">
-        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;
-          color:#555;border-bottom:1px solid #ccc;padding-bottom:3px;margin-bottom:5px">${sec.s}</div>`;
+      // Section sub-header (smaller, grey)
+      modeHtml += `<div style="font-size:7.5px;font-weight:700;color:#666;text-transform:uppercase;
+        letter-spacing:.04em;margin:3px 0 1px;border-bottom:1px dotted #ccc">${sec.s}</div>`;
       (sec.items||[]).forEach(it => {
-        const done = !blank && cl[it.t];
+        const checked = !blank && cl[it.t];
         const fields = it.fields || [];
-        secHtml += `<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid #f0f0f0;
-          font-size:10px;align-items:flex-start">
-          <span style="font-size:13px;flex-shrink:0;color:${done?'#16a34a':'#ccc'}">${done?'☑':'☐'}</span>
-          <div style="flex:1">
-            <div style="color:${done?'#333':'#555'};text-decoration:${done?'line-through':''}">${it.t}</div>
-            ${fields.map(fld=>{
-              const val=blank?'':((STATE.fields||{})[fld.key]||'');
-              return `<div style="margin:2px 0 2px 0;display:flex;align-items:center;gap:6px">
-                <span style="font-size:9px;color:#888;white-space:nowrap">${fld.label}:</span>
-                <span style="font-size:10px;font-family:monospace;border-bottom:1px solid #ccc;
-                  min-width:120px;display:inline-block;color:#333">${val||''}</span>
-              </div>`;
-            }).join('')}
-          </div>
+        const hasFields = fields.length > 0;
+        // Build inline field display: "Label: ___value___"
+        const fieldHtml = fields.map(fld => {
+          const val = blank ? '' : ((STATE.fields||{})[fld.key] || '');
+          return `<span style="margin-left:4px;color:#888;font-size:7.5px">${fld.label}:</span>
+            <span style="font-family:monospace;color:#000;border-bottom:1px dotted #999;
+              min-width:30px;display:inline-block;padding:0 2px;font-size:8.5px">${val||'_____'}</span>`;
+        }).join(' ');
+        modeHtml += `<div style="display:flex;align-items:flex-start;gap:3px;padding:1.5px 0;
+          font-size:9px;line-height:1.25">
+          <span style="font-size:10px;color:${checked?'#16a34a':'#bbb'};flex-shrink:0;line-height:1">${checked?'☑':'☐'}</span>
+          <div style="flex:1;color:${checked?'#222':'#333'}">${it.t}${hasFields?'<br>'+fieldHtml:''}</div>
         </div>`;
       });
-      secHtml += '</div>';
     });
-
-    const done = Object.values(cl).filter(Boolean).length;
-    const total = data.reduce((a,s)=>a+(s.items||[]).length,0);
-    sectionsHtml += `
-      <div style="break-inside:avoid;margin-bottom:12px">
-        <div style="background:#1a1a2e;color:#fff;padding:6px 10px;border-radius:4px 4px 0 0;
-          font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:space-between">
-          <span>${modeLabels[mode]}</span>
-          <span style="font-size:10px;opacity:.8">${blank?'___ / '+total:done+' / '+total}</span>
-        </div>
-        <div style="border:1px solid #ddd;border-top:none;border-radius:0 0 4px 4px;padding:8px 10px">
-          ${secHtml}
-        </div>
-      </div>`;
+    modeHtml += '</div>';
+    allHtml += modeHtml;
   });
 
-  const headerHtml = `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px">
+  // Compact 5-cell summary strip across the top
+  const pol = STATE.walkUpPolicy || 'open';
+  const wlbls = {open:'All Open',core:'Core Only',noncore:'Non-Core',closed:'Closed'};
+  const headerHtml = `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:6px">
     ${[
-      ['Opening Mgr', f.openMgr||auto.open||'_______________'],
-      ['Closing Mgr', f.closeMgr||auto.close||'_______________'],
-      ['Completely Satisfied', f.cs||'___'],
-      ['Hot Alerts',  f.hot||'___'],
-    ].map(([lbl,val])=>`<div style="border:1px solid #ccc;border-radius:4px;padding:6px 8px">
-      <div style="font-size:8px;font-weight:800;text-transform:uppercase;color:#888">${lbl}</div>
-      <div style="font-size:13px;font-weight:700">${val}</div>
+      ['Open Mgr', blank?'_______':f.openMgr||auto.open||'—'],
+      ['Close Mgr', blank?'_______':f.closeMgr||auto.close||'—'],
+      ['CS Score', blank?'____':f.cs||'—'],
+      ['Hot Alerts', blank?'____':f.hot||'—'],
+      ['Walk-Ups', blank?'_______':wlbls[pol]],
+    ].map(([lbl,val])=>`<div style="border:1px solid #bbb;border-radius:3px;padding:3px 5px">
+      <div style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#666;line-height:1">${lbl}</div>
+      <div style="font-size:11px;font-weight:700;line-height:1.2;margin-top:1px">${val}</div>
     </div>`).join('')}
   </div>`;
 
-  const win = window.open('','_blank','width=860,height=1100');
+  const win = window.open('','_blank','width=900,height=1100');
   if (!win) { if(typeof toast==='function') toast('Allow popups to print'); return; }
   win.document.write(`<!DOCTYPE html><html><head>
     <title>CMH Checklists — ${blank?'Blank':today}</title>
     <style>
-      * { box-sizing:border-box; margin:0; padding:0; }
-      body { font-family:Arial,sans-serif; padding:16px; color:#333; font-size:11px; }
-      h1 { font-size:16px; margin-bottom:2px; }
-      h2 { font-size:11px; color:#666; margin-bottom:10px; font-weight:400; }
-      @media print {
-        body { padding:10px; }
-        @page { margin:0.4in; size:letter portrait; }
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;color:#222;font-size:11px;line-height:1.3;padding:0}
+      h1{font-size:13px;font-weight:800;margin:0}
+      h2{font-size:9px;color:#666;margin:0 0 6px;font-weight:500}
+      .header{display:flex;justify-content:space-between;align-items:flex-end;
+        border-bottom:1.5px solid #333;padding-bottom:3px;margin-bottom:6px}
+      /* The grid: 2 columns flowing; columns auto-balance content height. */
+      .checklist-grid{
+        column-count:2;
+        column-gap:14px;
+        column-fill:balance;
+      }
+      .checklist-grid > div{
+        page-break-inside:avoid;
+        break-inside:avoid;
+      }
+      @page{size:letter portrait;margin:0.35in}
+      @media print{
+        body{margin:0}
+        .no-print{display:none}
       }
     </style>
   </head><body>
-    <h1>🚗 CMH Daily Driver — ${blank?'Blank Checklists':today}</h1>
-    <h2>All three checklists${blank?'':' · Printed '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</h2>
+    <div class="header">
+      <div>
+        <h1>🚗 CMH Daily Driver${blank?' — Blank Checklists':''}</h1>
+        <h2>${blank?'Fill in and enter into app later':today + ' · printed ' + new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</h2>
+      </div>
+    </div>
     ${headerHtml}
-    ${sectionsHtml}
+    <div class="checklist-grid">
+      ${allHtml}
+    </div>
   </body></html>`);
   win.document.close();
   setTimeout(()=>win.print(), 400);
