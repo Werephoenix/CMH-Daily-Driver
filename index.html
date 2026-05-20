@@ -90,6 +90,29 @@ html {
 .scr.on { display: block !important; }
 @media (max-width: 600px) { .scr { padding: 10px; } }
 
+/* v59 ANIMATIONS — subtle, monitor-friendly (no flashy motion, no spin) */
+@keyframes annc-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes scr-fade {
+  from { opacity: 0.4; }
+  to   { opacity: 1; }
+}
+@keyframes pulse-soft {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(116, 179, 255, 0.0); }
+  50%      { box-shadow: 0 0 0 6px rgba(116, 179, 255, 0.15); }
+}
+.scr.on { animation: scr-fade 0.22s ease-out; }
+/* Mgr-item cards already have hover transition (from v56). Add a faint
+   entrance fade so dashboard tiles don't feel static after refresh. */
+.mgr-item { animation: annc-fade 0.28s ease-out; }
+/* Soft pulse on the live time indicator dot if present (status band). */
+#status-band-dot { animation: pulse-soft 2.4s infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .scr.on, .mgr-item, #status-band-dot { animation: none; }
+}
+
 /* v53: per-tab accent strip at the top of each screen — quick visual
    cue of what page you're on without reading the tab text. The strip
    color matches each tab's --tab-* variable. */
@@ -1453,6 +1476,15 @@ button { cursor: pointer; }
   </div>
 
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       ANNOUNCEMENTS & CELEBRATIONS (v59)
+       Announcements: pinned manager-authored items (paste/edit in Admin).
+       Celebrations: today's birthdays and work anniversaries.
+       Both render compact at the top of the dashboard; hidden when empty.
+       ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+  <div id="dash-celebrations" style="display:none;margin-bottom:8px"></div>
+  <div id="dash-announcements" style="display:none;margin-bottom:8px"></div>
+
+  <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        HERO BAR (v53 restructure): Res / Ret / Net + brand split (now
        sized to match the left side, was 11px lost in the corner) + WU
        and 24hr policy indicators (consolidated from the separate
@@ -1959,6 +1991,9 @@ button { cursor: pointer; }
         <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
         <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
+        <button class="btn btn-gh btn-sm" id="adm-tab-annc" onclick="showAdminSection('annc')">📣 Announcements</button>
+        <button class="btn btn-gh btn-sm" id="adm-tab-celeb" onclick="showAdminSection('celeb')">🎂 Celebrations</button>
+        <button class="btn btn-gh btn-sm" id="adm-tab-photos" onclick="showAdminSection('photos')">📸 Car Photos</button>
         <button class="btn btn-gh btn-sm" onclick="openThresholdQuiz()">📊 Thresholds</button>
         <button class="btn btn-gh btn-sm" style="margin-left:auto;color:var(--red)" onclick="lockAdmin()">🔒 Lock</button>
       </div>
@@ -2116,6 +2151,88 @@ button { cursor: pointer; }
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-gh btn-sm" onclick="if(typeof clearStoredSchedule==='function')clearStoredSchedule()">🗑 Clear All</button>
             <button class="btn btn-gh btn-sm" onclick="if(confirm('Reset today from MAY_SCHEDULE?')&&typeof resetAndReloadToday==='function')resetAndReloadToday()">🔄 Reset &amp; Reload Today</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ ANNOUNCEMENTS section (v59) ═══════════════════════════════ -->
+      <div id="adm-annc" class="adm-section" style="display:none">
+        <div class="card" style="margin-bottom:10px">
+          <div class="ch">📣 Dashboard Announcements
+            <span class="sub">Post a message to the top of the dashboard</span>
+          </div>
+          <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
+            Announcements appear at the top of the Dashboard for all users.
+            Set an expiry date if you want it to auto-remove.
+          </p>
+          <div style="display:grid;gap:10px;margin-bottom:12px">
+            <textarea id="annc-input-text" rows="3" placeholder="Type your announcement here..."
+              style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;
+                color:var(--txt);padding:9px;font-size:13px;font-family:var(--ff-ui);resize:vertical"></textarea>
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
+              <div>
+                <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Priority</label>
+                <select id="annc-input-prio" style="width:100%;padding:7px 8px;margin-top:3px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:12px">
+                  <option value="info">📣 Notice (blue)</option>
+                  <option value="important">❗ Important (orange)</option>
+                  <option value="urgent">🚨 Urgent (red)</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Expires (optional)</label>
+                <input type="date" id="annc-input-expires"
+                  style="width:100%;padding:6px 8px;margin-top:3px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:12px">
+              </div>
+              <button class="btn btn-g" onclick="submitNewAnnouncement()" style="padding:8px 16px">📣 Post</button>
+            </div>
+          </div>
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:14px 0 6px;padding-top:8px;border-top:1px solid var(--bdr)">Active Announcements</div>
+          <div id="adm-annc-list"></div>
+        </div>
+      </div>
+
+      <!-- ═══ CELEBRATIONS section (v59) ═══════════════════════════════ -->
+      <div id="adm-celeb" class="adm-section" style="display:none">
+        <div class="card" style="margin-bottom:10px">
+          <div class="ch">🎂 Birthdays & Anniversaries
+            <span class="sub">Show on dashboard when the date is today</span>
+          </div>
+          <div style="font-size:11px;color:var(--txt3);background:var(--bg3);padding:8px 10px;border-radius:5px;border-left:3px solid var(--acc);margin-bottom:12px;line-height:1.5">
+            <b style="color:var(--txt2)">Paste from a spreadsheet</b>, one per line. Tabs or commas separate columns:
+            <pre style="margin:6px 0 0;font-family:var(--ff-mono);font-size:11px;color:var(--txt2);background:var(--bg2);padding:6px 8px;border-radius:4px">Matt Johnson, 3/15
+Mariam Mbye, 7/22, anniversary, 2018
+Lily Tesfaye, 11/8, anniversary
+Genesis Cochran, 5/14</pre>
+            Format: <b>Name, MM/DD</b> for birthdays. Add the word <b>anniversary</b> (and optional start year) for work anniversaries.
+          </div>
+          <textarea id="celeb-paste-text" rows="6" placeholder="Paste names and dates here..."
+            style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;color:var(--txt);padding:9px;font-size:12px;font-family:var(--ff-mono);resize:vertical;margin-bottom:8px"></textarea>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+            <button class="btn btn-g" onclick="submitCelebrationsPaste()">+ Add These</button>
+            <button class="btn btn-gh btn-sm" style="margin-left:auto" onclick="clearAllCelebrations()">🗑 Clear All</button>
+          </div>
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:14px 0 6px;padding-top:8px;border-top:1px solid var(--bdr)">Stored (sorted by date)</div>
+          <div id="adm-celeb-list"></div>
+        </div>
+      </div>
+
+      <!-- ═══ CAR PHOTOS section (v59) ═══════════════════════════════ -->
+      <div id="adm-photos" class="adm-section" style="display:none">
+        <div class="card" style="margin-bottom:10px">
+          <div class="ch">📸 Car Reference Photos
+            <span class="sub">Optional image URL per car code — shows as thumbnail in Reference</span>
+          </div>
+          <div style="font-size:11px;color:var(--txt3);background:var(--bg3);padding:8px 10px;border-radius:5px;border-left:3px solid var(--acc);margin-bottom:12px;line-height:1.5">
+            Paste a direct image URL for any car code. The thumbnail will appear in the Reference tab next to that code. If you leave a code blank or its URL breaks, a body-type icon is shown as a fallback so the layout never breaks.
+            <div style="margin-top:6px;font-size:10px;color:var(--txt3)">
+              <b>Tip:</b> use Enterprise/National fleet pages, manufacturer press images, or Wikipedia. Right-click an image → "Copy image address" then paste here.
+            </div>
+          </div>
+          <div style="display:grid;gap:6px;max-height:60vh;overflow-y:auto;padding-right:4px"
+            id="adm-photos-list"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+            <button class="btn btn-g btn-sm" onclick="saveAllCarPhotos()">💾 Save All</button>
+            <button class="btn btn-gh btn-sm" style="margin-left:auto" onclick="clearAllCarPhotos()">🗑 Clear All</button>
           </div>
         </div>
       </div>
@@ -2906,6 +3023,13 @@ function loadState() {
       s.pendingCoverage = s.pendingCoverage || null; // { staffStation, altSchedule, shiftMod, customSplits, specialBlocks } — buffer of edits before Confirm
       s.confirmedCoverage = s.confirmedCoverage || null; // snapshot of last Confirm
       s.closingExtension = s.closingExtension || null; // {until: hour, reason: 'unfulfilled res'}
+      // v57+ migrations — keep all newer fields here so loading old localStorage
+      // dumps doesn't leave them undefined and cause downstream crashes.
+      s.customLunch  = s.customLunch  || {};  // v57: {pid: lunch_start_hour} manual lunch override
+      s.scheduleOverrides = s.scheduleOverrides || {}; // v54: {YYYY-MM-DD: {pid: [s,e]|'OFF'}}
+      s.announcements = Array.isArray(s.announcements) ? s.announcements : [];  // v59
+      s.celebrations  = Array.isArray(s.celebrations)  ? s.celebrations  : [];  // v59
+      s.carPhotos     = (s.carPhotos && typeof s.carPhotos === 'object') ? s.carPhotos : {}; // v59
       return s;
     }
   } catch(e) {}
@@ -2913,7 +3037,7 @@ function loadState() {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
-    stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{},
+    stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{},
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -2927,13 +3051,25 @@ window.STATE = loadState();
 var STATE = window.STATE; // var hoists to script scope for function closures
 
 function saveState() {
-  // Local save always immediate
+  // Local save always immediate. v59.2: previously silently swallowed all
+  // failures — if localStorage was full or disabled, Matt would think his
+  // data was being saved when it wasn't. Now logs to console (one warning
+  // per session, no toast spam) and emits a custom event consumers can hook.
   try {
     const TODAY = new Date().toISOString().slice(0,10);
     const LS_KEY = 'cmh-v2-' + TODAY;
     localStorage.setItem(LS_KEY, JSON.stringify(STATE));
-  } catch(e) {}
-  // Debounce save 2.5s
+    window._saveStateOk = true;
+  } catch(e) {
+    if (!window._saveStateWarned) {
+      window._saveStateWarned = true;
+      try { console.warn('saveState failed (localStorage may be full or disabled):', e && e.message); } catch(_){}
+      // Subtle one-time toast — not on every save, just the first failure
+      try { if (typeof toast === 'function') toast('⚠ Local save failed — changes may not persist'); } catch(_){}
+    }
+    window._saveStateOk = false;
+  }
+  // Debounce cloud sync 2.5s
   if (window._syncTimer) clearTimeout(window._syncTimer);
   window._syncTimer = setTimeout(pushToJsonbin, 2500);
 }
@@ -3629,7 +3765,10 @@ function updateBoardTotals() {
 }
 
 function updateBoardHeader() {
-  const f = STATE.fields;
+  // v59.2: defensive — STATE.fields could be null if state got partially
+  // wiped (corruption, manual localStorage edit, etc.). Default to {} so
+  // we don't crash reading .cs / .openMgr.
+  const f = STATE.fields || {};
   const set = (id, val) => { const el=document.getElementById(id); if(el) el.textContent = val||'—'; };
   set('bh-cs', f.cs);
   set('bh-hot', f.hot);
@@ -4655,8 +4794,18 @@ function buildSmartRotation() {
     if (!inExpected && duty !== true) return;
     if ((STATE.todayOverrides||{})[pid] === 'callout') return;
 
-    const shift = getPersonShiftToday(person);
+    let shift = getPersonShiftToday(person);
     if (!shift) return;
+    // v59.2: APPLY STATE.shiftMod here. Previously shiftMod was only honored
+    // at render time, which meant the rotation engine computed lunch/b1/b2
+    // against the ORIGINAL shift bounds while the timeline drew the MODIFIED
+    // bounds — resulting in misplaced blocks (e.g. lunch outside the
+    // displayed shift). Apply the override at rotation-build time so all
+    // downstream calculations use the same shift window.
+    const shiftModOverride = (STATE.shiftMod || {})[pid];
+    if (shiftModOverride && shiftModOverride.start != null && shiftModOverride.end != null) {
+      shift = { ...shift, start: shiftModOverride.start, end: shiftModOverride.end };
+    }
     // Normalize overnight shifts: "4P-1A" parses as start=16.5 end=1, which
     // breaks the (end-start)/2 midpoint math. Closers like Leslie and Feven
     // need end+24 so b1/lunch/b2 calculations are sensible. The timeline
@@ -4718,8 +4867,15 @@ function buildSmartRotation() {
 
     // ── Exit-First: first half exit, second half counter ─────────────────────
     if (altPos === 'exit-first') {
+      // v59.2: honor customLunch override across all altSchedule paths.
+      // Previously these paths hardcoded lunchStart = midpoint and ignored
+      // STATE.customLunch entirely.
+      const customLunch_ef = (STATE.customLunch || {})[pid];
       const mid2 = shift.start + (shift.end - shift.start) / 2;
-      const ls2  = noLunch ? null : mid2 - ROTATION.lunchHours / 2;
+      const ls2  = noLunch ? null
+        : (typeof customLunch_ef === 'number' && customLunch_ef > shift.start && customLunch_ef < shift.end)
+            ? customLunch_ef
+            : mid2 - ROTATION.lunchHours / 2;
       const le2  = noLunch ? null : ls2  + ROTATION.lunchHours;
       return {
         pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
@@ -4733,7 +4889,12 @@ function buildSmartRotation() {
 
     // ── Full Counter: entire shift at counter, lunch at midpoint ──────────
     if (altPos === 'full-counter') {
-      const lunchStart = noLunch ? null : shift.start + shiftDur / 2 - ROTATION.lunchHours / 2;
+      // v59.2: honor customLunch override
+      const customLunch_fc = (STATE.customLunch || {})[pid];
+      const lunchStart = noLunch ? null
+        : (typeof customLunch_fc === 'number' && customLunch_fc > shift.start && customLunch_fc < shift.end)
+            ? customLunch_fc
+            : shift.start + shiftDur / 2 - ROTATION.lunchHours / 2;
       const lunchEnd   = noLunch ? null : lunchStart + ROTATION.lunchHours;
       return {
         pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
@@ -4747,7 +4908,12 @@ function buildSmartRotation() {
 
     // ── Full Exit: entire shift at exit, lunch at midpoint ────────────────
     if (altPos === 'full-exit') {
-      const lunchStart = noLunch ? null : shift.start + shiftDur / 2 - ROTATION.lunchHours / 2;
+      // v59.2: honor customLunch override
+      const customLunch_fe = (STATE.customLunch || {})[pid];
+      const lunchStart = noLunch ? null
+        : (typeof customLunch_fe === 'number' && customLunch_fe > shift.start && customLunch_fe < shift.end)
+            ? customLunch_fe
+            : shift.start + shiftDur / 2 - ROTATION.lunchHours / 2;
       const lunchEnd   = noLunch ? null : lunchStart + ROTATION.lunchHours;
       return {
         pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
@@ -4925,6 +5091,9 @@ function buildSmartRotation() {
     // Custom-lunch CXRs are never shifted at all.
     if (!r.lunch) return false;
     if (customLunchFor(r) !== null) return false;
+    // v58: manually-defined assignment blocks override the auto rotation
+    // entirely. Don't shift the lunch of someone whose blocks are manual.
+    if ((STATE.mgmtBlocks||{})[r.pid] && STATE.mgmtBlocks[r.pid].length) return false;
     const newFrom = r.lunch.from + deltaH;
     const newTo   = r.lunch.to   + deltaH;
     // Lunch must stay at least 30min into shift on both sides
@@ -4933,6 +5102,16 @@ function buildSmartRotation() {
     // HARD: lunch.from >= shiftStart + 3.0 — NEVER violated
     if (newFrom < r.shiftStart + LUNCH_MIN_FROM_START_HARD - 0.01) {
       if (!opts || !opts.allowEmergency) return false;
+    }
+    // v58 MIDPOINT CAP: lunch stays within +/-1hr of shift midpoint
+    // per Matt: "Lunches for anyone should never be over 1 hr off of
+    // their mid point unless manually changed." Multi-iteration stagger
+    // passes could otherwise compound and drift lunches far from the
+    // natural midpoint. Custom lunches bypass (customLunchFor refuses).
+    // Block-override CXRs also bypass (their blocks are entirely manual).
+    const midpoint = (r.shiftStart + r.shiftEnd) / 2;
+    if (Math.abs(newFrom - midpoint) > 1.0 + 0.01) {
+      return false;
     }
     // Apply
     if (r.b1 && Math.abs(r.b1.to - r.lunch.from) < 0.01) r.b1.to = newFrom;
@@ -6175,6 +6354,7 @@ function confirmToday() {
 
   // Auto-fill manager fields from schedule
   const auto = detectManagersFromSchedule(todayShifts, allRoster);
+  if (!STATE.fields) STATE.fields = {}; // v59.2: defensive — never crash on null
   if (!STATE.fields.openMgr && auto.openName) {
     STATE.fields.openMgr = auto.openName;
     const el = document.getElementById('f-openmgr');
@@ -6542,10 +6722,15 @@ function addMgmtBlockPrompt(pid) {
   // bounce between Emerald, Counter, Exit, Returns, Floater, Shuttle).
   // CXRs get a smaller list (Counter, Exit, Returns, Shuttle) since they
   // don't typically work the Emerald booth or float positions.
+  // v58: added Lunch / Break / Training to CXR options so managers can
+  // explicitly mark a lunch slot (or short break, or training session)
+  // as part of the manual block override. The timeline renderer's
+  // getZone() recognizes these station names and shows them with the
+  // right zone color.
   const stations = isMgmt
-    ? ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling']
-    : ['Counter','Exit Booth','Returns','Shuttling'];
-  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Counter':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌'};
+    ? ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling','Lunch','Break','Training']
+    : ['Counter','Exit Booth','Returns','Lunch','Break','Shuttling','Training'];
+  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Counter':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌','Lunch':'🍽️','Break':'☕','Training':'📚'};
 
   const html = `
     <div style="display:grid;gap:10px">
@@ -6768,10 +6953,15 @@ function openEditMgmtBlockModal(pid, bidx) {
   const entry = exp[pid];
   const nick = entry?.person?.nick || entry?.person?.name?.split(' ')[0] || pid;
   const isMgmt = entry?.person && ['ARM','BRM','ABRM','MT'].includes(entry.person.role);
+  // v58: added Lunch / Break / Training to CXR options so managers can
+  // explicitly mark a lunch slot (or short break, or training session)
+  // as part of the manual block override. The timeline renderer's
+  // getZone() recognizes these station names and shows them with the
+  // right zone color.
   const stations = isMgmt
-    ? ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling']
-    : ['Counter','Exit Booth','Returns','Shuttling'];
-  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Counter':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌'};
+    ? ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling','Lunch','Break','Training']
+    : ['Counter','Exit Booth','Returns','Lunch','Break','Shuttling','Training'];
+  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Counter':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌','Lunch':'🍽️','Break':'☕','Training':'📚'};
 
   const html = `
     <div style="display:grid;gap:10px">
@@ -6865,9 +7055,11 @@ function buildScheduleGrids() {
 
 // getAutoManagers — detect opening/closing managers from working staff
 function getAutoManagers() {
+  // v59.2: defensive — STATE.staffDuty could be null on first load
+  const duty = STATE.staffDuty || {};
   const workingMgmt = ROSTER_MGMT.filter(p => {
     const key = p.name.replace(/\s/g,'_');
-    return STATE.staffDuty[key] === true;
+    return duty[key] === true;
   });
   let openMgr = null, closeMgr = null;
   let earliestStart = 99;
@@ -6880,9 +7072,10 @@ function getAutoManagers() {
     if (isClose && !closeMgr) closeMgr = p;
     if (!isClose && startH < earliestStart) { earliestStart = startH; openMgr = p; }
   });
-  // Fallback to stored fields
-  const openName  = (openMgr  ? (openMgr.nick  || openMgr.name.split(' ')[0])  : null) || STATE.fields.openMgr  || null;
-  const closeName = (closeMgr ? (closeMgr.nick || closeMgr.name.split(' ')[0]) : null) || STATE.fields.closeMgr || null;
+  // Fallback to stored fields. v59.2: defensive — STATE.fields could be null.
+  const _f = STATE.fields || {};
+  const openName  = (openMgr  ? (openMgr.nick  || openMgr.name.split(' ')[0])  : null) || _f.openMgr  || null;
+  const closeName = (closeMgr ? (closeMgr.nick || closeMgr.name.split(' ')[0]) : null) || _f.closeMgr || null;
   return { open: openName, close: closeName, openFull: openMgr ? openMgr.name : null, closeFull: closeMgr ? closeMgr.name : null };
 }
 
@@ -6938,6 +7131,9 @@ function updateStatusBand() {
 function refreshDash() {
   buildDashSchedMini();
   updateSummary(); updateBoardHeader(); updateStatusBand();
+  // v59: render announcements + celebrations widgets at top of dashboard
+  if (typeof renderDashAnnouncements === 'function') renderDashAnnouncements();
+  if (typeof renderDashCelebrations === 'function') renderDashCelebrations();
   const f   = STATE.fields;
   const auto = typeof getAutoManagers==='function' ? getAutoManagers() : {};
   const clO = typeof countCLDone==='function' ? countCLDone('opening') : {done:0,total:0};
@@ -7365,13 +7561,39 @@ function renderCodes(codes) {
         ${thresh ? `<span style="font-size:9px;color:var(--txt3);margin-left:auto">WU≥${thresh[0]} UP≥${thresh[1]}</span>` : ''}
       </div>
       <div style="display:flex;flex-wrap:wrap;gap:4px">
-        ${groupCodes.map(c => `
-          <div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;
-            padding:4px 8px;display:flex;flex-direction:column;gap:1px;min-width:72px">
-            <span style="font-family:var(--ff-mono);font-size:12px;font-weight:500;
-              color:${(c.code||'').includes('⚠')||(c.group||'').includes('Pending')?'var(--amber)':'var(--txt)'}">${c.code||''}</span>
-            <span style="font-size:9px;color:var(--txt3);line-height:1.3">${(c.desc||'').split('—')[0].trim()}</span>
-          </div>`).join('')}
+        ${groupCodes.map(c => {
+          // v59: photo URL lookup. Lives in STATE.carPhotos[CODE] (managed
+          // via Admin → Car Codes). If no URL, fall back to a body-type
+          // emoji per the group (small visual differentiation).
+          const photoUrl = (STATE.carPhotos||{})[c.code] || '';
+          const groupIcons = {
+            'Econ/Compact Car':'🚗','Intermediate Car':'🚙','Standard Car':'🚘',
+            'Full Size Car':'🚖','Premium Car':'✨','Luxury Car':'💎',
+            'Compact SUV':'🚙','Intermediate SUV':'🚐','Standard SUV':'🚐',
+            'Full Size SUV':'🚐','Premium SUV':'🚙','Standard Pickup':'🛻',
+            'Large Pickup':'🛻','Passenger Van':'🚌','Cargo Van':'📦',
+            'Convertible':'🏎️','Sports Car':'🏎️',
+          };
+          const fallbackIcon = groupIcons[c.group] || '🚗';
+          // Photo shown as 28x18 thumbnail to the left of code+desc. Errors
+          // are absorbed (img.onerror=this.style.display=none) so a broken
+          // link doesn't break the layout.
+          const thumb = photoUrl
+            ? `<img src="${_sanitizeImageUrl(photoUrl)}" alt="${c.code} reference"
+                onerror="this.style.display='none';this.nextSibling.style.display='inline'"
+                style="width:36px;height:24px;object-fit:cover;border-radius:3px;flex-shrink:0;border:1px solid var(--bdr)">
+               <span style="display:none;font-size:18px" title="${c.code} (photo unavailable)">${fallbackIcon}</span>`
+            : `<span style="font-size:18px;line-height:1">${fallbackIcon}</span>`;
+          return `<div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;
+            padding:4px 8px;display:flex;align-items:center;gap:7px;min-width:130px">
+            ${thumb}
+            <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
+              <span style="font-family:var(--ff-mono);font-size:12px;font-weight:500;
+                color:${(c.code||'').includes('⚠')||(c.group||'').includes('Pending')?'var(--amber)':'var(--txt)'}">${c.code||''}</span>
+              <span style="font-size:9px;color:var(--txt3);line-height:1.3">${(c.desc||'').split('—')[0].trim()}</span>
+            </div>
+          </div>`;
+        }).join('')}
       </div>
       <div style="font-size:10px;color:var(--txt3);line-height:1.5">
         ${(groupCodes[0]?.desc||'').split('—').slice(1).join('—').trim()}
@@ -8929,9 +9151,25 @@ function setAltPosition(pid, posKey) {
 
 function showAltScheduleModal(pid, personName) {
   const current = getAltPosition(pid);
-  const person  = ROSTER_CXR.find(p => p.name.replace(/\s/g,'_') === pid);
-  if (!person || person.role === 'EXIT') {
+  // v59.2: also check ROSTER_EXIT/RETURNS so admin-added people who somehow
+  // ended up in those arrays still get a meaningful error message instead of
+  // the misleading "Exit agents stay at exit" fallback.
+  const allRosters = [
+    ...(typeof ROSTER_CXR !== 'undefined' ? ROSTER_CXR : []),
+    ...(typeof ROSTER_EXIT !== 'undefined' ? ROSTER_EXIT : []),
+    ...(typeof ROSTER_RETURNS !== 'undefined' ? ROSTER_RETURNS : []),
+  ];
+  const person = allRosters.find(p => p && p.name && p.name.replace(/\s/g,'_') === pid);
+  if (!person) {
+    toast('Could not find ' + (personName || pid) + ' in roster');
+    return;
+  }
+  if (person.role === 'EXIT') {
     toast('Exit agents stay at exit — no rotation to modify');
+    return;
+  }
+  if (person.role === 'RETURNS') {
+    toast('Returns agents stay at returns — no rotation to modify');
     return;
   }
 
@@ -9975,7 +10213,8 @@ function changeAdminPin() {
 }
 
 function showAdminSection(sec) {
-  ['staff','edit','codes','pin','sched'].forEach(s => {
+  // v59: added 'annc' (announcements) and 'celeb' (celebrations) tabs.
+  ['staff','edit','codes','pin','sched','annc','celeb','photos'].forEach(s => {
     const el  = document.getElementById('adm-'+s);
     const btn = document.getElementById('adm-tab-'+s);
     if(el)  el.style.display  = s===sec ? 'block' : 'none';
@@ -9983,7 +10222,6 @@ function showAdminSection(sec) {
   });
   if (sec==='staff') buildAdminStaffList();
   if (sec==='edit')  {
-    // Default to today on first open
     const dEl = document.getElementById('sched-edit-date');
     if (dEl && !dEl.value) setSchedEditDate(0);
     else buildScheduleEditor();
@@ -9993,6 +10231,87 @@ function showAdminSection(sec) {
     if(typeof updateStoredStatus==='function') updateStoredStatus();
     if(typeof buildMonthGrid==='function') buildMonthGrid();
   }
+  if (sec==='annc')  buildAnnouncementsList();
+  if (sec==='celeb') buildCelebrationsList();
+  if (sec==='photos') buildCarPhotosList();
+}
+
+// ── CAR PHOTOS admin (v59) ─────────────────────────────────────────
+// One row per unique car code with an input for image URL. Shows live
+// thumbnail next to each input. Saved into STATE.carPhotos as {CODE: URL}.
+function buildCarPhotosList() {
+  const el = document.getElementById('adm-photos-list');
+  if (!el) return;
+  const photos = STATE.carPhotos || {};
+  // Show all codes; sort by group then code so reference page matches
+  const codes = (typeof FLEET_CODES !== 'undefined' ? FLEET_CODES : [])
+    .slice()
+    .sort((a,b) => (a.group||'').localeCompare(b.group||'') || (a.code||'').localeCompare(b.code||''));
+  let html = '';
+  let lastGroup = '';
+  codes.forEach(c => {
+    if (!c || !c.code) return;
+    if (c.group !== lastGroup) {
+      html += `<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:8px 0 2px;padding-top:6px;${lastGroup?'border-top:1px solid var(--bdr)':''}">${c.group||''}</div>`;
+      lastGroup = c.group;
+    }
+    const url = photos[c.code] || '';
+    const safeUrl = _sanitizeImageUrl(url);
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:4px 6px;background:var(--bg3);border:1px solid var(--bdr);border-radius:4px">
+      <div style="flex-shrink:0;width:48px;height:32px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden">
+        ${url
+          ? `<img src="${safeUrl}" alt="${c.code} preview" onerror="this.style.display='none';this.nextSibling.style.display='inline'" style="width:100%;height:100%;object-fit:cover"><span style="display:none;font-size:18px">🚗</span>`
+          : '<span style="font-size:18px">🚗</span>'}
+      </div>
+      <div style="font-family:var(--ff-mono);font-size:11px;font-weight:600;color:var(--txt);width:54px;flex-shrink:0">${c.code}</div>
+      <input type="text" id="cph-${c.code}" value="${safeUrl}" placeholder="https://… (image URL)"
+        style="flex:1;padding:5px 7px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:3px;color:var(--txt);font-size:11px;font-family:var(--ff-mono)">
+      <button onclick="previewCarPhoto('${c.code}')" title="Refresh preview"
+        style="padding:4px 8px;border-radius:3px;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt2);font-size:10px;cursor:pointer">↻</button>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function previewCarPhoto(code) {
+  const inp = document.getElementById('cph-'+code);
+  if (!inp) return;
+  // Re-render the row to update thumbnail with new URL
+  if (!STATE.carPhotos) STATE.carPhotos = {};
+  const val = inp.value.trim();
+  if (val) STATE.carPhotos[code] = val;
+  else delete STATE.carPhotos[code];
+  buildCarPhotosList();
+}
+
+function saveAllCarPhotos() {
+  if (!STATE.carPhotos) STATE.carPhotos = {};
+  let count = 0;
+  (typeof FLEET_CODES !== 'undefined' ? FLEET_CODES : []).forEach(c => {
+    if (!c || !c.code) return;
+    const inp = document.getElementById('cph-'+c.code);
+    if (!inp) return;
+    const v = inp.value.trim();
+    if (v) {
+      if (STATE.carPhotos[c.code] !== v) count++;
+      STATE.carPhotos[c.code] = v;
+    } else if (STATE.carPhotos[c.code]) {
+      delete STATE.carPhotos[c.code];
+      count++;
+    }
+  });
+  saveState();
+  // Refresh Reference if open
+  if (typeof filterCodes === 'function') filterCodes();
+  if (typeof toast === 'function') toast('Saved · ' + count + ' photo(s) changed');
+}
+
+function clearAllCarPhotos() {
+  if (!confirm('Clear ALL car photo URLs? This cannot be undone.')) return;
+  STATE.carPhotos = {};
+  saveState();
+  buildCarPhotosList();
+  if (typeof filterCodes === 'function') filterCodes();
 }
 
 // ── Get effective roster (admin overrides merged with hardcoded) ───────────
@@ -10426,7 +10745,362 @@ function confirmAddOneOff() {
   toast('Added ✓');
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ANNOUNCEMENTS + CELEBRATIONS (v59) ──────────────────────────────────
+// Announcements: free-text manager-posted items shown on the dashboard.
+// Each is { id, text, priority, dateAdded, expires } where priority is
+// 'info' | 'important' | 'urgent' (drives color), and expires is an
+// optional ISO date after which it stops rendering. Stored at
+// STATE.announcements as an array.
+// Celebrations: birthdays + work anniversaries. Each is
+// { name, date: 'MM-DD' or 'MM/DD' (year ignored), type: 'birthday'|'anniversary',
+//   startYear: number? (for anniversaries — year they started),
+//   notes: string }. Stored at STATE.celebrations as an array.
+// Both have admin paste interfaces so Matt can bulk-load from a spreadsheet.
+// ════════════════════════════════════════════════════════════════════
+
+function renderDashAnnouncements() {
+  const wrap = document.getElementById('dash-announcements');
+  if (!wrap) return;
+  const list = (STATE.announcements || []).filter(a => {
+    if (!a || !a.text) return false;
+    if (a.expires) {
+      const exp = new Date(a.expires);
+      if (!isNaN(exp.getTime()) && exp.getTime() < Date.now()) return false;
+    }
+    return true;
+  });
+  if (!list.length) { wrap.style.display = 'none'; return; }
+  // Sort by priority (urgent first) then dateAdded desc
+  const prioRank = { urgent: 0, important: 1, info: 2 };
+  list.sort((a, b) => {
+    const pa = prioRank[a.priority] ?? 2;
+    const pb = prioRank[b.priority] ?? 2;
+    if (pa !== pb) return pa - pb;
+    return (b.dateAdded || '').localeCompare(a.dateAdded || '');
+  });
+  const prioStyle = {
+    urgent:    { col:'#dc2626', bg:'rgba(220,38,38,.10)', icon:'🚨', label:'URGENT' },
+    important: { col:'#ea580c', bg:'rgba(234,88,12,.10)', icon:'❗', label:'IMPORTANT' },
+    info:      { col:'#2563eb', bg:'rgba(37,99,235,.10)', icon:'📣', label:'NOTICE' },
+  };
+  let html = '';
+  list.forEach(a => {
+    const s = prioStyle[a.priority] || prioStyle.info;
+    html += `<div class="annc-card" style="display:flex;align-items:center;gap:10px;
+      background:${s.bg};border:1px solid ${s.col}55;border-left:3px solid ${s.col};
+      border-radius:5px;padding:8px 12px;margin-bottom:5px;animation:annc-fade .35s ease;
+      cursor:pointer" onclick="showTab('admin');showAdminSection&&showAdminSection('annc')">
+      <span style="font-size:18px;flex-shrink:0;line-height:1">${s.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:9px;font-weight:800;letter-spacing:.08em;color:${s.col};
+          text-transform:uppercase;margin-bottom:1px">${s.label}</div>
+        <div style="font-size:13px;color:var(--text);line-height:1.3">${
+          String(a.text).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;')
+        }</div>
+      </div>
+    </div>`;
+  });
+  wrap.innerHTML = html;
+  wrap.style.display = 'block';
+}
+
+function renderDashCelebrations() {
+  const wrap = document.getElementById('dash-celebrations');
+  if (!wrap) return;
+  const list = STATE.celebrations || [];
+  if (!list.length) { wrap.style.display = 'none'; return; }
+  const today = new Date();
+  const todayMD = String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  // Match either MM-DD or MM/DD; normalize to MM-DD for compare
+  function normMD(s) {
+    if (!s) return '';
+    const m = String(s).match(/(\d{1,2})[\/\-](\d{1,2})/);
+    if (!m) return '';
+    return String(parseInt(m[1])).padStart(2, '0') + '-' + String(parseInt(m[2])).padStart(2, '0');
+  }
+  const todays = list.filter(c => normMD(c.date) === todayMD);
+  if (!todays.length) { wrap.style.display = 'none'; return; }
+  let html = '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+  todays.forEach(c => {
+    const isAnniv = c.type === 'anniversary';
+    const years = (isAnniv && c.startYear) ? (today.getFullYear() - parseInt(c.startYear)) : null;
+    const icon = isAnniv ? '🎉' : '🎂';
+    const label = isAnniv ? `${years ? years + '-year ' : ''}work anniversary` : 'birthday';
+    html += `<div style="background:rgba(168,85,247,.10);border:1px solid rgba(168,85,247,.4);
+      border-radius:14px;padding:5px 12px;font-size:12px;animation:annc-fade .4s ease">
+      <span style="font-size:14px">${icon}</span>
+      <b style="color:var(--text);margin:0 4px">${String(c.name).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;')}</b>
+      <span style="color:var(--txt3);font-size:11px">— ${label}</span>
+    </div>`;
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+  wrap.style.display = 'block';
+}
+
+// ── ANNOUNCEMENT ADMIN ─────────────────────────────────────────────
+function addAnnouncement(text, priority, expires) {
+  if (!text || !text.trim()) return;
+  if (!STATE.announcements) STATE.announcements = [];
+  STATE.announcements.push({
+    id: 'a-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
+    text: text.trim(),
+    priority: priority || 'info',
+    dateAdded: new Date().toISOString(),
+    expires: expires || null,
+  });
+  saveState();
+  if (typeof renderDashAnnouncements === 'function') renderDashAnnouncements();
+  if (typeof buildAnnouncementsList === 'function') buildAnnouncementsList();
+}
+
+function removeAnnouncement(id) {
+  if (!STATE.announcements) return;
+  STATE.announcements = STATE.announcements.filter(a => a && a.id !== id);
+  saveState();
+  if (typeof renderDashAnnouncements === 'function') renderDashAnnouncements();
+  if (typeof buildAnnouncementsList === 'function') buildAnnouncementsList();
+}
+
+function buildAnnouncementsList() {
+  const el = document.getElementById('adm-annc-list');
+  if (!el) return;
+  const list = STATE.announcements || [];
+  if (!list.length) {
+    el.innerHTML = '<p style="font-size:12px;color:var(--txt3);font-style:italic">No announcements yet. Add one above.</p>';
+    return;
+  }
+  const prioStyle = {
+    urgent:    { col:'#dc2626', icon:'🚨' },
+    important: { col:'#ea580c', icon:'❗' },
+    info:      { col:'#2563eb', icon:'📣' },
+  };
+  let html = '';
+  list.forEach(a => {
+    const s = prioStyle[a.priority] || prioStyle.info;
+    const added = a.dateAdded ? new Date(a.dateAdded).toLocaleDateString() : '—';
+    const exp = a.expires ? new Date(a.expires).toLocaleDateString() : 'never';
+    html += `<div style="display:flex;gap:10px;padding:8px 10px;border:1px solid var(--bdr);
+      border-left:3px solid ${s.col};border-radius:5px;margin-bottom:6px;background:var(--bg3)">
+      <span style="font-size:18px">${s.icon}</span>
+      <div style="flex:1">
+        <div style="font-size:13px;color:var(--text);margin-bottom:3px">${
+          String(a.text).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;')
+        }</div>
+        <div style="font-size:10px;color:var(--txt3)">${(a.priority||'info').toUpperCase()} · added ${added} · expires ${exp}</div>
+      </div>
+      <button onclick="removeAnnouncement('${a.id}')"
+        style="padding:5px 9px;border-radius:4px;border:1px solid var(--red);background:rgba(239,68,68,.1);color:var(--red);font-size:11px;cursor:pointer;align-self:flex-start">✕ Remove</button>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+function submitNewAnnouncement() {
+  const txt = (document.getElementById('annc-input-text')||{}).value || '';
+  const pri = (document.getElementById('annc-input-prio')||{}).value || 'info';
+  const exp = (document.getElementById('annc-input-expires')||{}).value || null;
+  if (!txt.trim()) { if (typeof toast==='function') toast('Enter announcement text'); return; }
+  addAnnouncement(txt, pri, exp);
+  const tEl = document.getElementById('annc-input-text');
+  const xEl = document.getElementById('annc-input-expires');
+  if (tEl) tEl.value = '';
+  if (xEl) xEl.value = '';
+  if (typeof toast === 'function') toast('Announcement posted ✓');
+}
+
+// ── CELEBRATIONS (birthdays / anniversaries) ───────────────────────
+// Paste input format (flexible). Each line one entry:
+//   Name, MM/DD                    → birthday
+//   Name, MM/DD, anniversary       → work anniversary
+//   Name, MM/DD, 2018              → work anniversary started 2018
+//   Name, MM/DD, anniversary, 2018 → same
+// Anything else with at least Name + date is parsed as birthday.
+function parseCelebrationsPaste(text) {
+  if (!text) return [];
+  const lines = text.split(/\r?\n/);
+  const out = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    // Split on comma OR tab (handles paste from spreadsheet)
+    const parts = line.split(/[,\t]/).map(s => s.trim()).filter(Boolean);
+    if (parts.length < 2) continue;
+    const name = parts[0];
+    const dateRaw = parts.find(p => /\d{1,2}[\/\-]\d{1,2}/.test(p));
+    if (!dateRaw) continue;
+    const date = dateRaw;
+    // Type detection
+    const hasAnniv = parts.some(p => /annivers/i.test(p));
+    const yearMatch = parts.map(p => p.match(/^(?:19|20)(\d{2})$/)).find(Boolean);
+    const startYear = yearMatch ? parseInt(yearMatch[0]) : null;
+    const type = (hasAnniv || startYear) ? 'anniversary' : 'birthday';
+    out.push({ name, date, type, startYear });
+  }
+  return out;
+}
+
+// v59.1: smart dedupe so the same person doesn't accumulate duplicate
+// entries across pastes. Match criteria:
+//   1. Name normalized: trimmed + lowercased + collapsed whitespace
+//   2. Date normalized: MM-DD compare (handles both "3/15" and "03/15")
+//   3. Type: birthday vs anniversary distinguished
+// On match: NEW paste wins (overwrites old entry). On no match: appended.
+// Net effect: re-pasting the same list is idempotent. Pasting a list
+// with some old + some new entries adds only the new ones.
+function _normName(n) {
+  return String(n || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+function _normMD(s) {
+  const m = String(s || '').match(/(\d{1,2})[\/\-](\d{1,2})/);
+  if (!m) return '';
+  return String(parseInt(m[1])).padStart(2, '0') + '-' + String(parseInt(m[2])).padStart(2, '0');
+}
+function _celebKey(c) {
+  return _normName(c.name) + '|' + _normMD(c.date) + '|' + (c.type || 'birthday');
+}
+
+function submitCelebrationsPaste() {
+  const ta = document.getElementById('celeb-paste-text');
+  if (!ta) return;
+  const parsed = parseCelebrationsPaste(ta.value);
+  if (!parsed.length) {
+    if (typeof toast === 'function') toast('Could not parse any rows. Each line needs Name, MM/DD.');
+    return;
+  }
+  // v59.2 refined dedupe: MERGE rather than REPLACE on match. Preserves
+  // the existing entry's name formatting (so "Matt Johnson" doesn't get
+  // overwritten by "MATT   JOHNSON" if user re-pastes with messy casing),
+  // but takes new startYear/notes when the new paste provides them.
+  // Net behavior:
+  //   - Same person re-pasted with different casing → no change
+  //   - Same person re-pasted now with anniversary year added → year updates
+  //   - Truly new person → appended
+  const existing = STATE.celebrations || [];
+  const existingByKey = {};
+  existing.forEach(c => { existingByKey[_celebKey(c)] = c; });
+  let merged = 0, added = 0, noop = 0;
+  parsed.forEach(p => {
+    const key = _celebKey(p);
+    const old = existingByKey[key];
+    if (old) {
+      // Same person+date+type already stored. Merge new info into old.
+      let changed = false;
+      if (p.startYear && old.startYear !== p.startYear) {
+        old.startYear = p.startYear; changed = true;
+      }
+      if (p.notes && old.notes !== p.notes) {
+        old.notes = p.notes; changed = true;
+      }
+      // Name stays as the old one (preserves first-seen casing/whitespace)
+      if (changed) merged++; else noop++;
+    } else {
+      existing.push(p);
+      existingByKey[key] = p;
+      added++;
+    }
+  });
+  STATE.celebrations = existing;
+  saveState();
+  ta.value = '';
+  if (typeof buildCelebrationsList === 'function') buildCelebrationsList();
+  if (typeof renderDashCelebrations === 'function') renderDashCelebrations();
+  if (typeof toast === 'function') {
+    const parts = [];
+    if (added) parts.push(added + ' new');
+    if (merged) parts.push(merged + ' updated');
+    if (noop && !added && !merged) parts.push(noop + ' already stored');
+    parts.push(STATE.celebrations.length + ' total');
+    toast(parts.join(' \u00b7 '));
+  }
+}
+
+function removeCelebration(idx) {
+  if (!STATE.celebrations || idx < 0 || idx >= STATE.celebrations.length) return;
+  STATE.celebrations.splice(idx, 1);
+  saveState();
+  if (typeof buildCelebrationsList === 'function') buildCelebrationsList();
+  if (typeof renderDashCelebrations === 'function') renderDashCelebrations();
+}
+
+function clearAllCelebrations() {
+  if (!confirm('Remove ALL celebrations? Type-paste them back from a spreadsheet to restore.')) return;
+  STATE.celebrations = [];
+  saveState();
+  if (typeof buildCelebrationsList === 'function') buildCelebrationsList();
+  if (typeof renderDashCelebrations === 'function') renderDashCelebrations();
+}
+
+function buildCelebrationsList() {
+  const el = document.getElementById('adm-celeb-list');
+  if (!el) return;
+  const list = STATE.celebrations || [];
+  if (!list.length) {
+    el.innerHTML = '<p style="font-size:12px;color:var(--txt3);font-style:italic">No celebrations stored. Paste from a spreadsheet above.</p>';
+    return;
+  }
+  // Sort by month/day
+  const sorted = [...list].map((c,i)=>({...c,_i:i})).sort((a,b)=>{
+    const ma=String(a.date||'').match(/(\d{1,2})[\/\-](\d{1,2})/);
+    const mb=String(b.date||'').match(/(\d{1,2})[\/\-](\d{1,2})/);
+    if(!ma||!mb)return 0;
+    const aN=parseInt(ma[1])*100+parseInt(ma[2]);
+    const bN=parseInt(mb[1])*100+parseInt(mb[2]);
+    return aN-bN;
+  });
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">';
+  sorted.forEach(c => {
+    const icon = c.type === 'anniversary' ? '🎉' : '🎂';
+    const subtitle = c.type === 'anniversary'
+      ? (c.startYear ? `Anniversary · since ${c.startYear}` : 'Work anniversary')
+      : 'Birthday';
+    html += `<div style="display:flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--bdr);border-radius:5px;background:var(--bg3)">
+      <span style="font-size:18px">${icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${
+          String(c.name).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;')
+        }</div>
+        <div style="font-size:10px;color:var(--txt3)">${c.date} · ${subtitle}</div>
+      </div>
+      <button onclick="removeCelebration(${c._i})" style="padding:3px 7px;border-radius:4px;border:1px solid var(--bdr2);background:transparent;color:var(--red);font-size:10px;cursor:pointer">✕</button>
+    </div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
 // ── CAR CODES ─────────────────────────────────────────────────────────
+// v59.2: URL sanitizer to prevent javascript:/data:text/html XSS via
+// car photo URLs (or any other user-pasted URL we eventually render).
+// Allow only http(s):// and data:image/* schemes; reject everything else
+// including 'javascript:', 'data:text/html', 'vbscript:', etc.
+function _sanitizeImageUrl(u) {
+  if (!u) return '';
+  const s = String(u).trim();
+  if (!s) return '';
+  // Match the scheme (everything before the first ':')
+  const colonIdx = s.indexOf(':');
+  if (colonIdx === -1) {
+    // No scheme — allow relative URLs (uncommon for this app, but harmless)
+    return s.replace(/\"/g, '&quot;').replace(/</g, '&lt;');
+  }
+  const scheme = s.slice(0, colonIdx).toLowerCase();
+  if (scheme === 'http' || scheme === 'https') {
+    return s.replace(/\"/g, '&quot;').replace(/</g, '&lt;');
+  }
+  if (scheme === 'data') {
+    // Allow only data:image/...
+    const rest = s.slice(colonIdx + 1).toLowerCase();
+    if (rest.startsWith('image/')) {
+      return s.replace(/\"/g, '&quot;').replace(/</g, '&lt;');
+    }
+  }
+  // Reject all other schemes (javascript:, vbscript:, file:, etc.)
+  return '';
+}
+
+
 function getEffectiveCodes() {
   const overrides = STATE.adminCodes || [];
   return FLEET_CODES
@@ -10587,6 +11261,32 @@ function buildCoverageTimeline() {
     const se=ov.end!=null?ov.end:person.shiftEnd;
     if(ss==null||h<ss||h>=se)return'off';
     if((STATE.todayOverrides||{})[pid]==='callout')return'off';
+    // v58: Manually-set assignment blocks (STATE.mgmtBlocks) ALWAYS win
+    // over the auto rotation for that person. Was previously only honored
+    // for managers; now any role with manual blocks gets them honored.
+    // Matt asked for "a way to manually alter a person\u2019s time frame
+    // for each station and lunch if it doesn\u2019t make what we need
+    // with the auto distribute" — the blocks UI already exists on CXRs
+    // but the timeline wasn\u2019t reading from it. This is that read.
+    const manualBlocks=(STATE.mgmtBlocks||{})[pid];
+    if(manualBlocks&&manualBlocks.length){
+      for(const b of manualBlocks){
+        if(h>=b.from&&h<b.to){
+          const s=(b.station||'').toLowerCase();
+          if(s.includes('exit'))return'exit';
+          if(s.includes('lunch'))return'lunch';
+          if(s.includes('return'))return'returns';
+          if(s.includes('emerald'))return'emerald';
+          if(s.includes('shuttl'))return'shuttling';
+          if(s.includes('break'))return'break';
+          if(s.includes('train'))return'training';
+          return'counter';
+        }
+      }
+      // Hour is on-shift but not covered by any block — show as off-block
+      // so the gap is visually obvious to the manager who set the blocks.
+      return'off';
+    }
     const rot=window._lastRotations&&window._lastRotations[pid];
     if(rot){
       if(rot.lunch&&h<rot.lunch.to&&h+1>rot.lunch.from)return'lunch'; // overlap check
