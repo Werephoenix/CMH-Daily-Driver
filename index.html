@@ -1807,16 +1807,29 @@ button { cursor: pointer; }
     <button onclick="printScheduleGrid()"
       style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
         background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
-      🖨 Print Schedule Grid
+      🖨 Print Weekly Grid
+    </button>
+    <button onclick="printScheduleMap()"
+      style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
+        background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
+      🖨 Print Today's Schedule
     </button>
     <button onclick="printDashboardSummary()"
       style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
         background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
-      🖨 Print Day Summary
+      🖨 Print Fleet Summary
     </button>
   </div>
 
-  <!-- Manager Mode toggle bar -->
+  <!-- View toggle -->
+  <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
+    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">View:</span>
+    <button id="sched-view-timeline" class="btn btn-g btn-sm" onclick="setSchedView('timeline')">📅 Timeline</button>
+    <button id="sched-view-station" class="btn btn-gh btn-sm" onclick="setSchedView('station')">🗂 By Station</button>
+  </div>
+
+  <!-- Station view container (hidden by default) -->
+  <div id="sched-station-view" style="display:none;margin-bottom:10px"></div>
   <div id="mgr-mode-bar" style="display:flex;align-items:center;gap:8px;
     padding:8px 12px;background:var(--bg2);border:1px solid var(--bdr);
     border-radius:8px;margin-bottom:10px">
@@ -3199,10 +3212,6 @@ function showTab(id) {
 
   if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); }
   if (id === 'schedule')  {
-    // Auto-distribute on first entry: if there are no rotations yet but CXRs
-    // are scheduled, run autoSchedule once so Matt sees real Exit/Counter
-    // blocks instead of an undifferentiated counter wall. Manager edits
-    // (full-counter, full-exit, etc.) are preserved across this call.
     try {
       const hasRotations = window._lastRotations && Object.keys(window._lastRotations).length > 0;
       const exp = (typeof buildExpectedToday === 'function') ? buildExpectedToday() : {};
@@ -3211,7 +3220,7 @@ function showTab(id) {
         autoSchedule();
       }
     } catch (e) { /* never block tab entry on rotation errors */ }
-    buildCoverageTimeline();
+    setSchedView(typeof _schedView !== 'undefined' ? _schedView : 'timeline');
     updateManagerModeUI();
   }
   if (id === 'checklist') { renderChecklist(window._curCLMode || 'opening'); }
@@ -9549,11 +9558,32 @@ function buildExpectedToday() {
     });
   }
 
-  // 3. Fill remaining from roster daysOn (CXR + Exit only — mgmt always from stored sched)
+  // 2b. Manager fallback: if manager is in STATE.staffDuty (loaded from MAY_SCHEDULE)
+  //     but not yet in expected (stored mgmt sched empty/missing for today), add them.
+  _ROSTER_MGMT.forEach(person => {
+    const pid = normPid(person.name);
+    if (expected[pid]) return;
+    if (person.active === false) return;
+    // Check staffDuty — MAY_SCHEDULE loads set this
+    const dutyKey = pid;
+    const duty = STATE.staffDuty || {};
+    if (duty[dutyKey] !== true) return;
+    // Pull shift times from shiftMod if available
+    const mod = (STATE.shiftMod || {})[pid];
+    const personWithTimes = mod
+      ? Object.assign({}, person, { shiftStart: mod.start, shiftEnd: mod.end })
+      : person;
+    const shiftDisp = mod
+      ? (()=>{ const fh=h=>{const hr=Math.floor(h),mn=Math.round((h-hr)*60),ap=h>=12?'P':'A',d=hr>12?hr-12:hr===0?12:hr;return d+(mn?':'+String(mn).padStart(2,'0'):'')+ap;};return fh(mod.start)+'-'+fh(mod.end);})()
+      : (person.shiftCode || 'varies');
+    expected[pid] = { person: personWithTimes, shift: shiftDisp, source:'duty' };
+  });
+
+  // 3. Fill remaining from roster daysOn (CXR + Exit only — mgmt always from stored sched or duty)
   allRoster.forEach(person => {
     const pid = normPid(person.name);
     if (expected[pid]) return;
-    // Skip mgmt if not in stored schedule
+    // Skip mgmt — handled above
     if (['ARM','BRM','ABRM','MT'].includes(person.role)) return;
     if (person.active === false) return;
     if (!person.daysOn || !Array.isArray(person.daysOn)) return;
@@ -11584,6 +11614,163 @@ function removeCode(code) {
 
 
 
+
+var _schedView = 'timeline'; // 'timeline' | 'station'
+
+function setSchedView(mode) {
+  _schedView = mode;
+  const tlBtn = document.getElementById('sched-view-timeline');
+  const stBtn = document.getElementById('sched-view-station');
+  const tlArea = document.getElementById('coverage-timeline');
+  const stArea = document.getElementById('sched-station-view');
+  const chartArea = document.getElementById('coverage-chart');
+  const mgmtBar = document.getElementById('mgr-mode-bar');
+  const covHeader = tlArea && tlArea.parentElement;
+
+  if (tlBtn) { tlBtn.className = mode==='timeline' ? 'btn btn-g btn-sm' : 'btn btn-gh btn-sm'; }
+  if (stBtn) { stBtn.className = mode==='station'  ? 'btn btn-g btn-sm' : 'btn btn-gh btn-sm'; }
+
+  if (mode === 'timeline') {
+    if (stArea) stArea.style.display = 'none';
+    if (chartArea) chartArea.style.display = '';
+    if (mgmtBar) mgmtBar.style.display = '';
+    if (covHeader && covHeader.classList) covHeader.style.display = '';
+    buildCoverageTimeline();
+  } else {
+    if (stArea) stArea.style.display = '';
+    if (chartArea) chartArea.style.display = 'none';
+    if (mgmtBar) mgmtBar.style.display = 'none';
+    if (covHeader && covHeader.classList) covHeader.style.display = 'none';
+    buildStationView();
+  }
+}
+
+function buildStationView() {
+  const el = document.getElementById('sched-station-view');
+  if (!el) return;
+  const exp = typeof buildExpectedToday === 'function' ? buildExpectedToday() : {};
+  if (!Object.keys(exp).length) {
+    el.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--txt3);text-align:center">📅 No schedule data — paste Game Plan or import schedule first.</div>';
+    return;
+  }
+
+  function fmtH(h) {
+    if (h == null) return '—';
+    const hr = Math.floor(h), mn = Math.round((h - hr) * 60);
+    const ap = h >= 12 ? 'p' : 'a', d = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
+    return d + (mn ? ':' + String(mn).padStart(2, '0') : '') + ap;
+  }
+
+  const people = Object.entries(exp).map(([pid, entry]) => {
+    const { person, shift } = entry;
+    const isCallout = (STATE.todayOverrides || {})[pid] === 'callout';
+    const mod = (STATE.shiftMod || {})[pid];
+    const startH = mod ? mod.start : person.shiftStart;
+    const endH   = mod ? mod.end   : person.shiftEnd;
+    const timeStr = (startH != null) ? fmtH(startH) + '–' + fmtH(endH) : shift;
+    const station = STATE.staffStation[pid] || 'unassigned';
+    return { pid, person, timeStr, isCallout, station };
+  }).filter(p => !p.isCallout);
+
+  // Group by station/role
+  const groups = {
+    mgmt:     { label: '🏢 Management', color: 'var(--acc)',   items: [] },
+    counter:  { label: '🟦 Counter',    color: 'var(--acc)',   items: [] },
+    exit:     { label: '🟩 Exit Booth', color: 'var(--green)', items: [] },
+    returns:  { label: '↩ Returns',     color: '#06b6d4',      items: [] },
+    unset:    { label: '⚠ Unassigned',  color: 'var(--amber)', items: [] },
+  };
+
+  people.forEach(p => {
+    const role = p.person.role;
+    if (['ARM','BRM','ABRM','MT'].includes(role)) { groups.mgmt.items.push(p); return; }
+    if (role === 'RETURNS') { groups.returns.items.push(p); return; }
+    if (role === 'EXIT') { groups.exit.items.push(p); return; }
+    if (p.station === 'Counter') { groups.counter.items.push(p); return; }
+    if (p.station === 'Exit Booth') { groups.exit.items.push(p); return; }
+    groups.unset.items.push(p);
+  });
+
+  // Sort each group by shift start time
+  Object.values(groups).forEach(g => {
+    g.items.sort((a, b) => {
+      const modA = (STATE.shiftMod || {})[a.pid];
+      const modB = (STATE.shiftMod || {})[b.pid];
+      const sA = modA ? modA.start : (a.person.shiftStart || 99);
+      const sB = modB ? modB.start : (b.person.shiftStart || 99);
+      return sA - sB;
+    });
+  });
+
+  // Hourly coverage strip
+  const H_START = 6, H_END = 25;
+  const hLbl = h => { const hh = h%24, d = hh>12?hh-12:hh===0?12:hh, ap = hh>=12?'p':'a'; return d+ap; };
+  const hours = Array.from({length: H_END - H_START}, (_, i) => H_START + i);
+  const nowH = new Date().getHours() + new Date().getMinutes()/60;
+
+  function coverageBar() {
+    let html = '<div style="margin-bottom:12px">';
+    html += '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:5px">Hourly Coverage (Counter + Exit)</div>';
+    html += '<div style="display:flex;gap:0;align-items:flex-end;height:40px;border-bottom:1px solid var(--bdr)">';
+    hours.forEach(h => {
+      const onShift = people.filter(p => {
+        const mod = (STATE.shiftMod || {})[p.pid];
+        const s = mod ? mod.start : (p.person.shiftStart || 99);
+        const e = mod ? mod.end   : (p.person.shiftEnd   || 0);
+        const isCXRorExit = ['CXR','EXIT'].includes(p.person.role);
+        return isCXRorExit && h >= s && h < e;
+      }).length;
+      const maxCount = 12;
+      const pct = Math.min(onShift / maxCount, 1);
+      const barH = Math.max(4, Math.round(pct * 36));
+      const isCurrent = h <= nowH && nowH < h + 1;
+      const col = isCurrent ? 'var(--acc)' : onShift >= 4 ? 'var(--green)' : onShift >= 2 ? 'var(--amber)' : 'var(--red)';
+      html += `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">
+        <div style="font-size:7px;color:var(--txt3);line-height:1">${onShift||''}</div>
+        <div style="width:100%;max-width:22px;height:${barH}px;background:${col};border-radius:2px 2px 0 0;${isCurrent?'outline:2px solid var(--acc);':''}"></div>
+      </div>`;
+    });
+    html += '</div>';
+    html += '<div style="display:flex;gap:0;margin-top:2px">';
+    hours.forEach(h => {
+      html += `<div style="flex:1;font-size:7px;color:var(--txt3);text-align:center">${h%3===0?hLbl(h):''}</div>`;
+    });
+    html += '</div></div>';
+    return html;
+  }
+
+  let html = coverageBar();
+
+  Object.entries(groups).forEach(([key, g]) => {
+    if (!g.items.length) return;
+    html += `<div style="margin-bottom:10px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
+        color:${g.color};padding:5px 0;border-bottom:1px solid var(--bdr);margin-bottom:6px">
+        ${g.label} <span style="font-weight:400;color:var(--txt3)">(${g.items.length})</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px">`;
+    g.items.forEach(p => {
+      const nick = p.person.nick || p.person.name.split(' ')[0];
+      const roleTag = ['ARM','BRM','ABRM','MT'].includes(p.person.role) ? `<span style="font-size:9px;color:var(--acc)">${p.person.role}</span>` : '';
+      html += `<div style="padding:8px 10px;border:1px solid var(--bdr);border-left:3px solid ${g.color};
+        border-radius:5px;background:var(--bg3)">
+        <div style="font-size:13px;font-weight:700;color:var(--txt)">${nick} ${roleTag}</div>
+        <div style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono)">${p.timeStr}</div>
+      </div>`;
+    });
+    html += '</div></div>';
+  });
+
+  // Callouts
+  const callouts = Object.entries(exp)
+    .filter(([pid, e]) => (STATE.todayOverrides || {})[pid] === 'callout')
+    .map(([pid, e]) => e.person.nick || e.person.name.split(' ')[0]);
+  if (callouts.length) {
+    html += `<div style="margin-top:8px;font-size:11px;color:var(--red)">❌ Called off: ${callouts.join(', ')}</div>`;
+  }
+
+  el.innerHTML = html;
+}
 
 function buildCoverageTimeline() {
   updateManagerModeUI();
