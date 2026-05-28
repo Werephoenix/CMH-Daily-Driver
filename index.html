@@ -959,14 +959,14 @@ select option { background: var(--bg3); }
 .xxar-lbl{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
 
 /* ── QUICK LINKS ── */
-.quick-links{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.quick-links{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 @media(max-width:500px){.quick-links{grid-template-columns:repeat(2,1fr)}}
-.ql-btn{background:var(--bg2);border:1px solid var(--bdr);border-radius:7px;padding:12px;
-  cursor:pointer;transition:all .15s;text-align:center;display:flex;flex-direction:column;gap:3px}
-.ql-btn:hover{border-color:var(--bdr2);background:var(--bg3);transform:translateY(-1px)}
-.ql-icon{font-size:20px}
+.ql-btn{background:var(--bg2);border:2px solid var(--bdr);border-radius:10px;padding:16px 12px;
+  cursor:pointer;transition:all .15s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
+.ql-btn:hover{border-color:var(--acc);background:var(--bg3);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.ql-icon{font-size:26px;line-height:1}
 .ql-label{font-family:var(--ff-hd);font-size:13px;font-weight:700;color:var(--txt)}
-.ql-stat{font-family:var(--ff-mono);font-size:14px;color:var(--txt3)}
+.ql-stat{font-family:var(--ff-mono);font-size:15px;font-weight:700;color:var(--txt3)}
 .ql-stat.g{color:var(--green)} .ql-stat.b{color:var(--acc)} .ql-stat.a{color:var(--amber)} .ql-stat.r{color:var(--red)}
 
 /* ── DIVIDER ── */
@@ -1039,7 +1039,7 @@ input.autofill{background:rgba(22,163,74,.06);border-color:var(--green3);color:v
 }
 .mgr-item[onclick]{cursor:pointer}
 .mgr-item-lbl{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
-.mgr-item-val{font-weight:700;font-size:13px;color:var(--txt)}
+.mgr-item-val{font-weight:700;font-size:16px;color:var(--txt)}
 
 /* ── STATUS BAND ── */
 .status-band{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--bg3);border-radius:6px;margin-bottom:12px;flex-wrap:wrap;font-size:12px}
@@ -1123,8 +1123,8 @@ select option{background:var(--bg3)}
 
 /* Checklist item */
 .ci{
-  display:flex;align-items:flex-start;gap:12px;
-  padding:11px 10px;
+  display:flex;align-items:flex-start;gap:14px;
+  padding:14px 12px;
   border-radius:5px;
   cursor:pointer;
   transition:background .12s;
@@ -1141,11 +1141,11 @@ select option{background:var(--bg3)}
 
 /* Checkbox */
 .cbox{
-  width:20px;height:20px;border-radius:4px;
+  width:26px;height:26px;border-radius:5px;
   border:2px solid var(--bdr2);
-  flex-shrink:0;flex-shrink:0;
+  flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
-  font-size:12px;font-weight:700;
+  font-size:14px;font-weight:700;
   transition:all .15s;
   margin-top:1px;
   background:var(--bg3);
@@ -1442,8 +1442,9 @@ button { cursor: pointer; }
 <div id="topbar">
   <div id="logo">🚗 <span class="accent">CMH</span> DAILY DRIVER</div>
   <div id="topbar-date" style="font-size:11px;color:var(--txt3);font-family:var(--ff-mono);margin-left:8px"></div>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
     <div id="topbar-time" style="font-family:var(--ff-mono);font-size:13px;color:var(--txt2)"></div>
+    <div id="topbar-onduty" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(37,99,235,.12);color:var(--acc);display:none"></div>
     <div id="topbar-shift-badge" class="shift-pill opening">OPENING</div>
   </div>
 </div>
@@ -1452,12 +1453,12 @@ button { cursor: pointer; }
 <div id="nav">
   <button class="nbtn on" id="tab-opening" onclick="showTab('opening')"><span class="ni">🏠</span>Dashboard</button>
   <button class="nbtn" id="tab-paste"   onclick="showTab('paste')"><span class="ni">📋</span>Paste Data</button>
-  <button class="nbtn" id="tab-board"   onclick="showTab('board')"><span class="ni">📊</span>Availability</button>
-  <button class="nbtn" id="tab-coverage" onclick="showTab('schedule')"><span class="ni">📊</span>Coverage</button>
+  <button class="nbtn" id="tab-board"   onclick="showTab('board')"><span class="ni">🚗</span>Live Board</button>
+  <button class="nbtn" id="tab-coverage" onclick="showTab('schedule')"><span class="ni">📅</span>Schedule</button>
   <button class="nbtn" id="tab-checklist" onclick="showTab('checklist')"><span class="ni">✅</span>Checklist</button>
   <button class="nbtn" id="tab-reference" onclick="showTab('reference')"><span class="ni">📖</span>Reference</button>
   <button class="nbtn" id="tab-inventory" onclick="showTab('inventory')"><span class="ni">🔢</span>Inventory</button>
-  <button class="nbtn" id="tab-history" onclick="showTab('history')"><span class="ni">📅</span>History</button>
+  <button class="nbtn" id="tab-history" onclick="showTab('history')"><span class="ni">🕑</span>History</button>
   <button class="nbtn" id="tab-admin" onclick="showTab('admin')"><span class="ni">⚙️</span>Admin</button>
 </div>
 
@@ -1469,8 +1470,8 @@ button { cursor: pointer; }
   <!-- STATUS BAND -->
   <div id="status-band" class="status-band">
     <div class="status-item"><div class="status-dot" style="background:var(--txt3)"></div><span style="color:var(--txt3)">Loading...</span></div>
-    <div id="sync-indicator" style="margin-left:auto;font-size:10px;color:var(--txt3);display:flex;align-items:center;gap:4px">
-      <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--txt3)" id="sync-dot"></span>
+    <div id="sync-indicator" style="margin-left:auto;font-size:11px;color:var(--txt3);display:flex;align-items:center;gap:4px">
+      <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--txt3)" id="sync-dot"></span>
       <span id="sync-msg">—</span>
     </div>
   </div>
@@ -1629,8 +1630,8 @@ button { cursor: pointer; }
       <div class="ql-stat" id="dl-paste">0 / 4</div>
     </div>
     <div class="ql-btn" onclick="showTab('board')">
-      <span class="ql-icon">📊</span>
-      <div class="ql-label">Availability</div>
+      <span class="ql-icon">🚗</span>
+      <div class="ql-label">Live Board</div>
       <div class="ql-stat g" id="dl-board">—</div>
     </div>
     <div class="ql-btn" onclick="showTab('checklist')">
@@ -1693,7 +1694,7 @@ button { cursor: pointer; }
   <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:10px">
 <div id="paste-overall-status" style="font-size:12px;color:var(--txt3)">0 of 4 completed (Brand Totals optional)</div>
     <div class="row">
-      <button class="btn btn-gh btn-sm" onclick="clearPaste()">Clear All</button>
+      <button class="btn btn-gh btn-sm" onclick="confirmDestructive('Clear all pasted Game Plan data?', 'This will wipe all 4 pastes and the Live Board will go blank.', clearPaste)">🗑 Clear Pastes</button>
       <button class="btn btn-p btn-lg" onclick="calcBoard();showTab('board')">→ View Live Board</button>
     </div>
   </div>
@@ -1916,7 +1917,7 @@ button { cursor: pointer; }
     <button class="cl-tab on" id="clt-opening" onclick="showChecklist('opening')">🌅 Opening</button>
     <button class="cl-tab"    id="clt-mid"     onclick="showChecklist('mid')">🔄 Mid-Shift</button>
     <button class="cl-tab"    id="clt-closing" onclick="showChecklist('closing')">🌙 Closing</button>
-    <button class="btn btn-gh btn-sm" onclick="resetCL()" style="margin-left:auto">Reset</button>
+    <button class="btn btn-gh btn-sm" onclick="confirmDestructive('Reset checklist?', 'All checked items for today will be cleared.', resetCL)" style="margin-left:auto">↺ Reset</button>
   </div>
   <div style="display:flex;gap:8px;margin:8px 0 4px;flex-wrap:wrap">
     <button onclick="printAllChecklists(false)"
@@ -1984,18 +1985,24 @@ button { cursor: pointer; }
     <!-- Admin content (hidden until PIN entered) -->
     <div id="admin-content" style="display:none">
 
-      <!-- Section tabs -->
-      <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-        <button class="btn btn-g btn-sm" id="adm-tab-staff" onclick="showAdminSection('staff')">👥 Staff</button>
-        <button class="btn btn-gh btn-sm" id="adm-tab-edit" onclick="showAdminSection('edit')">✏️ Edit Schedule</button>
-        <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
-        <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
-        <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
-        <button class="btn btn-gh btn-sm" id="adm-tab-annc" onclick="showAdminSection('annc')">📣 Announcements</button>
-        <button class="btn btn-gh btn-sm" id="adm-tab-celeb" onclick="showAdminSection('celeb')">🎂 Celebrations</button>
-        <button class="btn btn-gh btn-sm" id="adm-tab-photos" onclick="showAdminSection('photos')">📸 Car Photos</button>
-        <button class="btn btn-gh btn-sm" onclick="openThresholdQuiz()">📊 Thresholds</button>
-        <button class="btn btn-gh btn-sm" style="margin-left:auto;color:var(--red)" onclick="lockAdmin()">🔒 Lock</button>
+      <!-- Section tabs — grouped -->
+      <div style="margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">⚡ Operations</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-g btn-sm" id="adm-tab-annc" onclick="showAdminSection('annc')">📣 Announcements</button>
+          <button class="btn btn-gh btn-sm" id="adm-tab-celeb" onclick="showAdminSection('celeb')">🎂 Celebrations</button>
+          <button class="btn btn-gh btn-sm" id="adm-tab-edit" onclick="showAdminSection('edit')">✏️ Edit Schedule</button>
+          <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
+        </div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">🔧 Setup</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-gh btn-sm" id="adm-tab-staff" onclick="showAdminSection('staff')">👥 Staff</button>
+          <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
+          <button class="btn btn-gh btn-sm" id="adm-tab-photos" onclick="showAdminSection('photos')">📸 Car Photos</button>
+          <button class="btn btn-gh btn-sm" onclick="openThresholdQuiz()">📊 Thresholds</button>
+          <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
+          <button class="btn btn-gh btn-sm" style="margin-left:auto;color:var(--red)" onclick="lockAdmin()">🔒 Lock</button>
+        </div>
       </div>
 
       <!-- STAFF section -->
@@ -2125,8 +2132,7 @@ button { cursor: pointer; }
                 background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;
                 color:var(--txt);padding:8px;line-height:1.4"></textarea>
             <div style="display:flex;gap:8px;margin-top:5px">
-              <button class="btn btn-g btn-sm" onclick="parseSection('mgmt')">Parse →</button>
-              <button id="save-btn-mgmt" class="btn btn-p btn-sm" onclick="saveSection('mgmt')" style="display:none">✅ Save</button>
+              <button class="btn btn-g btn-sm" onclick="importAndSave('mgmt')">⬇️ Import &amp; Save</button>
             </div>
             <div id="preview-mgmt" style="display:none;margin-top:8px;overflow-x:auto;border-radius:4px;border:1px solid var(--bdr)"></div>
           </div>
@@ -2138,8 +2144,7 @@ button { cursor: pointer; }
                 background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;
                 color:var(--txt);padding:8px;line-height:1.4"></textarea>
             <div style="display:flex;gap:8px;margin-top:5px">
-              <button class="btn btn-g btn-sm" onclick="parseSection('cxr')">Parse →</button>
-              <button id="save-btn-cxr" class="btn btn-p btn-sm" onclick="saveSection('cxr')" style="display:none">✅ Save</button>
+              <button class="btn btn-g btn-sm" onclick="importAndSave('cxr')">⬇️ Import &amp; Save</button>
             </div>
             <div id="preview-cxr" style="display:none;margin-top:8px;overflow-x:auto;border-radius:4px;border:1px solid var(--bdr)"></div>
           </div>
@@ -2149,7 +2154,7 @@ button { cursor: pointer; }
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-gh btn-sm" onclick="if(typeof clearStoredSchedule==='function')clearStoredSchedule()">🗑 Clear All</button>
+            <button class="btn btn-gh btn-sm" onclick="confirmDestructive('Clear imported schedule?', 'The stored weekly schedule will be wiped. You will need to re-import.', ()=>clearStoredSchedule&&clearStoredSchedule())">🗑 Clear Schedule</button>
             <button class="btn btn-gh btn-sm" onclick="if(confirm('Reset today from MAY_SCHEDULE?')&&typeof resetAndReloadToday==='function')resetAndReloadToday()">🔄 Reset &amp; Reload Today</button>
           </div>
         </div>
@@ -2169,13 +2174,14 @@ button { cursor: pointer; }
             <textarea id="annc-input-text" rows="3" placeholder="Type your announcement here..."
               style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;
                 color:var(--txt);padding:9px;font-size:13px;font-family:var(--ff-ui);resize:vertical"></textarea>
-            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <div>
-                <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Priority</label>
-                <select id="annc-input-prio" style="width:100%;padding:7px 8px;margin-top:3px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:12px">
+                <label style="font-size:10px;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em;font-weight:700">Type</label>
+                <select id="annc-input-type" onchange="anncTypeChange()" style="width:100%;padding:7px 8px;margin-top:3px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:12px">
                   <option value="info">📣 Notice (blue)</option>
                   <option value="important">❗ Important (orange)</option>
                   <option value="urgent">🚨 Urgent (red)</option>
+                  <option value="policy">📋 New Policy (pinned + logged)</option>
                 </select>
               </div>
               <div>
@@ -2183,11 +2189,19 @@ button { cursor: pointer; }
                 <input type="date" id="annc-input-expires"
                   style="width:100%;padding:6px 8px;margin-top:3px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:12px">
               </div>
-              <button class="btn btn-g" onclick="submitNewAnnouncement()" style="padding:8px 16px">📣 Post</button>
             </div>
+            <div id="annc-policy-row" style="display:none;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:5px;padding:10px">
+              <label style="font-size:10px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;font-weight:700">⚠️ Manager Name (required for Policy)</label>
+              <input type="text" id="annc-input-mgr" placeholder="Your name — e.g. Vada Griffith"
+                style="width:100%;margin-top:4px;padding:7px 8px;background:var(--bg3);border:1px solid var(--acc);border-radius:4px;color:var(--txt);font-size:12px">
+            </div>
+            <button class="btn btn-g" onclick="submitNewAnnouncement()" style="padding:8px 16px;width:100%">📣 Post Announcement</button>
           </div>
           <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:14px 0 6px;padding-top:8px;border-top:1px solid var(--bdr)">Active Announcements</div>
           <div id="adm-annc-list"></div>
+          <!-- Policy Board Log -->
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--acc);margin:14px 0 6px;padding-top:8px;border-top:1px solid var(--bdr)">📋 Policy Board (permanent log)</div>
+          <div id="adm-policy-log" style="font-size:11px;color:var(--txt3);font-style:italic">No policies logged yet.</div>
         </div>
       </div>
 
@@ -2209,7 +2223,7 @@ Genesis Cochran, 5/14</pre>
             style="width:100%;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;color:var(--txt);padding:9px;font-size:12px;font-family:var(--ff-mono);resize:vertical;margin-bottom:8px"></textarea>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
             <button class="btn btn-g" onclick="submitCelebrationsPaste()">+ Add These</button>
-            <button class="btn btn-gh btn-sm" style="margin-left:auto" onclick="clearAllCelebrations()">🗑 Clear All</button>
+            <button class="btn btn-gh btn-sm" style="margin-left:auto" onclick="confirmDestructive('Clear all celebrations?', 'All birthdays and anniversaries will be removed. You will need to re-paste them.', clearAllCelebrations)">🗑 Clear All</button>
           </div>
           <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:14px 0 6px;padding-top:8px;border-top:1px solid var(--bdr)">Stored (sorted by date)</div>
           <div id="adm-celeb-list"></div>
@@ -2232,7 +2246,8 @@ Genesis Cochran, 5/14</pre>
             id="adm-photos-list"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
             <button class="btn btn-g btn-sm" onclick="saveAllCarPhotos()">💾 Save All</button>
-            <button class="btn btn-gh btn-sm" style="margin-left:auto" onclick="clearAllCarPhotos()">🗑 Clear All</button>
+            <button class="btn btn-gh btn-sm" onclick="prePopulateCarPhotos()">🖼 Pre-populate Defaults</button>
+            <button class="btn btn-gh btn-sm" style="margin-left:auto" onclick="confirmDestructive('Clear all car photos?', 'All saved photo URLs will be removed.', clearAllCarPhotos)">🗑 Clear All</button>
           </div>
         </div>
       </div>
@@ -2479,12 +2494,7 @@ var ROSTER_CXR = [
    lunchCode:'30min',
    notes:'Sun ends 1:00p. Mon–Thu ends 2:00p. Counter clock starts 6:00am.'},
 
-  {id:'mini-c',   name:'Rukmini (Mini) Carr',    nick:'Mini',    role:'CXR',
-   shiftCode:'530A-200P', shiftStart:5.5, shiftEnd:14.0,
-   daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat — confirmed ✓ marks
-   pref:'none', exitFairness:0,
-   lunchCode:'30min',
-   notes:'Sun/Mon/Thu/Fri/Sat 5:30a-2:00p. Counter clock starts 6am.'},
+  // Mini Carr — resigned. Removed from active roster 2026-05-26.
 
   {id:'laura',    name:'Laura Gonzalez',          nick:'Laura',   role:'CXR',
    shiftCode:'530A-230P/5P-1A', shiftStart:5.5, shiftEnd:14.5,
@@ -2493,6 +2503,7 @@ var ROSTER_CXR = [
    lunchCode:'30min',
    notes:'DUAL SHIFT: AM 5:30a-2:30p (Sun/Sat). Evening 5:00p-1:00a (Tue/Wed/Thu). Two patterns.'},
 
+  // Guenther Meyer — restored 2026-05-26 (still active, error in prior edit)
   {id:'guenther', name:'Guenther Meyer',          nick:'Guenther',role:'CXR',
    shiftCode:'830A-500P', shiftStart:8.5, shiftEnd:17.0,
    daysOn:[0,1,2,3,4],  // Sun-Thu — confirmed
@@ -2613,11 +2624,15 @@ var ROSTER_EXIT = [
   {id:'kenneth',  name:'Kenneth Hooks', nick:'Kenneth', role:'EXIT',
    daysOn:[0,1,2,3,4], shiftStart:18, shiftEnd:26.5,
    shiftCode:'6P-230A',
-   notes:'Exit agent. Sun/Mon/Tue/Wed/Thu. 6p-2:30a overnight.', active:true},,
+   notes:'Exit agent. Sun/Mon/Tue/Wed/Thu. 6p-2:30a overnight. LAST DAY ~2026-05-26/27.', active:false},
   {id:'zina', name:'Zina Kellen', nick:'Zina', role:'EXIT',
    daysOn:[0,1,4,5,6], shiftStart:10, shiftEnd:18.5,
    shiftCode:'10A-630P',
-   notes:'Exit agent. Sun/Mon/Thu/Fri/Sat. 10a-6:30p. No counter rotation.', active:true}
+   notes:'Exit agent. Sun/Mon/Thu/Fri/Sat. 10a-6:30p. No counter rotation.', active:true},
+  {id:'duria', name:'Duria', nick:'Duria', role:'EXIT',
+   daysOn:[], shiftStart:18, shiftEnd:26.5,
+   shiftCode:'TBD',
+   notes:'New evening exit agent. Schedule TBD — Matt to provide on next schedule paste.', active:true},
 ];
 
 var ROSTER_MGMT = [
@@ -3030,6 +3045,7 @@ function loadState() {
       s.announcements = Array.isArray(s.announcements) ? s.announcements : [];  // v59
       s.celebrations  = Array.isArray(s.celebrations)  ? s.celebrations  : [];  // v59
       s.carPhotos     = (s.carPhotos && typeof s.carPhotos === 'object') ? s.carPhotos : {}; // v59
+      s.policyLog     = Array.isArray(s.policyLog)     ? s.policyLog     : [];  // v60
       return s;
     }
   } catch(e) {}
@@ -3037,7 +3053,7 @@ function loadState() {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
-    stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{},
+    stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -3150,6 +3166,13 @@ function startClock() {
     else if (h < 16)        { shiftBadge.textContent = 'MID-SHIFT'; shiftBadge.style.background = '#166534'; }
     else if (h < 20)        { shiftBadge.textContent = 'EVENING';  shiftBadge.style.background = '#7c3aed'; }
     else                    { shiftBadge.textContent = 'CLOSING';  shiftBadge.style.background = '#991b1b'; }
+    // On-duty chip
+    const onDutyChip = document.getElementById('topbar-onduty');
+    if (onDutyChip) {
+      const onDuty = Object.values(STATE.staffDuty||{}).filter(v=>v===true).length;
+      if (onDuty > 0) { onDutyChip.textContent = onDuty + ' on duty'; onDutyChip.style.display = 'block'; }
+      else { onDutyChip.style.display = 'none'; }
+    }
   }
   tick();
   setInterval(tick, 10000);
@@ -3157,8 +3180,8 @@ function startClock() {
 
 function autoRouteByTime() {
   const h = new Date().getHours();
-  if      (h >= 15) { showTab('checklist'); showChecklist('closing'); }
-  else if (h >= 11) { showTab('checklist'); showChecklist('mid'); }
+  if      (h >= 15) { showTab('checklist'); _forceShowChecklist('closing'); }
+  else if (h >= 11) { showTab('checklist'); _forceShowChecklist('mid'); }
   else               { showTab('opening'); }
 }
 
@@ -3518,6 +3541,9 @@ function parseStep(stepNum) {
   buildBoardFlow();
   if(done>=4){if(!STATE.fields)STATE.fields={};STATE.fields.gameplanPasted='1';}
   toast('Step '+stepNum+' parsed ✓  ('+cCount+' codes · '+total.toLocaleString()+' remaining)');
+  if (done === 4) {
+    setTimeout(() => { toast('All pastes complete — opening Live Board…'); showTab('board'); }, 900);
+  }
 }
 
 
@@ -3663,7 +3689,7 @@ function buildBoardGrid() {
 
     const netClass  = net===null?'no-data':net>0?'positive':net<0?'negative':'zero';
     const netDisplay = net===null?'—':(net>0?'+':'')+net;
-    const stLbls = {wu:'WU + UPGRADE',up:'UPGRADE ONLY',na:'NOT AVAILABLE','no-data':'NO DATA'};
+    const stLbls = {wu:'▲ WU + UPGRADE', up:'▶ UPGRADE ONLY', na:'■ NOT AVAILABLE', 'no-data':'○ NO DATA'};
     const coreTag = g.core ? '<div class="tile-override-mark" style="color:var(--text3)">◆</div>' 
                            : `<div class="tile-override-mark">${g.flag}</div>`;
 
@@ -5519,6 +5545,12 @@ function saveSection(section) {
   toast(`✅ ${section === 'mgmt' ? 'Management' : 'CXR/Exit'} schedule saved`);
 }
 
+function importAndSave(section) {
+  parseSection(section);
+  if (!_parsed[section]) return; // parse failed — toast already shown
+  saveSection(section);
+}
+
 function shiftDisplayCls(shift) {
   const s = (shift||'').toUpperCase();
   if (s === 'OFF' || s === '—') return 'shift-pill-off';
@@ -7321,6 +7353,19 @@ function closeModal() {
   const overlay = document.getElementById('modal-overlay');
   if (overlay) overlay.style.display = 'none';
 }
+
+function confirmDestructive(title, message, onConfirm) {
+  openModal('⚠️ ' + title, `
+    <div style="text-align:center;padding:8px 0">
+      <div style="font-size:13px;color:var(--txt2);margin-bottom:20px">${message}</div>
+      <div style="display:flex;gap:10px;justify-content:center">
+        <button class="btn btn-gh btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-sm" style="background:var(--red);color:#fff;border:none;border-radius:5px;padding:7px 18px;cursor:pointer;font-weight:700"
+          onclick="closeModal();(${onConfirm.toString()})()">Yes, Delete</button>
+      </div>
+    </div>
+  `);
+}
 function putStoredSchedule(sched) {
   if (typeof putStoredSection === 'function') {
     putStoredSection('mgmt', sched);
@@ -7693,7 +7738,17 @@ function renderChecklist(mode) {
         'onclick="event.stopPropagation();showCLTeamText()">📱 Team Text</button>' +
         '</div></div>';
     } else {
-      htm += '<div class="cl-sec-hdr">' + sec.s + '</div>';
+      var secTotal = (sec.items||[]).filter(function(it){return !it.days||it.days.includes(dow);}).length;
+      var secDone  = (sec.items||[]).filter(function(it){
+        if(it.days&&!it.days.includes(dow))return false;
+        return cl[it.t]===true||(it.autoKey&&checkAutoComplete(it.autoKey));
+      }).length;
+      var badgeColor = secDone===secTotal&&secTotal>0 ? 'var(--green)' : 'var(--txt3)';
+      htm += '<div class="cl-sec-hdr" style="display:flex;align-items:center;justify-content:space-between">' +
+        '<span>' + sec.s + '</span>' +
+        '<span style="font-size:10px;font-weight:700;color:'+badgeColor+';background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;padding:2px 8px;margin-left:8px">' +
+        secDone + '/' + secTotal + '</span>' +
+        '</div>';
     }
     (sec.items||[]).forEach(function(it) {
       if (it.days && !it.days.includes(dow)) return;
@@ -7704,7 +7759,7 @@ function renderChecklist(mode) {
       htm += '<div class="ci ' + (isDone?'done':'') + '" data-mode="' + mode + '" data-txt="' + it.t.replace(/"/g,'&quot;') + '" onclick="ciClick(this)">' +
         '<div class="cbox">' + (isDone?'✓':'') + '</div>' +
         '<div style="flex:1">' +
-          '<div class="ci-txt">' + it.t + (auto&&!done?' <span style="font-size:9px;color:var(--green);opacity:.6">(auto)</span>':'') + '</div>' +
+          '<div class="ci-txt">' + it.t.replace(/^(\S+)/, '<b>$1</b>') + (auto&&!done?' <span style="font-size:9px;color:var(--green);opacity:.6">(auto)</span>':'') + '</div>' +
           buildFields(fields) +
         '</div>' +
         (it.p ? '<div class="ci-photo">📷</div>' : '') +
@@ -7759,6 +7814,38 @@ function resetCL() {
 }
 
 function showChecklist(mode) {
+  // Gate: don't allow skipping ahead if previous checklist has unfinished items
+  if (mode === 'mid' || mode === 'closing') {
+    const prev = mode === 'mid' ? 'opening' : 'mid';
+    const prevLabel = prev === 'opening' ? '🌅 Opening' : '🔄 Mid-Shift';
+    const modeLabel = mode === 'mid' ? '🔄 Mid-Shift' : '🌙 Closing';
+    const prevCount = countCLDone(prev);
+    const modalAvailable = typeof openModal === 'function' && document.getElementById('modal-overlay') && document.getElementById('modal-overlay').style.position === 'fixed';
+    if (modalAvailable && prevCount.total > 0 && prevCount.done < prevCount.total) {
+      const remaining = prevCount.total - prevCount.done;
+      openModal('Not So Fast! ✋', `
+        <div style="text-align:center;padding:8px 0">
+          <div style="font-size:32px;margin-bottom:12px">⚠️</div>
+          <div style="font-size:14px;font-weight:700;color:var(--txt);margin-bottom:8px">
+            ${prevLabel} checklist isn't finished yet
+          </div>
+          <div style="font-size:13px;color:var(--txt2);margin-bottom:16px">
+            <b style="color:var(--amber)">${remaining} item${remaining!==1?'s':''}</b> still unchecked.<br>
+            Complete ${prevLabel} before moving to ${modeLabel}.
+          </div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <button class="btn btn-g btn-sm" onclick="closeModal();showChecklist('${prev}')">Go Back &amp; Finish</button>
+            <button class="btn btn-gh btn-sm" onclick="closeModal();_forceShowChecklist('${mode}')">Skip Anyway</button>
+          </div>
+        </div>
+      `);
+      return;
+    }
+  }
+  _forceShowChecklist(mode);
+}
+
+function _forceShowChecklist(mode) {
   window._curCLMode = mode;
   ['opening','mid','closing'].forEach(m => {
     const b = document.getElementById('clt-' + m);
@@ -8798,7 +8885,7 @@ function buildBoardFlow() {
   const hasData = Object.values(data).some(d => d && d.has);
 
   if (!hasData) {
-    chartEl.innerHTML = '<p style="font-size:11px;color:var(--txt3);padding:8px 0;text-align:center">Paste Game Plan data to see flow.</p>';
+    chartEl.innerHTML = '<p style="font-size:12px;color:var(--txt3);padding:16px 8px;text-align:center">📋 No Game Plan data yet.<br><span style="color:var(--acc);text-decoration:underline;cursor:pointer" onclick="showTab(\'paste\')">Go to Paste Data →</span></p>';
     if (totalsEl) totalsEl.innerHTML = '';
     buildDashFlowStrip();
     return;
@@ -9770,7 +9857,7 @@ function buildDashSchedMini() {
   const dow      = new Date().getDay();
 
   if (!Object.keys(exp).length) {
-    el.innerHTML='<div style="color:var(--txt3);font-size:11px">No schedule loaded</div>';
+    el.innerHTML='<div style="color:var(--txt3);font-size:11px">📅 No schedule loaded &mdash; <span style="color:var(--acc);text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showTab(\'admin\');showAdminSection(\'sched\')">Import schedule →</span></div>';
     return;
   }
 
@@ -10231,7 +10318,7 @@ function showAdminSection(sec) {
     if(typeof updateStoredStatus==='function') updateStoredStatus();
     if(typeof buildMonthGrid==='function') buildMonthGrid();
   }
-  if (sec==='annc')  buildAnnouncementsList();
+  if (sec==='annc')  { buildAnnouncementsList(); buildPolicyLog(); }
   if (sec==='celeb') buildCelebrationsList();
   if (sec==='photos') buildCarPhotosList();
 }
@@ -10307,11 +10394,90 @@ function saveAllCarPhotos() {
 }
 
 function clearAllCarPhotos() {
-  if (!confirm('Clear ALL car photo URLs? This cannot be undone.')) return;
   STATE.carPhotos = {};
   saveState();
   buildCarPhotosList();
   if (typeof filterCodes === 'function') filterCodes();
+  toast('Car photos cleared');
+}
+
+// Default representative photo per vehicle group — current year base models.
+// Wikimedia Commons direct links (free, stable, no hotlink restrictions).
+var CAR_PHOTO_DEFAULTS = {
+  'ECAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/2024_Chevrolet_Trax_LS_%28facelift%2C_orange%29%2C_front_8.28.23.jpg/640px-2024_Chevrolet_Trax_LS_%28facelift%2C_orange%29%2C_front_8.28.23.jpg',
+  'ICAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/b/b9/2024_Toyota_Camry_%28XV70%2C_facelift%2C_white%29%2C_front_8.5.23.jpg/640px-2024_Toyota_Camry_%28XV70%2C_facelift%2C_white%29%2C_front_8.5.23.jpg',
+  'SCAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/2023_Nissan_Altima_SR_%28L34%2C_facelift%2C_white%29%2C_front_4.16.23.jpg/640px-2023_Nissan_Altima_SR_%28L34%2C_facelift%2C_white%29%2C_front_4.16.23.jpg',
+  'FCAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/2023_Chrysler_300_Touring_L_%28LX2%2C_facelift%29%2C_front_4.1.23.jpg/640px-2023_Chrysler_300_Touring_L_%28LX2%2C_facelift%29%2C_front_4.1.23.jpg',
+  'PCAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/2021_Acura_TLX_SH-AWD_Technology%2C_front_8.20.20.jpg/640px-2021_Acura_TLX_SH-AWD_Technology%2C_front_8.20.20.jpg',
+  'LCAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e6/2020_Lincoln_Continental_Reserve_%28facelift%29%2C_front_9.7.19.jpg/640px-2020_Lincoln_Continental_Reserve_%28facelift%29%2C_front_9.7.19.jpg',
+  'CFAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/2022_Nissan_Rogue_Sport_SL_%28B32%2C_facelift%2C_US%29%2C_front_12.12.21.jpg/640px-2022_Nissan_Rogue_Sport_SL_%28B32%2C_facelift%2C_US%29%2C_front_12.12.21.jpg',
+  'IFAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/2023_Nissan_Rogue_SL_%28T33%29%2C_front_3.5.23.jpg/640px-2023_Nissan_Rogue_SL_%28T33%29%2C_front_3.5.23.jpg',
+  'SFAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/2022_Jeep_Grand_Cherokee_L_Laredo_%28WL%29%2C_front_8.22.21.jpg/640px-2022_Jeep_Grand_Cherokee_L_Laredo_%28WL%29%2C_front_8.22.21.jpg',
+  'PFAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9a/2023_Ford_Explorer_ST-Line_%28U625%2C_facelift%29%2C_front_4.15.23.jpg/640px-2023_Ford_Explorer_ST-Line_%28U625%2C_facelift%29%2C_front_4.15.23.jpg',
+  'FFAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/2022_Chevrolet_Suburban_LT_%28facelift%29%2C_front_3.14.21.jpg/640px-2022_Chevrolet_Suburban_LT_%28facelift%29%2C_front_3.14.21.jpg',
+  'RFAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/2022_Lincoln_Navigator_Reserve%2C_front_10.3.21.jpg/640px-2022_Lincoln_Navigator_Reserve%2C_front_10.3.21.jpg',
+  'SPAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/2022_Ram_1500_Big_Horn_%28DT%2C_facelift%29%2C_front_3.21.22.jpg/640px-2022_Ram_1500_Big_Horn_%28DT%2C_facelift%29%2C_front_3.21.22.jpg',
+  'FPAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/2021_Ford_F-150_XL_%2814th_generation%2C_silver%29%2C_front_3.28.21.jpg/640px-2021_Ford_F-150_XL_%2814th_generation%2C_silver%29%2C_front_3.28.21.jpg',
+  'MVAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/2022_Chrysler_Pacifica_Touring_L_%28facelift%29%2C_front_7.17.21.jpg/640px-2022_Chrysler_Pacifica_Touring_L_%28facelift%29%2C_front_7.17.21.jpg',
+  'FVAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1e/2020_Ford_Transit-350_XL%2C_front_2.21.20.jpg/640px-2020_Ford_Transit-350_XL%2C_front_2.21.20.jpg',
+  'EVAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/e/ef/2024_Tesla_Model_3_%22Highland%22_facelift%2C_front_left.jpg/640px-2024_Tesla_Model_3_%22Highland%22_facelift%2C_front_left.jpg',
+  'JWAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/1/10/2022_Jeep_Wrangler_Unlimited_Rubicon_392_%28JL%29%2C_front_9.5.21.jpg/640px-2022_Jeep_Wrangler_Unlimited_Rubicon_392_%28JL%29%2C_front_9.5.21.jpg',
+  'XCAR':'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/2024_Ford_Mustang_GT_convertible_%28S650%29%2C_front_7.30.23.jpg/640px-2024_Ford_Mustang_GT_convertible_%28S650%29%2C_front_7.30.23.jpg',
+};
+
+var CAR_PHOTO_ALIASES = {
+  'EDAR':'ECAR','ECDR':'ECAR','CCAR':'ECAR','CDAR':'ECAR','CCDR':'ECAR',
+  'IDAR':'ICAR','ICDR':'ICAR',
+  'SCAH':'SCAR','SDAR':'SCAR',
+  'FCDR':'FCAR','FCAH':'FCAR','FDAR':'FCAR',
+  'PDAR':'PCAR','PCDR':'PCAR',
+  'CFDR':'CFAR','CFAH':'CFAR',
+  'IFDR':'IFAR','IFAH':'IFAR',
+  'SFDR':'SFAR','SFAH':'SFAR',
+  'PFDR':'PFAR',
+  'FFDR':'FFAR','FRAR':'FFAR',
+  'RFDR':'RFAR',
+  'SPDR':'SPAR','SPBR':'SPAR',
+  'FXAR':'FPAR',
+  'SVAR':'MVAR',
+  'UVAR':'FVAR','RVAR':'FVAR',
+  'EHAR':'EVAR','EBAR':'EVAR',
+  'JXAR':'JWAR',
+  'XDAR':'XCAR','COAR':'XCAR',
+};
+
+function prePopulateCarPhotos() {
+  openModal('Pre-populate Car Photos', `
+    <div style="text-align:center;padding:8px 0">
+      <div style="font-size:13px;color:var(--txt2);margin-bottom:8px">
+        Fill in representative photos for all vehicle groups using current-year base model images.
+      </div>
+      <div style="font-size:11px;color:var(--txt3);margin-bottom:20px">
+        Choose whether to fill only empty slots, or replace everything.
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+        <button class="btn btn-gh btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-g btn-sm" onclick="closeModal();_doPrePopulate(false)">Fill Empty Only</button>
+        <button class="btn btn-sm" style="background:var(--acc);color:#fff;border:none;border-radius:5px;padding:7px 14px;cursor:pointer;font-weight:700"
+          onclick="closeModal();_doPrePopulate(true)">Replace All</button>
+      </div>
+    </div>
+  `);
+}
+
+function _doPrePopulate(replaceAll) {
+  if (!STATE.carPhotos) STATE.carPhotos = {};
+  let count = 0;
+  Object.entries(CAR_PHOTO_DEFAULTS).forEach(([code, url]) => {
+    if (replaceAll || !STATE.carPhotos[code]) { STATE.carPhotos[code] = url; count++; }
+  });
+  Object.entries(CAR_PHOTO_ALIASES).forEach(([alias, base]) => {
+    const url = CAR_PHOTO_DEFAULTS[base];
+    if (url && (replaceAll || !STATE.carPhotos[alias])) { STATE.carPhotos[alias] = url; count++; }
+  });
+  saveState();
+  buildCarPhotosList();
+  toast('Pre-populated ' + count + ' car photo' + (count !== 1 ? 's' : ''));
 }
 
 // ── Get effective roster (admin overrides merged with hardcoded) ───────────
@@ -10319,13 +10485,28 @@ function getEffectiveRoster() {
   const overrides = (STATE.adminRoster || []);
   const exitArr    = typeof ROSTER_EXIT    !== 'undefined' ? ROSTER_EXIT    : [];
   const returnsArr = typeof ROSTER_RETURNS !== 'undefined' ? ROSTER_RETURNS : [];
-  const base = [...ROSTER_CXR, ...ROSTER_MGMT, ...exitArr, ...returnsArr].map(p => {
-    const ov = overrides.find(o => o.id === p.id);
-    return ov ? Object.assign({}, p, ov) : p;
+  const base = [...ROSTER_CXR, ...ROSTER_MGMT, ...exitArr, ...returnsArr].filter(Boolean).map(p => {
+    const ov = overrides.find(o => o && o.id === p.id);
+    const merged = ov ? Object.assign({}, p, ov) : Object.assign({}, p);
+    // Preferred name overrides nick for all display purposes
+    if (merged.preferredName && merged.preferredName.trim()) {
+      merged.nick = merged.preferredName.trim();
+    }
+    return merged;
   });
   // Add new people not in base
-  overrides.filter(o => o._new).forEach(o => base.push(o));
+  overrides.filter(o => o && o._new).forEach(o => {
+    const clone = Object.assign({}, o);
+    if (clone.preferredName && clone.preferredName.trim()) clone.nick = clone.preferredName.trim();
+    base.push(clone);
+  });
   return base.filter(p => p && p.active !== false && p._deleted !== true);
+}
+
+// Returns the preferred display name for a person object
+function displayName(p) {
+  if (!p) return '—';
+  return (p.preferredName && p.preferredName.trim()) ? p.preferredName.trim() : (p.nick || (p.name||'').split(' ')[0] || '—');
 }
 
 // ── STAFF LIST ─────────────────────────────────────────────────────────
@@ -10343,6 +10524,7 @@ function buildAdminStaffList() {
     return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr)">
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:700;color:var(--txt)">${p.nick||p.name.split(' ')[0]}
+          ${p.preferredName && p.preferredName !== p.nick ? `<span style="font-size:9px;background:rgba(37,99,235,.12);color:var(--acc);border-radius:3px;padding:1px 5px;margin-left:3px">goes by ${p.preferredName}</span>` : ''}
           <span style="font-size:10px;color:${roleColor};margin-left:4px">${p.role}</span>${isNew}
         </div>
         <div style="font-size:10px;color:var(--txt3)">${p.name} · ${p.shiftCode||'varies'} · ${daysStr}</div>
@@ -10369,15 +10551,20 @@ function showEditStaffModal(id) {
     <div style="display:grid;gap:10px">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div>
-          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Full Name</label>
+          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Full Name (legal)</label>
           <input id="es-name" value="${person?person.name:''}" placeholder="First Last"
             style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
         </div>
         <div>
-          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Nickname</label>
+          <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Nickname (short)</label>
           <input id="es-nick" value="${person?person.nick||'':''}" placeholder="Matt"
             style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
         </div>
+      </div>
+      <div style="background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:5px;padding:8px 10px">
+        <label style="font-size:10px;color:var(--acc);font-weight:700;display:block;margin-bottom:3px">⭐ Preferred Name — what they go by (overrides nickname everywhere)</label>
+        <input id="es-preferred" value="${person?person.preferredName||'':''}" placeholder="e.g. CeCe, Jay, TT — leave blank to use Nickname"
+          style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div>
@@ -10419,6 +10606,7 @@ function showEditStaffModal(id) {
 function saveStaff(id) {
   const name  = document.getElementById('es-name')  && document.getElementById('es-name').value.trim();
   const nick  = document.getElementById('es-nick')  && document.getElementById('es-nick').value.trim();
+  const preferredName = (document.getElementById('es-preferred') && document.getElementById('es-preferred').value.trim()) || '';
   const role  = document.getElementById('es-role')  && document.getElementById('es-role').value;
   const shift = document.getElementById('es-shift') && document.getElementById('es-shift').value.trim();
   const notes = document.getElementById('es-notes') && document.getElementById('es-notes').value.trim();
@@ -10451,13 +10639,13 @@ function saveStaff(id) {
   if (id) {
     // Update existing
     const idx = STATE.adminRoster.findIndex(o=>o.id===id);
-    const update = { id, name, nick:nick||name.split(' ')[0], role, shiftCode:shift, shiftStart, shiftEnd, daysOn, notes };
+    const update = { id, name, nick:nick||name.split(' ')[0], preferredName, role, shiftCode:shift, shiftStart, shiftEnd, daysOn, notes };
     if (idx>=0) STATE.adminRoster[idx] = Object.assign(STATE.adminRoster[idx], update);
     else STATE.adminRoster.push(update);
   } else {
     // Add new
     const newId = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'') + '-' + Date.now().toString(36);
-    STATE.adminRoster.push({ id:newId, name, nick:nick||name.split(' ')[0], role, shiftCode:shift,
+    STATE.adminRoster.push({ id:newId, name, nick:nick||name.split(' ')[0], preferredName, role, shiftCode:shift,
       shiftStart, shiftEnd, daysOn, notes, pref:'none', _new:true });
   }
 
@@ -10787,6 +10975,9 @@ function renderDashAnnouncements() {
   let html = '';
   list.forEach(a => {
     const s = prioStyle[a.priority] || prioStyle.info;
+    const policyMgr = a.isPolicy && a.mgrName
+      ? `<span style="font-size:10px;color:var(--acc);margin-left:6px;font-weight:700">📋 Policy from ${String(a.mgrName).replace(/[<>]/g,'')}</span>`
+      : '';
     html += `<div class="annc-card" style="display:flex;align-items:center;gap:10px;
       background:${s.bg};border:1px solid ${s.col}55;border-left:3px solid ${s.col};
       border-radius:5px;padding:8px 12px;margin-bottom:5px;animation:annc-fade .35s ease;
@@ -10794,7 +10985,7 @@ function renderDashAnnouncements() {
       <span style="font-size:18px;flex-shrink:0;line-height:1">${s.icon}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:9px;font-weight:800;letter-spacing:.08em;color:${s.col};
-          text-transform:uppercase;margin-bottom:1px">${s.label}</div>
+          text-transform:uppercase;margin-bottom:1px">${s.label}${policyMgr}</div>
         <div style="font-size:13px;color:var(--text);line-height:1.3">${
           String(a.text).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;')
         }</div>
@@ -10811,48 +11002,112 @@ function renderDashCelebrations() {
   const list = STATE.celebrations || [];
   if (!list.length) { wrap.style.display = 'none'; return; }
   const today = new Date();
-  const todayMD = String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-  // Match either MM-DD or MM/DD; normalize to MM-DD for compare
+  const yr = today.getFullYear();
+
   function normMD(s) {
     if (!s) return '';
     const m = String(s).match(/(\d{1,2})[\/\-](\d{1,2})/);
     if (!m) return '';
     return String(parseInt(m[1])).padStart(2, '0') + '-' + String(parseInt(m[2])).padStart(2, '0');
   }
-  const todays = list.filter(c => normMD(c.date) === todayMD);
-  if (!todays.length) { wrap.style.display = 'none'; return; }
-  let html = '<div style="display:flex;flex-wrap:wrap;gap:6px">';
-  todays.forEach(c => {
+  function mdToDate(md) {
+    // Returns a Date for MM-DD in the current year (or next if already passed)
+    const [mm, dd] = md.split('-').map(Number);
+    const d = new Date(yr, mm - 1, dd);
+    if (d < today) d.setFullYear(yr + 1);
+    return d;
+  }
+  function daysUntil(md) {
+    const msPerDay = 86400000;
+    const target = mdToDate(md);
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return Math.round((target - todayMidnight) / msPerDay);
+  }
+  function chipLabel(c, days) {
     const isAnniv = c.type === 'anniversary';
-    const years = (isAnniv && c.startYear) ? (today.getFullYear() - parseInt(c.startYear)) : null;
+    const years = (isAnniv && c.startYear) ? (yr - parseInt(c.startYear) + (days > 0 ? 1 : 0)) : null;
     const icon = isAnniv ? '🎉' : '🎂';
-    const label = isAnniv ? `${years ? years + '-year ' : ''}work anniversary` : 'birthday';
-    html += `<div style="background:rgba(168,85,247,.10);border:1px solid rgba(168,85,247,.4);
-      border-radius:14px;padding:5px 12px;font-size:12px;animation:annc-fade .4s ease">
-      <span style="font-size:14px">${icon}</span>
-      <b style="color:var(--text);margin:0 4px">${String(c.name).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;')}</b>
-      <span style="color:var(--txt3);font-size:11px">— ${label}</span>
-    </div>`;
-  });
-  html += '</div>';
+    const typeLabel = isAnniv ? (years ? years + '-year work anniversary' : 'work anniversary') : 'birthday';
+    return { icon, typeLabel };
+  }
+
+  const todayMD = String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+  const todays = list.filter(c => normMD(c.date) === todayMD);
+  const upcoming = list
+    .map(c => ({ c, days: daysUntil(normMD(c.date)) }))
+    .filter(({ days }) => days > 0 && days <= 7)
+    .sort((a, b) => a.days - b.days);
+
+  if (!todays.length && !upcoming.length) { wrap.style.display = 'none'; return; }
+
+  let html = '';
+
+  // TODAY section
+  if (todays.length) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:' + (upcoming.length ? '8px' : '0') + '">';
+    todays.forEach(c => {
+      const { icon, typeLabel } = chipLabel(c, 0);
+      const safeName = String(c.name).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;');
+      html += `<div style="background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.45);
+        border-radius:14px;padding:6px 13px;font-size:12px;animation:annc-fade .4s ease;display:flex;align-items:center;gap:5px">
+        <span style="font-size:15px">${icon}</span>
+        <b style="color:var(--txt)">${safeName}</b>
+        <span style="color:var(--txt3);font-size:11px">— ${typeLabel} TODAY</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  // UPCOMING section (next 7 days)
+  if (upcoming.length) {
+    html += '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">';
+    html += '<span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-right:2px">Coming up:</span>';
+    upcoming.forEach(({ c, days }) => {
+      const { icon, typeLabel } = chipLabel(c, days);
+      const safeName = String(c.name).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;');
+      const dayLabel = days === 1 ? 'tomorrow' : 'in ' + days + ' days';
+      html += `<div style="background:var(--bg3);border:1px solid var(--bdr2);
+        border-radius:12px;padding:4px 10px;font-size:11px;display:flex;align-items:center;gap:4px">
+        <span>${icon}</span>
+        <b style="color:var(--txt2)">${safeName}</b>
+        <span style="color:var(--txt3)">${dayLabel}</span>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
   wrap.innerHTML = html;
   wrap.style.display = 'block';
 }
 
 // ── ANNOUNCEMENT ADMIN ─────────────────────────────────────────────
-function addAnnouncement(text, priority, expires) {
+function addAnnouncement(text, priority, expires, mgrName) {
   if (!text || !text.trim()) return;
   if (!STATE.announcements) STATE.announcements = [];
-  STATE.announcements.push({
+  const isPolicy = priority === 'policy';
+  const entry = {
     id: 'a-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
     text: text.trim(),
-    priority: priority || 'info',
+    priority: isPolicy ? 'urgent' : (priority || 'info'),
+    isPolicy: isPolicy || false,
+    mgrName: mgrName || null,
     dateAdded: new Date().toISOString(),
-    expires: expires || null,
-  });
+    expires: isPolicy ? null : (expires || null),
+  };
+  STATE.announcements.push(entry);
+  // Auto-log policies to the permanent policy board
+  if (isPolicy) {
+    if (!STATE.policyLog) STATE.policyLog = [];
+    STATE.policyLog.unshift({
+      text: text.trim(),
+      mgrName: mgrName || 'Unknown',
+      dateAdded: new Date().toISOString(),
+    });
+  }
   saveState();
   if (typeof renderDashAnnouncements === 'function') renderDashAnnouncements();
   if (typeof buildAnnouncementsList === 'function') buildAnnouncementsList();
+  if (typeof buildPolicyLog === 'function') buildPolicyLog();
 }
 
 function removeAnnouncement(id) {
@@ -10897,17 +11152,51 @@ function buildAnnouncementsList() {
   el.innerHTML = html;
 }
 
+function anncTypeChange() {
+  const typeEl = document.getElementById('annc-input-type');
+  const policyRow = document.getElementById('annc-policy-row');
+  if (policyRow) policyRow.style.display = (typeEl && typeEl.value === 'policy') ? 'block' : 'none';
+}
+
 function submitNewAnnouncement() {
   const txt = (document.getElementById('annc-input-text')||{}).value || '';
-  const pri = (document.getElementById('annc-input-prio')||{}).value || 'info';
+  const pri = (document.getElementById('annc-input-type')||{}).value || 'info';
   const exp = (document.getElementById('annc-input-expires')||{}).value || null;
+  const mgr = (document.getElementById('annc-input-mgr')||{}).value || '';
   if (!txt.trim()) { if (typeof toast==='function') toast('Enter announcement text'); return; }
-  addAnnouncement(txt, pri, exp);
-  const tEl = document.getElementById('annc-input-text');
-  const xEl = document.getElementById('annc-input-expires');
-  if (tEl) tEl.value = '';
-  if (xEl) xEl.value = '';
+  if (pri === 'policy' && !mgr.trim()) {
+    if (typeof toast==='function') toast('⚠️ Manager name required for Policy announcements');
+    const mgrEl = document.getElementById('annc-input-mgr');
+    if (mgrEl) { mgrEl.style.border = '2px solid var(--red)'; setTimeout(()=>mgrEl.style.border='',2000); }
+    return;
+  }
+  addAnnouncement(txt, pri, exp, mgr.trim());
+  ['annc-input-text','annc-input-expires','annc-input-mgr'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const typeEl = document.getElementById('annc-input-type');
+  if (typeEl) typeEl.value = 'info';
+  anncTypeChange();
   if (typeof toast === 'function') toast('Announcement posted ✓');
+}
+
+function buildPolicyLog() {
+  const el = document.getElementById('adm-policy-log');
+  if (!el) return;
+  const log = STATE.policyLog || [];
+  if (!log.length) { el.innerHTML = '<p style="font-size:11px;color:var(--txt3);font-style:italic">No policies logged yet.</p>'; return; }
+  let html = '<div style="display:flex;flex-direction:column;gap:6px">';
+  log.forEach(p => {
+    const dt = p.dateAdded ? new Date(p.dateAdded).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '—';
+    const safeTxt = String(p.text).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;');
+    const safeMgr = String(p.mgrName||'Unknown').replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;');
+    html += `<div style="padding:8px 10px;border:1px solid var(--bdr);border-left:3px solid var(--acc);border-radius:4px;background:var(--bg3)">
+      <div style="font-size:12px;color:var(--txt);margin-bottom:4px">${safeTxt}</div>
+      <div style="font-size:10px;color:var(--txt3)">📋 <b style="color:var(--acc)">${safeMgr}</b> · ${dt}</div>
+    </div>`;
+  });
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 // ── CELEBRATIONS (birthdays / anniversaries) ───────────────────────
@@ -11040,6 +11329,25 @@ function buildCelebrationsList() {
     el.innerHTML = '<p style="font-size:12px;color:var(--txt3);font-style:italic">No celebrations stored. Paste from a spreadsheet above.</p>';
     return;
   }
+
+  // Build active roster name set (lowercase for fuzzy match)
+  const activeNames = new Set();
+  const allRosters = [
+    ...(typeof ROSTER_CXR  !== 'undefined' ? ROSTER_CXR  : []),
+    ...(typeof ROSTER_EXIT !== 'undefined' ? ROSTER_EXIT : []),
+    ...(typeof ROSTER_MGMT !== 'undefined' ? ROSTER_MGMT : []),
+    ...(STATE.adminRoster || []),
+  ];
+  allRosters.forEach(p => {
+    if (p && p.name) activeNames.add(p.name.toLowerCase().trim());
+    if (p && p.nick) activeNames.add(p.nick.toLowerCase().trim());
+  });
+  function isActive(name) {
+    if (!activeNames.size) return true; // no roster loaded — don't flag anything
+    const n = String(name).toLowerCase().trim();
+    return activeNames.has(n) || [...activeNames].some(a => a.includes(n) || n.includes(a));
+  }
+
   // Sort by month/day
   const sorted = [...list].map((c,i)=>({...c,_i:i})).sort((a,b)=>{
     const ma=String(a.date||'').match(/(\d{1,2})[\/\-](\d{1,2})/);
@@ -11049,18 +11357,45 @@ function buildCelebrationsList() {
     const bN=parseInt(mb[1])*100+parseInt(mb[2]);
     return aN-bN;
   });
-  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">';
+
+  // Separate mismatches
+  const mismatches = sorted.filter(c => !isActive(c.name));
+  let html = '';
+
+  if (mismatches.length) {
+    html += `<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.4);border-radius:7px;padding:10px 12px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px">⚠️ ${mismatches.length} name${mismatches.length!==1?'s':''} not found in active roster — still employed?</div>
+      <div style="display:flex;flex-direction:column;gap:6px">`;
+    mismatches.forEach(c => {
+      const safeName = String(c.name).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;');
+      html += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <b style="font-size:12px;color:var(--txt)">${safeName}</b>
+        <button onclick="celebRosterResolve(${c._i},'active')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--green);background:rgba(34,197,94,.1);color:var(--green);cursor:pointer">✓ Still Employed</button>
+        <button onclick="celebRosterResolve(${c._i},'leave')"  style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--amber);background:rgba(245,158,11,.1);color:var(--amber);cursor:pointer">⏸ On Leave</button>
+        <button onclick="celebRosterResolve(${c._i},'other')"  style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--txt3);background:transparent;color:var(--txt3);cursor:pointer">? Other / Left</button>
+        <button onclick="removeCelebration(${c._i})" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--red);background:rgba(239,68,68,.1);color:var(--red);cursor:pointer">✕ Remove</button>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px">';
   sorted.forEach(c => {
     const icon = c.type === 'anniversary' ? '🎉' : '🎂';
     const subtitle = c.type === 'anniversary'
       ? (c.startYear ? `Anniversary · since ${c.startYear}` : 'Work anniversary')
       : 'Birthday';
-    html += `<div style="display:flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid var(--bdr);border-radius:5px;background:var(--bg3)">
+    const mismatch = !isActive(c.name);
+    const status = c._rosterStatus;
+    const statusBadge = status === 'leave' ? ' <span style="font-size:9px;color:var(--amber)">(On Leave)</span>'
+                      : status === 'other' ? ' <span style="font-size:9px;color:var(--txt3)">(Other)</span>'
+                      : mismatch        ? ' <span style="font-size:9px;color:var(--amber)">⚠</span>' : '';
+    html += `<div style="display:flex;gap:8px;align-items:center;padding:6px 10px;border:1px solid ${mismatch&&!status?'rgba(245,158,11,.5)':'var(--bdr)'};border-radius:5px;background:var(--bg3)">
       <span style="font-size:18px">${icon}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${
           String(c.name).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;')
-        }</div>
+        }${statusBadge}</div>
         <div style="font-size:10px;color:var(--txt3)">${c.date} · ${subtitle}</div>
       </div>
       <button onclick="removeCelebration(${c._i})" style="padding:3px 7px;border-radius:4px;border:1px solid var(--bdr2);background:transparent;color:var(--red);font-size:10px;cursor:pointer">✕</button>
@@ -11068,6 +11403,29 @@ function buildCelebrationsList() {
   });
   html += '</div>';
   el.innerHTML = html;
+}
+
+function celebRosterResolve(idx, status) {
+  if (!STATE.celebrations || !STATE.celebrations[idx]) return;
+  STATE.celebrations[idx]._rosterStatus = status;
+  if (status === 'other') {
+    // "Other/Left" — offer to remove
+    const name = STATE.celebrations[idx].name;
+    openModal('Remove ' + name + '?', `
+      <div style="text-align:center;padding:8px 0">
+        <div style="font-size:13px;color:var(--txt2);margin-bottom:20px">Mark as no longer with the team and remove from celebrations?</div>
+        <div style="display:flex;gap:10px;justify-content:center">
+          <button class="btn btn-gh btn-sm" onclick="closeModal();buildCelebrationsList()">Keep (hide warning)</button>
+          <button class="btn btn-sm" style="background:var(--red);color:#fff;border:none;border-radius:5px;padding:7px 18px;cursor:pointer;font-weight:700"
+            onclick="closeModal();removeCelebration(${idx})">Remove</button>
+        </div>
+      </div>
+    `);
+    return;
+  }
+  saveState();
+  buildCelebrationsList();
+  toast(status === 'leave' ? 'Marked as On Leave — will still show on dashboard' : 'Confirmed active — cleared warning');
 }
 
 // ── CAR CODES ─────────────────────────────────────────────────────────
@@ -11234,7 +11592,7 @@ function buildCoverageTimeline() {
   const nowH = new Date().getHours()+new Date().getMinutes()/60;
   if (!Object.keys(exp).length) {
     const tlEl=document.getElementById('coverage-timeline');
-    if(tlEl) tlEl.innerHTML='<div style="padding:12px;font-size:11px;color:var(--txt3)">No schedule loaded — confirm schedule from Opening Checklist</div>';
+    if(tlEl) tlEl.innerHTML='<div style="padding:16px 12px;font-size:12px;color:var(--txt3);text-align:center">📅 No schedule loaded.<br><span style="color:var(--acc);text-decoration:underline;cursor:pointer" onclick="showTab(\'admin\');showAdminSection(\'sched\')">Import schedule →</span></div>';
     return;
   }
 
