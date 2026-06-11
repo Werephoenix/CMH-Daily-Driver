@@ -11388,6 +11388,7 @@ function addAnnouncement(text, priority, expires, mgrName) {
   if (typeof renderDashAnnouncements === 'function') renderDashAnnouncements();
   if (typeof buildAnnouncementsList === 'function') buildAnnouncementsList();
   if (typeof buildPolicyLog === 'function') buildPolicyLog();
+  return entry;  // v60.12: callers can offer send-out for the new entry
 }
 
 function removeAnnouncement(id) {
@@ -11425,6 +11426,8 @@ function buildAnnouncementsList() {
         }</div>
         <div style="font-size:10px;color:var(--txt3)">${(a.priority||'info').toUpperCase()} · added ${added} · expires ${exp}</div>
       </div>
+      <button onclick="sendOutAnnouncement('${a.id}')"
+        style="padding:5px 9px;border-radius:4px;border:1px solid var(--acc);background:rgba(59,130,246,.1);color:var(--acc);font-size:11px;cursor:pointer;align-self:flex-start">📤 Send</button>
       <button onclick="removeAnnouncement('${a.id}')"
         style="padding:5px 9px;border-radius:4px;border:1px solid var(--red);background:rgba(239,68,68,.1);color:var(--red);font-size:11px;cursor:pointer;align-self:flex-start">✕ Remove</button>
     </div>`;
@@ -11450,7 +11453,7 @@ function submitNewAnnouncement() {
     if (mgrEl) { mgrEl.style.border = '2px solid var(--red)'; setTimeout(()=>mgrEl.style.border='',2000); }
     return;
   }
-  addAnnouncement(txt, pri, exp, mgr.trim());
+  const entry = addAnnouncement(txt, pri, exp, mgr.trim());
   ['annc-input-text','annc-input-expires','annc-input-mgr'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
@@ -11458,6 +11461,8 @@ function submitNewAnnouncement() {
   if (typeEl) typeEl.value = 'info';
   anncTypeChange();
   if (typeof toast === 'function') toast('Announcement posted ✓');
+  // v60.12: offer the text/email blast right after posting (Skip to decline)
+  if (entry && typeof sendOutAnnouncement === 'function') sendOutAnnouncement(entry.id);
 }
 
 function buildPolicyLog() {
@@ -11477,6 +11482,66 @@ function buildPolicyLog() {
   });
   html += '</div>';
   el.innerHTML = html;
+}
+
+// ── v60.12: ANNOUNCEMENT SEND-OUT (text/email blast) ───────────────
+// Matt's Q3 answer: posting to the dashboard should also offer a push to
+// the team as a text/email blast. Everything stays client-side: Email
+// opens the mail app pre-filled, Text opens Messages pre-filled — nothing
+// is sent until Matt hits send in that app. Copy puts the blast text on
+// the clipboard for Slack/Teams/whatever.
+function _anncBlastText(a) {
+  const prioLbl = a.isPolicy ? 'POLICY' : (a.priority || 'info').toUpperCase();
+  let out = '[CMH ' + prioLbl + '] ' + a.text;
+  if (a.isPolicy && a.mgrName) out += '\n— ' + a.mgrName;
+  if (a.expires) out += '\n(through ' + new Date(a.expires).toLocaleDateString() + ')';
+  return out;
+}
+function _findAnnc(id) {
+  return (STATE.announcements || []).find(a => a && a.id === id) || null;
+}
+function sendOutAnnouncement(id) {
+  const a = _findAnnc(id);
+  if (!a) return;
+  const esc = s => String(s).replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const blast = _anncBlastText(a);
+  const body = `
+    <div style="font-size:12px;color:var(--txt3);margin-bottom:10px">
+      Send this announcement to the team. Email and Text open pre-filled —
+      you pick the recipients and hit send there.
+    </div>
+    <pre style="white-space:pre-wrap;font-family:inherit;font-size:12px;color:var(--txt);
+      background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;
+      padding:9px 11px;margin-bottom:12px">${esc(blast)}</pre>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <button class="btn btn-gh btn-sm" onclick="closeModal()">Skip</button>
+      <button class="btn btn-gh btn-sm" onclick="anncBlastCopy('${a.id}')">📋 Copy</button>
+      <button class="btn btn-g btn-sm" onclick="anncBlastSMS('${a.id}')">💬 Text</button>
+      <button class="btn btn-g btn-sm" onclick="anncBlastEmail('${a.id}')">✉ Email</button>
+    </div>`;
+  if (typeof openModal === 'function') openModal('📤 Send Out Announcement', body);
+}
+function anncBlastEmail(id) {
+  const a = _findAnnc(id);
+  if (!a) return;
+  const prioLbl = a.isPolicy ? 'POLICY' : (a.priority || 'info').toUpperCase();
+  const sub = encodeURIComponent('[CMH] ' + prioLbl + ' announcement');
+  const body = encodeURIComponent(_anncBlastText(a));
+  window.location.href = 'mailto:?subject=' + sub + '&body=' + body;
+}
+function anncBlastSMS(id) {
+  const a = _findAnnc(id);
+  if (!a) return;
+  // 'sms:?&body=' works on both iOS and Android
+  window.location.href = 'sms:?&body=' + encodeURIComponent(_anncBlastText(a));
+}
+function anncBlastCopy(id) {
+  const a = _findAnnc(id);
+  if (!a) return;
+  const blast = _anncBlastText(a);
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(blast).then(()=>{ if (typeof toast==='function') toast('Copied ✓'); });
+  } else if (typeof toast === 'function') toast('Clipboard unavailable');
 }
 
 // ── CELEBRATIONS (birthdays / anniversaries) ───────────────────────
@@ -14828,6 +14893,11 @@ function printAllChecklists(blank) {
   // flat layout (v55) was readable but visually monotonous — sections
   // ran together and printed-out checklists were "visually cluttered"
   // per Matt. Still fits 1 page via 2-column balanced flow.
+  // v60.11: Matt's 5 requested print improvements — breathing room (bigger
+  // font/padding), bold action text, 13px checkboxes, per-section done/total
+  // counts, and a progress bar under each mode header. Counts/rendering now
+  // honor day-specific items (it.days) like the live checklist does. May
+  // spill slightly past 1 page on dense days — Matt prefers readability.
 
   // Per-mode config: color (used as accent + section tint), label, light tint
   const modeConfig = {
@@ -14842,8 +14912,13 @@ function printAllChecklists(blank) {
     const data = (typeof getCLDataForToday==='function' ? getCLDataForToday()[mode] : null) ||
                  (typeof CL_DATA!=='undefined' ? CL_DATA[mode] : []) || [];
     const cl = blank ? {} : ((STATE.checklist||{})['cl-'+mode]||{});
-    const total = data.reduce((a,s)=>a+(s.items||[]).length,0);
-    const done  = Object.values(cl).filter(Boolean).length;
+    // v60.11: counts honor day-specific items (same filter renderChecklist
+    // uses) and only count checks belonging to today's items.
+    const dow = new Date().getDay();
+    const isTodayItem = it => !it.days || it.days.includes(dow);
+    const todayItems = data.reduce((a,s)=>a.concat((s.items||[]).filter(isTodayItem)),[]);
+    const total = todayItems.length;
+    const done  = blank ? 0 : todayItems.filter(it=>cl[it.t]===true).length;
 
     // Mode CARD — outer wrapper with colored top stripe + label bar.
     // break-inside:avoid keeps the mode header together with its first
@@ -14857,21 +14932,31 @@ function printAllChecklists(blank) {
         <span>${cfg.icon} ${cfg.label}</span>
         <span style="font-size:9px;font-weight:600;opacity:.95">${blank?'___':done} / ${total}</span>
       </div>
-      <div style="padding:4px 5px;background:${cfg.tint}">`;
+      <div style="height:5px;background:#e5e5e5">
+        <div style="height:100%;width:${total?Math.round(done/total*100):0}%;background:${cfg.col}"></div>
+      </div>
+      <div style="padding:6px 6px;background:${cfg.tint}">`;
 
     data.forEach((sec, secIdx) => {
       // SECTION sub-card — visible grouping with white bg + thin border
       // + colored left accent stripe. Each section is its own avoid-break
       // container so it doesn't split mid-section across columns.
+      // v60.11: skip sections whose items are all day-specific and not today;
+      // header shows a per-section done/total count.
+      const secItems = (sec.items||[]).filter(isTodayItem);
+      if (!secItems.length) return;
+      const secDone = blank ? 0 : secItems.filter(it=>cl[it.t]===true).length;
       modeHtml += `<div style="break-inside:avoid;background:#fff;
         border:1px solid ${cfg.col}30;border-left:2.5px solid ${cfg.col};
-        border-radius:2px;padding:4px 7px;margin-bottom:3px">
+        border-radius:2px;padding:5px 8px;margin-bottom:5px">
         <div style="font-size:8px;font-weight:800;color:${cfg.col};
-          text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;
-          padding-bottom:1.5px;border-bottom:1px dotted ${cfg.col}50">
-          ${sec.s}
+          text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;
+          padding-bottom:2px;border-bottom:1px dotted ${cfg.col}50;
+          display:flex;justify-content:space-between;align-items:baseline">
+          <span>${sec.s}</span>
+          <span style="font-weight:600;opacity:.8">${blank?'__':secDone} / ${secItems.length}</span>
         </div>`;
-      (sec.items||[]).forEach(it => {
+      secItems.forEach(it => {
         const checked = !blank && cl[it.t];
         const fields = it.fields || [];
         const hasFields = fields.length > 0;
@@ -14882,10 +14967,12 @@ function printAllChecklists(blank) {
             <span style="font-family:monospace;color:#000;border-bottom:1px dotted #999;
               min-width:28px;display:inline-block;padding:0 2px;font-size:8px">${val||'_____'}</span>`;
         }).join(' ');
-        modeHtml += `<div style="display:flex;align-items:flex-start;gap:3px;padding:1px 0;
-          font-size:8.5px;line-height:1.25">
-          <span style="font-size:10px;color:${checked?'#16a34a':'#bbb'};flex-shrink:0;line-height:1">${checked?'☑':'☐'}</span>
-          <div style="flex:1;color:${checked?'#222':'#333'}">${it.t}${hasFields?'<br>'+fieldHtml:''}</div>
+        // v60.11: bigger checkbox (13px), bold action text, roomier rows —
+        // per Matt's "all 5 improvements" answer to morning question 8.
+        modeHtml += `<div style="display:flex;align-items:flex-start;gap:4px;padding:2px 0;
+          font-size:9.5px;line-height:1.3">
+          <span style="font-size:13px;color:${checked?'#16a34a':'#aaa'};flex-shrink:0;line-height:1">${checked?'☑':'☐'}</span>
+          <div style="flex:1;color:${checked?'#222':'#333'}"><span style="font-weight:700">${it.t}</span>${hasFields?'<br>'+fieldHtml:''}</div>
         </div>`;
       });
       modeHtml += `</div>`;  // close section sub-card
