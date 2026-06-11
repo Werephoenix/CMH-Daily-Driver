@@ -2024,14 +2024,21 @@ button { cursor: pointer; }
           <div class="ch">👥 Staff Roster
             <button class="btn btn-g btn-sm" style="margin-left:auto" onclick="showAddStaffModal()">+ Add Person</button>
           </div>
-  <!-- Print controls -->
+  <!-- Print controls
+       v60.4: repointed from printChecklist() → printAllChecklists(). The old
+       printChecklist() read two symbols that are never defined anywhere —
+       CHECKLIST_ITEMS (only CL_DATA / CHECKLISTS exist) and STATE.clDone (the
+       real state is STATE.checklist['cl-<mode>']) — so it silently printed an
+       EMPTY checklist. printAllChecklists() is the maintained v57 card layout
+       used by the Checklist tab and works correctly. printChecklist() is now
+       dead code (no callers) — left in place; safe to remove in a later pass. -->
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-    <button onclick="printChecklist(false)"
+    <button onclick="printAllChecklists(false)"
       style="padding:8px 14px;border-radius:6px;border:1px solid var(--bdr2);
         background:var(--bg3);color:var(--txt);font-size:12px;font-weight:700;cursor:pointer">
       🖨 Print Current
     </button>
-    <button onclick="printChecklist(true)"
+    <button onclick="printAllChecklists(true)"
       style="padding:8px 14px;border-radius:6px;border:1px solid var(--bdr2);
         background:var(--bg3);color:var(--txt);font-size:12px;font-weight:700;cursor:pointer">
       📄 Print Blank
@@ -2168,7 +2175,7 @@ button { cursor: pointer; }
 
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn btn-gh btn-sm" onclick="confirmDestructive('Clear imported schedule?', 'The stored weekly schedule will be wiped. You will need to re-import.', ()=>clearStoredSchedule&&clearStoredSchedule())">🗑 Clear Schedule</button>
-            <button class="btn btn-gh btn-sm" onclick="if(confirm('Reset today from MAY_SCHEDULE?')&&typeof resetAndReloadToday==='function')resetAndReloadToday()">🔄 Reset &amp; Reload Today</button>
+            <button class="btn btn-gh btn-sm" onclick="if(typeof resetAndReloadToday==='function')resetAndReloadToday()">🔄 Reset &amp; Reload Today</button>
           </div>
         </div>
       </div>
@@ -2494,6 +2501,14 @@ var GROUP_META = [
   {n:'Premium Elite SUV',name:'Premium Elite SUV',flag:'💎⭐',core:false},
 ];
 
+// v60.5: the backward-compat aliases `THRESH` and `GROUPS` are declared near
+// CODE_MAP (above) but their targets (THRESHOLDS, GROUP_META) are defined HERE,
+// AFTER those declarations — so the early `var THRESH = THRESHOLDS` /
+// `var GROUPS = GROUP_META` captured `undefined`. Reassign now that both exist
+// so the aliases actually point at their arrays for any code that relies on them.
+THRESH = THRESHOLDS;
+GROUPS = GROUP_META;
+
 // ── ROSTER ──────────────────────────────────────────────────────────────────
 var ROSTER_CXR = [
 
@@ -2682,7 +2697,14 @@ var ROSTER_MGMT = [
    notes:'MT. Typical shifts: 6A-4P / 8A-6P / 10A-8P / 12P-10P / 4P-C.'},
   {id:'lauren',  name:'Lauren Kretschman',       nick:'Lauren',  role:'MT',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'MT. Typical: 6A-4P / 8A-6P / 12P-10P / 4P-C.'},,
+   notes:'MT. Typical: 6A-4P / 8A-6P / 12P-10P / 4P-C.'},
+  // v60.3: removed a stray double-comma here (was `},,`) that left a
+  // sparse-array HOLE between Lauren and Ennis in ROSTER_MGMT. forEach/map
+  // skip holes (so smoke passed), but the ~13 sites that SPREAD the roster
+  // (`[...ROSTER_MGMT, ...ROSTER_CXR].find(p => p.name...)`) materialize the
+  // hole as `undefined` and crash with "Cannot read properties of undefined
+  // (reading 'name')" — e.g. findMgrByName, schedule-paste matching, callout
+  // suggestion. One char fixes all of them.
   {id:'ennis_mt', name:'Ennis', nick:'Ennis', role:'MT',
    shiftCode:'varies', shiftStart:null, shiftEnd:null,
    defaultStation:'Counter Manager', active:true,
@@ -2981,6 +3003,116 @@ var CL_DATA = {
 // Alias for any code that uses CHECKLISTS instead of CL_DATA
 var CHECKLISTS = CL_DATA;
 
+// ═══════════════════════════════════════════════════════════════════════
+// v60.8: IMPORTANT-ITEM EMAIL VALIDATION
+// When a manager generates the opening/closing email with IMPORTANT checklist
+// items still unchecked, prompt for a short reason per item and fold
+// "what didn't get done + why" into the email body so leadership sees it.
+// ONLY the items listed below are flagged (matched by exact item text) — edit
+// these Sets to change what counts as "important". Routine tidying is excluded.
+// ═══════════════════════════════════════════════════════════════════════
+var CL_IMPORTANT = {
+  opening: new Set([
+    '# of Completely Satisfied + Hot Alerts',
+    'OOS Units — all have claims?',
+    "FBO's — written & delivered",
+    'Game Plan car data pasted (all 4 zones)',
+    'Walk-Up policy set',
+    'Schedule confirmed — stations assigned',
+    'Morning Email sent (#CMHBoothCSR #NationalColumbusOH)',
+  ]),
+  closing: new Set([
+    'Final OOS count',
+    "FBO's completed — count & detail",
+    "Tomorrow's numbers",
+    'ABRM notes for incoming team',
+    'End of Night Email sent (#CMHBoothCSR #CMHMgmt #NationalColumbusOH)',
+    'Coffee pot — OFF ⚠',
+    'Day saved to History in app',
+  ]),
+};
+function isImportantCL(mode, itemText){
+  const set = CL_IMPORTANT[mode];
+  return !!(set && set.has(itemText));
+}
+// Texts of IMPORTANT items for `mode` still not done today (honors day-specific
+// items and autoKey auto-completion — same done-check renderChecklist uses).
+function getIncompleteImportant(mode){
+  const data = (typeof getCLDataForToday==='function')
+    ? (getCLDataForToday()[mode]||[])
+    : ((typeof CL_DATA!=='undefined' && CL_DATA[mode]) || []);
+  const cl  = (STATE.checklist && STATE.checklist['cl-'+mode]) || {};
+  const dow = new Date().getDay();
+  const out = [];
+  data.forEach(sec=>{
+    (sec.items||[]).forEach(it=>{
+      if (it.days && !it.days.includes(dow)) return;        // day-specific, not today
+      if (!isImportantCL(mode, it.t)) return;
+      const done = cl[it.t] === true ||
+        (it.autoKey && typeof checkAutoComplete==='function' && checkAutoComplete(it.autoKey));
+      if (!done) out.push(it.t);
+    });
+  });
+  return out;
+}
+// Formats the "incomplete important items + reasons" block for an email body.
+// Empty string when nothing is outstanding.
+function buildIncompleteBlock(mode){
+  const items = getIncompleteImportant(mode);
+  if (!items.length) return '';
+  const reasons = (STATE.clReasons && STATE.clReasons['cl-'+mode]) || {};
+  let out = '⚠ INCOMPLETE — IMPORTANT ITEMS\n';
+  items.forEach(t=>{
+    const r = String(reasons[t]||'').trim();
+    out += '  • ' + t + (r ? '  — ' + r : '  — (no reason given)') + '\n';
+  });
+  return out + '\n';
+}
+// Modal: capture a reason for each outstanding important item, then proceed.
+function promptIncompleteReasons(mode, onProceed){
+  const items = getIncompleteImportant(mode);
+  if (!items.length) { if (typeof onProceed==='function') onProceed(); return; }
+  if (!STATE.clReasons) STATE.clReasons = {};
+  if (!STATE.clReasons['cl-'+mode]) STATE.clReasons['cl-'+mode] = {};
+  const reasons = STATE.clReasons['cl-'+mode];
+  const esc = s => String(s).replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+  const rows = items.map((t,i)=>`
+    <div style="margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--txt);margin-bottom:3px">⚠ ${esc(t)}</div>
+      <input id="clr-${i}" type="text" value="${esc(reasons[t]||'')}"
+        placeholder="Why wasn't this done? (e.g. survey system wasn't up yet)"
+        style="width:100%;padding:7px 9px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:12px">
+    </div>`).join('');
+  const body = `
+    <div style="font-size:12px;color:var(--txt3);margin-bottom:12px">
+      <b style="color:var(--amber)">${items.length} important item${items.length>1?'s are':' is'} still unchecked.</b>
+      Add a quick reason for each — it gets included in the email so leadership
+      sees what didn't get done and why. Leave blank to send without a reason.
+    </div>
+    ${rows}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
+      <button class="btn btn-gh btn-sm" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-g btn-sm" onclick="saveIncompleteReasons('${mode}')">Add reasons &amp; continue →</button>
+    </div>`;
+  if (typeof openModal==='function') openModal('⚠ Unfinished Important Items', body);
+  window._clReasonsCtx = { mode, items, onProceed };  // stash for the save handler
+}
+function saveIncompleteReasons(mode){
+  const ctx = window._clReasonsCtx || {};
+  const items = ctx.items || getIncompleteImportant(mode);
+  if (!STATE.clReasons) STATE.clReasons = {};
+  if (!STATE.clReasons['cl-'+mode]) STATE.clReasons['cl-'+mode] = {};
+  items.forEach((t,i)=>{
+    const el = document.getElementById('clr-'+i);
+    if (el) STATE.clReasons['cl-'+mode][t] = el.value;
+  });
+  saveState();
+  if (typeof closeModal==='function') closeModal();
+  const onProceed = ctx.onProceed;
+  window._clReasonsCtx = null;
+  if (typeof onProceed==='function') onProceed();
+}
+
 
 
 // CXR ROTATION CONSTANTS
@@ -3059,6 +3191,9 @@ function loadState() {
       s.celebrations  = Array.isArray(s.celebrations)  ? s.celebrations  : [];  // v59
       s.carPhotos     = (s.carPhotos && typeof s.carPhotos === 'object') ? s.carPhotos : {}; // v59
       s.policyLog     = Array.isArray(s.policyLog)     ? s.policyLog     : [];  // v60
+      s.dnr           = Array.isArray(s.dnr)           ? s.dnr           : [];  // v60.7: fraud / Do-Not-Rent list (now synced)
+      s.dnq           = Array.isArray(s.dnq)           ? s.dnq           : [];  // v60.7: Did-Not-Qualify list (now synced, 48h auto-expire)
+      s.clReasons     = (s.clReasons && typeof s.clReasons === 'object') ? s.clReasons : {};  // v60.8: {cl-mode: {itemText: reason}} for incomplete-item email validation
       return s;
     }
   } catch(e) {}
@@ -3067,6 +3202,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
+    dnr:[], dnq:[], clReasons:{},
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -3078,6 +3214,29 @@ function loadState() {
 // Using window assignment so it's accessible everywhere (browser + Node vm)
 window.STATE = loadState();
 var STATE = window.STATE; // var hoists to script scope for function closures
+
+// v60.7: one-time migration of legacy DNR/DNQ fraud lists into synced STATE.
+// They used to live in their own device-local localStorage keys
+// ('cmh-dnr' / 'cmh-dnq') which NEVER synced — a fraud / Do-Not-Rent alert
+// added on the work computer was invisible on managers' phones. Import any
+// legacy entries (dedup by id) into STATE.dnr/dnq, then remove the old keys so
+// this runs once. From here on, cloud sync's union merge propagates them to all
+// devices. (In the smoke/sync vm, localStorage is empty so this no-ops.)
+(function migrateLegacyDNRDNQ(){
+  try {
+    [['cmh-dnr','dnr'],['cmh-dnq','dnq']].forEach(([key,prop])=>{
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const o = JSON.parse(raw);
+        if (Array.isArray(o) && o.length) {
+          if (!Array.isArray(STATE[prop])) STATE[prop] = [];
+          o.forEach(e=>{ if (e && e.id!=null && !STATE[prop].some(x=>x && x.id===e.id)) STATE[prop].push(e); });
+        }
+        localStorage.removeItem(key);
+      }
+    });
+  } catch(e) {}
+})();
 
 function saveState() {
   // Local save always immediate. v59.2: previously silently swallowed all
@@ -3100,6 +3259,12 @@ function saveState() {
   }
   // Debounce cloud sync 2.5s
   if (window._syncTimer) clearTimeout(window._syncTimer);
+  // v60.6: mark that a local edit is queued to push. pullFromJsonbin checks
+  // this (via syncPushPending) and DEFERS applying a remote pull while a push
+  // is pending — otherwise an interleaved 30s poll would Object.assign over the
+  // just-made local edit before it ever reaches the server, and the queued push
+  // would then upload the clobbered state, silently losing the edit.
+  window._syncPending = true;
   window._syncTimer = setTimeout(pushToJsonbin, 2500);
 }
 
@@ -4251,6 +4416,9 @@ function buildEmailData(type) {
       body += '📝 NOTES\n' + f.classNotes + '\n\n';
     }
 
+    // v60.8: incomplete important items + reasons (empty when all done)
+    body += buildIncompleteBlock('opening');
+
     body += '─────────────────────────────────\n';
     body += `CMH Daily Driver · ${dateLabel}`;
 
@@ -4293,6 +4461,9 @@ function buildEmailData(type) {
 
     if (f.lateStaff)  body += '⏰ STAYED LATE\n' + f.lateStaff + '\n\n';
     if (f.closeNotes) body += '💬 NOTES FOR INCOMING TEAM\n' + f.closeNotes + '\n\n';
+
+    // v60.8: incomplete important items + reasons (empty when all done)
+    body += buildIncompleteBlock('closing');
 
     body += '─────────────────────────────────\n';
     body += 'Have a great night! — ' + cmgr;
@@ -4399,6 +4570,17 @@ function clearAllDuty() {
   toast('Schedule cleared');
 }
 
+
+// v60.10: HIST_KEY was referenced by loadHistory/saveDayToHistory/
+// autoSaveHistory/clearOldHistory but NEVER declared anywhere — so every
+// localStorage call here threw a ReferenceError that the surrounding try/catch
+// swallowed. Net effect: the entire Shift History feature was dead — nothing
+// ever saved, loadHistory() always returned [], the History tab showed "No
+// history yet" forever, and the 4am auto-save did nothing. Declaring the
+// constant (value matches the 'cmh-history-v2' literal already used elsewhere)
+// restores the feature. (Day history is device-local; syncing it across devices
+// is possible future work, like DNR/DNQ in v60.7.)
+var HIST_KEY = 'cmh-history-v2';
 
 function loadHistory() {
   try { const r = localStorage.getItem(HIST_KEY); return r ? JSON.parse(r) : []; }
@@ -7151,7 +7333,11 @@ function updateStatusBand() {
   const pasteDone = ['res-am','res-pm','ret-am','ret-pm'].filter(k=>STATE.pasteData&&STATE.pasteData[k]).length;
   const d = typeof getGroupNetData === 'function' ? getGroupNetData() : {};
   let wuOpen = 0;
-  if (typeof GROUPS !== 'undefined') {
+  // v60.5: was `typeof GROUPS` — but the GROUPS alias was assigned BEFORE
+  // GROUP_META existed (definition-order bug), so it was permanently undefined
+  // and this guard was always false → the status band never counted walk-up-open
+  // groups. Guard on GROUP_META directly (the array actually iterated below).
+  if (typeof GROUP_META !== 'undefined') {
     GROUP_META.forEach(g=>{ const gd=d[g.n]; if(gd&&gd.has&&getGroupStatus(g.n,gd.net)==='wu') wuOpen++; });
   }
   const auto = getAutoManagers();
@@ -10101,6 +10287,18 @@ function buildDashSchedMini() {
 }
 
 function showCLEmail(mode) {
+  // v60.8: if IMPORTANT checklist items are still unchecked, capture a reason
+  // for each before generating the email. The reasons get folded into the body
+  // (buildEmailData → buildIncompleteBlock) so leadership sees what didn't get
+  // done and why. If everything important is done, generate the email directly.
+  const incomplete = (typeof getIncompleteImportant === 'function') ? getIncompleteImportant(mode) : [];
+  if (incomplete.length && typeof promptIncompleteReasons === 'function') {
+    promptIncompleteReasons(mode, () => _doShowCLEmail(mode));
+    return;
+  }
+  _doShowCLEmail(mode);
+}
+function _doShowCLEmail(mode) {
   const type = mode === 'closing' ? 'closing' : 'opening';
   showEmailType(type);
   // Show the output inline
@@ -10168,6 +10366,12 @@ function setSyncStatus(status, msg) {
 }
 
 async function pushToJsonbin() {
+  // v60.6: the push is firing now — clear the pending flag. Everything below
+  // runs synchronously up to the `await fetch`, so JSON.stringify(payload)
+  // captures the current STATE into the request body before any remote pull
+  // could mutate it. Clearing here (not on success) means an actively-editing
+  // device resumes accepting remote pulls right after it pushes.
+  window._syncPending = false;
   setSyncStatus('syncing');
   try {
     const payload = {
@@ -10197,6 +10401,81 @@ async function pushToJsonbin() {
   }
 }
 
+// ── v60.6: sync merge split into pure, offline-testable pieces ──────────────
+// (see test_sync.js — proves the race guard and merge behavior without ever
+//  touching the network or the production JSONBin.)
+
+// True when a local edit is saved and queued to push but the debounced push
+// hasn't fired yet.
+function syncPushPending() {
+  return window._syncPending === true;
+}
+
+// Pure merge: remote state wins on shared keys; local checklist TRUE ticks are
+// preserved (union — a remote pull never un-checks an item completed locally).
+// Mutates `state` in place; returns it.
+function mergeRemoteIntoState(state, remote) {
+  const localCL  = JSON.parse(JSON.stringify(state.checklist || {}));
+  const localDNR = Array.isArray(state.dnr) ? state.dnr.slice() : [];
+  const localDNQ = Array.isArray(state.dnq) ? state.dnq.slice() : [];
+  Object.assign(state, remote);
+  delete state._meta;
+  if (!state.checklist) state.checklist = {};
+  Object.keys(localCL).forEach(mode => {
+    if (!state.checklist[mode]) state.checklist[mode] = {};
+    Object.keys(localCL[mode] || {}).forEach(item => {
+      if (localCL[mode][item]) state.checklist[mode][item] = true;
+    });
+  });
+  // v60.7: DNR/DNQ fraud lists union by id so an addition on EITHER device
+  // survives a concurrent merge (a remote pull never drops a fraud flag the
+  // local device just added). Tradeoff: a delete on one device can be
+  // resurrected by another that still has the entry — acceptable for a safety
+  // list (errs toward keeping flags); DNQ also self-expires after 48h.
+  const unionById = (localArr, remoteArr) => {
+    const byId = new Map();
+    (Array.isArray(remoteArr) ? remoteArr : []).forEach(e => { if (e && e.id != null) byId.set(e.id, e); });
+    (Array.isArray(localArr)  ? localArr  : []).forEach(e => { if (e && e.id != null && !byId.has(e.id)) byId.set(e.id, e); });
+    return Array.from(byId.values());
+  };
+  state.dnr = unionById(localDNR, state.dnr);
+  state.dnq = unionById(localDNQ, state.dnq);
+  return state;
+}
+
+// Redraw the screens that depend on synced state after a remote apply.
+function rebuildAfterSync() {
+  ['refreshDash','buildBoardGrid','buildSwitchboard','buildDashSchedMini',
+   'updateBoardHeader','updateWalkUpButtons','updateSummary',
+   'refreshDNRDNQCards'].forEach(fn => {  // v60.7: re-render fraud cards after sync
+    if (typeof window[fn] === 'function') try { window[fn](); } catch(e) {}
+  });
+}
+
+// Decide what to do with a fetched remote record and (if appropriate) apply it.
+// No network I/O, so it's deterministically testable. Returns an outcome string:
+//   'no-state' | 'unchanged' | 'deferred' | 'noted' | 'applied'.
+function applyRemoteRecord(record, apply) {
+  const remote = record && record.state;
+  if (!remote || typeof remote !== 'object') { setSyncStatus('synced', 'Ready'); return 'no-state'; }
+  const remoteAt = record.savedAt;
+  // Already have this version — nothing to do.
+  if (remoteAt && remoteAt === _lastRemoteAt) return 'unchanged';
+  // v60.6 RACE GUARD: a local edit is queued to push. Applying the remote now
+  // would Object.assign over the unsynced edit, and the queued push would then
+  // upload the clobbered state — silently losing the edit. Defer: leave
+  // _lastRemoteAt UNCHANGED so the next poll (after our push fires and
+  // _syncPending clears) re-sees this remote change and applies it then.
+  if (apply && syncPushPending()) { setSyncStatus('syncing', 'Local edit pending…'); return 'deferred'; }
+  _lastRemoteAt = remoteAt;
+  if (!apply) return 'noted';
+  mergeRemoteIntoState(STATE, remote);
+  rebuildAfterSync();
+  const t = remoteAt ? new Date(remoteAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
+  setSyncStatus('synced', 'Updated '+(t||''));
+  return 'applied';
+}
+
 async function pullFromJsonbin(apply) {
   try {
     const res = await fetch(JSONBIN_URL+'/latest', {
@@ -10210,36 +10489,7 @@ async function pullFromJsonbin(apply) {
     const data = await res.json();
     // jsonbin v3 with X-Bin-Meta:false returns the record directly
     const record = data.record || data;
-    const remote = record.state;
-    if (!remote || typeof remote !== 'object') {
-      setSyncStatus('synced', 'Ready');
-      return;
-    }
-
-    // Skip if same timestamp (no change since last pull)
-    const remoteAt = record.savedAt;
-    if (remoteAt && remoteAt === _lastRemoteAt) return;
-    _lastRemoteAt = remoteAt;
-
-    if (apply) {
-      // Merge: remote wins on shared data, preserve local checklist ticks
-      const localCL = JSON.parse(JSON.stringify(STATE.checklist||{}));
-      Object.assign(STATE, remote);
-      delete STATE._meta;
-      if (!STATE.checklist) STATE.checklist = {};
-      Object.keys(localCL).forEach(mode => {
-        if (!STATE.checklist[mode]) STATE.checklist[mode] = {};
-        Object.keys(localCL[mode]||{}).forEach(item => {
-          if (localCL[mode][item]) STATE.checklist[mode][item] = true;
-        });
-      });
-      ['refreshDash','buildBoardGrid','buildSwitchboard','buildDashSchedMini',
-       'updateBoardHeader','updateWalkUpButtons','updateSummary'].forEach(fn => {
-        if (typeof window[fn]==='function') try{window[fn]();}catch(e){}
-      });
-      const t = remoteAt ? new Date(remoteAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
-      setSyncStatus('synced', 'Updated '+(t||''));
-    }
+    applyRemoteRecord(record, apply);
   } catch(e) {
     setSyncStatus('offline');
   }
@@ -14094,10 +14344,14 @@ var DNR_REASONS = [
   'Previous unpaid damage claim','Corporate blacklist','Other (see notes)'
 ];
 
-function getDNRList(){try{return JSON.parse(localStorage.getItem('cmh-dnr')||'[]');}catch(e){return[];}}
-function getDNQList(){try{return JSON.parse(localStorage.getItem('cmh-dnq')||'[]');}catch(e){return[];}}
-function saveDNR(list){localStorage.setItem('cmh-dnr',JSON.stringify(list));}
-function saveDNQ(list){localStorage.setItem('cmh-dnq',JSON.stringify(list));}
+// v60.7: DNR/DNQ now live in synced STATE (were device-local localStorage).
+// saveDNR/saveDNQ call saveState() so additions/removals push to the cloud and
+// reach every device. The pull-side union merge (mergeRemoteIntoState) ensures
+// concurrent additions from two devices both survive.
+function getDNRList(){ if(!Array.isArray(STATE.dnr)) STATE.dnr=[]; return STATE.dnr; }
+function getDNQList(){ if(!Array.isArray(STATE.dnq)) STATE.dnq=[]; return STATE.dnq; }
+function saveDNR(list){ STATE.dnr = Array.isArray(list)?list:[]; saveState(); }
+function saveDNQ(list){ STATE.dnq = Array.isArray(list)?list:[]; saveState(); }
 
 function pruneDNQ(){
   const cutoff=Date.now()-48*60*60*1000;
@@ -14448,7 +14702,21 @@ function loadScheduleForToday(force) {
     String(today.getDate()).padStart(2,'0');
   // v54: use getScheduleForDate so per-date admin overrides take effect
   const sched = getScheduleForDate(key);
-  if (!sched) { toast('No schedule found for '+key); return false; }
+  if (!sched) {
+    // v60.2: today is past the built-in MAY_SCHEDULE range (or no schedule
+    // has been imported yet). This is NOT an error — buildExpectedToday
+    // still falls back to each person's roster daysOn, so CXR/Exit coverage
+    // populates; only the variable management schedule is missing. Replace
+    // the old alarming "No schedule found for <date>" toast (which read like
+    // a crash on every open) with a calm, actionable, once-per-session nudge
+    // to import the current week. window._noSchedNotified gates it so it
+    // shows once per page load, not on every loadScheduleForToday() call.
+    if (!window._noSchedNotified) {
+      window._noSchedNotified = true;
+      toast('📅 No saved schedule for today — import this week in Admin → Schedule');
+    }
+    return false;
+  }
 
   if (!STATE.shiftMod)      STATE.shiftMod      = {};
   if (!STATE.staffDuty)     STATE.staffDuty     = {};
@@ -15022,30 +15290,27 @@ function saveThresholds() {
 
 
 function resetAndReloadToday() {
-  if (!confirm('This will clear all saved coverage assignments and reload from the May schedule. Continue?')) return;
-  // Clear coverage-related state (keep user prefs like PINs)
-  const keep = ['cmh-admin-pin','cmh-mod-pin','cmh-dnr','cmh-dnq','cmh-exit-fairness-v1'];
-  const toKeep = {};
-  keep.forEach(k => { const v=localStorage.getItem(k); if(v) toKeep[k]=v; });
+  if (!confirm("Clear today's coverage assignments (stations, shift edits, lunches, callouts, manual blocks) and reload shifts from the schedule?\n\nPaste data, checklists, announcements, and fraud lists are NOT affected.")) return;
+  // v60.9: previously did localStorage.removeItem('cmhDailyDriver') — the WRONG
+  // key (state lives under 'cmh-v2-<date>'), so the reset silently did NOTHING
+  // and loadState() just reloaded the same data. A full localStorage wipe would
+  // also be wrong here: this button is coverage-scoped. Clear only the
+  // coverage/assignment fields on STATE, then force-reload shifts from
+  // MAY_SCHEDULE (+ per-date overrides). Edits sync via saveState as usual.
+  ['staffDuty','staffStation','altSchedule','shiftMod','customSplits',
+   'specialBlocks','mgmtBlocks','customLunch','todayOverrides'].forEach(k => { STATE[k] = {}; });
+  STATE.pendingCoverage = null;
+  window._lastRotations = {};
+  saveState();
 
-  // Clear the main state
-  localStorage.removeItem('cmhDailyDriver');
+  // Force-reload today's shifts from the schedule
+  if (typeof loadScheduleForToday === 'function') loadScheduleForToday(true);
 
-  // Restore kept items
-  Object.entries(toKeep).forEach(([k,v]) => localStorage.setItem(k,v));
-
-  // Reinitialize
-  if(typeof loadState==='function') {
-    window.STATE = loadState();
-  }
-
-  // Load today's schedule
-  loadScheduleForToday();
-
-  toast('State reset — today\'s schedule reloaded ✓');
-  showAdminSection('staff');
-  refreshDash();
-  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildSwitchboard === 'function') buildSwitchboard();
+  if (typeof refreshDash === 'function') refreshDash();
+  if (typeof showAdminSection === 'function') showAdminSection('sched');
+  toast('Coverage reset — shifts reloaded from schedule ✓');
 }
 
 
