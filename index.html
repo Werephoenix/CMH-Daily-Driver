@@ -68,6 +68,11 @@
   --green:  #5eead4;  --green2:#064e3b;  --green3:#34d399;
   --amber:  #fbbf24;  --amber2:#1c1200;  --amber3:#d97706;
   --red:    #fca5a5;  --red2:  #2a0606;  --red3:  #dc2626;
+  /* v60.15 — Logical color standard (ported from the D&D app's "color = meaning,
+     never decorative"). Prefer these semantic names so a color means the SAME
+     thing on every screen. ok=good/covered/open · warn=caution/limited ·
+     bad=problem/below-min/closed · info=neutral data (no good/bad meaning). */
+  --ok: var(--green);  --warn: var(--amber);  --bad: var(--red);  --info: var(--acc);
   --purple: #c4b5fd;  --orange:#fb923c;  --teal:  #67e8f9;
   --ff-ui:  'Barlow',sans-serif;
   --ff-mono:'DM Mono',monospace;
@@ -2304,6 +2309,17 @@ Genesis Cochran, 5/14</pre>
       </div>
       <div id="ref-sec-loyalty" style="display:none"><div id="loyalty-content"></div></div>
       <div id="ref-sec-hourly" style="display:none"><div id="hourly-content"></div></div>
+    </div>
+    <!-- v60.15: staff-facing color key — documents the logical-color standard -->
+    <div class="card" style="margin-bottom:8px">
+      <div class="ch">🎨 Color Key</div>
+      <div style="font-size:11px;color:var(--txt3);margin:-2px 0 9px">What the colors mean across the app — the same meaning on every screen.</div>
+      <div style="display:flex;flex-direction:column;gap:7px">
+        <div style="display:flex;align-items:center;gap:9px"><span style="width:14px;height:14px;border-radius:4px;background:var(--ok);flex-shrink:0"></span><span style="font-size:12px;color:var(--txt)"><b style="color:var(--ok)">Green</b> — good · covered · open / permissive</span></div>
+        <div style="display:flex;align-items:center;gap:9px"><span style="width:14px;height:14px;border-radius:4px;background:var(--warn);flex-shrink:0"></span><span style="font-size:12px;color:var(--txt)"><b style="color:var(--warn)">Amber</b> — caution · limited · restricted / watch</span></div>
+        <div style="display:flex;align-items:center;gap:9px"><span style="width:14px;height:14px;border-radius:4px;background:var(--bad);flex-shrink:0"></span><span style="font-size:12px;color:var(--txt)"><b style="color:var(--bad)">Red</b> — problem · below minimum · closed</span></div>
+        <div style="display:flex;align-items:center;gap:9px"><span style="width:14px;height:14px;border-radius:4px;background:var(--info);flex-shrink:0"></span><span style="font-size:12px;color:var(--txt)"><b style="color:var(--info)">Blue</b> — neutral info · plain data (no good/bad meaning)</span></div>
+      </div>
     </div>
   </div>
 
