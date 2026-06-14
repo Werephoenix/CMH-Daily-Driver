@@ -182,6 +182,18 @@ html {
 }
 .nbtn:hover { color: var(--txt2); }
 .nbtn.on { color: var(--acc); border-bottom-color: var(--acc); }
+/* v60.16: active nav tab adopts its section's accent color (matches the page
+   accent strip) so each tab has its own identity — the D&D "each tab feels
+   like itself" cue applied to navigation. Id selectors override .nbtn.on. */
+#tab-opening.on   { color: var(--tab-dashboard); border-bottom-color: var(--tab-dashboard); }
+#tab-paste.on     { color: var(--tab-paste);     border-bottom-color: var(--tab-paste); }
+#tab-board.on     { color: var(--tab-board);     border-bottom-color: var(--tab-board); }
+#tab-coverage.on  { color: var(--tab-coverage);  border-bottom-color: var(--tab-coverage); }
+#tab-checklist.on { color: var(--tab-checklist); border-bottom-color: var(--tab-checklist); }
+#tab-reference.on { color: var(--tab-reference); border-bottom-color: var(--tab-reference); }
+#tab-inventory.on { color: var(--tab-history);   border-bottom-color: var(--tab-history); }
+#tab-history.on   { color: var(--tab-history);   border-bottom-color: var(--tab-history); }
+#tab-admin.on     { color: var(--tab-admin);     border-bottom-color: var(--tab-admin); }
 .ni { font-size: 13px; }
 
 /* Topbar */
