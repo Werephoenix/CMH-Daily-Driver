@@ -129,6 +129,12 @@ html {
   0%, 100% { box-shadow: 0 0 0 1px rgba(220,38,38,.35), 0 6px 22px -6px rgba(220,38,38,.45); }
   50%      { box-shadow: 0 0 0 1px rgba(220,38,38,.60), 0 9px 30px -4px rgba(220,38,38,.85); }
 }
+/* v60.19: amber pulse = time-sensitive (expiring soon). Pulse colour encodes
+   the TYPE of attention — red=urgent, amber=time-sensitive. */
+@keyframes expiring-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(217,119,6,.35), 0 6px 22px -6px rgba(217,119,6,.45); }
+  50%      { box-shadow: 0 0 0 1px rgba(217,119,6,.60), 0 9px 30px -4px rgba(217,119,6,.85); }
+}
 /* Accessibility: reduced-motion disables ALL animation (including inline-set
    ones like the announcement cards) while the static color/contrast/glow
    remains. !important is required to override inline `animation:` declarations. */
@@ -11337,21 +11343,45 @@ function renderDashAnnouncements() {
     important: { col:'#ea580c', bg:'rgba(234,88,12,.12)', icon:'❗', label:'IMPORTANT', glow:'0 4px 18px -8px rgba(234,88,12,.50)', anim:'annc-fade .35s ease' },
     info:      { col:'#2563eb', bg:'rgba(37,99,235,.10)', icon:'📣', label:'NOTICE',    glow:'none', anim:'annc-fade .35s ease' },
   };
+  // v60.19: color-coded pulse by attention TYPE. Red pulse = urgent. Amber
+  // pulse = time-sensitive (expiring within 24h). The pulse colour tells you
+  // WHICH kind of attention is needed; an "⏳ expires in Nh" chip (icon+text,
+  // not colour alone) backs it up. Urgent outranks expiry for the pulse colour.
+  const EXPIRE_SOON_MS = 24 * 60 * 60 * 1000;
+  const AMBER = '#d97706';
+  const now = Date.now();
   let html = '';
   list.forEach(a => {
     const s = prioStyle[a.priority] || prioStyle.info;
+    let expSoon = false, hrsLeft = 0;
+    if (a.expires) {
+      const exp = new Date(a.expires).getTime();
+      if (!isNaN(exp) && exp > now && (exp - now) <= EXPIRE_SOON_MS) {
+        expSoon = true; hrsLeft = Math.max(1, Math.round((exp - now) / 3600000));
+      }
+    }
+    // Pulse tier: urgent (red) wins; else expiring-soon (amber); else the
+    // priority's static glow.
+    let anim = s.anim, glow = s.glow;
+    if (a.priority !== 'urgent' && expSoon) {
+      anim = 'annc-fade .35s ease, expiring-pulse 2.2s ease-in-out .35s infinite';
+      glow = '0 0 0 1px rgba(217,119,6,.40), 0 7px 24px -6px rgba(217,119,6,.70)';
+    }
+    const expChip = expSoon
+      ? `<span style="font-size:9px;font-weight:800;letter-spacing:.06em;color:${AMBER};text-transform:uppercase;margin-left:6px">⏳ expires in ${hrsLeft}h</span>`
+      : '';
     const policyMgr = a.isPolicy && a.mgrName
       ? `<span style="font-size:10px;color:var(--acc);margin-left:6px;font-weight:700">📋 Policy from ${String(a.mgrName).replace(/[<>]/g,'')}</span>`
       : '';
     html += `<div class="annc-card" style="display:flex;align-items:center;gap:10px;
       background:${s.bg};border:1px solid ${s.col}55;border-left:3px solid ${s.col};
-      border-radius:5px;padding:8px 12px;margin-bottom:5px;animation:${s.anim};
-      box-shadow:${s.glow};
+      border-radius:5px;padding:8px 12px;margin-bottom:5px;animation:${anim};
+      box-shadow:${glow};
       cursor:pointer" onclick="showTab('admin');showAdminSection&&showAdminSection('annc')">
       <span style="font-size:18px;flex-shrink:0;line-height:1">${s.icon}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:9px;font-weight:800;letter-spacing:.08em;color:${s.col};
-          text-transform:uppercase;margin-bottom:1px">${s.label}${policyMgr}</div>
+          text-transform:uppercase;margin-bottom:1px">${s.label}${expChip}${policyMgr}</div>
         <div style="font-size:13px;color:var(--text);line-height:1.3">${
           String(a.text).replace(/[<>]/g, ch => ch === '<' ? '&lt;' : '&gt;')
         }</div>
