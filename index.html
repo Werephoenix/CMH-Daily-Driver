@@ -109,8 +109,16 @@ html {
 .mgr-item { animation: annc-fade 0.28s ease-out; }
 /* Soft pulse on the live time indicator dot if present (status band). */
 #status-band-dot { animation: pulse-soft 2.4s infinite; }
+/* v60.14: brief highlight when a dashboard metric's value actually changes
+   (visual update cue, inspired by the D&D app's logical-color feedback). */
+@keyframes flash-update {
+  0%   { background: rgba(116, 179, 255, 0); }
+  20%  { background: rgba(116, 179, 255, 0.22); }
+  100% { background: rgba(116, 179, 255, 0); }
+}
+.just-updated { animation: flash-update 0.9s ease-out; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) {
-  .scr.on, .mgr-item, #status-band-dot { animation: none; }
+  .scr.on, .mgr-item, #status-band-dot, .just-updated { animation: none; }
 }
 
 /* v53: per-tab accent strip at the top of each screen — quick visual
@@ -1001,7 +1009,9 @@ input.autofill{background:rgba(22,163,74,.06);border-color:var(--green3);color:v
 @media(max-width:600px){}
 
 /* ── CARDS ── */
-.card{background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:var(--card-pad,16px);margin-bottom:var(--card-mb,14px)}
+.card{background:var(--bg2);border:1px solid var(--bdr);border-top-color:rgba(255,255,255,.10);border-radius:8px;padding:var(--card-pad,16px);margin-bottom:var(--card-mb,14px);box-shadow:0 10px 24px -14px rgba(0,0,0,.65),0 1px 0 rgba(255,255,255,.04) inset;transition:transform .16s,box-shadow .16s}
+/* v60.14: D&D-style "float" — soft layered shadow + lit top edge + gentle hover lift */
+.card:hover{transform:translateY(-2px);box-shadow:0 16px 30px -14px rgba(0,0,0,.72),0 1px 0 rgba(255,255,255,.06) inset}
 /* v60.13: Compact density — opt-in; default (unset vars) keeps original 16px/14px spacing */
 body.density-compact{--card-pad:10px;--card-mb:8px}
 .ch{font-family:var(--ff-hd);font-size:13px;font-weight:700;letter-spacing:.08em;color:var(--txt2);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -7379,6 +7389,15 @@ function updateStatusBand() {
   ).join('');
 }
 
+// v60.14: brief highlight when a dashboard value changes (visual update cue,
+// inspired by the D&D app). Forced reflow restarts the CSS animation so
+// repeated changes each re-flash. Only called when a value actually differs.
+function flashUpdated(el) {
+  if (!el || !el.classList) return;
+  el.classList.remove('just-updated');
+  void el.offsetWidth;
+  el.classList.add('just-updated');
+}
 function refreshDash() {
   buildDashSchedMini();
   updateSummary(); updateBoardHeader(); updateStatusBand();
@@ -7394,7 +7413,7 @@ function refreshDash() {
   const wlbls = {open:'All Open',core:'Core Only',noncore:'Non-Core',closed:'Closed'};
   const working = Object.values(STATE.staffDuty||{}).filter(v=>v===true).length;
 
-  const s=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v!==undefined&&v!==null&&v!==''?String(v):'—';};
+  const s=(id,v)=>{const e=document.getElementById(id);if(!e)return;const nv=v!==undefined&&v!==null&&v!==''?String(v):'—';if(e.textContent!==nv){e.textContent=nv;flashUpdated(e);}};
   const sh=(id,v)=>{const e=document.getElementById(id);if(e)e.innerHTML=v||'—';};
 
   // Ops bar (Open Mgr / Close Mgr / Yesterday's Sales / OOS / FBO / Inv / Checklist)
