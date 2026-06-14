@@ -122,10 +122,18 @@ html {
   100% { background: rgba(116, 179, 255, 0);    box-shadow: 0 0 0 0 rgba(116, 179, 255, 0); }
 }
 .just-updated { animation: flash-update 0.9s ease-out; border-radius: 4px; }
-/* v60.17: ADHD/accessibility — momentary cue, no looping motion; reduced-motion
-   users keep the static color/contrast but get no animation. */
+/* v60.18: a gentle looping pulse IS allowed for PURPOSEFUL attention — urgent
+   alerts / time-sensitive info (Matt). Important info stays a static glow;
+   routine info stays calm. ~2.2s ease-in-out = a slow breath, not a strobe. */
+@keyframes urgent-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(220,38,38,.35), 0 6px 22px -6px rgba(220,38,38,.45); }
+  50%      { box-shadow: 0 0 0 1px rgba(220,38,38,.60), 0 9px 30px -4px rgba(220,38,38,.85); }
+}
+/* Accessibility: reduced-motion disables ALL animation (including inline-set
+   ones like the announcement cards) while the static color/contrast/glow
+   remains. !important is required to override inline `animation:` declarations. */
 @media (prefers-reduced-motion: reduce) {
-  .scr.on, .mgr-item, #status-band-dot, .just-updated, .annc-card { animation: none; }
+  .scr.on, .mgr-item, #status-band-dot, .just-updated, .annc-card { animation: none !important; }
 }
 
 /* v53: per-tab accent strip at the top of each screen — quick visual
@@ -11325,9 +11333,9 @@ function renderDashAnnouncements() {
   // each carries an icon + an uppercase label. Calm 'info' stays glow-free so
   // the glow itself signals "this matters".
   const prioStyle = {
-    urgent:    { col:'#dc2626', bg:'rgba(220,38,38,.14)', icon:'🚨', label:'URGENT',    glow:'0 0 0 1px rgba(220,38,38,.35), 0 6px 22px -6px rgba(220,38,38,.55)' },
-    important: { col:'#ea580c', bg:'rgba(234,88,12,.12)', icon:'❗', label:'IMPORTANT', glow:'0 4px 18px -8px rgba(234,88,12,.50)' },
-    info:      { col:'#2563eb', bg:'rgba(37,99,235,.10)', icon:'📣', label:'NOTICE',    glow:'none' },
+    urgent:    { col:'#dc2626', bg:'rgba(220,38,38,.14)', icon:'🚨', label:'URGENT',    glow:'0 0 0 1px rgba(220,38,38,.35), 0 6px 22px -6px rgba(220,38,38,.55)', anim:'annc-fade .35s ease, urgent-pulse 2.2s ease-in-out .35s infinite' },
+    important: { col:'#ea580c', bg:'rgba(234,88,12,.12)', icon:'❗', label:'IMPORTANT', glow:'0 4px 18px -8px rgba(234,88,12,.50)', anim:'annc-fade .35s ease' },
+    info:      { col:'#2563eb', bg:'rgba(37,99,235,.10)', icon:'📣', label:'NOTICE',    glow:'none', anim:'annc-fade .35s ease' },
   };
   let html = '';
   list.forEach(a => {
@@ -11337,7 +11345,7 @@ function renderDashAnnouncements() {
       : '';
     html += `<div class="annc-card" style="display:flex;align-items:center;gap:10px;
       background:${s.bg};border:1px solid ${s.col}55;border-left:3px solid ${s.col};
-      border-radius:5px;padding:8px 12px;margin-bottom:5px;animation:annc-fade .35s ease;
+      border-radius:5px;padding:8px 12px;margin-bottom:5px;animation:${s.anim};
       box-shadow:${s.glow};
       cursor:pointer" onclick="showTab('admin');showAdminSection&&showAdminSection('annc')">
       <span style="font-size:18px;flex-shrink:0;line-height:1">${s.icon}</span>
