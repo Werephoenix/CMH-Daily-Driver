@@ -1001,7 +1001,9 @@ input.autofill{background:rgba(22,163,74,.06);border-color:var(--green3);color:v
 @media(max-width:600px){}
 
 /* ── CARDS ── */
-.card{background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:16px;margin-bottom:14px}
+.card{background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:var(--card-pad,16px);margin-bottom:var(--card-mb,14px)}
+/* v60.13: Compact density — opt-in; default (unset vars) keeps original 16px/14px spacing */
+body.density-compact{--card-pad:10px;--card-mb:8px}
 .ch{font-family:var(--ff-hd);font-size:13px;font-weight:700;letter-spacing:.08em;color:var(--txt2);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ch .badge,.badge{font-size:10px;background:var(--bg3);padding:2px 8px;border-radius:10px;color:var(--txt3);font-weight:400;letter-spacing:.02em;text-transform:none;font-family:var(--ff-ui)}
 
@@ -1445,6 +1447,7 @@ button { cursor: pointer; }
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
     <div id="topbar-time" style="font-family:var(--ff-mono);font-size:13px;color:var(--txt2)"></div>
     <div id="topbar-onduty" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(37,99,235,.12);color:var(--acc);display:none"></div>
+    <button id="density-toggle" onclick="toggleDensity()" title="Switch to compact spacing" style="background:none;border:1px solid var(--bdr);color:var(--txt3);border-radius:6px;cursor:pointer;font-size:12px;line-height:1;padding:3px 6px">⊟</button>
     <div id="topbar-shift-badge" class="shift-pill opening">OPENING</div>
   </div>
 </div>
@@ -3194,6 +3197,7 @@ function loadState() {
       s.dnr           = Array.isArray(s.dnr)           ? s.dnr           : [];  // v60.7: fraud / Do-Not-Rent list (now synced)
       s.dnq           = Array.isArray(s.dnq)           ? s.dnq           : [];  // v60.7: Did-Not-Qualify list (now synced, 48h auto-expire)
       s.clReasons     = (s.clReasons && typeof s.clReasons === 'object') ? s.clReasons : {};  // v60.8: {cl-mode: {itemText: reason}} for incomplete-item email validation
+      s.uiDensity     = (s.uiDensity === 'compact') ? 'compact' : 'comfortable';  // v60.13: card spacing preference
       return s;
     }
   } catch(e) {}
@@ -3202,7 +3206,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{},
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable',
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -3214,6 +3218,25 @@ function loadState() {
 // Using window assignment so it's accessible everywhere (browser + Node vm)
 window.STATE = loadState();
 var STATE = window.STATE; // var hoists to script scope for function closures
+
+// v60.13: Dashboard density toggle (comfortable | compact). Purely cosmetic —
+// toggles a body class that overrides two card-spacing CSS vars. Default
+// 'comfortable' leaves the vars unset, so original 16px/14px spacing is exact.
+function applyDensity() {
+  var compact = (typeof STATE !== 'undefined' && STATE && STATE.uiDensity === 'compact');
+  if (document.body) document.body.classList.toggle('density-compact', compact);
+  var btn = document.getElementById('density-toggle');
+  if (btn) {
+    btn.textContent = compact ? '⊞' : '⊟';
+    btn.title = compact ? 'Switch to comfortable spacing' : 'Switch to compact spacing';
+  }
+}
+function toggleDensity() {
+  STATE.uiDensity = (STATE.uiDensity === 'compact') ? 'comfortable' : 'compact';
+  if (typeof saveState === 'function') saveState();
+  applyDensity();
+  if (typeof toast === 'function') toast(STATE.uiDensity === 'compact' ? 'Compact spacing' : 'Comfortable spacing');
+}
 
 // v60.7: one-time migration of legacy DNR/DNQ fraud lists into synced STATE.
 // They used to live in their own device-local localStorage keys
@@ -3279,6 +3302,7 @@ function saveField(key, val) {
 window.onload = function() {
   startClock();
   restoreFields();
+  if (typeof applyDensity === 'function') applyDensity();  // v60.13: apply saved density pref
   // v54: rebuild live rosters from stored admin overrides BEFORE any UI
   // builders run. Without this, admin add/edit/remove changes from prior
   // sessions wouldn't take effect until a save action triggered the rebuild.
