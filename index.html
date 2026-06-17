@@ -5761,14 +5761,27 @@ function parseSection(section) {
   const dateKeys = Object.keys(sched.grid).sort();
   const today = todayKey();
   const previewDates = dateKeys.slice(0, 8);
+  // v60.21: warn about pasted names that matched NO roster person — they're
+  // dropped silently otherwise (misspelling, departed/new staff, or pasted into
+  // the wrong grid). Same idea as the celebrations roster-mismatch prompt.
+  const unmatched = Array.from(new Set(sched.unmatched || []));
+  const unmatchedWarn = unmatched.length
+    ? `<div style="padding:7px 12px;font-size:11px;background:rgba(217,119,6,.12);
+        border-bottom:1px solid var(--amber3);color:var(--amber)">
+        ⚠ <b>${unmatched.length} name${unmatched.length>1?'s':''} not recognized</b>
+        — not added (check spelling, the roster, or that this is the right grid):
+        <b style="color:var(--txt)">${unmatched.map(n=>String(n).replace(/[<>]/g,'')).join(', ')}</b>
+      </div>`
+    : '';
   let ph = `<div style="padding:8px 12px;font-size:11px;color:var(--txt2);
     border-bottom:1px solid var(--bdr)">
-    <b style="color:var(--txt)">${Object.keys(sched.people).length} staff</b> · 
+    <b style="color:var(--txt)">${Object.keys(sched.people).length} staff</b> ·
     <b>${dateKeys.length} days</b> · ${sched.startDate||'?'} → ${sched.endDate||'?'}
     ${dateKeys.includes(today)
       ? ' · <span style="color:var(--green)">✓ Includes today</span>'
       : ' · <span style="color:var(--amber)">⚠ Today not in range</span>'}
   </div>
+  ${unmatchedWarn}
   <div style="overflow-x:auto">
   <table class="month-grid" style="margin:0">
   <tr><th class="mg-name">Name</th>`;
@@ -5896,7 +5909,7 @@ function parseGridSchedule(text, rosterFilter) {
     return parseSimpleFormat(text, rosterFilter);
   }
 
-  const schedule = { dates: dates.filter(d=>d.key), people:{}, grid:{} };
+  const schedule = { dates: dates.filter(d=>d.key), people:{}, grid:{}, unmatched:[] };
 
   dataLines.forEach(line => {
     const cols = splitRow(line);
@@ -5910,7 +5923,15 @@ function parseGridSchedule(text, rosterFilter) {
       return pn===nl || nn===nl || pn.startsWith(nl) ||
              nl===pn.split(' ')[0] || (nl.length>3 && pn.includes(nl));
     });
-    if (!person) return;
+    if (!person) {
+      // v60.21: remember names we couldn't match so the import preview can warn
+      // — otherwise an unrecognized/misspelled name is silently dropped. Skip
+      // header-ish/date-ish rows (start with a digit, or literally "name").
+      if (nameRaw && !/^\d/.test(nameRaw) && nameRaw.toLowerCase() !== 'name') {
+        schedule.unmatched.push(nameRaw);
+      }
+      return;
+    }
 
     const pid = person.name.replace(/\s/g,'_');
     schedule.people[pid] = { name:person.name, nick:person.nick||person.name.split(' ')[0], role:person.role };
