@@ -2745,7 +2745,7 @@ var ROSTER_MGMT = [
   {id:'josh',    name:'Joshua (Josh) Osei',      nick:'Josh',    role:'MT',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
    notes:'MT. Full name: Joshua Osei. Typical shifts: 6A-4P / 10A-8P / 12P-10P / 4P-C.'},
-  {id:'brittney',name:'Brittney Francis',        nick:'Brittney',role:'MT',
+  {id:'brittney',name:'Britney Francis',         nick:'Britney',role:'MT',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
    notes:'MT. Typical shifts: 6A-4P / 8A-6P / 10A-8P / 12P-10P / 4P-C.'},
   {id:'lauren',  name:'Lauren Kretschman',       nick:'Lauren',  role:'MT',
@@ -3248,6 +3248,7 @@ function loadState() {
       s.dnq           = Array.isArray(s.dnq)           ? s.dnq           : [];  // v60.7: Did-Not-Qualify list (now synced, 48h auto-expire)
       s.clReasons     = (s.clReasons && typeof s.clReasons === 'object') ? s.clReasons : {};  // v60.8: {cl-mode: {itemText: reason}} for incomplete-item email validation
       s.uiDensity     = (s.uiDensity === 'compact') ? 'compact' : 'comfortable';  // v60.13: card spacing preference
+      s.nameAliases   = (s.nameAliases && typeof s.nameAliases === 'object') ? s.nameAliases : {};  // v60.23: confirmed name→roster mappings for schedule import
       return s;
     }
   } catch(e) {}
@@ -3256,7 +3257,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable',
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{},
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -5761,14 +5762,29 @@ function parseSection(section) {
   // dropped silently otherwise (misspelling, departed/new staff, or pasted into
   // the wrong grid). Same idea as the celebrations roster-mismatch prompt.
   const unmatched = Array.from(new Set(sched.unmatched || []));
-  const unmatchedWarn = unmatched.length
-    ? `<div style="padding:7px 12px;font-size:11px;background:rgba(217,119,6,.12);
-        border-bottom:1px solid var(--amber3);color:var(--amber)">
-        ⚠ <b>${unmatched.length} name${unmatched.length>1?'s':''} not recognized</b>
-        — not added (check spelling, the roster, or that this is the right grid):
-        <b style="color:var(--txt)">${unmatched.map(n=>String(n).replace(/[<>]/g,'')).join(', ')}</b>
-      </div>`
-    : '';
+  let unmatchedWarn = '';
+  if (unmatched.length) {
+    const filtered = [...ROSTER_CXR, ...ROSTER_MGMT].filter(rosterFilter);
+    const escH = s => String(s).replace(/[<>&"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    const escA = s => String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    const rows = unmatched.map(nm => {
+      const sug = suggestRosterMatch(nm, filtered);
+      if (sug) {
+        const short = sug.person.nick || sug.person.name.split(' ')[0];
+        return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:5px 0">
+          <span><b style="color:var(--txt)">${escH(nm)}</b> — did you mean
+          <b style="color:var(--green)">${escH(sug.person.name)}</b>?</span>
+          <button class="btn btn-g btn-sm" onclick="confirmNameAlias('${section}','${escA(nm)}','${escA(sug.person.name)}')">✓ Yes, it's ${escH(short)}</button>
+        </div>`;
+      }
+      return `<div style="margin:5px 0"><b style="color:var(--txt)">${escH(nm)}</b> — not recognized (no close match). Fix the spelling, or add them in Admin → Staff Roster.</div>`;
+    }).join('');
+    unmatchedWarn = `<div style="padding:8px 12px;font-size:11px;background:rgba(217,119,6,.12);
+      border-bottom:1px solid var(--amber3);color:var(--amber)">
+      ⚠ <b>${unmatched.length} name${unmatched.length>1?'s':''} not matched</b> — won't be added until resolved:
+      ${rows}
+    </div>`;
+  }
   let ph = `<div style="padding:8px 12px;font-size:11px;color:var(--txt2);
     border-bottom:1px solid var(--bdr)">
     <b style="color:var(--txt)">${Object.keys(sched.people).length} staff</b> ·
@@ -5912,7 +5928,12 @@ function parseGridSchedule(text, rosterFilter) {
     if (!cols[0]) return;
     const nameRaw = cols[0];
 
+    // v60.23: a confirmed alias (STATE.nameAliases) wins — lets a remembered
+    // misspelling map straight to the right person.
+    const aliasTarget = (typeof STATE!=='undefined' && STATE && STATE.nameAliases)
+      ? STATE.nameAliases[nameRaw.toLowerCase()] : null;
     const person = allRoster.find(p => {
+      if (aliasTarget && p.name === aliasTarget) return true;
       const pn = p.name.toLowerCase();
       const nn = (p.nick||'').toLowerCase();
       const nl = nameRaw.toLowerCase();
@@ -5944,6 +5965,44 @@ function parseGridSchedule(text, rosterFilter) {
   schedule.startDate = validKeys[0]    || null;
   schedule.endDate   = validKeys[validKeys.length-1] || null;
   return schedule;
+}
+
+// v60.23: "did you mean?" support — fuzzy-match an unrecognized pasted name to
+// the closest roster person, and remember a confirmed mapping so it matches now
+// and on every future import.
+function levenshtein(a, b) {
+  a = String(a||''); b = String(b||'');
+  const m = a.length, n = b.length;
+  if (!m) return n; if (!n) return m;
+  let prev = Array.from({length:n+1}, (_,i)=>i);
+  for (let i=1;i<=m;i++) {
+    const cur = [i];
+    for (let j=1;j<=n;j++) {
+      const cost = a[i-1]===b[j-1] ? 0 : 1;
+      cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1]+cost);
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+function suggestRosterMatch(name, roster) {
+  const nl = String(name||'').trim().toLowerCase();
+  if (!nl) return null;
+  let best = null, bestD = 99;
+  (roster||[]).forEach(p => {
+    if (!p || !p.name) return;
+    [ (p.nick||'').toLowerCase(), p.name.toLowerCase().split(' ')[0], p.name.toLowerCase() ]
+      .forEach(c => { if (c) { const d = levenshtein(nl, c); if (d < bestD) { bestD = d; best = p; } } });
+  });
+  const tol = Math.max(1, Math.min(3, Math.floor(nl.length * 0.34)));
+  return (best && bestD <= tol) ? { person: best, dist: bestD } : null;
+}
+function confirmNameAlias(section, typed, rosterName) {
+  if (!STATE.nameAliases) STATE.nameAliases = {};
+  STATE.nameAliases[String(typed).trim().toLowerCase()] = rosterName;
+  if (typeof saveState === 'function') saveState();
+  if (typeof toast === 'function') toast('"' + typed + '" → ' + rosterName + ' (remembered)');
+  parseSection(section);   // re-parse: alias now matches → preview refreshes
 }
 
 // Patched parseSimpleFormat to accept roster filter
