@@ -2584,6 +2584,7 @@ var ROSTER_CXR = [
   {id:'laura',    name:'Laura Gonzalez',          nick:'Laura',   role:'CXR',
    shiftCode:'530A-230P/5P-1A', shiftStart:5.5, shiftEnd:14.5,
    daysOn:[0,2,3,4,6],  // Sun/Tue/Wed/Thu/Sat — confirmed ✓ marks
+   dayShifts:{0:'530A-230P', 6:'530A-230P', 2:'5P-1A', 3:'5P-1A', 4:'5P-1A'},  // v60.25: AM Sun/Sat, PM Tue/Wed/Thu
    pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'DUAL SHIFT: AM 5:30a-2:30p (Sun/Sat). Evening 5:00p-1:00a (Tue/Wed/Thu). Two patterns.'},
@@ -5031,8 +5032,17 @@ function getPersonShiftToday(person) {
   if (!shiftCode && cxrSched && cxrSched.grid[today]) {
     shiftCode = cxrSched.grid[today][pid];
   }
-  if (!shiftCode && person.shiftCode && person.shiftCode !== 'varies') {
-    shiftCode = person.shiftCode;
+  // v60.25: day-aware roster fallback for split/odd-shift people. A person with
+  // different shifts on different days defines a `dayShifts` map (day-of-week →
+  // code), e.g. Laura: AM some days, PM others. A dual `shiftCode` like
+  // "530A-230P/5P-1A" is a human SUMMARY and must NOT be parsed directly.
+  if (!shiftCode) {
+    const dowNow = new Date().getDay();
+    if (person.dayShifts && person.dayShifts[dowNow]) {
+      shiftCode = person.dayShifts[dowNow];
+    } else if (person.shiftCode && person.shiftCode !== 'varies' && person.shiftCode.indexOf('/') === -1) {
+      shiftCode = person.shiftCode;
+    }
   }
 
   if (!shiftCode || shiftCode === 'OFF') return null;
@@ -9963,7 +9973,18 @@ function buildExpectedToday() {
     if (!person.daysOn.includes(dow)) return;
     if (!person || !person.role) return;
     if (!person.shiftStart && !person.shiftCode) return;
-    expected[pid] = { person, shift: person.shiftCode || 'varies', source:'roster' };
+    // v60.25: resolve the per-day shift for split/odd-shift people (dayShifts).
+    // A dual "A/B" shiftCode is a summary — only parse a concrete single code,
+    // and override the person's start/end so coverage uses the RIGHT times today.
+    const dayCode = (person.dayShifts && person.dayShifts[dow])
+      ? person.dayShifts[dow]
+      : (person.shiftCode && person.shiftCode.indexOf('/') === -1 ? person.shiftCode : null);
+    let pw = person;
+    if (dayCode && dayCode !== 'varies' && typeof parseShiftToTimes === 'function') {
+      const t = parseShiftToTimes(dayCode);
+      if (t) pw = Object.assign({}, person, t);
+    }
+    expected[pid] = { person: pw, shift: dayCode || person.shiftCode || 'varies', source:'roster' };
   });
 
   return expected;
