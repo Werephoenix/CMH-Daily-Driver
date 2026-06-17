@@ -6526,15 +6526,28 @@ function autoLoadFromExpected(expectedToday, dow) {
       if(b.lastWasExit&&!a.lastWasExit)return -1;
       return a.shiftStart-b.shiftStart;
     });
-  cxrs.forEach((cxr,rank)=>{
-    if(STATE.staffStation[cxr.pid]) return; // already set (exit agent)
-    // First exitMax CXRs in sorted order go to Exit, rest to Counter
-    // Exception: if someone has explicit counter pref, keep at counter unless we're short
-    // forceCounter only for manager-set preference, not roster default
-    const managerSetPref = (STATE.stationPref||{})[cxr.pid];
-    const forceCounter = managerSetPref==='counter' && rank >= exitMin;
-    STATE.staffStation[cxr.pid] = (!forceCounter && rank < exitMax) ? 'Exit Booth' : 'Counter';
+  // v60.24: cover the exit NEED, balance the rest at counter, and SPREAD exit
+  // duty across start-times so people who start together don't all land at exit
+  // at once (fixes "3 people who start at 8:30 all sent to exit"). Preferences
+  // still win: exit-pref take exit first; counter-pref stay at counter.
+  let exitFilled = 0;
+  const wantsExit    = cxrs.filter(c => c.pref==='exit' || c.rosterPref==='exit' || c.overridePref==='exit');
+  const wantsCounter = cxrs.filter(c => wantsExit.indexOf(c)===-1 && (c.pref==='counter' || c.overridePref==='counter'));
+  wantsExit.forEach(c => {
+    if (STATE.staffStation[c.pid]) return;
+    if (exitFilled < exitMax) { STATE.staffStation[c.pid] = 'Exit Booth'; exitFilled++; }
+    else STATE.staffStation[c.pid] = 'Counter';
   });
+  wantsCounter.forEach(c => { if (!STATE.staffStation[c.pid]) STATE.staffStation[c.pid] = 'Counter'; });
+  // No-preference CXRs: spread the remaining exit slots EVENLY across the
+  // start-time-sorted order, so same-start people are split rather than clumped.
+  const noPref  = cxrs.filter(c => !STATE.staffStation[c.pid]);
+  const slots   = Math.max(0, exitMax - exitFilled);
+  const exitIdx = new Set();
+  for (let k = 0; k < slots && noPref.length > 0; k++) {
+    exitIdx.add(Math.min(noPref.length - 1, Math.round((k + 0.5) * noPref.length / slots)));
+  }
+  noPref.forEach((c, idx) => { STATE.staffStation[c.pid] = exitIdx.has(idx) ? 'Exit Booth' : 'Counter'; });
   if(typeof buildSmartRotation==='function'){try{const rot=buildSmartRotation();window._lastRotations={};if(rot&&rot.rotations)rot.rotations.forEach(r=>{window._lastRotations[r.pid]=r;});}catch(err){}}
   saveState();
 }
