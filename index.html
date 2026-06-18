@@ -6158,7 +6158,7 @@ function buildSwitchboard() {
             ${pref==='counter'?'<span style="font-size:9px;color:var(--acc)"> 🟦</span>':pref==='exit'?'<span style="font-size:9px;color:var(--green)"> 🟩</span>':''}
           ${(()=>{const sg=typeof getPatternSuggestion==='function'?getPatternSuggestion(pid):null;return sg&&pref==='none'?`<span style="font-size:8px;background:rgba(217,119,6,.1);color:var(--amber);border-radius:3px;padding:1px 4px;margin-left:3px">~${sg.pref==='exit'?'🟩':'🟦'}</span>`:'';})()}
           </div>
-          <div style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono)">${timeDisp}</div>
+          <div onclick="showShiftModModal('${pid}','${(nick||'').replace(/'/g,'')}')" title="Adjust work time — slide or type" style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono);cursor:pointer;border-bottom:1px dotted var(--bdr2);display:inline-block">⏰ ${timeDisp}</div>
         </div>
         <button onclick="toggleCallout('${pid}');buildSwitchboard()"
           style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:4px;
@@ -6295,7 +6295,7 @@ function buildSwitchboard() {
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <div style="flex:1;min-width:0">
           <div style="font-size:13px;font-weight:700;color:var(--txt)">${nick}</div>
-          <div style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono)">${timeDisp}</div>
+          <div onclick="showShiftModModal('${pid}','${(nick||'').replace(/'/g,'')}')" title="Adjust work time — slide or type" style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono);cursor:pointer;border-bottom:1px dotted var(--bdr2);display:inline-block">⏰ ${timeDisp}</div>
         </div>
         <button onclick="toggleCallout('${pid}');buildSwitchboard()"
           style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:4px;
@@ -9693,7 +9693,14 @@ const _origBuildStaffSection = typeof buildStaffSection === 'function' ? buildSt
 // ═══════════════════════════════════════════════════════════════════════
 
 function showShiftModModal(pid, personName) {
-  const person   = ROSTER_CXR.find(p => p.name.replace(/\s/g,'_') === pid);
+  // v60.26: works for anyone on the board, not just CXRs.
+  const _allR = [
+    ...(typeof ROSTER_CXR!=='undefined'?ROSTER_CXR:[]),
+    ...(typeof ROSTER_MGMT!=='undefined'?ROSTER_MGMT:[]),
+    ...(typeof ROSTER_EXIT!=='undefined'?ROSTER_EXIT:[]),
+    ...(typeof ROSTER_RETURNS!=='undefined'?ROSTER_RETURNS:[]),
+  ];
+  const person   = _allR.find(p => p && p.name && p.name.replace(/\s/g,'_') === pid);
   const baseStart = person ? person.shiftStart : null;
   const baseEnd   = person ? person.shiftEnd   : null;
   const currentMod = STATE.shiftMod && STATE.shiftMod[pid];
@@ -9735,15 +9742,31 @@ function showShiftModModal(pid, personName) {
     </div>`;
   }).join('');
 
-  const body = `
-    <p style="font-size:12px;color:var(--txt3);margin-bottom:14px">
-      Select a time modification for ${personName} today only. 
-      Resets at start of next day. Also affects their rotation block timing.
-    </p>
-    ${optHtml}
-    <div style="margin-top:10px;padding:10px;background:var(--bg3);border-radius:5px;font-size:11px;color:var(--txt3)">
-      💡 Custom time? Use the Schedule → Load Schedule paste zone to update the stored schedule.
+  // v60.26: exact "slide or type" start/end control (Matt). Defaults to the
+  // person's current modified or scheduled hours; overnight ends (>24) are fine.
+  const _mod = (STATE.shiftMod||{})[pid];
+  const curStart = (_mod && _mod.start!=null) ? _mod.start : (baseStart!=null ? baseStart : 8);
+  const curEnd   = (_mod && _mod.end!=null)   ? _mod.end   : (baseEnd!=null   ? baseEnd   : 16);
+  const inRow = (w,cur,lo,hi) => `<div style="display:flex;align-items:center;gap:8px;margin-bottom:9px">
+      <span style="font-size:11px;color:var(--txt3);width:30px">${w==='start'?'In':'Out'}</span>
+      <input id="sm-${w}-range" type="range" min="${lo}" max="${hi}" step="0.25" value="${cur}" oninput="smOnRange('${w}')" style="flex:1">
+      <input id="sm-${w}-txt" type="text" value="${smFmtH(cur)}" onchange="smOnText('${w}')"
+        style="width:62px;text-align:center;font-size:12px;padding:4px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt)">
     </div>`;
+  const customHtml = `<div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;padding:12px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:800;color:var(--txt);margin-bottom:10px">⏰ Set exact time — slide or type</div>
+      ${inRow('start',curStart,3,23.75)}
+      ${inRow('end',curEnd,4,27)}
+      <button class="btn btn-g btn-sm" style="width:100%" onclick="applyCustomShiftMod('${pid}')">Apply this time</button>
+      <div style="font-size:10px;color:var(--txt3);margin-top:7px">Type like “5:30p”, “530a”, or “17”. Applies today only; resets tomorrow.</div>
+    </div>`;
+  const body = `
+    <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
+      Adjust ${personName}'s hours for today — came in early/late, leaving early/late.
+    </p>
+    ${customHtml}
+    <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Or a quick preset</div>
+    ${optHtml}`;
 
   openModal('⏰ Adjust Shift — ' + personName, body);
 }
@@ -9780,6 +9803,56 @@ function applyShiftMod(pid, presetIdx) {
   buildStaffGrid();
   buildCoverageUI();
   toast('Shift modified ✓');
+}
+
+// v60.26: "slide or type" exact-time helpers for the Adjust Shift modal.
+function smFmtH(h) {
+  if (h == null || isNaN(h)) return '—';
+  let hh = ((h % 24) + 24) % 24, hr = Math.floor(hh), mn = Math.round((hh - hr) * 60);
+  if (mn === 60) { hr = (hr + 1) % 24; mn = 0; }
+  const ap = hr >= 12 ? 'p' : 'a', d = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
+  return d + (mn ? ':' + String(mn).padStart(2, '0') : '') + ap;
+}
+function smParseTime(s) {
+  if (s == null) return null;
+  s = String(s).trim().toLowerCase().replace(/\s/g, '');
+  if (!s) return null;
+  if (/^\d{1,2}(\.\d+)?$/.test(s)) { const n = parseFloat(s); return (n >= 0 && n <= 27) ? n : null; }
+  const m = s.match(/^(\d{1,2})(?::?(\d{2}))?(a|p)?$/);
+  if (!m) return null;
+  const hr = parseInt(m[1]), mn = m[2] ? parseInt(m[2]) : 0, ap = m[3];
+  if (mn >= 60 || hr > 23) return null;
+  let h = hr + mn / 60;
+  if (ap === 'p' && hr < 12) h += 12;
+  if (ap === 'a' && hr === 12) h = mn / 60;
+  return (h >= 0 && h <= 27) ? h : null;
+}
+function smOnRange(which) {
+  const r = document.getElementById('sm-' + which + '-range');
+  const t = document.getElementById('sm-' + which + '-txt');
+  if (r && t) t.value = smFmtH(parseFloat(r.value));
+}
+function smOnText(which) {
+  const t = document.getElementById('sm-' + which + '-txt');
+  const v = smParseTime(t && t.value);
+  if (v == null) return;
+  const r = document.getElementById('sm-' + which + '-range');
+  if (r) r.value = v;
+}
+function applyCustomShiftMod(pid) {
+  const rs = document.getElementById('sm-start-range'), re = document.getElementById('sm-end-range');
+  if (!rs || !re) return;
+  let sv = parseFloat(rs.value), ev = parseFloat(re.value);
+  if (ev <= sv) ev += 24;  // crosses midnight → overnight hours
+  if (!STATE.shiftMod) STATE.shiftMod = {};
+  STATE.shiftMod[pid] = { start: sv, end: ev, reason: 'custom', display: smFmtH(sv) + '–' + smFmtH(ev) + ' (set)' };
+  saveState();
+  if (typeof closeModal === 'function') closeModal();
+  if (typeof buildStaffGrid === 'function') buildStaffGrid();
+  if (typeof buildCoverageUI === 'function') buildCoverageUI();
+  if (typeof buildSwitchboard === 'function') buildSwitchboard();
+  if (typeof refreshDash === 'function') refreshDash();
+  if (typeof toast === 'function') toast('Shift set: ' + smFmtH(sv) + '–' + smFmtH(ev));
 }
 
 // ═══════════════════════════════════════════════════════════════════════
