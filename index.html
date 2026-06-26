@@ -6558,13 +6558,17 @@ function autoLoadFromExpected(expectedToday, dow) {
   wantsCounter.forEach(c => { if (!STATE.staffStation[c.pid]) STATE.staffStation[c.pid] = 'Counter'; });
   // No-preference CXRs: spread the remaining exit slots EVENLY across the
   // start-time-sorted order, so same-start people are split rather than clumped.
-  const noPref  = cxrs.filter(c => !STATE.staffStation[c.pid]);
-  const slots   = Math.max(0, exitMax - exitFilled);
-  const exitIdx = new Set();
-  for (let k = 0; k < slots && noPref.length > 0; k++) {
-    exitIdx.add(Math.min(noPref.length - 1, Math.round((k + 0.5) * noPref.length / slots)));
-  }
-  noPref.forEach((c, idx) => { STATE.staffStation[c.pid] = exitIdx.has(idx) ? 'Exit Booth' : 'Counter'; });
+  const noPref = cxrs.filter(c => !STATE.staffStation[c.pid]);
+  const slots  = Math.max(0, exitMax - exitFilled);
+  // v60.29: FAIRNESS — give exit to the CXRs with the LEAST exit time this week,
+  // so exit/counter evens out over time. Tiebreak by start time (spreads
+  // same-fairness people across the day, keeping the v60.24 anti-clumping).
+  // Day-over-day this rotates naturally: whoever does exit today gains hours →
+  // counter tomorrow.
+  const _fair = (typeof getExitFairnessData === 'function') ? getExitFairnessData() : {};
+  const _fh = pid => (typeof exitHoursTotal === 'function') ? exitHoursTotal(_fair, pid) : (_fair[pid] || 0);
+  noPref.sort((a, b) => (_fh(a.pid) - _fh(b.pid)) || ((a.shiftStart||99) - (b.shiftStart||99)));
+  noPref.forEach((c, idx) => { STATE.staffStation[c.pid] = idx < slots ? 'Exit Booth' : 'Counter'; });
   if(typeof buildSmartRotation==='function'){try{const rot=buildSmartRotation();window._lastRotations={};if(rot&&rot.rotations)rot.rotations.forEach(r=>{window._lastRotations[r.pid]=r;});}catch(err){}}
   saveState();
 }
@@ -8859,11 +8863,21 @@ function getWeekKey() {
   return monday.toISOString().slice(0,10);
 }
 
+// v60.29: record per-DAY (idempotent) so re-rendering the panel can no longer
+// inflate the weekly total. Weekly total = sum of distinct days (exitHoursTotal).
 function recordExitTime(personId, hours) {
   const weekKey = 'cmh-exit-fairness-' + getWeekKey();
   const data = getExitFairnessData();
-  data[personId] = (data[personId] || 0) + hours;
+  const dk = (typeof todayKey === 'function') ? todayKey() : new Date().toISOString().slice(0,10);
+  if (typeof data[personId] !== 'object' || data[personId] === null) data[personId] = {};
+  data[personId][dk] = hours;  // overwrite today's entry — no double-counting
   try { localStorage.setItem(weekKey, JSON.stringify(data)); } catch(e) {}
+}
+function exitHoursTotal(data, pid) {
+  const v = (data || {})[pid];
+  if (v == null) return 0;
+  if (typeof v === 'number') return v;            // legacy flat format
+  return Object.values(v).reduce((s, h) => s + (Number(h) || 0), 0);
 }
 
 function buildExitFairnessPanel() {
@@ -8881,7 +8895,7 @@ function buildExitFairnessPanel() {
 
   const allData = getExitFairnessData();
   const allCXR = ROSTER_CXR.filter(p => p.role === 'CXR');
-  const maxHours = Math.max(...allCXR.map(p => allData[p.name.replace(/\s/g,'_')] || 0), 1);
+  const maxHours = Math.max(...allCXR.map(p => exitHoursTotal(allData, p.name.replace(/\s/g,'_'))), 1);
 
   return `<div class="card" style="margin-top:10px">
     <div class="ch">⚖️ Exit Fairness — This Week <span class="sub">Auto-tracked from rotation blocks</span></div>
@@ -8889,9 +8903,9 @@ function buildExitFairnessPanel() {
       Goal is equal exit hours per CXR. Lower bar = less exit time this week = prioritize for exit next.
     </p>
     <div style="display:flex;flex-direction:column;gap:4px">
-      ${allCXR.sort((a,b) => (allData[a.name.replace(/\s/g,'_')]||0) - (allData[b.name.replace(/\s/g,'_')]||0)).map(p => {
+      ${allCXR.sort((a,b) => exitHoursTotal(allData, a.name.replace(/\s/g,'_')) - exitHoursTotal(allData, b.name.replace(/\s/g,'_'))).map(p => {
         const pid = p.name.replace(/\s/g,'_');
-        const hrs = allData[pid] || 0;
+        const hrs = exitHoursTotal(allData, pid);
         const pct = Math.min(100, hrs / maxHours * 100);
         const isWorking = STATE.staffDuty[pid] === true;
         return `<div style="display:flex;align-items:center;gap:8px;opacity:${isWorking?1:0.5}">
