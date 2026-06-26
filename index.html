@@ -12347,8 +12347,9 @@ function buildStationView() {
 
   function fmtH(h) {
     if (h == null) return '—';
-    const hr = Math.floor(h), mn = Math.round((h - hr) * 60);
-    const ap = h >= 12 ? 'p' : 'a', d = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
+    const hh = ((h % 24) + 24) % 24;  // v60.31: wrap overnight (25 → 1a, not 13p)
+    const hr = Math.floor(hh), mn = Math.round((hh - hr) * 60);
+    const ap = hr >= 12 ? 'p' : 'a', d = hr > 12 ? hr - 12 : hr === 0 ? 12 : hr;
     return d + (mn ? ':' + String(mn).padStart(2, '0') : '') + ap;
   }
 
