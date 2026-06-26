@@ -5121,8 +5121,15 @@ function buildSmartRotation() {
     } else if (person.role === 'RETURNS') {
       return; // Returns agents never rotate — skip entirely
     } else {
-      // Determine starting station: from staffStation override or fairness logic
-      let startStation = 'counter'; // CXRs default counter; altPos handles rotation
+      // v60.28: start the rotation at the person's ASSIGNED station
+      // (STATE.staffStation, balanced/de-clumped by autoLoadFromExpected) so the
+      // rotation blocks AGREE with the board, and exit coverage stays steady all
+      // day — exit-assigned start exit then rotate to counter; counter-assigned
+      // the reverse. Reconciles the two previously-disconnected station systems.
+      // (The exitGap loop below is now superseded — staffStation already did the
+      // balancing — and stays skipped because startStation is always set.)
+      const assignedStn = (STATE.staffStation || {})[pid];
+      const startStation = assignedStn === 'Exit Booth' ? 'exit' : 'counter';
       workingCXRs.push({ ...person, shift, startStation, pid });
     }
   });
