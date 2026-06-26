@@ -12432,24 +12432,47 @@ function buildStationView() {
 
   let html = coverageBar();
 
+  // v60.30: visual time BARS (slider-style) per person on a shared 6a–1a axis,
+  // grouped by station, so you can SEE coverage at a glance. Each bar is
+  // clickable → opens the hour/lunch slider adjuster.
+  const AX0 = 6, AX1 = 25, SPAN = AX1 - AX0;
+  const nowPct = Math.max(0, Math.min(100, (nowH - AX0) / SPAN * 100));
+  const axisRow = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <div style="width:78px;flex-shrink:0"></div>
+      <div style="flex:1;position:relative;height:11px">
+        ${[6,9,12,15,18,21,24].map(h=>`<span style="position:absolute;left:${(h-AX0)/SPAN*100}%;transform:translateX(-50%);font-size:8px;color:var(--txt3)">${hLbl(h)}</span>`).join('')}
+      </div>
+    </div>`;
+  const barFor = (p, color) => {
+    const nick = p.person.nick || p.person.name.split(' ')[0];
+    const roleTag = ['ARM','BRM','ABRM','MT'].includes(p.person.role) ? ` <span style="font-size:8px;color:var(--acc)">${p.person.role}</span>` : '';
+    const mod = (STATE.shiftMod||{})[p.pid];
+    const sH = mod ? mod.start : (p.person.shiftStart!=null ? p.person.shiftStart : AX0);
+    const eH = mod ? mod.end   : (p.person.shiftEnd!=null   ? p.person.shiftEnd   : AX0);
+    const L = Math.max(0, Math.min(100, (sH-AX0)/SPAN*100));
+    const R = Math.max(0, Math.min(100, (eH-AX0)/SPAN*100));
+    const W = Math.max(3, R - L);
+    return `<div onclick="showShiftModModal('${p.pid}','${nick.replace(/'/g,'')}')" title="Click to adjust hours / lunch" style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer">
+        <div style="width:78px;flex-shrink:0;font-size:11px;font-weight:700;color:var(--txt);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nick}${roleTag}</div>
+        <div style="flex:1;position:relative;height:18px;background:var(--bg);border:1px solid var(--bdr);border-radius:9px;overflow:hidden">
+          <div style="position:absolute;left:${L}%;width:${W}%;top:2px;bottom:2px;background:${color};border-radius:7px;display:flex;align-items:center;padding:0 6px">
+            <span style="font-size:9px;color:#fff;font-weight:700;font-family:var(--ff-mono);white-space:nowrap">${p.timeStr}</span>
+          </div>
+          <div style="position:absolute;left:${nowPct}%;top:0;bottom:0;width:2px;background:var(--red);opacity:.85"></div>
+        </div>
+      </div>`;
+  };
+
+  html += axisRow;
   Object.entries(groups).forEach(([key, g]) => {
     if (!g.items.length) return;
     html += `<div style="margin-bottom:10px">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
-        color:${g.color};padding:5px 0;border-bottom:1px solid var(--bdr);margin-bottom:6px">
+        color:${g.color};padding:5px 0;border-bottom:1px solid var(--bdr);margin-bottom:4px">
         ${g.label} <span style="font-weight:400;color:var(--txt3)">(${g.items.length})</span>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px">`;
-    g.items.forEach(p => {
-      const nick = p.person.nick || p.person.name.split(' ')[0];
-      const roleTag = ['ARM','BRM','ABRM','MT'].includes(p.person.role) ? `<span style="font-size:9px;color:var(--acc)">${p.person.role}</span>` : '';
-      html += `<div style="padding:8px 10px;border:1px solid var(--bdr);border-left:3px solid ${g.color};
-        border-radius:5px;background:var(--bg3)">
-        <div style="font-size:13px;font-weight:700;color:var(--txt)">${nick} ${roleTag}</div>
-        <div style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono)">${p.timeStr}</div>
-      </div>`;
-    });
-    html += '</div></div>';
+      ${g.items.map(p => barFor(p, g.color)).join('')}
+    </div>`;
   });
 
   // Callouts
