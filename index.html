@@ -9760,11 +9760,31 @@ function showShiftModModal(pid, personName) {
       <button class="btn btn-g btn-sm" style="width:100%" onclick="applyCustomShiftMod('${pid}')">Apply this time</button>
       <div style="font-size:10px;color:var(--txt3);margin-top:7px">Type like “5:30p”, “530a”, or “17”. Applies today only; resets tomorrow.</div>
     </div>`;
+  // v60.27: lunch slider — move this person's lunch earlier/later (STATE.customLunch).
+  const lunchHrs = (typeof ROTATION!=='undefined' && ROTATION.lunchHours) ? ROTATION.lunchHours : 0.5;
+  const _cl = (STATE.customLunch||{})[pid];
+  const sugLunch = (curStart + curEnd)/2 - lunchHrs/2;
+  const lunchVal = (typeof _cl==='number') ? _cl : sugLunch;
+  const lMin = curStart + 0.5, lMax = curEnd - lunchHrs - 0.5;
+  const lunchHtml = (curEnd - curStart) > (lunchHrs + 1.5)
+    ? `<div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;padding:12px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:12px;font-weight:800;color:var(--txt)">🍽 Lunch — slide to move</span>
+          <span id="sm-lunch-lbl" style="font-size:11px;color:var(--acc);font-weight:700">${smFmtH(lunchVal)}–${smFmtH(lunchVal+lunchHrs)}</span>
+        </div>
+        <input id="sm-lunch-range" type="range" min="${lMin}" max="${lMax}" step="0.25" value="${lunchVal}" oninput="smOnLunchRange(${lunchHrs})" style="width:100%">
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn btn-g btn-sm" style="flex:1" onclick="applyLunch('${pid}')">Apply lunch</button>
+          <button class="btn btn-gh btn-sm" onclick="resetLunch('${pid}')">Auto</button>
+        </div>
+      </div>`
+    : '';
   const body = `
     <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
       Adjust ${personName}'s hours for today — came in early/late, leaving early/late.
     </p>
     ${customHtml}
+    ${lunchHtml}
     <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Or a quick preset</div>
     ${optHtml}`;
 
@@ -9853,6 +9873,31 @@ function applyCustomShiftMod(pid) {
   if (typeof buildSwitchboard === 'function') buildSwitchboard();
   if (typeof refreshDash === 'function') refreshDash();
   if (typeof toast === 'function') toast('Shift set: ' + smFmtH(sv) + '–' + smFmtH(ev));
+}
+
+// v60.27: lunch slider helpers — move a person's lunch (STATE.customLunch[pid]).
+function smOnLunchRange(lunchHrs) {
+  const r = document.getElementById('sm-lunch-range'), lbl = document.getElementById('sm-lunch-lbl');
+  if (r && lbl) { const v = parseFloat(r.value); lbl.textContent = smFmtH(v) + '–' + smFmtH(v + (lunchHrs || 0.5)); }
+}
+function applyLunch(pid) {
+  const r = document.getElementById('sm-lunch-range');
+  if (!r) return;
+  if (!STATE.customLunch) STATE.customLunch = {};
+  STATE.customLunch[pid] = parseFloat(r.value);
+  saveState();
+  if (typeof buildStaffGrid === 'function') buildStaffGrid();
+  if (typeof buildCoverageUI === 'function') buildCoverageUI();
+  if (typeof buildSwitchboard === 'function') buildSwitchboard();
+  if (typeof toast === 'function') toast('Lunch set: ' + smFmtH(parseFloat(r.value)));
+}
+function resetLunch(pid) {
+  if (STATE.customLunch) delete STATE.customLunch[pid];
+  saveState();
+  if (typeof buildStaffGrid === 'function') buildStaffGrid();
+  if (typeof buildCoverageUI === 'function') buildCoverageUI();
+  if (typeof buildSwitchboard === 'function') buildSwitchboard();
+  if (typeof toast === 'function') toast('Lunch back to auto');
 }
 
 // ═══════════════════════════════════════════════════════════════════════
