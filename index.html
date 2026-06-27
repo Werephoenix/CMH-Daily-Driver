@@ -74,6 +74,9 @@
      bad=problem/below-min/closed · info=neutral data (no good/bad meaning). */
   --ok: var(--green);  --warn: var(--amber);  --bad: var(--red);  --info: var(--acc);
   --purple: #c4b5fd;  --orange:#fb923c;  --teal:  #67e8f9;
+  /* v60.32: authentic rental-brand colors (Alamo cobalt / Enterprise green /
+     National lime), brightened for readability on the dark theme. */
+  --brand-ala: #5b9be6;  --brand-ent: #1ec77a;  --brand-nat: #97d92a;
   --ff-ui:  'Barlow',sans-serif;
   --ff-mono:'DM Mono',monospace;
   --ff-hd:  'Barlow Condensed',sans-serif;
@@ -1047,6 +1050,24 @@ input.autofill{background:rgba(22,163,74,.06);border-color:var(--green3);color:v
 .card:hover{transform:translateY(-2px);box-shadow:0 16px 30px -14px rgba(0,0,0,.72),0 1px 0 rgba(255,255,255,.06) inset}
 /* v60.13: Compact density — opt-in; default (unset vars) keeps original 16px/14px spacing */
 body.density-compact{--card-pad:10px;--card-mb:8px}
+/* v60.32: BOLD brand theme (opt-in via body.theme-bold). Brand-tinted luminous
+   glow + higher-contrast, glowing hero on the dashboard — engagement-forward,
+   work-appropriate. Calm Mode = absence of this class (current look). Static
+   (no looping motion) so it's reduced-motion-safe. */
+body.theme-bold #screen-opening{
+  background:
+    radial-gradient(ellipse at 8% -12%, rgba(30,199,122,.16), transparent 56%),
+    radial-gradient(ellipse at 94% 114%, rgba(91,155,230,.15), transparent 56%);
+  border-radius:10px; padding:8px 8px 2px; margin:-2px -6px 0;
+}
+body.theme-bold .mgr-item{
+  border-color:var(--bdr2);
+  border-top-color:rgba(255,255,255,.13);
+  background:linear-gradient(162deg, color-mix(in srgb, var(--bg2) 88%, #fff 6%), var(--bg2) 68%, color-mix(in srgb, var(--bg2) 90%, #000 8%));
+  box-shadow:0 10px 26px -14px rgba(0,0,0,.7), 0 1px 0 rgba(255,255,255,.05) inset;
+}
+body.theme-bold .mgr-item-val{ text-shadow:0 0 16px currentColor; }
+body.theme-bold .mgr-item:hover{ transform:translateY(-2px); box-shadow:0 16px 34px -14px rgba(0,0,0,.8), 0 0 0 1px var(--acc) inset; }
 .ch{font-family:var(--ff-hd);font-size:13px;font-weight:700;letter-spacing:.08em;color:var(--txt2);text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .ch .badge,.badge{font-size:10px;background:var(--bg3);padding:2px 8px;border-radius:10px;color:var(--txt3);font-weight:400;letter-spacing:.02em;text-transform:none;font-family:var(--ff-ui)}
 
@@ -1491,6 +1512,7 @@ button { cursor: pointer; }
     <div id="topbar-time" style="font-family:var(--ff-mono);font-size:13px;color:var(--txt2)"></div>
     <div id="topbar-onduty" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(37,99,235,.12);color:var(--acc);display:none"></div>
     <button id="density-toggle" onclick="toggleDensity()" title="Switch to compact spacing" style="background:none;border:1px solid var(--bdr);color:var(--txt3);border-radius:6px;cursor:pointer;font-size:12px;line-height:1;padding:3px 6px">⊟</button>
+    <button id="theme-toggle" onclick="toggleTheme()" title="Toggle Bold / Calm look" style="background:none;border:1px solid var(--bdr);color:var(--txt3);border-radius:6px;cursor:pointer;font-size:12px;line-height:1;padding:3px 6px">🎨</button>
     <div id="topbar-shift-badge" class="shift-pill opening">OPENING</div>
   </div>
 </div>
@@ -1558,7 +1580,7 @@ button { cursor: pointer; }
          style="cursor:pointer;">
       <div class="mgr-item-lbl">Brands</div>
       <div id="db-brands" style="font-size:18px;font-family:var(--ff-mono);font-weight:700;color:var(--txt2);line-height:1.05;white-space:nowrap">— · — · —</div>
-      <div style="font-size:8px;color:var(--txt3);font-weight:700;letter-spacing:.04em;margin-top:1px">ALA · ENT · NAT</div>
+      <div style="font-size:8px;font-weight:700;letter-spacing:.04em;margin-top:1px"><span style="color:var(--brand-ala)">ALA</span> · <span style="color:var(--brand-ent)">ENT</span> · <span style="color:var(--brand-nat)">NAT</span></div>
     </div>
     <div class="mgr-item" onclick="showTab('checklist')" style="cursor:pointer">
       <div class="mgr-item-lbl">2.0 Res</div>
@@ -3249,6 +3271,7 @@ function loadState() {
       s.dnq           = Array.isArray(s.dnq)           ? s.dnq           : [];  // v60.7: Did-Not-Qualify list (now synced, 48h auto-expire)
       s.clReasons     = (s.clReasons && typeof s.clReasons === 'object') ? s.clReasons : {};  // v60.8: {cl-mode: {itemText: reason}} for incomplete-item email validation
       s.uiDensity     = (s.uiDensity === 'compact') ? 'compact' : 'comfortable';  // v60.13: card spacing preference
+      s.uiTheme       = (s.uiTheme === 'calm') ? 'calm' : 'bold';  // v60.32: dashboard look (bold default, calm opt-out)
       s.nameAliases   = (s.nameAliases && typeof s.nameAliases === 'object') ? s.nameAliases : {};  // v60.23: confirmed name→roster mappings for schedule import
       return s;
     }
@@ -3258,7 +3281,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{},
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold',
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -3288,6 +3311,24 @@ function toggleDensity() {
   if (typeof saveState === 'function') saveState();
   applyDensity();
   if (typeof toast === 'function') toast(STATE.uiDensity === 'compact' ? 'Compact spacing' : 'Comfortable spacing');
+}
+
+// v60.32: Bold brand theme ↔ Calm Mode. Bold adds a brand-tinted glow + higher
+// contrast on the dashboard (engagement); Calm = the original look. Persisted.
+function applyTheme() {
+  var bold = (typeof STATE !== 'undefined' && STATE && STATE.uiTheme === 'bold');
+  if (document.body) document.body.classList.toggle('theme-bold', bold);
+  var btn = document.getElementById('theme-toggle');
+  if (btn) {
+    btn.textContent = bold ? '🎨' : '🌙';
+    btn.title = bold ? 'Bold brand theme — tap for Calm Mode' : 'Calm Mode — tap for Bold theme';
+  }
+}
+function toggleTheme() {
+  STATE.uiTheme = (STATE.uiTheme === 'bold') ? 'calm' : 'bold';
+  if (typeof saveState === 'function') saveState();
+  applyTheme();
+  if (typeof toast === 'function') toast(STATE.uiTheme === 'bold' ? '🎨 Bold theme' : '🌙 Calm Mode');
 }
 
 // v60.7: one-time migration of legacy DNR/DNQ fraud lists into synced STATE.
@@ -3355,6 +3396,7 @@ window.onload = function() {
   startClock();
   restoreFields();
   if (typeof applyDensity === 'function') applyDensity();  // v60.13: apply saved density pref
+  if (typeof applyTheme === 'function') applyTheme();  // v60.32: apply saved bold/calm theme
   // v54: rebuild live rosters from stored admin overrides BEFORE any UI
   // builders run. Without this, admin add/edit/remove changes from prior
   // sessions wouldn't take effect until a save action triggered the rebuild.
@@ -7615,7 +7657,7 @@ function refreshDash() {
   // ALA · ENT · NAT shown beneath the numbers for visual consistency).
   if(natB.totalRes||alaB.totalRes||entB.totalRes){
     const el2=document.getElementById('db-brands');
-    if(el2)el2.textContent=(alaB.totalRes||'—')+' · '+(entB.totalRes||'—')+' · '+(natB.totalRes||'—');
+    if(el2)el2.innerHTML='<span style="color:var(--brand-ala)">'+(alaB.totalRes||'—')+'</span> · <span style="color:var(--brand-ent)">'+(entB.totalRes||'—')+'</span> · <span style="color:var(--brand-nat)">'+(natB.totalRes||'—')+'</span>';
   }
   s('db-brand20', f.brand20||'—');
 
