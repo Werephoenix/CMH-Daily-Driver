@@ -1054,12 +1054,19 @@ body.density-compact{--card-pad:10px;--card-mb:8px}
    glow + higher-contrast, glowing hero on the dashboard — engagement-forward,
    work-appropriate. Calm Mode = absence of this class (current look). Static
    (no looping motion) so it's reduced-motion-safe. */
-body.theme-bold #screen-opening{
+/* v60.33: bold treatment extended app-wide — brand glow behind EVERY screen
+   + the bold card style on all .card elements (was dashboard-only in v60.32). */
+body.theme-bold .scr.on{
   background:
-    radial-gradient(ellipse at 8% -12%, rgba(30,199,122,.16), transparent 56%),
-    radial-gradient(ellipse at 94% 114%, rgba(91,155,230,.15), transparent 56%);
-  border-radius:10px; padding:8px 8px 2px; margin:-2px -6px 0;
+    radial-gradient(ellipse at 6% -10%, rgba(30,199,122,.13), transparent 58%),
+    radial-gradient(ellipse at 96% 112%, rgba(91,155,230,.12), transparent 58%);
 }
+body.theme-bold .card{
+  border-top-color:rgba(255,255,255,.12);
+  background:linear-gradient(162deg, color-mix(in srgb, var(--bg2) 90%, #fff 5%), var(--bg2) 70%, color-mix(in srgb, var(--bg2) 92%, #000 6%));
+  box-shadow:0 12px 30px -16px rgba(0,0,0,.72), 0 1px 0 rgba(255,255,255,.05) inset;
+}
+body.theme-bold .card:hover{ box-shadow:0 18px 38px -16px rgba(0,0,0,.8), 0 0 0 1px var(--bdr2) inset; }
 body.theme-bold .mgr-item{
   border-color:var(--bdr2);
   border-top-color:rgba(255,255,255,.13);
