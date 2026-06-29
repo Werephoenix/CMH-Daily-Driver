@@ -9839,10 +9839,12 @@ function showShiftModModal(pid, personName) {
   const lunchHtml = (curEnd - curStart) > (lunchHrs + 1.5)
     ? `<div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;padding:12px;margin-bottom:14px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:12px;font-weight:800;color:var(--txt)">🍽 Lunch — slide to move</span>
-          <span id="sm-lunch-lbl" style="font-size:11px;color:var(--acc);font-weight:700">${smFmtH(lunchVal)}–${smFmtH(lunchVal+lunchHrs)}</span>
+          <span style="font-size:12px;font-weight:800;color:var(--txt)">🍽 Lunch — slide or type</span>
+          <input id="sm-lunch-txt" type="text" value="${smFmtH(lunchVal)}" onchange="smOnLunchText(${lunchHrs})"
+            style="width:62px;text-align:center;font-size:12px;padding:3px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt)">
         </div>
         <input id="sm-lunch-range" type="range" min="${lMin}" max="${lMax}" step="0.25" value="${lunchVal}" oninput="smOnLunchRange(${lunchHrs})" style="width:100%">
+        <div id="sm-lunch-lbl" style="font-size:10px;color:var(--txt3);margin-top:5px">Lunch: ${smFmtH(lunchVal)}–${smFmtH(lunchVal+lunchHrs)}</div>
         <div style="display:flex;gap:8px;margin-top:10px">
           <button class="btn btn-g btn-sm" style="flex:1" onclick="applyLunch('${pid}')">Apply lunch</button>
           <button class="btn btn-gh btn-sm" onclick="resetLunch('${pid}')">Auto</button>
@@ -9947,8 +9949,17 @@ function applyCustomShiftMod(pid) {
 
 // v60.27: lunch slider helpers — move a person's lunch (STATE.customLunch[pid]).
 function smOnLunchRange(lunchHrs) {
-  const r = document.getElementById('sm-lunch-range'), lbl = document.getElementById('sm-lunch-lbl');
-  if (r && lbl) { const v = parseFloat(r.value); lbl.textContent = smFmtH(v) + '–' + smFmtH(v + (lunchHrs || 0.5)); }
+  const r = document.getElementById('sm-lunch-range');
+  if (!r) return;
+  const v = parseFloat(r.value);
+  const lbl = document.getElementById('sm-lunch-lbl'); if (lbl) lbl.textContent = 'Lunch: ' + smFmtH(v) + '–' + smFmtH(v + (lunchHrs || 0.5));
+  const t = document.getElementById('sm-lunch-txt'); if (t) t.value = smFmtH(v);
+}
+function smOnLunchText(lunchHrs) {
+  const t = document.getElementById('sm-lunch-txt'); const v = smParseTime(t && t.value);
+  if (v == null) return;
+  const r = document.getElementById('sm-lunch-range'); if (r) r.value = v;
+  const lbl = document.getElementById('sm-lunch-lbl'); if (lbl) lbl.textContent = 'Lunch: ' + smFmtH(v) + '–' + smFmtH(v + (lunchHrs || 0.5));
 }
 function applyLunch(pid) {
   const r = document.getElementById('sm-lunch-range');
@@ -12482,6 +12493,12 @@ function buildStationView() {
 
   let html = coverageBar();
 
+  // v60.34: ensure rotation data exists so bars can show counter/exit segments
+  // + the lunch block (same source the Timeline uses).
+  if ((!window._lastRotations || !Object.keys(window._lastRotations).length) && typeof buildSmartRotation === 'function') {
+    try { const _r = buildSmartRotation(); window._lastRotations = {}; if (_r && _r.rotations) _r.rotations.forEach(x => { window._lastRotations[x.pid] = x; }); } catch(e) {}
+  }
+
   // v60.30: visual time BARS (slider-style) per person on a shared 6a–1a axis,
   // grouped by station, so you can SEE coverage at a glance. Each bar is
   // clickable → opens the hour/lunch slider adjuster.
@@ -12493,21 +12510,37 @@ function buildStationView() {
         ${[6,9,12,15,18,21,24].map(h=>`<span style="position:absolute;left:${(h-AX0)/SPAN*100}%;transform:translateX(-50%);font-size:8px;color:var(--txt3)">${hLbl(h)}</span>`).join('')}
       </div>
     </div>`;
+  const pct = h => Math.max(0, Math.min(100, (h - AX0) / SPAN * 100));
+  const seg = (from, to, col, lbl) => {
+    const l = pct(from), w = Math.max(1.2, pct(to) - l);
+    return `<div${lbl?` title="${lbl}"`:''} style="position:absolute;left:${l}%;width:${w}%;top:2px;bottom:2px;background:${col};border-radius:3px"></div>`;
+  };
   const barFor = (p, color) => {
     const nick = p.person.nick || p.person.name.split(' ')[0];
     const roleTag = ['ARM','BRM','ABRM','MT'].includes(p.person.role) ? ` <span style="font-size:8px;color:var(--acc)">${p.person.role}</span>` : '';
     const mod = (STATE.shiftMod||{})[p.pid];
     const sH = mod ? mod.start : (p.person.shiftStart!=null ? p.person.shiftStart : AX0);
     const eH = mod ? mod.end   : (p.person.shiftEnd!=null   ? p.person.shiftEnd   : AX0);
-    const L = Math.max(0, Math.min(100, (sH-AX0)/SPAN*100));
-    const R = Math.max(0, Math.min(100, (eH-AX0)/SPAN*100));
-    const W = Math.max(3, R - L);
+    // v60.34: segmented bar — counter (blue) / exit (green) blocks + LUNCH
+    // (amber) from the rotation; else a solid bar + a lunch notch if one is set.
+    const rot = (window._lastRotations||{})[p.pid];
+    const zc = { counter:'var(--acc)', exit:'var(--green)' };
+    let segs = '';
+    if (rot && (rot.b1 || rot.b2)) {
+      if (rot.b1) segs += seg(rot.b1.from, rot.b1.to, zc[rot.b1.station] || color);
+      if (rot.b2) segs += seg(rot.b2.from, rot.b2.to, zc[rot.b2.station] || color);
+      if (rot.b3) segs += seg(rot.b3.from, rot.b3.to, zc[rot.b3.station] || color);
+      if (rot.lunch) segs += seg(rot.lunch.from, rot.lunch.to, 'var(--amber)', 'Lunch');
+    } else {
+      segs += seg(sH, eH, color);
+      const cl = (STATE.customLunch||{})[p.pid];
+      if (typeof cl === 'number' && cl > sH && cl < eH) segs += seg(cl, cl + 0.5, 'var(--amber)', 'Lunch');
+    }
     return `<div onclick="showShiftModModal('${p.pid}','${nick.replace(/'/g,'')}')" title="Click to adjust hours / lunch" style="display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer">
         <div style="width:78px;flex-shrink:0;font-size:11px;font-weight:700;color:var(--txt);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nick}${roleTag}</div>
         <div style="flex:1;position:relative;height:18px;background:var(--bg);border:1px solid var(--bdr);border-radius:9px;overflow:hidden">
-          <div style="position:absolute;left:${L}%;width:${W}%;top:2px;bottom:2px;background:${color};border-radius:7px;display:flex;align-items:center;padding:0 6px">
-            <span style="font-size:9px;color:#fff;font-weight:700;font-family:var(--ff-mono);white-space:nowrap">${p.timeStr}</span>
-          </div>
+          ${segs}
+          <span style="position:absolute;left:${pct(sH)}%;top:0;bottom:0;display:flex;align-items:center;padding-left:6px;font-size:9px;color:#fff;font-weight:700;font-family:var(--ff-mono);white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.85);pointer-events:none">${p.timeStr}</span>
           <div style="position:absolute;left:${nowPct}%;top:0;bottom:0;width:2px;background:var(--red);opacity:.85"></div>
         </div>
       </div>`;
