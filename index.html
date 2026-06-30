@@ -7272,9 +7272,13 @@ function setupMgmtBlockHandlers() {
   if (!tlEl || tlEl._mgmtHandlersAttached) return;
   tlEl._mgmtHandlersAttached = true; // attach once per element
 
-  const HOUR_W = 26; // matches W in buildCoverageTimeline
+  const HOUR_W = 26; // legacy px-per-hour (kept for fallback)
   const H_START_PX = 5; // matches H_START
   const SNAP = 0.5; // 30-min grid
+  // v60.36: the timeline is now FLUID (% layout), so a fixed px-per-hour no
+  // longer maps drag distance to hours. Derive hours-per-pixel from the bar
+  // container's LIVE rendered width instead. SPAN_H = total hours on the axis.
+  const SPAN_H = 26 - H_START_PX; // = 21 (H_END − H_START)
 
   // Convert pixel offset within bar container to hour value, snapped.
   // The bar container starts at 72px (LABEL_W) from the left of the row.
@@ -7318,6 +7322,7 @@ function setupMgmtBlockHandlers() {
       origFrom: block.from, origTo: block.to, station: block.station,
       startX: e.clientX,
       containerLeft: containerRect.left,
+      containerWidth: containerRect.width || (SPAN_H * HOUR_W),
       blockEl,
       moved: false,
     };
@@ -7333,8 +7338,11 @@ function setupMgmtBlockHandlers() {
     if (Math.abs(dx) < 6 && !st.moved) return; // ignore micro-movements (allow tap)
     st.moved = true;
     e.preventDefault();
-    // Compute new from/to in HOUR units, snapped.
-    const dHours = Math.round((dx / HOUR_W) / SNAP) * SNAP;
+    // Compute new from/to in HOUR units, snapped. Hours-per-pixel comes from
+    // the bar container's LIVE width (fluid layout) so drag tracks the cursor
+    // at any screen size.
+    const hourPerPx = SPAN_H / (st.containerWidth || (SPAN_H * HOUR_W));
+    const dHours = Math.round((dx * hourPerPx) / SNAP) * SNAP;
     let newFrom = st.origFrom, newTo = st.origTo;
     if (st.mode === 'resize-from') newFrom = Math.min(st.origTo - SNAP, st.origFrom + dHours);
     else if (st.mode === 'resize-to') newTo = Math.max(st.origFrom + SNAP, st.origTo + dHours);
@@ -7342,11 +7350,10 @@ function setupMgmtBlockHandlers() {
     // Clamp to reasonable hour range (5–26 = 5am to 2am)
     newFrom = Math.max(5, Math.min(25.5, newFrom));
     newTo   = Math.max(5.5, Math.min(26, newTo));
-    // Update visual immediately (don't commit to STATE yet)
-    const newLeftPx = (newFrom - H_START_PX) * HOUR_W;
-    const newWidthPx = Math.max(2, (newTo - newFrom) * HOUR_W - 2);
-    st.blockEl.style.left = newLeftPx + 'px';
-    st.blockEl.style.width = newWidthPx + 'px';
+    // Update visual immediately (don't commit to STATE yet) — in % to match
+    // the fluid render.
+    st.blockEl.style.left  = ((newFrom - H_START_PX) / SPAN_H * 100) + '%';
+    st.blockEl.style.width = 'calc(' + ((newTo - newFrom) / SPAN_H * 100) + '% - 2px)';
     st.previewFrom = newFrom;
     st.previewTo   = newTo;
   });
@@ -7374,9 +7381,9 @@ function setupMgmtBlockHandlers() {
     const newTo   = st.previewTo   != null ? st.previewTo   : st.origTo;
     if (newFrom >= newTo) {
       if (typeof toast === 'function') toast('Block must end after it starts');
-      // Restore original visual
-      st.blockEl.style.left = ((st.origFrom - H_START_PX) * HOUR_W) + 'px';
-      st.blockEl.style.width = Math.max(2, (st.origTo - st.origFrom) * HOUR_W - 2) + 'px';
+      // Restore original visual (% to match fluid render)
+      st.blockEl.style.left = ((st.origFrom - H_START_PX) / SPAN_H * 100) + '%';
+      st.blockEl.style.width = 'calc(' + ((st.origTo - st.origFrom) / SPAN_H * 100) + '% - 2px)';
       return;
     }
     blocks[st.bidx].from = newFrom;
@@ -7393,8 +7400,8 @@ function setupMgmtBlockHandlers() {
     if (!st) return;
     window._mgmtDragState = null;
     if (st.moved && st.blockEl) {
-      st.blockEl.style.left  = ((st.origFrom - 5) * 26) + 'px';
-      st.blockEl.style.width = Math.max(2, (st.origTo - st.origFrom) * 26 - 2) + 'px';
+      st.blockEl.style.left  = ((st.origFrom - H_START_PX) / SPAN_H * 100) + '%';
+      st.blockEl.style.width = 'calc(' + ((st.origTo - st.origFrom) / SPAN_H * 100) + '% - 2px)';
     }
   });
 }
@@ -12768,33 +12775,41 @@ function buildCoverageTimeline() {
 
   // ── Coverage chart ──────────────────────────────────────────────────────────
   const W=26;
-  const LABEL_W=72; // staff name column width — used by chart header AND timeline rows so they align
+  const LABEL_W=80; // staff name column width — used by chart header AND timeline rows so they align
+  // v60.36: the timeline is now FLUID (like the By-Station view) — the bar
+  // area is flex:1 and every hour column / segment is positioned by % of the
+  // available width, so it fills any screen with NO horizontal scroll. The W
+  // constant is only kept because addSeg() builds segment x/w in "pixel units"
+  // that divide cleanly into fractions (s.x/totalW2 == fraction of the day).
+  const NH = H_END - H_START; // number of hour columns (used for % math)
   const exitCts=HOURS.map(h=>people.filter(([pid,e])=>getZone(pid,e.person,h)==='exit').length);
   const ctrCts =HOURS.map(h=>people.filter(([pid,e])=>{const z=getZone(pid,e.person,h);return z==='counter'||z==='mgmt';}).length);
   const maxC=Math.max(...exitCts,...ctrCts,4);
   const chEl=document.getElementById('coverage-chart');
   if(chEl){
-    const barH=28;
-    let c=`<div style="position:relative;padding-left:${LABEL_W}px">`;
-    c+=`<div style="display:flex;margin-bottom:1px">`;
-    HOURS.forEach((h,i)=>{const isNow=Math.floor(nowH)===h%24;c+=`<div style="width:${W}px;flex-shrink:0;text-align:center;font-size:7px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:400};border-right:1px solid rgba(255,255,255,.05)">${hLbl(h)}</div>`;});
+    const barH=30;
+    const gl='border-right:1px solid rgba(255,255,255,.05)';
+    let c=`<div>`;
+    // hour labels — fixed name gutter + one fluid cell per hour
+    c+=`<div style="display:flex;margin-bottom:1px"><div style="width:${LABEL_W}px;flex-shrink:0"></div>`;
+    HOURS.forEach((h,i)=>{const isNow=Math.floor(nowH)===h%24;c+=`<div style="flex:1;min-width:0;text-align:center;font-size:8px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:400};${gl}">${hLbl(h)}</div>`;});
     c+=`</div>`;
-    c+=`<div style="position:absolute;left:0;top:10px;font-size:8px;font-weight:700;color:var(--green);width:${LABEL_W-4}px;text-align:right;padding-right:4px">Exit</div>`;
-    c+=`<div style="display:flex;align-items:flex-end;height:${barH}px;margin-bottom:2px">`;
+    // Exit coverage row
+    c+=`<div style="display:flex;align-items:flex-end;height:${barH}px;margin-bottom:2px"><div style="width:${LABEL_W}px;flex-shrink:0;align-self:center;font-size:9px;font-weight:700;color:var(--green);text-align:right;padding-right:5px">Exit</div>`;
     HOURS.forEach((h,i)=>{
       const ct=exitCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{exitMin:1};
       const pct=Math.min(100,ct/maxC*100);
       const col=ct===0?'var(--red)':ct<r.exitMin?'var(--amber)':'var(--green)';
-      c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px;border-right:1px solid rgba(255,255,255,.04)"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
+      c+=`<div style="flex:1;min-width:0;padding:0 1px;${gl}"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
     });
     c+=`</div>`;
-    c+=`<div style="position:absolute;left:0;top:${10+barH+2}px;font-size:8px;font-weight:700;color:var(--acc);width:${LABEL_W-4}px;text-align:right;padding-right:4px">Ctr</div>`;
-    c+=`<div style="display:flex;align-items:flex-end;height:${barH}px">`;
+    // Counter coverage row
+    c+=`<div style="display:flex;align-items:flex-end;height:${barH}px"><div style="width:${LABEL_W}px;flex-shrink:0;align-self:center;font-size:9px;font-weight:700;color:var(--acc);text-align:right;padding-right:5px">Ctr</div>`;
     HOURS.forEach((h,i)=>{
       const ct=ctrCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{counterMin:2};
       const pct=Math.min(100,ct/maxC*100);
       const col=ct===0?'transparent':ct<r.counterMin?'var(--amber)':'var(--acc)';
-      c+=`<div style="width:${W}px;flex-shrink:0;padding:0 1px;border-right:1px solid rgba(255,255,255,.04)"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
+      c+=`<div style="flex:1;min-width:0;padding:0 1px;${gl}"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
     });
     c+=`</div></div>`;
     chEl.innerHTML=c;
@@ -12804,11 +12819,11 @@ function buildCoverageTimeline() {
   const tlEl=document.getElementById('coverage-timeline');
   if(!tlEl)return;
   const totalW=LABEL_W+HOURS.length*W;
-  // Render chart (c) and rows in the SAME scroll container so they stay aligned
-  // when the user scrolls horizontally on mobile.
+  // Render chart (c) and rows in the SAME container so they stay column-aligned.
+  // v60.36: fluid — width:100%, no horizontal scroll (matches By-Station view).
   const chartHtml = chEl ? chEl.innerHTML : '';
   if (chEl) chEl.innerHTML = ''; // hide standalone chart — it's now duplicated inside the timeline below
-  let htm=`<div style="min-width:${totalW}px">`;
+  let htm=`<div style="width:100%">`;
   if (chartHtml) htm += `<div style="margin-bottom:8px">${chartHtml}</div>`;
 
   // ── Called-off banner ───────────────────────────────────────────────────
@@ -12882,7 +12897,7 @@ function buildCoverageTimeline() {
     HOURS.forEach((h,i)=>{
       const r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{exitMin:1};
       const eg=exitCts[i]<r.exitMin;
-      const isPast=h%24<Math.floor(nowH%24)&&h<24;htm+=`<div style="width:${W}px;flex-shrink:0;height:14px;background:${eg&&!isPast?'rgba(248,113,113,.3)':'transparent'};border-right:1px solid rgba(255,255,255,.05);border-radius:2px"></div>`;
+      const isPast=h%24<Math.floor(nowH%24)&&h<24;htm+=`<div style="flex:1;min-width:0;height:14px;background:${eg&&!isPast?'rgba(248,113,113,.3)':'transparent'};border-right:1px solid rgba(255,255,255,.05);border-radius:2px"></div>`;
     });
     htm+=`</div>`;
     if(fillSuggestion){
@@ -12916,7 +12931,7 @@ function buildCoverageTimeline() {
         : {counterMin:2};
       const cg = !r.closed && ctrCounts[i] < r.counterMin;
       const isPast = h%24 < Math.floor(nowH%24) && h < 24;
-      htm += `<div style="width:${W}px;flex-shrink:0;height:14px;background:${cg && !isPast ? 'rgba(251,191,36,.25)' : 'transparent'};border-right:1px solid rgba(255,255,255,.05);border-radius:2px"></div>`;
+      htm += `<div style="flex:1;min-width:0;height:14px;background:${cg && !isPast ? 'rgba(251,191,36,.25)' : 'transparent'};border-right:1px solid rgba(255,255,255,.05);border-radius:2px"></div>`;
     });
     htm += `</div>`;
     htm += `<div style="font-size:9px;color:var(--amber);padding:2px 0 4px ${LABEL_W+4}px">
@@ -12972,7 +12987,7 @@ function buildCoverageTimeline() {
     }
     const isReturns=p.role==='RETURNS',isExit=p.role==='EXIT';
     const nameCol=isOff?'var(--red)':isReturns?'#67e8f9':isExit?'var(--green)':isMgmt?'#c4b5fd':'var(--txt)';
-    htm+=`<div style="width:${LABEL_W}px;flex-shrink:0;font-size:${isMgmt?9:isReturns?9:10}px;
+    htm+=`<div style="width:${LABEL_W}px;flex-shrink:0;font-size:${isMgmt?10:isReturns?10:11}px;
       font-weight:${isMgmt?500:700};
       color:${nameCol};
       text-align:right;padding-right:5px;
@@ -13127,12 +13142,16 @@ function buildCoverageTimeline() {
     // Render as absolute-positioned overlapping divs.
     // Background: subtle vertical grid lines every W pixels (one per hour) so
     // the eye can follow a column down through the timeline.
-    htm+=`<div style="position:relative;height:22px;width:${totalW2}px;flex-shrink:0;
+    // v60.36: FLUID bar — flex:1 container, every segment positioned by % of
+    // the day so it fills the available width (no horizontal scroll). Grid
+    // lines are one-per-hour as a % step; a red now-line leads the eye.
+    const nowPctRow = (nowH - H_S) / (H_E - H_S) * 100;
+    htm+=`<div style="position:relative;height:26px;flex:1;min-width:0;
       background-image:repeating-linear-gradient(to right,
         rgba(255,255,255,.06) 0,
         rgba(255,255,255,.06) 1px,
         transparent 1px,
-        transparent ${W}px);">`;
+        transparent calc(100% / ${NH}));">`;
     segments.filter(s=>s.zone!=='bg').forEach(s=>{
       const col=zColor[s.zone]||'rgba(255,255,255,.08)';
       const lbl=s.zone==='counter'?'Ctr':s.zone==='exit'?'Exit':
@@ -13142,6 +13161,7 @@ function buildCoverageTimeline() {
                  s.zone==='training'?'📚':'';
       const isNow=nowH>=s.x/W+H_S&&nowH<(s.x+s.w)/W+H_S;
       const wHrs=s.w/W;
+      const leftPct=s.x/totalW2*100, widthPct=s.w/totalW2*100;
       // Manager blocks get data attributes for drag/edit handlers (set up
       // by setupMgmtBlockHandlers below). Plus a faint dashed border on
       // the block edges as a visual hint that the block is draggable.
@@ -13150,16 +13170,19 @@ function buildCoverageTimeline() {
         ? ` data-mgmt-pid="${s.mgmtPid}" data-mgmt-bidx="${s.mgmtBidx}" class="mgmt-block-draggable"`
         : '';
       const dragHint = isMgmtBlock && wHrs > 0.6 ? ';cursor:ew-resize' : '';
-      htm+=`<div${mgmtAttrs} style="position:absolute;left:${s.x}px;top:2px;
-        width:${s.w-2}px;height:18px;
+      htm+=`<div${mgmtAttrs} style="position:absolute;left:${leftPct}%;top:2px;
+        width:calc(${widthPct}% - 2px);height:22px;
         background:${col};border-radius:4px;
         display:flex;align-items:center;justify-content:center;
-        font-size:${wHrs>1?'9':'7'}px;font-weight:700;color:#fff;opacity:.92;
+        font-size:${wHrs>1?'11':'9'}px;font-weight:700;color:#fff;opacity:.92;
         ${isNow?'box-shadow:0 0 0 2px white,0 0 8px rgba(255,255,255,.3);':''}${dragHint}"
         title="${nick}: ${s.zone} ${hLbl(s.x/W+H_S)}–${hLbl((s.x+s.w)/W+H_S)}${isMgmtBlock?' · tap to edit':''}">
         ${wHrs>0.4?lbl:''}
       </div>`;
     });
+    if(nowPctRow>=0&&nowPctRow<=100){
+      htm+=`<div style="position:absolute;left:${nowPctRow}%;top:0;bottom:0;width:2px;background:var(--red);opacity:.85;pointer-events:none"></div>`;
+    }
     htm+=`</div>`;
     // Reset old loop variables so nothing breaks
     let i=cells.length;
