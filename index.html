@@ -1896,11 +1896,16 @@ button { cursor: pointer; }
     </button>
   </div>
 
-  <!-- View toggle -->
-  <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
-    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">View:</span>
-    <button id="sched-view-timeline" class="btn btn-g btn-sm" onclick="setSchedView('timeline')">📅 Timeline</button>
-    <button id="sched-view-station" class="btn btn-gh btn-sm" onclick="setSchedView('station')">🗂 By Station</button>
+  <!-- Grouping selector (v60.37: single unified schedule view — the mode only
+       changes how rows are PLACED/grouped; bars, coverage chart & adjuster are
+       identical across all modes) -->
+  <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">Group by:</span>
+    <button id="sgrp-station" class="btn btn-g btn-sm" onclick="setSchedGroup('station')">🗂 Station</button>
+    <button id="sgrp-type" class="btn btn-gh btn-sm" onclick="setSchedGroup('type')">👥 Type</button>
+    <button id="sgrp-start" class="btn btn-gh btn-sm" onclick="setSchedGroup('start')">⏱ Start</button>
+    <button id="sgrp-end" class="btn btn-gh btn-sm" onclick="setSchedGroup('end')">🌙 End</button>
+    <button id="sgrp-name" class="btn btn-gh btn-sm" onclick="setSchedGroup('name')">🔤 Name</button>
   </div>
 
   <!-- Station view container (hidden by default) -->
@@ -3284,7 +3289,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold',
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station',
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -12398,32 +12403,31 @@ function removeCode(code) {
 
 var _schedView = 'timeline'; // 'timeline' | 'station'
 
+// v60.37: there is now ONE unified schedule view (the fluid bar timeline). The
+// old Timeline/By-Station split is gone — `setSchedView` just shows that single
+// view, and `setSchedGroup` changes how its rows are grouped/placed. Kept as a
+// function so the Schedule-tab init and any legacy callers still work.
 function setSchedView(mode) {
-  _schedView = mode;
-  const tlBtn = document.getElementById('sched-view-timeline');
-  const stBtn = document.getElementById('sched-view-station');
-  const tlArea = document.getElementById('coverage-timeline');
-  const stArea = document.getElementById('sched-station-view');
-  const chartArea = document.getElementById('coverage-chart');
-  const mgmtBar = document.getElementById('mgr-mode-bar');
-  const covHeader = tlArea && tlArea.parentElement;
+  _schedView = 'timeline';
+  const stArea = document.getElementById('sched-station-view'); // legacy, retired
+  if (stArea) stArea.style.display = 'none';
+  syncSchedGroupButtons();
+  buildCoverageTimeline();
+}
 
-  if (tlBtn) { tlBtn.className = mode==='timeline' ? 'btn btn-g btn-sm' : 'btn btn-gh btn-sm'; }
-  if (stBtn) { stBtn.className = mode==='station'  ? 'btn btn-g btn-sm' : 'btn btn-gh btn-sm'; }
+function syncSchedGroupButtons() {
+  const mode = STATE.schedGroupBy || 'station';
+  ['station','type','start','end','name'].forEach(m=>{
+    const b = document.getElementById('sgrp-'+m);
+    if (b) b.className = (m===mode ? 'btn btn-g btn-sm' : 'btn btn-gh btn-sm');
+  });
+}
 
-  if (mode === 'timeline') {
-    if (stArea) stArea.style.display = 'none';
-    if (chartArea) chartArea.style.display = '';
-    if (mgmtBar) mgmtBar.style.display = '';
-    if (covHeader && covHeader.classList) covHeader.style.display = '';
-    buildCoverageTimeline();
-  } else {
-    if (stArea) stArea.style.display = '';
-    if (chartArea) chartArea.style.display = 'none';
-    if (mgmtBar) mgmtBar.style.display = 'none';
-    if (covHeader && covHeader.classList) covHeader.style.display = 'none';
-    buildStationView();
-  }
+function setSchedGroup(mode) {
+  STATE.schedGroupBy = mode;
+  if (typeof saveState === 'function') saveState();
+  syncSchedGroupButtons();
+  buildCoverageTimeline();
 }
 
 function buildStationView() {
@@ -12731,6 +12735,52 @@ function buildCoverageTimeline() {
     return(a[1].person.shiftStart||99)-(b[1].person.shiftStart||99);
   });
 
+  // ── v60.37: GROUPING MODES ───────────────────────────────────────────────────
+  // The single schedule view groups rows by Station / employee Type / Start /
+  // End / Name. `people` stays a flat list (used by coverage counts + zone map);
+  // `orderedGroups` is what the render loop walks. Only PLACEMENT changes between
+  // modes — same bars, same coverage chart, same adjuster.
+  const groupBy = STATE.schedGroupBy || 'station';
+  const _startOf = (pid,p)=>{const ov=(STATE.shiftMod||{})[pid]||{};return ov.start!=null?ov.start:(p.shiftStart!=null?p.shiftStart:99);};
+  const _endOf   = (pid,p)=>{const ov=(STATE.shiftMod||{})[pid]||{};return ov.end!=null?ov.end:(p.shiftEnd!=null?p.shiftEnd:0);};
+  const _byStart = (a,b)=>_startOf(a[0],a[1].person)-_startOf(b[0],b[1].person);
+  function buildOrderedGroups(mode){
+    if(mode==='start'||mode==='end'||mode==='name'){
+      const items=people.slice();
+      if(mode==='start') items.sort(_byStart);
+      else if(mode==='end') items.sort((a,b)=>_endOf(a[0],a[1].person)-_endOf(b[0],b[1].person));
+      else items.sort((a,b)=>String(a[1].person.nick||a[1].person.name).localeCompare(String(b[1].person.nick||b[1].person.name)));
+      return [{label:(mode==='start'?'⏱ By Start Time':mode==='end'?'🌙 By End Time':'🔤 By Name'),color:'var(--txt3)',items}];
+    }
+    const defs = mode==='type' ? [
+      {key:'cxr',label:'CXR / Counter',color:'var(--acc)'},
+      {key:'exit',label:'Exit Agents',color:'var(--green)'},
+      {key:'returns',label:'Returns',color:'#06b6d4'},
+      {key:'mgmt',label:'Management',color:'#a5b4fc'},
+    ] : [
+      {key:'mgmt',label:'🏢 Management',color:'#a5b4fc'},
+      {key:'counter',label:'🟦 Counter',color:'var(--acc)'},
+      {key:'exit',label:'🟩 Exit Booth',color:'var(--green)'},
+      {key:'returns',label:'↩ Returns',color:'#06b6d4'},
+    ];
+    const buckets={}; defs.forEach(d=>buckets[d.key]=[]);
+    people.forEach(([pid,e])=>{
+      const role=e.person.role, st=(STATE.staffStation||{})[pid];
+      let key;
+      if(mode==='type') key=['ARM','BRM','ABRM','MT'].includes(role)?'mgmt':role==='EXIT'?'exit':role==='RETURNS'?'returns':'cxr';
+      else { // station
+        if(['ARM','BRM','ABRM','MT'].includes(role)) key='mgmt';
+        else if(role==='RETURNS') key='returns';
+        else if(role==='EXIT'||st==='Exit Booth') key='exit';
+        else key='counter';
+      }
+      (buckets[key]||buckets[defs[0].key]).push([pid,e]);
+    });
+    Object.values(buckets).forEach(it=>it.sort(_byStart));
+    return defs.filter(d=>buckets[d.key].length).map(d=>({label:d.label,color:d.color,items:buckets[d.key]}));
+  }
+  const orderedGroups = buildOrderedGroups(groupBy);
+
   // ── Zone map ────────────────────────────────────────────────────────────────
   const nowFloor=Math.floor(nowH%24); // use 24h modulo for overnight hours
   const zones={exit:[],counter:[],emerald:[],returns:[]};
@@ -12938,8 +12988,21 @@ function buildCoverageTimeline() {
       ⚑ Counter short — pull MT/ABRM or accept reduced coverage (no auto-fix)</div>`;
   }
 
-  // Person rows — the bar IS the control
-  people.forEach(([pid,entry])=>{
+  // v60.37: a shared hour-axis row (name gutter + one fluid cell per hour),
+  // rendered both ABOVE and BELOW the person rows so the flow reads top & bottom.
+  const axisRowHtml = ()=>{
+    let a=`<div style="display:flex;align-items:center;margin:3px 0">`+
+          `<div style="width:${LABEL_W}px;flex-shrink:0"></div>`;
+    HOURS.forEach((h)=>{const isNow=Math.floor(nowH%24)===h%24;a+=`<div style="flex:1;min-width:0;text-align:center;font-size:8px;color:${isNow?'var(--acc)':'var(--txt3)'};font-weight:${isNow?800:400}">${hLbl(h)}</div>`;});
+    return a+`</div>`;
+  };
+
+  // Person rows — the bar IS the control. v60.37: walk orderedGroups so the
+  // grouping mode (Station / Type / Start / End / Name) only changes PLACEMENT.
+  htm += axisRowHtml();
+  orderedGroups.forEach(grp=>{
+  grp._shown=false;
+  grp.items.forEach(([pid,entry])=>{
     const p=entry.person,nick=p.nick||p.name.split(' ')[0];
     const isMgmt=['ARM','BRM','ABRM','MT'].includes(p.role);
     const isOff=(STATE.todayOverrides||{})[pid]==='callout';
@@ -12967,19 +13030,16 @@ function buildCoverageTimeline() {
     // header took up flex space and pushed the first person's name
     // (Matt, Kerv, Carlos) to the right of where it should sit —
     // out of alignment with subsequent rows.
-    const roleGroup = p.role==='EXIT'?'exit' :
-                     p.role==='RETURNS'?'returns' :
-                     ['ARM','BRM','ABRM','MT'].includes(p.role)?'mgmt':'cxr';
-    if(!_groupHeaders[roleGroup]){
-      _groupHeaders[roleGroup] = true;
-      const ghLabel = {cxr:'CXR / Counter',exit:'Exit Agents',returns:'Returns',mgmt:'Management'};
-      const ghColor = {cxr:'var(--acc)',exit:'var(--green)',returns:'#06b6d4',mgmt:'#a5b4fc'};
-      const ghBdr   = {cxr:'rgba(37,99,235,.3)',exit:'rgba(22,163,74,.3)',returns:'rgba(6,182,212,.3)',mgmt:'rgba(99,102,241,.3)'};
-      htm+=`<div style="display:flex;margin:${roleGroup==='cxr'?0:8}px 0 3px"><div style="width:${LABEL_W}px;flex-shrink:0"></div><div style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${ghColor[roleGroup]};border-bottom:1px solid ${ghBdr[roleGroup]};padding-bottom:2px;flex:1">— ${ghLabel[roleGroup]} —</div></div>`;
+    // v60.37: group header (driven by the chosen grouping mode) — render once,
+    // lazily, before this group's first VISIBLE row so off-shift skips don't
+    // leave an empty header.
+    if(!grp._shown){
+      grp._shown=true;
+      htm+=`<div style="display:flex;margin:8px 0 3px"><div style="width:${LABEL_W}px;flex-shrink:0"></div><div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${grp.color};border-bottom:1px solid var(--bdr);padding-bottom:2px;flex:1">— ${grp.label} —</div></div>`;
     }
 
     htm+=`<div style="display:flex;align-items:center;margin-bottom:2px;cursor:pointer"
-      onclick="openPersonPanel('${pid}')">`;
+      onclick="showShiftModModal('${pid}','${nick.replace(/'/g,'')}')">`;
     const mgmtSt=isMgmt?(STATE.staffStation||{})[pid]||'':'' ;
     const mgmtBadge=isMgmt&&mgmtSt?`<span style="font-size:7px;color:#a5b4fc;display:block;line-height:1;margin-top:1px">${mgmtSt.replace(' Booth','').replace(' Manager','')}</span>`:'';
     if(isMgmt&&!_mgmtHeaderShown){
@@ -13189,6 +13249,8 @@ function buildCoverageTimeline() {
     while(false){i=cells.length;}
     htm+=`</div>`;
   });
+  });
+  htm += axisRowHtml(); // v60.37: bottom hour axis (synced to bars above)
   htm+=`</div>`;
   tlEl.innerHTML=htm;
   // Wire up tap-to-edit + drag-to-resize for manager blocks. Called every
