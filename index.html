@@ -7165,7 +7165,7 @@ function removeMgmtBlock(pid, idx) {
   if (!STATE.mgmtBlocks[pid].length) delete STATE.mgmtBlocks[pid];
   saveState();
   if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
-  if(typeof openPersonPanel==='function') openPersonPanel(pid);
+  refreshOpenPersonUI(pid); // v60.39: don't force the old panel open
 }
 
 // Modal-based block editor. Triggered by "+ Add Block" button on manager
@@ -7250,7 +7250,7 @@ function submitMgmtBlock(pid) {
   }
   if (typeof closeModal === 'function') closeModal();
   if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
-  if (typeof openPersonPanel === 'function') openPersonPanel(pid);
+  refreshOpenPersonUI(pid); // v60.39: don't force the old panel open
   if (typeof toast === 'function') toast(`Added: ${st}`);
 }
 
@@ -7812,6 +7812,20 @@ function openModal(title, bodyHtml) {
 function closeModal() {
   const overlay = document.getElementById('modal-overlay');
   if (overlay) overlay.style.display = 'none';
+}
+
+// v60.39: mutation helpers (setAltPosition, addSpecialBlock, mgmt-block edits)
+// used to force-open the OLD bottom person-panel at the end. That made the
+// switchboard/modal "jump" to a different screen. Instead, only refresh a panel
+// that's ALREADY open for this person; otherwise just leave the current view be.
+function refreshOpenPersonUI(pid) {
+  try {
+    const pp = document.getElementById('person-panel');
+    const disp = pp && pp.style ? pp.style.display : 'none';
+    if (pp && disp !== 'none' && typeof openPersonPanel === 'function') openPersonPanel(pid);
+  } catch(e) {}
+  // The unified modal (showShiftModModal) refreshes itself via its own callers
+  // (e.g. setRotationFromModal re-opens it), so nothing to do here for it.
 }
 
 function confirmDestructive(title, message, onConfirm) {
@@ -9703,7 +9717,7 @@ function setAltPosition(pid, posKey) {
   if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
   if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
   if (typeof updatePendingIndicator === 'function') updatePendingIndicator();
-  openPersonPanel(pid);
+  refreshOpenPersonUI(pid); // v60.39: was openPersonPanel(pid) — don't force the old panel open
 }
 
 function showAltScheduleModal(pid, personName) {
@@ -9869,7 +9883,7 @@ function showShiftModModal(pid, personName) {
       <div style="font-size:12px;font-weight:800;color:var(--txt);margin-bottom:10px">🔀 Rotation today</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">${_rotBtn('normal','🔄 Normal')}${_rotBtn('full-counter','🟦 All Counter')}${_rotBtn('full-exit','🟩 All Exit')}${_rotBtn('exit-first','↪ Exit First')}</div>
     </div>` : '';
-  const whatifHtml = `<button class="btn btn-gh btn-sm" style="width:100%;margin-bottom:14px" onclick="closeModal();if(typeof showTab==='function')showTab('schedule');showWhatif('${pid}')">🔮 What If…? — coverage scenarios</button>`;
+  const whatifHtml = `<button class="btn btn-gh btn-sm" style="width:100%;margin-bottom:14px" onclick="showWhatif('${pid}','${_escNm}')">🔮 What If…? — coverage scenarios</button>`;
   const body = `
     <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
       Everything for ${personName} today — hours, lunch, rotation, and what-ifs.
@@ -13579,16 +13593,16 @@ function redoCoverage() {
   try{Object.assign(STATE,JSON.parse(snap));}catch(e){toast('Redo failed');return;}
   buildCoverageTimeline();buildSwitchboard();toast('Redone ↪');
 }
-function showWhatif(pid) {
+function showWhatif(pid, personName) {
   const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
   const entry=exp[pid];if(!entry)return;
   const p=entry.person,nick=p.nick||p.name.split(' ')[0];
+  const nm=String(personName||p.name||nick).replace(/'/g,'');
   const mods=STATE.shiftMod||{},ov=mods[pid]||{};
   const se=ov.end!=null?ov.end:p.shiftEnd;
   const ss=ov.start!=null?ov.start:p.shiftStart;
-  const panel=document.getElementById('whatif-panel'),nameEl=document.getElementById('whatif-name'),bodyEl=document.getElementById('whatif-body');
-  if(!panel)return;
-  if(nameEl)nameEl.textContent=nick;
+  // v60.39: render into the SAME polished modal (openModal) instead of the old
+  // #whatif-panel (which didn't exist → the What-If button silently did nothing).
   const fmtH=h=>{if(h==null)return'—';const hh=Math.floor(h),mn=Math.round((h-hh)*60),s=h>=12?'p':'a',d=hh>12?hh-12:hh===0?12:hh;return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
   const dow=new Date().getDay();
   function gapMsg(newEnd) {
@@ -13611,15 +13625,17 @@ function showWhatif(pid) {
     const st=(STATE.staffStation||{})[pid];return st==='Exit Booth'?'exit':'counter';
   }
   var newEndLocal=se;
-  let body='<div style="display:grid;gap:10px">';
+  // ← Back returns to the main adjust panel (same modal), so there's no jump.
+  let body=`<button class="btn btn-gh btn-sm" style="margin-bottom:12px" onclick="showShiftModModal('${pid}','${nm}')">← Back to Adjust</button>`;
+  body+='<div style="display:grid;gap:10px">';
   // Special assignments
   body+=`<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Assign to...</div><div style="display:flex;gap:5px;flex-wrap:wrap">`;
-  (SPECIAL_ASSIGNMENTS||[]).forEach(sa=>{body+=`<button onclick="addSpecialBlock('${pid}','${sa.key}')" style="padding:5px 9px;border-radius:4px;border:1px solid ${sa.color}44;background:${sa.color}18;color:${sa.color};font-size:10px;font-weight:700;cursor:pointer">${sa.icon} ${sa.label}</button>`;});
+  (SPECIAL_ASSIGNMENTS||[]).forEach(sa=>{body+=`<button onclick="addSpecialBlock('${pid}','${sa.key}');closeModal()" style="padding:5px 9px;border-radius:4px;border:1px solid ${sa.color}44;background:${sa.color}18;color:${sa.color};font-size:10px;font-weight:700;cursor:pointer">${sa.icon} ${sa.label}</button>`;});
   body+=`</div></div>`;
   // Move station
   body+=`<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Move Station</div><div style="display:flex;gap:6px">
-    <button onclick="setStation('${pid}','Counter');closeWhatif();buildCoverageTimeline();buildSwitchboard()" style="flex:1;padding:7px;border-radius:4px;border:1px solid var(--acc)44;background:rgba(37,99,235,.1);color:var(--acc);font-size:11px;font-weight:700;cursor:pointer">🟦 Counter</button>
-    <button onclick="setStation('${pid}','Exit Booth');closeWhatif();buildCoverageTimeline();buildSwitchboard()" style="flex:1;padding:7px;border-radius:4px;border:1px solid var(--green)44;background:rgba(52,211,153,.1);color:var(--green);font-size:11px;font-weight:700;cursor:pointer">🟩 Exit</button>
+    <button onclick="setStation('${pid}','Counter');closeModal();buildCoverageTimeline();buildSwitchboard()" style="flex:1;padding:7px;border-radius:4px;border:1px solid var(--acc)44;background:rgba(37,99,235,.1);color:var(--acc);font-size:11px;font-weight:700;cursor:pointer">🟦 Counter</button>
+    <button onclick="setStation('${pid}','Exit Booth');closeModal();buildCoverageTimeline();buildSwitchboard()" style="flex:1;padding:7px;border-radius:4px;border:1px solid var(--green)44;background:rgba(52,211,153,.1);color:var(--green);font-size:11px;font-weight:700;cursor:pointer">🟩 Exit</button>
   </div></div>`;
   // Early out
   if(se){
@@ -13629,15 +13645,14 @@ function showWhatif(pid) {
       newEndLocal=ne;
       const msg=gapMsg(ne);
       body+=`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--bdr)">
-        <button onclick="applyEarlyOut('${pid}',${ne})" style="padding:4px 10px;border-radius:4px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:11px;cursor:pointer;flex-shrink:0">End ${fmtH(ne)}</button>
+        <button onclick="applyEarlyOut('${pid}',${ne});closeModal()" style="padding:4px 10px;border-radius:4px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:11px;cursor:pointer;flex-shrink:0">End ${fmtH(ne)}</button>
         <div style="font-size:10px;color:${msg.startsWith('✅')?'var(--green)':'var(--amber)'}">${msg}</div>
       </div>`;
     });
     body+=`</div>`;
   }
   body+=`</div>`;
-  if(bodyEl)bodyEl.innerHTML=body;
-  panel.style.display='block';
+  openModal('🔮 What If — ' + nick, body);
 }
 function closeWhatif(){const p=document.getElementById('whatif-panel');if(p)p.style.display='none';}
 function applyEarlyOut(pid,newEnd){
@@ -13669,7 +13684,7 @@ function addSpecialBlock(pid, key, fromTime, toTime) {
     buildCoverageTimeline();
     buildDashSchedMini();
     saveState();
-    openPersonPanel(pid);
+    refreshOpenPersonUI(pid); // v60.39: don't force the old panel open
   };
 
   // If times provided directly, apply immediately
