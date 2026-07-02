@@ -12777,16 +12777,34 @@ function buildCoverageTimeline() {
       {key:'exit',label:'🟩 Exit Booth',color:'var(--green)'},
       {key:'returns',label:'↩ Returns',color:'#06b6d4'},
     ];
+    // v60.40: station grouping reflects the EFFECTIVE assignment — a person moved
+    // to All Counter / All Exit (altSchedule) or whose rotation is mostly one side
+    // is grouped accordingly, not by their stale staffStation. This matches the
+    // bar colors + coverage counts (which already follow the rotation).
+    const effectiveStation = (pid, role, st) => {
+      const alt = (STATE.altSchedule||{})[pid];
+      if (alt === 'full-exit') return 'exit';
+      if (alt === 'full-counter') return 'counter';
+      if (role === 'EXIT' || st === 'Exit Booth') return 'exit';
+      if (st === 'Counter') return 'counter';
+      const rot = (window._lastRotations||{})[pid];
+      if (rot) {
+        let ex=0, ct=0;
+        [rot.b1,rot.b2,rot.b3].forEach(b=>{ if(!b) return; const d=(b.to-b.from)||0; if(b.station==='exit') ex+=d; else ct+=d; });
+        if (ex > ct) return 'exit';
+        if (ct > 0)  return 'counter';
+      }
+      return 'counter';
+    };
     const buckets={}; defs.forEach(d=>buckets[d.key]=[]);
     people.forEach(([pid,e])=>{
       const role=e.person.role, st=(STATE.staffStation||{})[pid];
       let key;
       if(mode==='type') key=['ARM','BRM','ABRM','MT'].includes(role)?'mgmt':role==='EXIT'?'exit':role==='RETURNS'?'returns':'cxr';
-      else { // station
+      else { // station — by effective assignment
         if(['ARM','BRM','ABRM','MT'].includes(role)) key='mgmt';
         else if(role==='RETURNS') key='returns';
-        else if(role==='EXIT'||st==='Exit Booth') key='exit';
-        else key='counter';
+        else key = effectiveStation(pid, role, st);
       }
       (buckets[key]||buckets[defs[0].key]).push([pid,e]);
     });
