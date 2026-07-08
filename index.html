@@ -7,7 +7,9 @@
 <style>
 
 /* ── FONTS ─────────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Barlow:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700;800&display=swap');
+/* v60.41 (iOS reskin): dropped the Google-Fonts @import — use the system stack
+   (SF Pro on iOS). This also removes the last CDN dependency, so the app is now
+   fully offline-capable per the hard constraints. Font vars set in :root below. */
 
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
@@ -15,71 +17,74 @@
      overall." This is the second pass. Backgrounds are now mid-slate
      so cards have real contrast against the page; text colors all
      pushed brighter; status colors saturated harder. */
-  --bg:        #1a2540;   /* was #131b2a */
-  --bg2:       #243456;   /* was #1c2841 */
-  --bg3:       #324769;   /* was #2a3a55 */
-  --border:    #4a6388;   /* was #3a4d6e */
-  --border2:   #5d78a3;   /* was #4a6088 */
-  --text:      #ffffff;   /* was #f0f5fc */
-  --text2:     #e0eaf5;   /* was #d0dff2 */
-  --text3:     #b0c4de;   /* was #95a8c0 — significantly brighter */
-  --accent:    #74b3ff;   /* was #5b9aff */
-  --accent2:   #2563eb;
+  /* v60.41 — iOS-native reskin palette (Claude Design handoff). Same var names,
+     new values, so all markup shifts at once. Page is true black with a radial
+     brand glow on the shell; surfaces are iOS system greys. */
+  --bg:        #000000;   /* page background (radial brand glow on the shell) */
+  --bg2:       #1C1C1E;   /* card surface */
+  --bg3:       #2C2C2E;   /* elevated surface (inside cards/sheets) */
+  --border:    #38383A;   /* hairline separator */
+  --border2:   #48484A;
+  --text:      #ffffff;
+  --text2:     rgba(235,235,245,.75);
+  --text3:     rgba(235,235,245,.5);
+  --accent:    #23C983;   /* brand accent = Enterprise green */
+  --accent2:   #12A866;
 
-  /* status colors — saturated harder */
-  --wu:        #34d399;  /* was #22c55e */
-  --wu-bg:     #064e3b;
-  --wu-border: #10b981;
-  --up:        #fbbf24;  /* was #eab308 */
-  --up-bg:     #1c1400;
-  --up-border: #d97706;
-  --na:        #f87171;  /* was #ef4444 */
+  /* status colors — iOS system values */
+  --wu:        #30D158;  /* OK / covered / above min */
+  --wu-bg:     #06351f;
+  --wu-border: #248A3D;
+  --up:        #FFCC00;  /* lunch / caution / met-exactly */
+  --up-bg:     #2a2100;
+  --up-border: #C99700;
+  --na:        #FF453A;  /* short / urgent / below-min */
   --na-bg:     #2a0606;
-  --na-border: #dc2626;
+  --na-border: #D70015;
 
   /* station colors */
-  --counter:   #74b3ff;
-  --exit:      #34d399;
-  --eb:        #a78bfa;
-  --returns:   #fb923c;
-  --off:       #8090a8;
+  --counter:   #0A84FF;  /* at the desk */
+  --exit:      #23C983;  /* contract check */
+  --eb:        #AF9CFF;  /* management */
+  --returns:   #64D2FF;  /* returns lane */
+  --off:       #8A8A8E;
 
   /* per-tab accent color — used on tab buttons + page accent strip
      so each section has a distinct "color identity" you can use to
      navigate by glance. Matt: "color code pages and sections for
      easy visual identification and navigation at a glance." */
-  --tab-dashboard:   #74b3ff;  /* blue */
-  --tab-paste:       #fbbf24;  /* amber */
-  --tab-board:       #34d399;  /* green */
-  --tab-coverage:    #a78bfa;  /* purple */
-  --tab-checklist:   #fb923c;  /* orange */
-  --tab-reference:   #b0c4de;  /* light blue-grey */
-  --tab-history:     #22d3ee;  /* cyan */
-  --tab-admin:       #f87171;  /* red */
+  --tab-dashboard:   #0A84FF;  /* counter blue */
+  --tab-paste:       #FFCC00;  /* amber */
+  --tab-board:       #23C983;  /* exit green */
+  --tab-coverage:    #AF9CFF;  /* mgmt purple */
+  --tab-checklist:   #FF9F0A;  /* orange */
+  --tab-reference:   rgba(235,235,245,.6);  /* neutral */
+  --tab-history:     #64D2FF;  /* cyan */
+  --tab-admin:       #FF453A;  /* red */
 
-  /* font stack */
-  --font-ui:   'Barlow', sans-serif;
-  --font-mono: 'DM Mono', monospace;
-  --font-hd:   'Barlow Condensed', sans-serif;
-  /* ── Aliases — both naming schemes work ── */
-  --txt:    #ffffff;  --txt2: #ecf3fc;  --txt3: #b9cee3;
-  --acc:    #82bcff;  --acc2: #2563eb;
-  --bdr:    #3d5a8a;  --bdr2: #5d78a3;
-  --green:  #5eead4;  --green2:#064e3b;  --green3:#34d399;
-  --amber:  #fbbf24;  --amber2:#1c1200;  --amber3:#d97706;
-  --red:    #fca5a5;  --red2:  #2a0606;  --red3:  #dc2626;
+  /* font stack — v60.41: system (SF Pro on iOS), no downloaded webfonts */
+  --font-ui:   -apple-system, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --font-hd:   -apple-system, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+  /* ── Aliases — both naming schemes work (v60.41: mapped to iOS palette) ── */
+  --txt:    #ffffff;  --txt2: rgba(235,235,245,.75);  --txt3: rgba(235,235,245,.5);
+  --acc:    #0A84FF;  --acc2: #4DA3FF;   /* counter blue (bars/primary data use --acc) */
+  --bdr:    #38383A;  --bdr2: #48484A;
+  --green:  #23C983;  --green2:#06351f;  --green3:#30D158;
+  --amber:  #FFCC00;  --amber2:#2a2100;  --amber3:#C99700;
+  --red:    #FF453A;  --red2:  #2a0606;  --red3:  #D70015;
   /* v60.15 — Logical color standard (ported from the D&D app's "color = meaning,
      never decorative"). Prefer these semantic names so a color means the SAME
      thing on every screen. ok=good/covered/open · warn=caution/limited ·
      bad=problem/below-min/closed · info=neutral data (no good/bad meaning). */
   --ok: var(--green);  --warn: var(--amber);  --bad: var(--red);  --info: var(--acc);
-  --purple: #c4b5fd;  --orange:#fb923c;  --teal:  #67e8f9;
+  --purple: #AF9CFF;  --orange:#FF9F0A;  --teal:  #64D2FF;
   /* v60.32: authentic rental-brand colors (Alamo cobalt / Enterprise green /
-     National lime), brightened for readability on the dark theme. */
-  --brand-ala: #5b9be6;  --brand-ent: #1ec77a;  --brand-nat: #97d92a;
-  --ff-ui:  'Barlow',sans-serif;
-  --ff-mono:'DM Mono',monospace;
-  --ff-hd:  'Barlow Condensed',sans-serif;
+     National lime). v60.41: retuned to the iOS-reskin palette. */
+  --brand-ala: #5B9BE6;  --brand-ent: #23C983;  --brand-nat: #A6E63A;
+  --ff-ui:  -apple-system, "SF Pro Text", "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
+  --ff-mono:ui-monospace, "SF Mono", Menlo, monospace;
+  --ff-hd:  -apple-system, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
 
 }
 /* ── CANONICAL SCREEN + NAV RULES ─────────────────────────────── */
@@ -88,7 +93,10 @@
 html {
   font-size: 16px;
   -webkit-text-size-adjust: 100%;
+  /* v60.41: true-black page with a soft radial brand glow up top (iOS shell). */
   background: var(--bg);
+  background-image: radial-gradient(1200px 600px at 50% -10%, #10231A 0%, #08080A 55%, #000 100%);
+  background-attachment: fixed;
 }
 
 /* body: see canonical rules above */
