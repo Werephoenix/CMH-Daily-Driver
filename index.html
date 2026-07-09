@@ -175,53 +175,63 @@ html {
 #screen-admin.on::before     { background: var(--tab-admin); }
 #screen-inventory.on::before { background: var(--tab-history); }
 
-/* Nav */
+/* Nav — v60.42: iOS-native bottom tab bar (5 items: Now · Schedule · Board ·
+   Rituals · More). Fixed to the bottom with a blur, icon-over-label, and the
+   home-indicator safe-area inset. Secondary screens live under "More". */
 #nav {
-  background: var(--bg2);
-  border-bottom: 1px solid var(--bdr);
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  z-index: 200;
   display: flex;
-  overflow-x: auto;
-  scrollbar-width: none;
-  padding: 0 4px;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  -webkit-overflow-scrolling: touch;
+  background: rgba(28,28,30,.88);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-top: 1px solid var(--bdr);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-#nav::-webkit-scrollbar { display: none; }
+/* keep page content clear of the fixed bar */
+body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 
 .nbtn {
+  flex: 1;
   font-family: var(--ff-ui);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--txt3);
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
-  padding: 10px 11px;
-  white-space: nowrap;
+  padding: 7px 2px 6px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
-  transition: color .15s, border-color .15s;
-  flex-shrink: 0;
+  transition: color .15s;
+  min-height: 49px;
 }
 .nbtn:hover { color: var(--txt2); }
-.nbtn.on { color: var(--acc); border-bottom-color: var(--acc); }
-/* v60.16: active nav tab adopts its section's accent color (matches the page
-   accent strip) so each tab has its own identity — the D&D "each tab feels
-   like itself" cue applied to navigation. Id selectors override .nbtn.on. */
-#tab-opening.on   { color: var(--tab-dashboard); border-bottom-color: var(--tab-dashboard); }
-#tab-paste.on     { color: var(--tab-paste);     border-bottom-color: var(--tab-paste); }
-#tab-board.on     { color: var(--tab-board);     border-bottom-color: var(--tab-board); }
-#tab-coverage.on  { color: var(--tab-coverage);  border-bottom-color: var(--tab-coverage); }
-#tab-checklist.on { color: var(--tab-checklist); border-bottom-color: var(--tab-checklist); }
-#tab-reference.on { color: var(--tab-reference); border-bottom-color: var(--tab-reference); }
-#tab-inventory.on { color: var(--tab-history);   border-bottom-color: var(--tab-history); }
-#tab-history.on   { color: var(--tab-history);   border-bottom-color: var(--tab-history); }
-#tab-admin.on     { color: var(--tab-admin);     border-bottom-color: var(--tab-admin); }
-.ni { font-size: 13px; }
+.nbtn.on { color: var(--acc); }
+/* v60.16/42: active tab adopts its section's accent color. */
+#tab-opening.on   { color: var(--tab-dashboard); }
+#tab-schedule.on  { color: var(--tab-coverage); }
+#tab-board.on     { color: var(--tab-board); }
+#tab-checklist.on { color: var(--tab-checklist); }
+#tab-more.on      { color: var(--txt); }
+.ni { font-size: 21px; line-height: 1; }
+
+/* More screen — grouped inset list rows */
+.more-group { background: var(--bg2); border: 1px solid var(--bdr); border-radius: 12px; overflow: hidden; }
+.more-row {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  background: none; border: none; border-bottom: 1px solid var(--bdr);
+  padding: 14px 14px; min-height: 48px; cursor: pointer;
+  color: var(--txt); font-family: var(--ff-ui); font-size: 16px; text-align: left;
+}
+.more-row:last-child { border-bottom: none; }
+.more-row:active { background: var(--bg3); }
+.more-ic { font-size: 20px; width: 26px; text-align: center; flex-shrink: 0; }
+.more-lbl { flex: 1; }
+.more-ch { color: var(--txt3); font-size: 20px; }
 
 /* Topbar */
 #topbar {
@@ -1533,16 +1543,32 @@ button { cursor: pointer; }
 </div>
 
 <!-- ── NAV ── -->
+<!-- v60.42: iOS 5-item bottom tab bar. Secondary screens (Paste, Inventory,
+     Reference, History, Admin) live under More. -->
 <div id="nav">
-  <button class="nbtn on" id="tab-opening" onclick="showTab('opening')"><span class="ni">🏠</span>Dashboard</button>
-  <button class="nbtn" id="tab-paste"   onclick="showTab('paste')"><span class="ni">📋</span>Paste Data</button>
-  <button class="nbtn" id="tab-board"   onclick="showTab('board')"><span class="ni">🚗</span>Live Board</button>
-  <button class="nbtn" id="tab-coverage" onclick="showTab('schedule')"><span class="ni">📅</span>Schedule</button>
-  <button class="nbtn" id="tab-checklist" onclick="showTab('checklist')"><span class="ni">✅</span>Checklist</button>
-  <button class="nbtn" id="tab-reference" onclick="showTab('reference')"><span class="ni">📖</span>Reference</button>
-  <button class="nbtn" id="tab-inventory" onclick="showTab('inventory')"><span class="ni">🔢</span>Inventory</button>
-  <button class="nbtn" id="tab-history" onclick="showTab('history')"><span class="ni">🕑</span>History</button>
-  <button class="nbtn" id="tab-admin" onclick="showTab('admin')"><span class="ni">⚙️</span>Admin</button>
+  <button class="nbtn on" id="tab-opening"  onclick="showTab('opening')"><span class="ni">🏠</span>Now</button>
+  <button class="nbtn"    id="tab-schedule" onclick="showTab('schedule')"><span class="ni">📅</span>Schedule</button>
+  <button class="nbtn"    id="tab-board"    onclick="showTab('board')"><span class="ni">🚗</span>Board</button>
+  <button class="nbtn"    id="tab-checklist" onclick="showTab('checklist')"><span class="ni">✅</span>Rituals</button>
+  <button class="nbtn"    id="tab-more"     onclick="showTab('more')"><span class="ni">⋯</span>More</button>
+</div>
+
+<!-- SCREEN: MORE (v60.42) — hub for secondary destinations + appearance -->
+<div class="scr" id="screen-more">
+  <div style="max-width:640px;margin:0 auto">
+    <h1 style="font-size:34px;font-weight:700;letter-spacing:-.8px;margin:6px 0 16px;color:var(--txt)">More</h1>
+    <div class="more-group">
+      <button class="more-row" onclick="showTab('paste')"><span class="more-ic">📋</span><span class="more-lbl">Paste Data</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('inventory')"><span class="more-ic">🔢</span><span class="more-lbl">Physical Inventory</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('reference')"><span class="more-ic">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('history')"><span class="more-ic">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('admin')"><span class="more-ic">⚙️</span><span class="more-lbl">Admin</span><span class="more-ch">›</span></button>
+    </div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:20px 0 6px 4px">Appearance</div>
+    <div class="more-group">
+      <button class="more-row" onclick="toggleTheme()"><span class="more-ic">🌙</span><span class="more-lbl">Calm Mode / Bold theme</span><span class="more-ch">⇄</span></button>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════
@@ -3505,7 +3531,11 @@ function showTab(id) {
   document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
   document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('on'));
   const scr = document.getElementById('screen-'+id);
-  const btn = document.getElementById('tab-'+id);
+  let btn = document.getElementById('tab-'+id);
+  // v60.42: secondary screens live under the More tab — keep it lit for them.
+  if (!btn && ['paste','reference','inventory','history','admin'].includes(id)) {
+    btn = document.getElementById('tab-more');
+  }
   if (scr) scr.classList.add('on');
   if (btn) btn.classList.add('on');
 
