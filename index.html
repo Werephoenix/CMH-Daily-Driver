@@ -275,6 +275,18 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .ros-sub { font-size: 12px; color: var(--txt3); }
 .ros-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; flex-shrink: 0; }
 
+/* Rituals finish card + REQ badge (v60.45) */
+.req-badge { font-size: 9px; font-weight: 800; letter-spacing: .04em; color: var(--na); background: rgba(255,69,58,.14); border: 1px solid rgba(255,69,58,.4); border-radius: 5px; padding: 1px 5px; vertical-align: middle; white-space: nowrap; }
+.finish-card { margin-top: 16px; background: var(--bg2); border: 1px solid var(--bdr); border-radius: 16px; padding: 16px; }
+.finish-card.ready { border-color: rgba(48,209,88,.5); background: linear-gradient(180deg, rgba(48,209,88,.10), var(--bg2)); }
+.finish-hd { font-size: 18px; font-weight: 700; color: var(--txt); letter-spacing: -.3px; }
+.finish-sub { font-size: 13px; color: var(--txt3); margin-top: 3px; }
+.finish-btn { width: 100%; margin-top: 12px; padding: 14px; border-radius: 12px; font-size: 16px; font-weight: 700; font-family: var(--ff-ui); cursor: pointer; border: none; transition: transform .1s; }
+.finish-btn:active { transform: scale(.98); }
+.finish-btn.go { background: var(--wu); color: #04160D; box-shadow: 0 6px 18px -6px rgba(48,209,88,.6); }
+.finish-btn.wait { background: var(--bg3); color: var(--up); border: 1px solid var(--up-border); }
+.ci { min-height: 44px; }
+
 /* Bottom-sheet modal (v60.44) */
 .modal-sheet {
   background: var(--bg2);
@@ -8488,11 +8500,13 @@ function renderChecklist(mode) {
       var done = cl[it.t] === true;
       var auto = it.autoKey ? checkAutoComplete(it.autoKey) : false;
       var isDone = done || auto;
+      var reqBadge = (typeof isImportantCL==='function' && isImportantCL(mode, it.t) && !isDone)
+        ? ' <span class="req-badge">REQ</span>' : '';
       var fields = it.fields || (it.field ? [{key:it.field, label:it.fieldLabel||'', type:it.fieldType||'text', ph:it.fieldPlaceholder||''}] : []);
       htm += '<div class="ci ' + (isDone?'done':'') + '" data-mode="' + mode + '" data-txt="' + it.t.replace(/"/g,'&quot;') + '" onclick="ciClick(this)">' +
         '<div class="cbox">' + (isDone?'✓':'') + '</div>' +
         '<div style="flex:1">' +
-          '<div class="ci-txt">' + it.t.replace(/^(\S+)/, '<b>$1</b>') + (auto&&!done?' <span style="font-size:9px;color:var(--green);opacity:.6">(auto)</span>':'') + '</div>' +
+          '<div class="ci-txt">' + it.t.replace(/^(\S+)/, '<b>$1</b>') + reqBadge + (auto&&!done?' <span style="font-size:9px;color:var(--green);opacity:.6">(auto)</span>':'') + '</div>' +
           buildFields(fields) +
         '</div>' +
         (it.p ? '<div class="ci-photo">📷</div>' : '') +
@@ -8500,11 +8514,38 @@ function renderChecklist(mode) {
     });
   });
 
+  // ── v60.45: guided finish card ────────────────────────────────────────────
+  var allItems = (data||[]).reduce(function(acc,s){return acc.concat((s.items||[]).filter(function(it){return !it.days||it.days.includes(dow);}));}, []);
+  var doneCount = allItems.filter(function(it){return cl[it.t]||(it.autoKey&&checkAutoComplete(it.autoKey));}).length;
+  var incompleteReq = (typeof getIncompleteImportant==='function') ? getIncompleteImportant(mode) : [];
+  var ready = incompleteReq.length === 0;
+  var allDone = allItems.length>0 && doneCount===allItems.length;
+  if (mode === 'opening' || mode === 'closing') {
+    var sendLbl = (mode==='opening' ? 'Send Morning Email' : 'Send Closing Email');
+    var reqList = ready ? '' :
+      '<div style="margin-top:10px;font-size:12px;color:var(--up)">' +
+        '<div style="font-weight:700;margin-bottom:4px">⚠ ' + incompleteReq.length + ' required item' + (incompleteReq.length>1?'s':'') + ' still open</div>' +
+        incompleteReq.map(function(t){return '<div style="opacity:.85">• ' + t + '</div>';}).join('') +
+        '<div style="margin-top:6px;opacity:.7">You can still send with a reason for each.</div>' +
+      '</div>';
+    htm += '<div class="finish-card ' + (ready?'ready':'') + '">' +
+      '<div class="finish-hd">' + (ready ? '✓ Ready to send' : 'Almost there') + '</div>' +
+      '<div class="finish-sub">' + doneCount + ' of ' + allItems.length + ' done' + (ready?' · all required items complete':'') + '</div>' +
+      '<button class="finish-btn ' + (ready?'go':'wait') + '" onclick="showCLEmail(\'' + mode + '\')">' +
+        (ready ? '✓ ' + sendLbl : sendLbl + ' (' + incompleteReq.length + ' req left)') +
+      '</button>' +
+      reqList +
+    '</div>';
+  } else {
+    htm += '<div class="finish-card ' + (allDone?'ready':'') + '">' +
+      '<div class="finish-hd">' + (allDone ? '✓ Mid-shift check complete' : 'Mid-shift check') + '</div>' +
+      '<div class="finish-sub">' + doneCount + ' of ' + allItems.length + ' done</div>' +
+    '</div>';
+  }
+
   var bd = document.getElementById('cl-body');
   if (bd) bd.innerHTML = htm;
 
-  var allItems = (data||[]).reduce(function(acc,s){return acc.concat((s.items||[]).filter(function(it){return !it.days||it.days.includes(dow);}));}, []);
-  var doneCount = allItems.filter(function(it){return cl[it.t]||(it.autoKey&&checkAutoComplete(it.autoKey));}).length;
   var prog = document.getElementById('cl-prog');
   var lbl  = document.getElementById('cl-prog-lbl');
   if (prog) prog.style.width = allItems.length ? (doneCount/allItems.length*100)+'%' : '0%';
