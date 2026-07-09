@@ -158,7 +158,7 @@ html {
    color matches each tab's --tab-* variable. */
 .scr.on::before {
   content: '';
-  display: block;
+  display: none; /* v60.47: removed the per-screen accent strip — reference uses large titles instead */
   height: 3px;
   margin: -14px -14px 12px -14px;
   border-radius: 0 0 6px 6px;
@@ -500,9 +500,9 @@ select option { background: var(--bg3); }
 .btn {
   font-family: var(--font-ui);
   font-size: 13px;
-  font-weight: 600;
-  padding: 8px 18px;
-  border-radius: 5px;
+  font-weight: 700;
+  padding: 10px 18px;
+  border-radius: 11px;
   border: none;
   cursor: pointer;
   transition: all 0.15s;
@@ -1141,7 +1141,7 @@ input.autofill{background:rgba(22,163,74,.06);border-color:var(--green3);color:v
 @media(max-width:600px){}
 
 /* ── CARDS ── */
-.card{background:var(--bg2);border:1px solid var(--bdr);border-top-color:rgba(255,255,255,.10);border-radius:8px;padding:var(--card-pad,16px);margin-bottom:var(--card-mb,14px);box-shadow:0 10px 24px -14px rgba(0,0,0,.65),0 1px 0 rgba(255,255,255,.04) inset;transition:transform .16s,box-shadow .16s}
+.card{background:var(--bg2);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:var(--card-pad,18px);margin-bottom:var(--card-mb,14px);box-shadow:0 10px 30px -16px rgba(0,0,0,.6);transition:transform .16s,box-shadow .16s}
 /* v60.14: D&D-style "float" — soft layered shadow + lit top edge + gentle hover lift */
 .card:hover{transform:translateY(-2px);box-shadow:0 16px 30px -14px rgba(0,0,0,.72),0 1px 0 rgba(255,255,255,.06) inset}
 /* v60.13: Compact density — opt-in; default (unset vars) keeps original 16px/14px spacing */
@@ -1193,9 +1193,9 @@ body.theme-bold .mgr-item:hover{ transform:translateY(-2px); box-shadow:0 16px 3
 .mgr-item{
   display:flex;flex-direction:column;gap:2px;
   background:var(--bg2);
-  border:1px solid var(--bdr);
-  border-radius:6px;
-  padding:8px 12px;
+  border:1px solid rgba(255,255,255,.07);
+  border-radius:14px;
+  padding:12px 14px;
   min-width:90px;
   flex:1 1 auto;
   transition:transform .12s ease,border-color .12s ease,box-shadow .12s ease;
@@ -1233,8 +1233,8 @@ select option{background:var(--bg3)}
 /* ── BUTTONS ── */
 .btn{font-family:var(--ff-ui);font-size:13px;font-weight:600;padding:8px 16px;border-radius:5px;border:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:all .15s;white-space:nowrap}
 .btn-p{background:var(--acc);color:#fff}.btn-p:hover{background:var(--acc2)}
-.btn-g{background:var(--green);color:#fff}.btn-g:hover{background:var(--green3)}
-.btn-gh{background:var(--bg3);color:var(--txt2);border:1px solid var(--bdr2)}.btn-gh:hover{color:var(--txt)}
+.btn-g{background:var(--exit);color:#04140C}.btn-g:hover{background:#3ee39a}
+.btn-gh{background:var(--bg3);color:var(--txt);border:1px solid rgba(255,255,255,.08)}.btn-gh:hover{background:var(--bg2)}
 .btn-sm{font-size:11px;padding:5px 11px}
 .btn-lg{font-size:14px;padding:11px 24px;border-radius:6px}
 
@@ -1282,12 +1282,12 @@ select option{background:var(--bg3)}
 
 /* Section header */
 .cl-sec-hdr{
-  font-family:var(--ff-hd);font-size:11px;font-weight:800;letter-spacing:.12em;
-  text-transform:uppercase;color:var(--txt2);
-  padding:12px 8px 6px;
-  border-bottom:2px solid var(--bdr2);
+  font-family:var(--ff-ui);font-size:11px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;color:rgba(235,235,245,.45);
+  padding:16px 4px 8px;
+  border-bottom:none;
   margin-bottom:4px;
-  background:var(--bg3);
+  background:transparent;
   border-radius:4px 4px 0 0;
   margin-top:10px;
 }
