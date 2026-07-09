@@ -1216,7 +1216,7 @@ body.theme-bold .mgr-item:hover{ transform:translateY(-2px); box-shadow:0 16px 3
 .status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 
 /* ── WALK-UP MASTER ── */
-.wu-master{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;background:var(--bg3);border-radius:6px;border:1px solid var(--bdr2);margin-bottom:10px}
+.wu-master{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 14px;background:var(--bg2);border-radius:14px;border:1px solid var(--bdr);margin-bottom:10px}
 .wu-lbl{font-family:var(--ff-hd);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt2)}
 .wubtn{font-size:11px;font-weight:600;padding:5px 12px;border-radius:16px;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);cursor:pointer;transition:all .15s}
 .wubtn.on.g{background:rgba(22,163,74,.12);border-color:var(--green);color:var(--green)}
@@ -1239,9 +1239,11 @@ select option{background:var(--bg3)}
 .btn-lg{font-size:14px;padding:11px 24px;border-radius:6px}
 
 /* ── AVAILABILITY BOARD ── */
-.board-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:7px}
-.tile{border-radius:6px;padding:10px 11px;border:1px solid;transition:transform .1s;cursor:pointer;position:relative;overflow:hidden}
-.tile:hover{transform:translateY(-1px);box-shadow:0 4px 20px rgba(0,0,0,.5)}
+.board-wrap{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:9px}
+/* v60.46: iOS-native tiles — rounder, softer surface, subtle float. */
+.tile{border-radius:15px;padding:12px 13px;border:1px solid;transition:transform .1s;cursor:pointer;position:relative;overflow:hidden}
+.tile:hover{transform:translateY(-1px);box-shadow:0 8px 24px -8px rgba(0,0,0,.6)}
+.tile:active{transform:scale(.98)}
 .tile.wu{background:rgba(5,46,22,.8);border-color:var(--green3)}
 .tile.up{background:rgba(28,18,0,.8);border-color:var(--amber3)}
 .tile.na{background:rgba(28,5,5,.8);border-color:var(--red3)}
@@ -1250,8 +1252,8 @@ select option{background:var(--bg3)}
 .tile-name{font-family:var(--ff-hd);font-size:12px;font-weight:700;line-height:1.2;margin-bottom:5px;color:var(--txt)}
 .tile-net{font-family:var(--ff-mono);font-size:22px;font-weight:500;line-height:1;margin-bottom:3px}
 .tile-net.pos{color:var(--green)}.tile-net.neg{color:var(--red)}.tile-net.zer{color:var(--txt3)}.tile-net.nd{color:var(--txt3);font-size:14px}
-.tile-st{font-size:9px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
-.tile-st.wu{color:var(--green)}.tile-st.up{color:var(--amber)}.tile-st.na{color:var(--red)}.tile-st.nd{color:var(--txt3)}
+.tile-st{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px}
+.tile-st.wu{color:var(--wu);background:rgba(48,209,88,.14)}.tile-st.up{color:var(--up);background:rgba(255,204,0,.14)}.tile-st.na{color:var(--na);background:rgba(255,69,58,.14)}.tile-st.nd{color:var(--txt3);background:var(--bg3)}
 .tile-res{font-size:9px;color:var(--txt3);margin-top:2px}
 .tile-core-mark{position:absolute;top:4px;right:5px;font-size:8px;color:var(--txt3);background:rgba(0,0,0,.3);padding:1px 4px;border-radius:2px}
 .tile-override-btn{position:absolute;bottom:4px;right:4px;font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;border:1px solid;cursor:pointer;transition:all .12s}
