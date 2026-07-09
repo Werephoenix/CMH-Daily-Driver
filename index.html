@@ -233,6 +233,27 @@ body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 .more-lbl { flex: 1; }
 .more-ch { color: var(--txt3); font-size: 20px; }
 
+/* Now hero (v60.43) */
+.now-title { font-size: 34px; font-weight: 700; letter-spacing: -.8px; color: var(--txt); line-height: 1.05; }
+.now-sub { font-size: 13px; color: var(--txt2); margin: 2px 0 12px; }
+.now-attn { border-radius: 16px; padding: 16px; margin-bottom: 14px; border: 1px solid var(--bdr); background: var(--bg2); }
+.now-attn.urgent { background: rgba(255,69,58,.12); border-color: rgba(255,69,58,.4); }
+.now-attn.warn   { background: rgba(255,204,0,.10); border-color: rgba(255,204,0,.4); }
+.now-attn.ok     { background: rgba(48,209,88,.10); border-color: rgba(48,209,88,.35); }
+body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-in-out infinite; }
+.now-kicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.now-attn.urgent .now-kicker { color: var(--na); }
+.now-attn.warn .now-kicker { color: var(--up); }
+.now-attn.ok .now-kicker { color: var(--wu); }
+.now-h { font-size: 23px; font-weight: 700; color: var(--txt); margin: 4px 0 3px; letter-spacing:-.3px; }
+.now-p { font-size: 14px; color: var(--txt2); margin-bottom: 12px; }
+.now-btn { width: 100%; border: none; border-radius: 12px; padding: 13px; font-size: 16px; font-weight: 700; font-family: var(--ff-ui); cursor: pointer; background: var(--acc); color: #04160D; }
+.now-btn.wide-green { background: var(--exit); }
+.now-btn2 { width: 100%; border: 1px solid var(--bdr2); border-radius: 12px; padding: 11px; font-size: 14px; font-weight: 600; font-family: var(--ff-ui); cursor: pointer; background: transparent; color: var(--txt2); margin-top: 8px; }
+.now-sec-hd { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--txt3); margin: 16px 0 6px 4px; }
+.now-floor-val { font-variant-numeric: tabular-nums; font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .now-attn { animation: none !important; } }
+
 /* Topbar */
 #topbar {
   background: var(--bg2);
@@ -1584,6 +1605,10 @@ button { cursor: pointer; }
       <span id="sync-msg">—</span>
     </div>
   </div>
+
+  <!-- v60.43: NOW hero — attention-first (single most-urgent item + one-tap fix,
+       on-the-floor-now, coming-up). Rendered by renderNow(); engine-driven. -->
+  <div id="now-hero" style="margin-bottom:12px"></div>
 
   <!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
        ANNOUNCEMENTS & CELEBRATIONS (v59)
@@ -3539,6 +3564,7 @@ function showTab(id) {
   if (scr) scr.classList.add('on');
   if (btn) btn.classList.add('on');
 
+  if (id === 'opening' && typeof renderNow === 'function') renderNow();  // v60.43
   if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); }
   if (id === 'schedule')  {
     try {
@@ -7664,6 +7690,7 @@ function refreshDash() {
   // v59: render announcements + celebrations widgets at top of dashboard
   if (typeof renderDashAnnouncements === 'function') renderDashAnnouncements();
   if (typeof renderDashCelebrations === 'function') renderDashCelebrations();
+  if (typeof renderNow === 'function') renderNow();  // v60.43: Now hero
   const f   = STATE.fields;
   const auto = typeof getAutoManagers==='function' ? getAutoManagers() : {};
   const clO = typeof countCLDone==='function' ? countCLDone('opening') : {done:0,total:0};
@@ -7761,6 +7788,149 @@ function refreshDash() {
   s('sum-cl-progress', 'Opening '+clO.done+'/'+clO.total+' · Mid '+clM.done+'/'+clM.total+' · Closing '+clC.done+'/'+clC.total);
   s('sum-cl-data', totalDone===totalItems&&totalItems>0?'All complete! ✅':'→ Checklist');
   saveState();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  v60.43 — NOW hero (iOS reskin Phase 3): attention-first open screen.
+//  Reuses the live engine (buildExpectedToday, COVERAGE_BY_HOUR, rotations,
+//  getExitHoursWeek) — no new data. Surfaces the SINGLE most-urgent thing +
+//  a one-tap fix, who's on the floor now, and what's coming up.
+// ═══════════════════════════════════════════════════════════════════════
+function _nowZone(pid, p, h) {
+  const ov = (STATE.shiftMod||{})[pid] || {};
+  const ss = ov.start!=null ? ov.start : p.shiftStart;
+  const se = ov.end!=null ? ov.end : p.shiftEnd;
+  if (ss==null || h<ss || h>=se) return 'off';
+  if ((STATE.todayOverrides||{})[pid]==='callout') return 'off';
+  if (p.role==='RETURNS') return 'returns';
+  const rot = (window._lastRotations||{})[pid];
+  if (rot) {
+    if (rot.lunch && h>=rot.lunch.from && h<rot.lunch.to) return 'lunch';
+    if (rot.b1 && h>=rot.b1.from && h<rot.b1.to) return rot.b1.station==='exit'?'exit':'counter';
+    if (rot.b2 && h>=rot.b2.from && h<rot.b2.to) return rot.b2.station==='exit'?'exit':'counter';
+    if (rot.b3 && h>=rot.b3.from && h<rot.b3.to) return rot.b3.station==='exit'?'exit':'counter';
+  }
+  const st = (STATE.staffStation||{})[pid];
+  if (p.role==='EXIT' || st==='Exit Booth') return 'exit';
+  if (['ARM','BRM','ABRM','MT'].includes(p.role)) return 'mgmt';
+  return 'counter';
+}
+function _nowFmtH(h){ if(h==null)return'—'; const hh=((Math.floor(h)%24)+24)%24, mn=Math.round((h-Math.floor(h))*60); const ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+(mn?':'+String(mn).padStart(2,'0'):'')+ap; }
+
+// Pick the freest on-counter CXR with the LEAST weekly exit time → keeps
+// exit-fairness balanced while covering the gap. Returns [pid, entry] or null.
+function _nowExitCandidate(exp, h) {
+  const cands = Object.entries(exp).filter(([pid,e]) => {
+    if (e.person.role !== 'CXR') return false;
+    if ((STATE.todayOverrides||{})[pid]==='callout') return false;
+    return _nowZone(pid, e.person, h) === 'counter';
+  });
+  if (!cands.length) return null;
+  cands.sort((a,b) => (getExitHoursWeek(a[0])||0) - (getExitHoursWeek(b[0])||0));
+  return cands[0];
+}
+function nowFix(pid) {
+  if (!pid) return;
+  if (typeof setStation === 'function') setStation(pid, 'Exit Booth');
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildSwitchboard === 'function') buildSwitchboard();
+  if (typeof renderNow === 'function') renderNow();
+  const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const nick = exp[pid] ? (exp[pid].person.nick || exp[pid].person.name.split(' ')[0]) : 'Staff';
+  if (typeof toast === 'function') toast('Sent ' + nick + ' to Exit');
+}
+
+function renderNow() {
+  const el = document.getElementById('now-hero');
+  if (!el) return;
+  const exp = typeof buildExpectedToday==='function' ? buildExpectedToday() : {};
+  const now = new Date();
+  const dow = now.getDay();
+  const nowH = now.getHours() + now.getMinutes()/60;
+  const h = Math.floor(nowH);
+  const dateStr = now.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  const timeStr = now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+
+  if (!Object.keys(exp).length) {
+    el.innerHTML = `<div class="now-title">Now</div><div class="now-sub">${dateStr} · ${timeStr}</div>
+      <div class="now-attn"><div class="now-kicker" style="color:var(--txt3)">No schedule loaded</div>
+      <div class="now-h">Load today's schedule</div><div class="now-p">Paste the fleet numbers and schedule to see live coverage.</div>
+      <button class="now-btn" onclick="showTab('paste')">Go to Paste Data →</button></div>`;
+    return;
+  }
+
+  // Who's on the floor right now + have/need
+  const zones = { exit:[], counter:[], returns:[] };
+  let exitAgents = 0;
+  Object.entries(exp).forEach(([pid,e]) => {
+    if (e.person.role==='EXIT' && (STATE.todayOverrides||{})[pid]!=='callout') {
+      const ov=(STATE.shiftMod||{})[pid]||{}; const ss=ov.start!=null?ov.start:e.person.shiftStart; const se=ov.end!=null?ov.end:e.person.shiftEnd;
+      if (ss!=null && h>=ss && h<se) exitAgents++;
+    }
+    const z = _nowZone(pid, e.person, h);
+    const nick = e.person.nick || e.person.name.split(' ')[0];
+    if (z==='exit') zones.exit.push(nick);
+    else if (z==='counter'||z==='mgmt') zones.counter.push(nick);
+    else if (z==='returns') zones.returns.push(nick);
+  });
+  const rules = typeof COVERAGE_BY_HOUR==='function' ? COVERAGE_BY_HOUR(h, dow, exitAgents) : {exitMin:1, counterMin:2};
+  const closed = !!rules.closed;
+  const exitHave = zones.exit.length, exitNeed = rules.exitMin||0;
+  const ctrHave = zones.counter.length, ctrNeed = rules.counterMin||0;
+
+  // Most-urgent decision
+  let attn;
+  if (!closed && exitHave < exitNeed) {
+    const cand = _nowExitCandidate(exp, h);
+    const cn = cand ? (cand[1].person.nick || cand[1].person.name.split(' ')[0]) : null;
+    attn = { cls:'urgent', kicker:'⚠ Exit short — right now',
+      title:`Exit is ${exitHave}/${exitNeed}`,
+      sub: cand ? `${cn} is freest at Counter and lowest on exit time this week.` : 'No free Counter CXR to pull — consider an MT/ABRM.',
+      btn: cand ? {label:`Send ${cn} to Exit →`, on:`nowFix('${cand[0]}')`, cls:'wide-green'} : null };
+  } else if (!closed && ctrHave < ctrNeed) {
+    attn = { cls:'warn', kicker:'⚠ Counter short — right now',
+      title:`Counter is ${ctrHave}/${ctrNeed}`,
+      sub:'Exit is covered. Pull an MT/ABRM to Counter or accept reduced coverage.',
+      btn:{label:'Open Schedule →', on:"showTab('schedule')"} };
+  } else {
+    attn = { cls:'ok', kicker:'✓ You’re covered',
+      title: closed ? 'Branch is closed this hour' : `Exit ${exitHave}/${exitNeed} · Counter ${ctrHave}/${ctrNeed}`,
+      sub:'Nothing needs attention this hour.',
+      btn:{label:'Open Schedule →', on:"showTab('schedule')"} };
+  }
+
+  // Coming up: next lunch, next ritual
+  let nextLunch = null;
+  Object.entries(exp).forEach(([pid,e]) => {
+    const rot=(window._lastRotations||{})[pid];
+    if (rot && rot.lunch && rot.lunch.from > nowH && (!nextLunch || rot.lunch.from < nextLunch.at)) {
+      nextLunch = { at: rot.lunch.from, who: e.person.nick||e.person.name.split(' ')[0] };
+    }
+  });
+  const ritual = h < 11 ? 'Opening' : h < 16 ? 'Mid-shift' : 'Closing';
+
+  let html = `<div class="now-title">Now</div><div class="now-sub">${dateStr} · ${timeStr}</div>`;
+  html += `<div class="now-attn ${attn.cls}"><div class="now-kicker">${attn.kicker}</div>
+    <div class="now-h">${attn.title}</div><div class="now-p">${attn.sub}</div>`;
+  if (attn.btn) html += `<button class="now-btn ${attn.btn.cls||''}" onclick="${attn.btn.on}">${attn.btn.label}</button>`;
+  html += `</div>`;
+
+  const floorRow = (ic,label,have,need,names,ok) => `<div class="more-row" style="cursor:default">
+    <span class="more-ic">${ic}</span>
+    <span class="more-lbl">${label}<div style="font-size:12px;color:var(--txt3);margin-top:1px">${names.length?names.join(', '):'—'}</div></span>
+    <span class="now-floor-val" style="color:${ok?'var(--wu)':'var(--na)'}">${have}${need?'/'+need:''}</span></div>`;
+  html += `<div class="now-sec-hd">On the floor right now</div><div class="more-group">`;
+  html += floorRow('🟦','Counter',ctrHave,ctrNeed,zones.counter, closed||ctrHave>=ctrNeed);
+  html += floorRow('🟩','Exit booth',exitHave,exitNeed,zones.exit, closed||exitHave>=exitNeed);
+  html += floorRow('↩','Returns',zones.returns.length,0,zones.returns, true);
+  html += `</div>`;
+
+  html += `<div class="now-sec-hd">Coming up</div><div class="more-group">`;
+  html += `<div class="more-row" style="cursor:default"><span class="more-ic">🍽</span><span class="more-lbl">Next lunch</span><span class="now-floor-val" style="color:var(--up)">${nextLunch?_nowFmtH(nextLunch.at)+' · '+nextLunch.who:'—'}</span></div>`;
+  html += `<button class="more-row" onclick="showTab('checklist')"><span class="more-ic">✅</span><span class="more-lbl">${ritual} ritual</span><span class="more-ch">›</span></button>`;
+  html += `</div>`;
+
+  el.innerHTML = html;
 }
 
 function autoRoute() { if(typeof autoRouteByTime==="function") autoRouteByTime(); }
