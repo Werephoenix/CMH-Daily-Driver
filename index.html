@@ -3567,6 +3567,9 @@ window.onload = function() {
   updateWalkUpButtons();
   updateBoardTotals();
   autoRouteByTime();
+  // v60.52: first open of the day → guided start-of-day flow (EOD recap → paste → next step).
+  // Deferred so the initial UI settles first; the recap is an overlay on top of the routed tab.
+  if (typeof maybeStartOfDay === 'function') setTimeout(maybeStartOfDay, 700);
   // Initialize schedule engine with pre-loaded data
   if (typeof initScheduleEngine === 'function') initScheduleEngine();
   if (typeof initSync === 'function') initSync();
@@ -3637,6 +3640,71 @@ function autoRouteByTime() {
   if      (h >= 15) { showTab('checklist'); _forceShowChecklist('closing'); }
   else if (h >= 11) { showTab('checklist'); _forceShowChecklist('mid'); }
   else               { showTab('opening'); }
+}
+
+// ── v60.52: START-OF-DAY GUIDED FLOW ─────────────────────────────────────────
+// First open of the day → show yesterday's EOD recap → paste GreenLight data →
+// offer "Fix Schedule" (recommended) or "Live Board".
+function _sodTodayKey(){ return new Date().toISOString().slice(0,10); }
+function maybeStartOfDay() {
+  try {
+    const today = _sodTodayKey();
+    if (STATE.lastOpenDate === today) return false;   // already opened today
+    STATE.lastOpenDate = today;
+    if (typeof saveState === 'function') saveState();
+    showEODRecap();
+    return true;
+  } catch(e){ return false; }
+}
+function _sodRow(lbl, val){
+  if (val === null || val === undefined || val === '') return '';
+  return `<div class="cov-row"><div style="flex:1;font-size:13px;color:var(--txt2)">${lbl}</div>`
+       + `<div style="font-weight:700;color:var(--txt)">${val}</div></div>`;
+}
+function showEODRecap() {
+  window._sodActive = true;              // arms the post-paste "what's next" prompt
+  window._sodPrompted = false;
+  const hist = (typeof loadHistory === 'function') ? loadHistory() : [];
+  const e = (hist && hist.length) ? hist[0] : null;
+  let body;
+  if (!e) {
+    body = `<p style="font-size:14px;color:var(--txt2);margin-bottom:16px">No saved end-of-day summary yet — let's get today started.</p>`
+         + `<button class="now-btn" onclick="sodToPaste()">Paste GreenLight data →</button>`;
+  } else {
+    body = `<div style="font-size:13px;color:var(--txt3);margin-bottom:12px">${e.dateLabel || e.date}</div>`
+         + `<div class="more-group" style="margin-bottom:16px">`
+         +   _sodRow('Closed by', e.closeMgr)
+         +   _sodRow('Completely Satisfied', e.cs)
+         +   _sodRow('Hot alerts', e.hot)
+         +   _sodRow('OOS units', e.oos)
+         +   _sodRow('Walk-up policy', e.walkUpPolicy)
+         +   (e.closeNotes ? `<div class="cov-row"><div style="font-size:13px;color:var(--txt2)">📝 ${e.closeNotes}</div></div>` : '')
+         + `</div>`
+         + `<button class="now-btn" onclick="sodToPaste()">Start the day → Paste data</button>`;
+  }
+  if (typeof openModal === 'function') openModal('☀️ Good morning — yesterday\'s recap', body);
+}
+function sodToPaste() {
+  if (typeof closeModal === 'function') closeModal();
+  showTab('paste');
+  if (typeof toast === 'function') toast('Paste the fresh GreenLight numbers');
+}
+function sodMaybeNext() {
+  if (!window._sodActive || window._sodPrompted) return;
+  const pd = STATE.pasteData || {};
+  const hasBoard = !!(pd.brands || pd.resAM || pd.resPM || pd.retAM || pd.retPM);
+  if (!hasBoard) return;
+  window._sodPrompted = true;
+  const body = `<p style="font-size:14px;color:var(--txt2);margin-bottom:16px">Data's in. What do you want to do next?</p>`
+    + `<button class="now-btn" onclick="sodGo('schedule')">🔧 Fix Schedule →</button>`
+    + `<div style="height:10px"></div>`
+    + `<button class="now-btn secondary" onclick="sodGo('board')">🚗 Live Board →</button>`;
+  if (typeof openModal === 'function') openModal('✅ Next step', body);
+}
+function sodGo(where) {
+  window._sodActive = false;
+  if (typeof closeModal === 'function') closeModal();
+  showTab(where);
 }
 
 function showTab(id) {
@@ -3831,6 +3899,9 @@ function hourArrayToPeakStr(hourly, topN) {
 }
 
 function parseStep(stepNum) {
+  // v60.52: during the start-of-day flow, offer the "what's next" step once board
+  // data lands (deferred so it runs after this parse commits, whatever path it takes).
+  if (window._sodActive) setTimeout(function(){ if (typeof sodMaybeNext==='function') sodMaybeNext(); }, 400);
   const idMap  = {1:'pa1',  2:'pa2',  3:'pa3',  4:'pa4',  5:'pa5'};
   const keyMap = {1:'resAM',2:'resPM',3:'retAM',4:'retPM',5:'brands'};
   const key    = keyMap[stepNum];
