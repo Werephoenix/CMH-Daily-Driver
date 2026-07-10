@@ -10212,18 +10212,29 @@ function showShiftModModal(pid, personName) {
       <div style="display:flex;flex-wrap:wrap;gap:6px">${_rotBtn('normal','🔄 Normal')}${_rotBtn('full-counter','🟦 All Counter')}${_rotBtn('full-exit','🟩 All Exit')}${_rotBtn('exit-first','↪ Exit First')}</div>
     </div>` : '';
   const whatifHtml = `<button class="btn btn-gh btn-sm" style="width:100%;margin-bottom:14px" onclick="showWhatif('${pid}','${_escNm}')">🔮 What If…? — coverage scenarios</button>`;
+  // v60.51: tabbed sheet (Hours & Lunch / Rotation / What-If) so it's not a long scroll.
+  const _showRotTab = _isCXR;
+  const _tab = (key,label,on)=>`<button class="seg${on?' on':''}" data-smt="${key}" onclick="smTab('${key}')">${label}</button>`;
+  const tabBar = `<div class="seg-ctl" style="margin-bottom:14px">
+    ${_tab('hours','Hours & Lunch',true)}
+    ${_showRotTab?_tab('rot','Rotation',false):''}
+    ${_tab('whatif','What-If',false)}
+  </div>`;
   const body = `
-    <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
-      Everything for ${personName} today — hours, lunch, rotation, and what-ifs.
-    </p>
-    ${customHtml}
-    ${lunchHtml}
-    ${rotationHtml}
-    ${whatifHtml}
-    <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Or a quick preset</div>
-    ${optHtml}`;
+    ${tabBar}
+    <div data-smpane="hours">
+      ${customHtml}
+      ${lunchHtml}
+      <div style="font-size:10px;font-weight:700;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin:4px 0 6px">Or a quick preset</div>
+      ${optHtml}
+    </div>
+    ${_showRotTab?`<div data-smpane="rot" style="display:none">${rotationHtml}</div>`:''}
+    <div data-smpane="whatif" style="display:none">
+      <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">Preview coverage impact before you commit — move ${personName} to a station or simulate an early out. Nothing changes until you apply.</p>
+      ${whatifHtml}
+    </div>`;
 
-  openModal('⏰ Adjust Shift — ' + personName, body);
+  openModal('⏰ Adjust — ' + personName, body);
 }
 
 function applyShiftMod(pid, presetIdx) {
@@ -10346,6 +10357,12 @@ function resetLunch(pid) {
 // v60.35: rotation change from the unified adjuster panel (All Counter / All
 // Exit / Normal / Exit-First). Sets altPosition, rebuilds every view, and
 // re-opens the panel so the active choice shows.
+// v60.51: switch tabs inside the Adjust sheet (Hours & Lunch / Rotation / What-If).
+function smTab(key) {
+  document.querySelectorAll('[data-smpane]').forEach(p => { p.style.display = (p.getAttribute('data-smpane')===key) ? '' : 'none'; });
+  document.querySelectorAll('[data-smt]').forEach(b => { b.className = 'seg' + (b.getAttribute('data-smt')===key ? ' on' : ''); });
+}
+
 function setRotationFromModal(pid, personName, key) {
   if (typeof setAltPosition === 'function') setAltPosition(pid, key);
   ['buildCoverageTimeline','buildStationView','buildSwitchboard','buildStaffGrid','buildCoverageUI','refreshDash'].forEach(fn => {
@@ -10356,6 +10373,7 @@ function setRotationFromModal(pid, personName, key) {
     toast('Set: ' + lbl);
   }
   if (typeof showShiftModModal === 'function') showShiftModModal(pid, personName);
+  if (typeof smTab === 'function') smTab('rot'); // v60.51: stay on the Rotation tab
 }
 
 // ═══════════════════════════════════════════════════════════════════════
