@@ -1136,7 +1136,7 @@ input.autofill{background:rgba(22,163,74,.06);border-color:var(--green3);color:v
 #topbar{background:rgba(20,20,22,.82);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid rgba(255,255,255,.07);height:50px;display:flex;align-items:center;padding:0 16px;gap:10px;position:sticky;top:0;z-index:200}
 #logo{font-family:var(--ff-hd);font-size:17px;font-weight:800;letter-spacing:.05em;display:flex;align-items:center;gap:6px}
 #logo .accent{color:var(--acc)}
-.shift-pill{font-family:var(--ff-hd);font-size:11px;font-weight:700;letter-spacing:.08em;padding:3px 10px;border-radius:3px;color:#fff}
+.shift-pill{font-family:var(--ff-ui);font-size:11px;font-weight:700;letter-spacing:.06em;padding:4px 11px;border-radius:999px;color:#fff}
 .shift-pill.opening{background:var(--acc2)}
 .shift-pill.mid{background:var(--green3)}
 .shift-pill.closing{background:var(--red3)}
@@ -1616,14 +1616,16 @@ button { cursor: pointer; }
 <body>
 
 <!-- ── TOPBAR ── -->
+<!-- v60.49: decluttered iOS topbar — brand + on-duty + time + shift pill. The
+     density/theme toggles moved to More → Appearance; the date now lives in each
+     screen's large-title subheader. (#topbar-date kept hidden — the clock JS
+     still writes to it.) -->
 <div id="topbar">
-  <div id="logo">🚗 <span class="accent">CMH</span> DAILY DRIVER</div>
-  <div id="topbar-date" style="font-size:11px;color:var(--txt3);font-family:var(--ff-mono);margin-left:8px"></div>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+  <div id="logo">🚗 <span class="accent">CMH</span> <span style="font-weight:600;color:var(--txt2);letter-spacing:.01em">Daily Driver</span></div>
+  <div id="topbar-date" style="display:none"></div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:9px">
+    <div id="topbar-onduty" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(10,132,255,.14);color:var(--counter);display:none"></div>
     <div id="topbar-time" style="font-family:var(--ff-mono);font-size:13px;color:var(--txt2)"></div>
-    <div id="topbar-onduty" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:rgba(37,99,235,.12);color:var(--acc);display:none"></div>
-    <button id="density-toggle" onclick="toggleDensity()" title="Switch to compact spacing" style="background:none;border:1px solid var(--bdr);color:var(--txt3);border-radius:6px;cursor:pointer;font-size:12px;line-height:1;padding:3px 6px">⊟</button>
-    <button id="theme-toggle" onclick="toggleTheme()" title="Toggle Bold / Calm look" style="background:none;border:1px solid var(--bdr);color:var(--txt3);border-radius:6px;cursor:pointer;font-size:12px;line-height:1;padding:3px 6px">🎨</button>
     <div id="topbar-shift-badge" class="shift-pill opening">OPENING</div>
   </div>
 </div>
@@ -1653,6 +1655,7 @@ button { cursor: pointer; }
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:20px 0 6px 4px">Appearance</div>
     <div class="more-group">
       <button class="more-row" onclick="toggleTheme()"><span class="more-ic">🌙</span><span class="more-lbl">Calm Mode / Bold theme</span><span class="more-ch">⇄</span></button>
+      <button class="more-row" onclick="toggleDensity()"><span class="more-ic">⊟</span><span class="more-lbl">Compact / Comfortable spacing</span><span class="more-ch">⇄</span></button>
     </div>
   </div>
 </div>
