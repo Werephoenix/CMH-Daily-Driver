@@ -273,7 +273,10 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .seg { flex: 1; border: none; background: transparent; color: var(--txt2); font-family: var(--ff-ui); font-size: 13px; font-weight: 600; padding: 7px 4px; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
 .seg.on { background: var(--bg2); color: var(--txt); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
 /* Coverage-first per-hour list */
-.cov-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-bottom: 1px solid var(--bdr); }
+.cov-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 10px; padding: 11px 14px; border-bottom: 1px solid var(--bdr); }
+.cov-note { flex-basis: 100%; font-size: 12px; font-weight: 600; margin-top: 2px; }
+.cov-note.movable { color: var(--up); }
+.cov-note.shortage { color: var(--na); }
 .cov-row:last-child { border-bottom: none; }
 .cov-row.nowrow { background: rgba(10,132,255,.10); }
 .cov-h { width: 48px; flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--txt2); font-size: 13px; }
@@ -12931,10 +12934,24 @@ function renderCoverageFirst() {
     const q = counts(h);
     if (q.closed && q.ex===0 && q.ct===0) continue;
     const isNow = h===nowFloor;
+    // v60.54: is a short hour FIXABLE by moving someone, or a TRUE shortage?
+    let note = '';
+    if (!q.closed && q.ex < q.exN) {
+      const cand = _nowExitCandidate(exp, h);          // counter CXR free this hour, least exit hrs
+      const wouldCtrShort = (q.ct - 1) < q.ctN;
+      if (cand && !wouldCtrShort) { const nm = cand[1].person.nick||cand[1].person.name.split(' ')[0]; note = `<div class="cov-note movable">⚑ Movable — send ${nm} to Exit (Counter stays OK)</div>`; }
+      else { note = `<div class="cov-note shortage">⚠ True shortage — need +${q.exN-q.ex} more at Exit</div>`; }
+    } else if (!q.closed && q.ct < q.ctN) {
+      const exitCxr = Object.entries(exp).find(([pid,e]) => e.person.role==='CXR' && _nowZone(pid,e.person,h)==='exit');
+      const wouldExitShort = (q.ex - 1) < q.exN;
+      if (exitCxr && !wouldExitShort) { const nm = exitCxr[1].person.nick||exitCxr[1].person.name.split(' ')[0]; note = `<div class="cov-note movable">⚑ Movable — pull ${nm} to Counter (Exit stays OK)</div>`; }
+      else { note = `<div class="cov-note shortage">⚠ Short — pull an MT/ABRM or accept reduced</div>`; }
+    }
     html += `<div class="cov-row${isNow?' nowrow':''}">
       <div class="cov-h">${fmtH(h)}</div>
       <div class="cov-cell"><span class="cov-tag" style="color:var(--exit)">EXIT</span> <span class="cov-n ${cls(q.ex,q.exN)}">${q.ex}/${q.exN}</span></div>
       <div class="cov-cell"><span class="cov-tag" style="color:var(--counter)">CTR</span> <span class="cov-n ${cls(q.ct,q.ctN)}">${q.ct}/${q.ctN}</span></div>
+      ${note}
     </div>`;
   }
   html += `</div>`;
