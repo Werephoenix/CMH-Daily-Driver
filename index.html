@@ -274,8 +274,9 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .seg.on { background: var(--bg2); color: var(--txt); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
 /* Coverage-first per-hour list */
 .cov-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 10px; padding: 11px 14px; border-bottom: 1px solid var(--bdr); }
-.cov-note { flex-basis: 100%; font-size: 12px; font-weight: 600; margin-top: 2px; }
-.cov-note.movable { color: var(--up); }
+.cov-note { flex-basis: 100%; font-size: 12px; font-weight: 600; margin-top: 2px; background: none; border: none; text-align: left; padding: 0; font-family: var(--ff-ui); }
+.cov-note.movable { color: var(--up); cursor: pointer; }
+.cov-note.movable:active { opacity: .55; }
 .cov-note.shortage { color: var(--na); }
 .cov-row:last-child { border-bottom: none; }
 .cov-row.nowrow { background: rgba(10,132,255,.10); }
@@ -8002,6 +8003,20 @@ function nowFix(pid) {
   const nick = exp[pid] ? (exp[pid].person.nick || exp[pid].person.name.split(' ')[0]) : 'Staff';
   if (typeof toast === 'function') toast('Sent ' + nick + ' to Exit');
 }
+// v60.55: one-tap apply for a "Movable" row in the Coverage view. Uses the same
+// primitive as the rotation buttons — setAltPosition full-exit/full-counter —
+// which is what actually moves the coverage numbers (staffStation alone just sets
+// the starting block). setAltPosition rebuilds the rotation + coverage; the view
+// re-renders so the manager immediately sees the new state and can fine-tune.
+function covFix(pid, mode) {
+  if (!pid || (mode !== 'full-exit' && mode !== 'full-counter')) return;
+  if (typeof setAltPosition === 'function') setAltPosition(pid, mode);
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof buildSwitchboard === 'function') buildSwitchboard();
+  const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
+  const nick = exp[pid] ? (exp[pid].person.nick || exp[pid].person.name.split(' ')[0]) : 'Staff';
+  if (typeof toast === 'function') toast('Sent ' + nick + ' to ' + (mode==='full-exit'?'Exit':'Counter') + ' (all shift)');
+}
 
 function renderNow() {
   const el = document.getElementById('now-hero');
@@ -12939,12 +12954,12 @@ function renderCoverageFirst() {
     if (!q.closed && q.ex < q.exN) {
       const cand = _nowExitCandidate(exp, h);          // counter CXR free this hour, least exit hrs
       const wouldCtrShort = (q.ct - 1) < q.ctN;
-      if (cand && !wouldCtrShort) { const nm = cand[1].person.nick||cand[1].person.name.split(' ')[0]; note = `<div class="cov-note movable">⚑ Movable — send ${nm} to Exit (Counter stays OK)</div>`; }
+      if (cand && !wouldCtrShort) { const nm = (cand[1].person.nick||cand[1].person.name.split(' ')[0]).replace(/'/g,''); note = `<button class="cov-note movable" onclick="covFix('${cand[0]}','full-exit')">⚑ Tap to fix — send ${nm} to Exit (Counter stays OK) →</button>`; }
       else { note = `<div class="cov-note shortage">⚠ True shortage — need +${q.exN-q.ex} more at Exit</div>`; }
     } else if (!q.closed && q.ct < q.ctN) {
       const exitCxr = Object.entries(exp).find(([pid,e]) => e.person.role==='CXR' && _nowZone(pid,e.person,h)==='exit');
       const wouldExitShort = (q.ex - 1) < q.exN;
-      if (exitCxr && !wouldExitShort) { const nm = exitCxr[1].person.nick||exitCxr[1].person.name.split(' ')[0]; note = `<div class="cov-note movable">⚑ Movable — pull ${nm} to Counter (Exit stays OK)</div>`; }
+      if (exitCxr && !wouldExitShort) { const nm = (exitCxr[1].person.nick||exitCxr[1].person.name.split(' ')[0]).replace(/'/g,''); note = `<button class="cov-note movable" onclick="covFix('${exitCxr[0]}','full-counter')">⚑ Tap to fix — pull ${nm} to Counter (Exit stays OK) →</button>`; }
       else { note = `<div class="cov-note shortage">⚠ Short — pull an MT/ABRM or accept reduced</div>`; }
     }
     html += `<div class="cov-row${isNow?' nowrow':''}">
