@@ -2087,7 +2087,7 @@ button { cursor: pointer; }
     <button class="btn btn-gh btn-sm" onclick="printScheduleMap()" title="Print full-day schedule for everyone">
       🖨 Print Schedule Map
     </button>
-    <span style="font-size:9px;color:var(--txt3)">
+    <span id="auto-why" style="font-size:9px;color:var(--txt3)">
       Fills exit gaps using available CXRs · respects manager overrides
     </span>
   </div>
@@ -6792,59 +6792,57 @@ function autoLoadFromExpected(expectedToday, dow) {
     }
   }
   const exitAgentCount = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='EXIT'&&STATE.staffDuty[pid]).length;
-  const rules   = (typeof COVERAGE_RULES!=='undefined'&&COVERAGE_RULES[dow])||{};
   const isMonday = dow===1;
   const baseExitMin = isMonday ? 5 : 1;
-  // How many CXRs we need at exit = max(0, exitMin - exitAgentsCovered)
-  // Exit agents cover 1 booth each for their full shift
-  const cxrExitNeeded = Math.max(0, baseExitMin - exitAgentCount);
+  // v60.53: DEMAND-AWARE need — "meet the need, don't exceed it." Instead of a
+  // flat exit minimum, take the PEAK Exit-min across the open day from
+  // COVERAGE_BY_HOUR, so we staff exit for the busiest hour (and no more).
+  let peakExitMin = baseExitMin;
+  if (typeof COVERAGE_BY_HOUR === 'function') {
+    let pk = 0;
+    for (let h=6; h<24; h++){ const r=COVERAGE_BY_HOUR(h,dow,exitAgentCount)||{}; if(!r.closed) pk=Math.max(pk, r.exitMin||0); }
+    if (pk) peakExitMin = pk;
+  }
+  const cxrExitNeeded = Math.max(0, peakExitMin - exitAgentCount);
   const cxrTotal = Object.entries(expectedToday).filter(([,e])=>e.person.role==='CXR').length;
-  // exitMax: enough to meet minimum, but cap at reasonable number
-  // If exit agents already meet minimum, no CXRs need to go to exit (exitMax=0)
-  // But we always want at least 1 CXR at exit as backup during peak
+  // exitMax = CXRs to send to exit: cover the need (+1 peak backup on non-Mondays),
+  // capped so we never overstaff exit.
   const exitMax = isMonday
     ? Math.max(cxrExitNeeded, Math.min(5, Math.round(cxrTotal*0.4)))
-    : Math.max(cxrExitNeeded, exitAgentCount>=baseExitMin ? 0 : 1);
+    : Math.max(cxrExitNeeded, exitAgentCount>=peakExitMin ? 0 : 1);
+  // yesterday's stations (continuity signal) + learned station patterns
   let lastSt={};try{const h=JSON.parse(localStorage.getItem('cmh-history-v2')||'{}');const dk=Object.keys(h).sort().slice(-1)[0];if(dk&&h[dk]&&h[dk].staffStation)lastSt=h[dk].staffStation;}catch(e){}
   let pats={};try{pats=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');}catch(err){}
-  const cxrs = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='CXR')
-    .map(([pid,e])=>({pid, pref:(STATE.stationPref||{})[pid]||'none', rosterPref:e.person.pref||'none',
-      overridePref:(pats[pid]&&pats[pid].suggestedPref)||null, shiftStart:e.person.shiftStart||99}))
-    .sort((a,b)=>{
-      if((a.pref==='exit'||a.rosterPref==='exit')&&b.pref!=='exit'&&b.rosterPref!=='exit')return -1; if((b.pref==='exit'||b.rosterPref==='exit')&&a.pref!=='exit'&&a.rosterPref!=='exit')return 1;
-      if(a.pref==='counter'&&b.pref!=='counter')return 1; if(b.pref==='counter'&&a.pref!=='counter')return -1;
-      if(a.overridePref==='exit'&&b.overridePref!=='exit')return -1; if(b.overridePref==='exit'&&a.overridePref!=='exit')return 1;
-      if(a.overridePref==='counter'&&b.overridePref!=='counter')return 1; if(b.overridePref==='counter'&&a.overridePref!=='counter')return -1;
-      if(a.lastWasExit&&!b.lastWasExit)return 1;
-      if(b.lastWasExit&&!a.lastWasExit)return -1;
-      return a.shiftStart-b.shiftStart;
-    });
-  // v60.24: cover the exit NEED, balance the rest at counter, and SPREAD exit
-  // duty across start-times so people who start together don't all land at exit
-  // at once (fixes "3 people who start at 8:30 all sent to exit"). Preferences
-  // still win: exit-pref take exit first; counter-pref stay at counter.
-  let exitFilled = 0;
-  const wantsExit    = cxrs.filter(c => c.pref==='exit' || c.rosterPref==='exit' || c.overridePref==='exit');
-  const wantsCounter = cxrs.filter(c => wantsExit.indexOf(c)===-1 && (c.pref==='counter' || c.overridePref==='counter'));
-  wantsExit.forEach(c => {
-    if (STATE.staffStation[c.pid]) return;
-    if (exitFilled < exitMax) { STATE.staffStation[c.pid] = 'Exit Booth'; exitFilled++; }
-    else STATE.staffStation[c.pid] = 'Counter';
-  });
-  wantsCounter.forEach(c => { if (!STATE.staffStation[c.pid]) STATE.staffStation[c.pid] = 'Counter'; });
-  // No-preference CXRs: spread the remaining exit slots EVENLY across the
-  // start-time-sorted order, so same-start people are split rather than clumped.
-  const noPref = cxrs.filter(c => !STATE.staffStation[c.pid]);
-  const slots  = Math.max(0, exitMax - exitFilled);
-  // v60.29: FAIRNESS — give exit to the CXRs with the LEAST exit time this week,
-  // so exit/counter evens out over time. Tiebreak by start time (spreads
-  // same-fairness people across the day, keeping the v60.24 anti-clumping).
-  // Day-over-day this rotates naturally: whoever does exit today gains hours →
-  // counter tomorrow.
+  // v60.53: COST-SCORED "who → Exit". One explainable score per CXR; the
+  // lowest-cost people fill the exit need. Blends the soft constraints:
+  //   cost = weeklyExitHours  −PREF·prefersExit  +PREF·prefersCounter  +tiny start-time spread.
+  // Preference dominates (PREF»fairness); within a preference tier, the CXR with
+  // the LEAST exit time this week goes first (fairness → rotates day-to-day); the
+  // start-time term keeps same-start people from all landing at exit at once.
   const _fair = (typeof getExitFairnessData === 'function') ? getExitFairnessData() : {};
   const _fh = pid => (typeof exitHoursTotal === 'function') ? exitHoursTotal(_fair, pid) : (_fair[pid] || 0);
-  noPref.sort((a, b) => (_fh(a.pid) - _fh(b.pid)) || ((a.shiftStart||99) - (b.shiftStart||99)));
-  noPref.forEach((c, idx) => { STATE.staffStation[c.pid] = idx < slots ? 'Exit Booth' : 'Counter'; });
+  const PREF = 1000;
+  const cxrs = Object.entries(expectedToday).filter(([pid,e])=>e.person.role==='CXR')
+    .map(([pid,e])=>{
+      const pref = (STATE.stationPref||{})[pid]||'none';
+      const rosterPref = e.person.pref||'none';
+      const overridePref = (pats[pid]&&pats[pid].suggestedPref)||'none';
+      const wantsExit    = pref==='exit' || rosterPref==='exit' || overridePref==='exit';
+      const wantsCounter = !wantsExit && (pref==='counter' || overridePref==='counter');
+      let cost = _fh(pid);
+      if (wantsExit)    cost -= PREF;
+      if (wantsCounter) cost += PREF;
+      cost += (e.person.shiftStart||99) * 0.01; // anti-clumping tiebreak by start time
+      return { pid, cost };
+    })
+    .sort((a,b)=>a.cost-b.cost);
+  // Assign the exitMax lowest-cost CXRs to Exit; everyone else to Counter.
+  // (Respect any station already forced above — EXIT/RETURNS/mgmt roles.)
+  cxrs.forEach((c, idx) => {
+    if (STATE.staffStation[c.pid]) return;
+    STATE.staffStation[c.pid] = (idx < exitMax) ? 'Exit Booth' : 'Counter';
+  });
+  window._lastAutoAssign = { peakExitMin, exitAgentCount, cxrExitNeeded, exitMax }; // for the "why" readout
   if(typeof buildSmartRotation==='function'){try{const rot=buildSmartRotation();window._lastRotations={};if(rot&&rot.rotations)rot.rotations.forEach(r=>{window._lastRotations[r.pid]=r;});}catch(err){}}
   saveState();
 }
@@ -12877,6 +12875,14 @@ function setSchedPattern(p) {
 
 function renderScheduleView() {
   const p = STATE.schedPattern || 'timeline';
+  // v60.53: explain the auto-assignment ("smart AND explainable").
+  const aw = document.getElementById('auto-why');
+  if (aw) {
+    const a = window._lastAutoAssign;
+    aw.textContent = a
+      ? `Exit need: peak ${a.peakExitMin}/hr · ${a.exitAgentCount} exit agent${a.exitAgentCount===1?'':'s'} on shift → ${a.exitMax} CXR${a.exitMax===1?'':'s'} to exit, rest to counter (fairness-balanced, prefs honored)`
+      : 'Fills exit gaps using available CXRs · respects manager overrides';
+  }
   const gb = document.getElementById('sched-groupby-row');
   if (gb) gb.style.display = (p==='coverage') ? 'none' : 'flex';
   ['timeline','roster','coverage'].forEach(m=>{
