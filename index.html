@@ -3443,7 +3443,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline',
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{},
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -8018,6 +8018,107 @@ function covFix(pid, mode) {
   if (typeof toast === 'function') toast('Sent ' + nick + ' to ' + (mode==='full-exit'?'Exit':'Counter') + ' (all shift)');
 }
 
+// ── v60.56: LIVE FLOOR — planned vs. ACTUAL (manager tap-in) ────────────────
+// The schedule says where people are SUPPOSED to be; the manager taps where they
+// ACTUALLY are right now. Actuals are "fresh" for 90 min then auto-expire (a
+// stale actual that's trusted is worse than none), so the app falls back to the
+// plan on its own. Scoped to the "right now" surfaces (Now screen), not the
+// future-facing schedule.
+var ACTUAL_TTL_MS = 90 * 60 * 1000;
+function _actualFresh(pid) {
+  const a = (STATE.actualStation || {})[pid];
+  if (!a || typeof a.ts !== 'number') return null;
+  if (Date.now() - a.ts > ACTUAL_TTL_MS) return null;
+  return a.z;
+}
+// Effective "where they are NOW" = fresh manager-tapped actual, else the plan.
+function _effectiveNowZone(pid, p, h) {
+  const a = _actualFresh(pid);
+  return a || _nowZone(pid, p, h);
+}
+function setActualZone(pid, z) {
+  if (!STATE.actualStation) STATE.actualStation = {};
+  if (!z || z === 'clear') delete STATE.actualStation[pid];
+  else STATE.actualStation[pid] = { z: z, ts: Date.now() };
+  if (typeof saveState === 'function') saveState();
+  if (typeof renderNow === 'function') renderNow();
+  if (document.getElementById('floor-sheet')) buildFloorSheet();
+}
+function clearAllActuals() {
+  STATE.actualStation = {};
+  if (typeof saveState === 'function') saveState();
+  if (typeof renderNow === 'function') renderNow();
+  if (document.getElementById('floor-sheet')) buildFloorSheet();
+  if (typeof toast === 'function') toast('Cleared — using the plan');
+}
+// Count how many on-shift people are tapped OFF their planned zone right now.
+function _offPlanCount() {
+  const exp = typeof buildExpectedToday==='function' ? buildExpectedToday() : {};
+  const h = Math.floor(new Date().getHours() + new Date().getMinutes()/60);
+  let n = 0;
+  Object.entries(exp).forEach(([pid,e]) => {
+    const a = _actualFresh(pid); if (!a) return;
+    const planned = _nowZone(pid, e.person, h);
+    if (planned !== 'off' && a !== planned) n++;
+  });
+  return n;
+}
+function showFloorSheet() {
+  if (typeof openModal !== 'function') return;
+  openModal('✋ Who’s actually where — right now', '<div id="floor-sheet"></div>');
+  buildFloorSheet();
+}
+function buildFloorSheet() {
+  const wrap = document.getElementById('floor-sheet');
+  if (!wrap) return;
+  const exp = typeof buildExpectedToday==='function' ? buildExpectedToday() : {};
+  const h = Math.floor(new Date().getHours() + new Date().getMinutes()/60);
+  // on-shift, non-callout people, sorted by role then name
+  const people = Object.entries(exp).filter(([pid,e]) => {
+    if ((STATE.todayOverrides||{})[pid]==='callout') return false;
+    const z = _nowZone(pid, e.person, h);
+    return z !== 'off';
+  }).sort((a,b)=>{
+    const ord = {CXR:0,EXIT:1,RETURNS:2}; const ra=ord[a[1].person.role]??3, rb=ord[b[1].person.role]??3;
+    return ra-rb || String(a[1].person.nick||'').localeCompare(String(b[1].person.nick||''));
+  });
+  const zones = [
+    { z:'counter', lbl:'Ctr',  col:'var(--counter)' },
+    { z:'exit',    lbl:'Exit', col:'var(--exit)' },
+    { z:'returns', lbl:'Ret',  col:'var(--returns)' },
+    { z:'lunch',   lbl:'🍽',   col:'var(--up)' },
+    { z:'break',   lbl:'Break',col:'var(--off)' },
+  ];
+  const off = _offPlanCount();
+  let html = `<p style="font-size:12px;color:var(--txt3);margin-bottom:10px">Tap where each person <b>actually</b> is now. Blank = go by the plan. Auto-clears after 90 min.${off?` · <span style="color:var(--up)">${off} off-plan</span>`:''}</p>`;
+  if (!people.length) { html += `<div style="color:var(--txt3);font-size:13px;padding:8px">Nobody on shift right now.</div>`; wrap.innerHTML = html; return; }
+  html += `<div class="more-group">`;
+  people.forEach(([pid,e]) => {
+    const nick = (e.person.nick||e.person.name.split(' ')[0]).replace(/'/g,'');
+    const planned = _nowZone(pid, e.person, h);
+    const actual = _actualFresh(pid);
+    const chips = zones.map(zc => {
+      const isActual = actual === zc.z;
+      const isPlan = planned === zc.z;
+      const bg = isActual ? zc.col : 'transparent';
+      const fg = isActual ? '#04140C' : zc.col;
+      const bd = isActual ? zc.col : 'var(--bdr2)';
+      return `<button onclick="setActualZone('${pid}','${isActual?'clear':zc.z}')" style="padding:5px 9px;border-radius:999px;border:1px solid ${bd};background:${bg};color:${fg};font-size:11px;font-weight:700;cursor:pointer">${zc.lbl}${isPlan?'<span style="opacity:.6"> ·plan</span>':''}</button>`;
+    }).join('');
+    const mismatch = actual && planned!=='off' && actual!==planned;
+    html += `<div style="padding:10px 12px;border-bottom:1px solid var(--bdr)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+        <span style="font-size:15px;font-weight:600;color:${mismatch?'var(--up)':'var(--txt)'}">${nick}</span>
+        <span style="font-size:11px;color:var(--txt3)">${e.person.role}${mismatch?' · off-plan':''}</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  html += `<button class="btn btn-gh btn-sm" style="width:100%;margin-top:12px" onclick="clearAllActuals()">Clear all — use the plan</button>`;
+  wrap.innerHTML = html;
+}
+
 function renderNow() {
   const el = document.getElementById('now-hero');
   if (!el) return;
@@ -8045,12 +8146,13 @@ function renderNow() {
       const ov=(STATE.shiftMod||{})[pid]||{}; const ss=ov.start!=null?ov.start:e.person.shiftStart; const se=ov.end!=null?ov.end:e.person.shiftEnd;
       if (ss!=null && h>=ss && h<se) exitAgents++;
     }
-    const z = _nowZone(pid, e.person, h);
+    const z = _effectiveNowZone(pid, e.person, h); // actual if tapped fresh, else plan
     const nick = e.person.nick || e.person.name.split(' ')[0];
     if (z==='exit') zones.exit.push(nick);
     else if (z==='counter'||z==='mgmt') zones.counter.push(nick);
     else if (z==='returns') zones.returns.push(nick);
   });
+  const offPlan = (typeof _offPlanCount==='function') ? _offPlanCount() : 0;
   const rules = typeof COVERAGE_BY_HOUR==='function' ? COVERAGE_BY_HOUR(h, dow, exitAgents) : {exitMin:1, counterMin:2};
   const closed = !!rules.closed;
   const exitHave = zones.exit.length, exitNeed = rules.exitMin||0;
@@ -8097,7 +8199,11 @@ function renderNow() {
     <span class="more-ic">${ic}</span>
     <span class="more-lbl">${label}<div style="font-size:12px;color:var(--txt3);margin-top:1px">${names.length?names.join(', '):'—'}</div></span>
     <span class="now-floor-val" style="color:${ok?'var(--wu)':'var(--na)'}">${have}${need?'/'+need:''}</span></div>`;
-  html += `<div class="now-sec-hd">On the floor right now</div><div class="more-group">`;
+  // v60.56: header shows ACTUAL-aware coverage + a tap to update who's really where.
+  html += `<div class="now-sec-hd" style="display:flex;align-items:center;justify-content:space-between">
+    <span>On the floor right now${offPlan?` · <span style="color:var(--up)">${offPlan} off-plan</span>`:''}</span>
+    <button onclick="showFloorSheet()" style="background:none;border:none;color:var(--exit);font-family:var(--ff-ui);font-size:13px;font-weight:700;cursor:pointer;padding:0">✋ Update</button>
+  </div><div class="more-group">`;
   html += floorRow('🟦','Counter',ctrHave,ctrNeed,zones.counter, closed||ctrHave>=ctrNeed);
   html += floorRow('🟩','Exit booth',exitHave,exitNeed,zones.exit, closed||exitHave>=exitNeed);
   html += floorRow('↩','Returns',zones.returns.length,0,zones.returns, true);
