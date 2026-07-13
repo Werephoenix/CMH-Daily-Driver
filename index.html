@@ -6204,7 +6204,17 @@ function parseGridSchedule(text, rosterFilter) {
   const _mattCXR = allRoster.find(p => p.id==='matt-j' || p.name==='Matthew Johnson');
   const _mattBRM = allRoster.find(p => p.id==='matt-b' || p.name==='Matt Johnson (BRM)');
   const _isMattName = nl => /^matt(hew)?\s+johnson\b/.test(nl);
-  const _isCxrShift = s => { const t = String(s||'').toUpperCase().replace(/[^0-9AP]/g,''); return t.startsWith('530A') && t.indexOf('2P') > 0; };
+  // Matt's signature CXR shift = 5:30a–2p. Tolerant of "530A-2P", "530A-200P",
+  // "5:30A-2:00P", etc. (start 5:30a AND end 2p; NOT 2:30p / 3:30p / etc).
+  const _isCxrShift = s => {
+    const parts = String(s||'').toUpperCase().split(/[-–—]/);
+    if (parts.length < 2) return false;
+    const start = parts[0].replace(/[^0-9AP]/g,'');
+    const end   = parts[1].replace(/[^0-9AP]/g,'');
+    const startOK = start==='530A' || start==='0530A';
+    const endOK   = end==='2P' || end==='200P' || end==='0200P';
+    return startOK && endOK;
+  };
 
   const lines = text.trim().split(/[\n\r]+/).filter(l => l.trim());
   if (lines.length < 2) return null;
