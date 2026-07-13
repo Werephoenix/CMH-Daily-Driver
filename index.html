@@ -6197,6 +6197,15 @@ function parseGridSchedule(text, rosterFilter) {
     ? [...ROSTER_CXR, ...ROSTER_MGMT].filter(rosterFilter)
     : [...ROSTER_CXR, ...ROSTER_MGMT];
 
+  // v60.57: the two Matt Johnsons — disambiguate by SHIFT (Matt's rule): the
+  // 5:30a–2p person is ALWAYS the CXR (Matthew Johnson / matt-j); any other
+  // pattern is the BRM (Matt Johnson (BRM) / matt-b). Needed because a row that
+  // just says "Matt Johnson" prefix-matches the BRM and never the CXR.
+  const _mattCXR = allRoster.find(p => p.id==='matt-j' || p.name==='Matthew Johnson');
+  const _mattBRM = allRoster.find(p => p.id==='matt-b' || p.name==='Matt Johnson (BRM)');
+  const _isMattName = nl => /^matt(hew)?\s+johnson\b/.test(nl);
+  const _isCxrShift = s => { const t = String(s||'').toUpperCase().replace(/[^0-9AP]/g,''); return t.startsWith('530A') && t.indexOf('2P') > 0; };
+
   const lines = text.trim().split(/[\n\r]+/).filter(l => l.trim());
   if (lines.length < 2) return null;
 
@@ -6229,7 +6238,7 @@ function parseGridSchedule(text, rosterFilter) {
     // misspelling map straight to the right person.
     const aliasTarget = (typeof STATE!=='undefined' && STATE && STATE.nameAliases)
       ? STATE.nameAliases[nameRaw.toLowerCase()] : null;
-    const person = allRoster.find(p => {
+    let person = allRoster.find(p => {
       if (aliasTarget && p.name === aliasTarget) return true;
       const pn = p.name.toLowerCase();
       const nn = (p.nick||'').toLowerCase();
@@ -6237,6 +6246,16 @@ function parseGridSchedule(text, rosterFilter) {
       return pn===nl || nn===nl || pn.startsWith(nl) ||
              nl===pn.split(' ')[0] || (nl.length>3 && pn.includes(nl));
     });
+    // v60.57: two-Matt disambiguation by shift. If this row is a "Matt Johnson"
+    // (matched either Matt, or an alias didn't force it), decide by the row's
+    // shifts: ALL non-off shifts are 5:30a–2p → the CXR (Matt); anything else →
+    // the BRM. Honors Matt's rule and fixes "Matt Johnson" prefix-matching BRM.
+    if (!aliasTarget && _isMattName(nameRaw.toLowerCase()) && (_mattCXR || _mattBRM)) {
+      const rowShifts = dates.map((d,i)=>(cols[i+1]||'').trim().toUpperCase())
+        .filter(s => s && s!=='OFF' && s!=='VACA' && s!=='VAC');
+      const looksCXR = rowShifts.length > 0 && rowShifts.every(_isCxrShift);
+      person = looksCXR ? (_mattCXR || person) : (_mattBRM || _mattCXR || person);
+    }
     if (!person) {
       // v60.21: remember names we couldn't match so the import preview can warn
       // — otherwise an unrecognized/misspelled name is silently dropped. Skip
