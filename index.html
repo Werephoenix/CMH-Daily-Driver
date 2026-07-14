@@ -268,6 +268,11 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .now-floor-val { font-variant-numeric: tabular-nums; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .now-attn { animation: none !important; } }
 
+/* Weather strip (v60.59) */
+.now-weather { width: 100%; display: flex; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--bdr); border-radius: 14px; padding: 11px 14px; margin-bottom: 12px; color: var(--txt); font-family: var(--ff-ui); font-size: 14px; text-align: left; cursor: pointer; }
+.now-weather.adverse { border-color: rgba(255,204,0,.4); }
+.now-weather-nudge { margin: -6px 0 12px; padding: 10px 14px; border-radius: 12px; background: rgba(255,204,0,.10); border: 1px solid rgba(255,204,0,.35); color: var(--up); font-size: 13px; font-weight: 600; }
+
 /* iOS segmented control (v60.44) */
 .seg-ctl { display: flex; background: var(--bg3); border-radius: 9px; padding: 2px; margin-bottom: 10px; gap: 2px; }
 .seg { flex: 1; border: none; background: transparent; color: var(--txt2); font-family: var(--ff-ui); font-size: 13px; font-weight: 600; padding: 7px 4px; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
@@ -3443,7 +3448,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{},
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null,
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -3637,6 +3642,8 @@ function startClock() {
   }
   tick();
   setInterval(tick, 10000);
+  // v60.59: weather (Open-Meteo, free). One fetch on load + every 20 min; silent offline.
+  if (typeof fetchWeather === 'function') { fetchWeather(); setInterval(function(){ fetchWeather(); }, 20*60*1000); }
 }
 
 function autoRouteByTime() {
@@ -8148,6 +8155,68 @@ function buildFloorSheet() {
   wrap.innerHTML = html;
 }
 
+// ── v60.59: WEATHER (Open-Meteo — free, no API key) ─────────────────────────
+// CMH airport. One live fetch; degrades silently offline. Adverse conditions
+// surface a protection-sales + drive-safe nudge on the Now screen.
+var WMO_CODES = {
+  0:{d:'Clear',i:'☀️'}, 1:{d:'Mainly clear',i:'🌤'}, 2:{d:'Partly cloudy',i:'⛅'}, 3:{d:'Overcast',i:'☁️'},
+  45:{d:'Fog',i:'🌫',caution:1}, 48:{d:'Rime fog',i:'🌫',caution:1},
+  51:{d:'Light drizzle',i:'🌦',adverse:1}, 53:{d:'Drizzle',i:'🌦',adverse:1}, 55:{d:'Heavy drizzle',i:'🌧',adverse:1},
+  56:{d:'Freezing drizzle',i:'🧊',adverse:1,ice:1}, 57:{d:'Freezing drizzle',i:'🧊',adverse:1,ice:1},
+  61:{d:'Light rain',i:'🌧',adverse:1}, 63:{d:'Rain',i:'🌧',adverse:1}, 65:{d:'Heavy rain',i:'🌧',adverse:1},
+  66:{d:'Freezing rain',i:'🧊',adverse:1,ice:1}, 67:{d:'Freezing rain',i:'🧊',adverse:1,ice:1},
+  71:{d:'Light snow',i:'🌨',adverse:1,snow:1}, 73:{d:'Snow',i:'❄️',adverse:1,snow:1}, 75:{d:'Heavy snow',i:'❄️',adverse:1,snow:1}, 77:{d:'Snow grains',i:'🌨',adverse:1,snow:1},
+  80:{d:'Rain showers',i:'🌦',adverse:1}, 81:{d:'Rain showers',i:'🌧',adverse:1}, 82:{d:'Violent showers',i:'⛈',adverse:1},
+  85:{d:'Snow showers',i:'🌨',adverse:1,snow:1}, 86:{d:'Snow showers',i:'❄️',adverse:1,snow:1},
+  95:{d:'Thunderstorm',i:'⛈',adverse:1}, 96:{d:'Storm + hail',i:'⛈',adverse:1,hail:1}, 99:{d:'Storm + hail',i:'⛈',adverse:1,hail:1},
+};
+async function fetchWeather(force) {
+  try {
+    const w = STATE.weather;
+    if (!force && w && w.ts && (Date.now() - w.ts) < 20*60*1000) return; // fresh < 20 min
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=39.9977&longitude=-82.8916'
+      + '&current=temperature_2m,precipitation,weather_code,wind_speed_10m'
+      + '&daily=weather_code,temperature_2m_max,precipitation_probability_max'
+      + '&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=America/New_York&forecast_days=1';
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const j = await res.json();
+    const cur = j.current || {}, daily = j.daily || {};
+    STATE.weather = {
+      ts: Date.now(),
+      tempF: Math.round(cur.temperature_2m),
+      code: cur.weather_code,
+      windMph: Math.round(cur.wind_speed_10m),
+      hiF: daily.temperature_2m_max ? Math.round(daily.temperature_2m_max[0]) : null,
+      popMax: daily.precipitation_probability_max ? daily.precipitation_probability_max[0] : null,
+      dayCode: daily.weather_code ? daily.weather_code[0] : cur.weather_code,
+    };
+    if (typeof saveState === 'function') saveState();
+    if (typeof renderNow === 'function') renderNow();
+  } catch(e) { /* offline / blocked — leave the last cached value (or nothing) */ }
+}
+// Returns the weather strip + nudge HTML for the Now screen (or '' if no data).
+function weatherStripHtml() {
+  const w = STATE.weather;
+  if (!w || !w.ts) return '';
+  const c = WMO_CODES[w.code] || {d:'—',i:'🌡'};
+  const dc = WMO_CODES[w.dayCode] || c;
+  const wetToday = dc.adverse || (w.popMax != null && w.popMax >= 40);
+  let html = `<button class="now-weather${wetToday?' adverse':''}" onclick="fetchWeather(true)" title="Tap to refresh">
+    <span style="font-size:19px">${c.i}</span>
+    <span><b>${w.tempF}°</b> ${c.d}${w.hiF!=null?` · High ${w.hiF}°`:''}${w.popMax!=null?` · ${w.popMax}% precip`:''}</span>
+  </button>`;
+  if (wetToday || dc.caution) {
+    const msg = dc.hail ? '⚠ Hail possible — push protection hard; watch the lot for exposed cars'
+      : dc.snow ? '❄️ Snow today — great day to offer protection; salt/scrape safety'
+      : dc.ice  ? '🧊 Icy conditions — offer protection; slick-road caution'
+      : dc.adverse || (w.popMax>=40) ? '🌧 Wet/slick roads today — good day to offer protection'
+      : '🌫 Low visibility — drive-safe reminder';
+    html += `<div class="now-weather-nudge">${msg}</div>`;
+  }
+  return html;
+}
+
 function renderNow() {
   const el = document.getElementById('now-hero');
   if (!el) return;
@@ -8219,6 +8288,7 @@ function renderNow() {
   const ritual = h < 11 ? 'Opening' : h < 16 ? 'Mid-shift' : 'Closing';
 
   let html = `<div class="now-title">Now</div><div class="now-sub">${dateStr} · ${timeStr}</div>`;
+  html += weatherStripHtml(); // v60.59: weather + protection/safety nudge
   html += `<div class="now-attn ${attn.cls}"><div class="now-kicker">${attn.kicker}</div>
     <div class="now-h">${attn.title}</div><div class="now-p">${attn.sub}</div>`;
   if (attn.btn) html += `<button class="now-btn ${attn.btn.cls||''}" onclick="${attn.btn.on}">${attn.btn.label}</button>`;
