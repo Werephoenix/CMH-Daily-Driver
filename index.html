@@ -293,6 +293,15 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .cov-note.movable { color: var(--up); cursor: pointer; }
 .cov-note.movable:active { opacity: .55; }
 .cov-note.shortage { color: var(--na); }
+.cov-note.flight { color: var(--counter); }
+/* Flight-banks editor (v60.61) */
+.flt-row { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--bdr); gap: 8px; }
+.flt-row.flt-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--txt3); }
+.flt-row.flt-head span:not(.flt-h) { flex: 1; text-align: center; }
+.flt-h { width: 44px; flex-shrink: 0; font-weight: 700; color: var(--txt2); font-variant-numeric: tabular-nums; }
+.flt-step { flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; }
+.flt-step button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--bdr2); background: var(--bg3); color: var(--txt); font-size: 17px; font-weight: 700; cursor: pointer; line-height: 1; }
+.flt-step b { min-width: 16px; text-align: center; font-variant-numeric: tabular-nums; }
 .cov-row:last-child { border-bottom: none; }
 .cov-row.nowrow { background: rgba(10,132,255,.10); }
 .cov-h { width: 48px; flex-shrink: 0; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--txt2); font-size: 13px; }
@@ -3460,7 +3469,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0,
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}},
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -8259,7 +8268,73 @@ function opsSignalsHtml() {
     <button onclick="setOutCancel(-1)" aria-label="minus">−</button>
     <b style="min-width:18px;text-align:center">${n}</b>
     <button onclick="setOutCancel(1)" aria-label="plus">+</button></div>`;
-  return `<div class="now-sec-hd">Today’s signals</div><div class="more-group">${alert}${stepper}</div>`;
+  // v60.61: next arrival bank summary + flight-banks editor entry
+  let flightRow = '';
+  const fb = (typeof _fb==='function') ? _fb() : {arr:{},dep:{}};
+  const nowFloor = Math.floor(new Date().getHours() + new Date().getMinutes()/60);
+  let nextBank = null;
+  for (let h=nowFloor; h<25 && !nextBank; h++) { if ((fb.arr[h]||0) > 0) nextBank = { h, n: fb.arr[h] }; }
+  const hLbl = h => { const hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };
+  if (nextBank) flightRow += `<div class="ops-sig warn"><span style="font-size:16px">✈️</span><span>Next arrival bank: <b>${hLbl(nextBank.h)}</b> (${nextBank.n} flight${nextBank.n>1?'s':''}) — counter demand incoming</span></div>`;
+  flightRow += `<button class="more-row" onclick="showFlightSheet()"><span class="more-ic">✈️</span><span class="more-lbl">Flight banks (arrivals / departures)</span><span class="more-ch">›</span></button>`;
+  return `<div class="now-sec-hd">Today’s signals</div><div class="more-group">${alert}${flightRow}${stepper}</div>`;
+}
+
+// ── v60.61: FLIGHT BANKS → per-hour demand (manual entry; no API needed) ────
+// Arrivals landing near hour h drive COUNTER demand (reservations picking up);
+// departures drive RETURNS. Heuristic + tunable: ~1 extra counter agent per
+// FLIGHTS_PER_AGENT arrivals across the landing hour + the one before it.
+var FLIGHTS_PER_AGENT = 4;
+function _fb() { const b = STATE.flightBank || {}; return { arr: b.arr || {}, dep: b.dep || {} }; }
+function flightArrBump(h) {
+  const a = _fb().arr;
+  const near = (a[h] || 0) + (a[h-1] || 0); // this hour's landings + last hour's (still at counter)
+  return Math.floor(near / FLIGHTS_PER_AGENT);
+}
+function flightDepLoad(h) { const d = _fb().dep; return (d[h] || 0) + (d[h+1] || 0); }
+function setFlight(kind, hour, delta) {
+  if (!STATE.flightBank) STATE.flightBank = { arr:{}, dep:{} };
+  if (!STATE.flightBank[kind]) STATE.flightBank[kind] = {};
+  const v = Math.max(0, (STATE.flightBank[kind][hour] || 0) + delta);
+  if (v === 0) delete STATE.flightBank[kind][hour]; else STATE.flightBank[kind][hour] = v;
+  if (typeof saveState === 'function') saveState();
+  if (typeof buildCoverageTimeline === 'function') { try { buildCoverageTimeline(); } catch(e){} }
+  if (typeof renderNow === 'function') renderNow();
+  if (document.getElementById('flight-sheet')) buildFlightSheet();
+}
+function clearFlights() {
+  STATE.flightBank = { arr:{}, dep:{} };
+  if (typeof saveState === 'function') saveState();
+  if (typeof buildCoverageTimeline === 'function') { try { buildCoverageTimeline(); } catch(e){} }
+  if (typeof renderNow === 'function') renderNow();
+  if (document.getElementById('flight-sheet')) buildFlightSheet();
+  if (typeof toast === 'function') toast('Cleared flight banks');
+}
+function showFlightSheet() {
+  if (typeof openModal !== 'function') return;
+  openModal('✈️ Flight banks — arrivals & departures', '<div id="flight-sheet"></div>');
+  buildFlightSheet();
+}
+function buildFlightSheet() {
+  const wrap = document.getElementById('flight-sheet');
+  if (!wrap) return;
+  const now = new Date(); const nowFloor = Math.floor(now.getHours() + now.getMinutes()/60);
+  const H_START = Math.max(6, nowFloor), H_END = 25;
+  const hLbl = h => { const hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };
+  const fb = _fb();
+  let html = `<p style="font-size:12px;color:var(--txt3);margin-bottom:10px">Log how many flights land / depart each hour (from the boards you already see). Arrivals raise <b>counter</b> need; departures flag heavy <b>returns</b>. Advisory — you decide.</p>`;
+  html += `<div class="more-group">`;
+  html += `<div class="flt-row flt-head"><span class="flt-h"></span><span>✈️ Arrivals</span><span>🛫 Departures</span></div>`;
+  for (let h=H_START; h<H_END; h++) {
+    const a = fb.arr[h]||0, d = fb.dep[h]||0;
+    html += `<div class="flt-row">
+      <span class="flt-h">${hLbl(h)}</span>
+      <span class="flt-step"><button onclick="setFlight('arr',${h},-1)">−</button><b>${a}</b><button onclick="setFlight('arr',${h},1)">+</button></span>
+      <span class="flt-step"><button onclick="setFlight('dep',${h},-1)">−</button><b>${d}</b><button onclick="setFlight('dep',${h},1)">+</button></span>
+    </div>`;
+  }
+  html += `</div><button class="btn btn-gh btn-sm" style="width:100%;margin-top:12px" onclick="clearFlights()">Clear all flight banks</button>`;
+  wrap.innerHTML = html;
 }
 
 function renderNow() {
@@ -13193,7 +13268,9 @@ function renderCoverageFirst() {
       if (z==='exit') ex++; else if (z==='counter'||z==='mgmt') ct++;
     });
     const r = typeof COVERAGE_BY_HOUR==='function' ? COVERAGE_BY_HOUR(h,dow,agents) : {exitMin:1,counterMin:2};
-    return { ex, ct, exN: r.exitMin||0, ctN: r.counterMin||0, closed: !!r.closed };
+    const arrBump = (typeof flightArrBump==='function') ? flightArrBump(h) : 0; // v60.61: arrivals raise counter need
+    const depLoad = (typeof flightDepLoad==='function') ? flightDepLoad(h) : 0;
+    return { ex, ct, exN: r.exitMin||0, ctN: (r.counterMin||0) + arrBump, closed: !!r.closed, arrBump, depLoad };
   }
   const cls = (have,need) => need===0 ? 'cov-ok' : have<need ? 'cov-bad' : have===need ? 'cov-warn' : 'cov-ok';
   // Current-hour card
@@ -13226,11 +13303,15 @@ function renderCoverageFirst() {
       if (exitCxr && !wouldExitShort) { const nm = (exitCxr[1].person.nick||exitCxr[1].person.name.split(' ')[0]).replace(/'/g,''); note = `<button class="cov-note movable" onclick="covFix('${exitCxr[0]}','full-counter')">⚑ Tap to fix — pull ${nm} to Counter (Exit stays OK) →</button>`; }
       else { note = `<div class="cov-note shortage">⚠ Short — pull an MT/ABRM or accept reduced</div>`; }
     }
+    // v60.61: flight-driven demand notes (arrivals→counter, departures→returns)
+    let flightNote = '';
+    if (q.arrBump > 0) flightNote += `<div class="cov-note flight">✈️ Arrival bank — counter need +${q.arrBump} this hour</div>`;
+    if (q.depLoad >= 4) flightNote += `<div class="cov-note flight">🛫 Departure bank (${q.depLoad}) — expect heavy returns</div>`;
     html += `<div class="cov-row${isNow?' nowrow':''}">
       <div class="cov-h">${fmtH(h)}</div>
       <div class="cov-cell"><span class="cov-tag" style="color:var(--exit)">EXIT</span> <span class="cov-n ${cls(q.ex,q.exN)}">${q.ex}/${q.exN}</span></div>
       <div class="cov-cell"><span class="cov-tag" style="color:var(--counter)">CTR</span> <span class="cov-n ${cls(q.ct,q.ctN)}">${q.ct}/${q.ctN}</span></div>
-      ${note}
+      ${note}${flightNote}
     </div>`;
   }
   html += `</div>`;
