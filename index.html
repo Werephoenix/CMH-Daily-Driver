@@ -272,6 +272,16 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .now-weather { width: 100%; display: flex; align-items: center; gap: 10px; background: var(--bg2); border: 1px solid var(--bdr); border-radius: 14px; padding: 11px 14px; margin-bottom: 12px; color: var(--txt); font-family: var(--ff-ui); font-size: 14px; text-align: left; cursor: pointer; }
 .now-weather.adverse { border-color: rgba(255,204,0,.4); }
 .now-weather-nudge { margin: -6px 0 12px; padding: 10px 14px; border-radius: 12px; background: rgba(255,204,0,.10); border: 1px solid rgba(255,204,0,.35); color: var(--up); font-size: 13px; font-weight: 600; }
+/* Today's signals (v60.60) */
+.ops-sig { display: flex; align-items: flex-start; gap: 9px; padding: 11px 14px; border-bottom: 1px solid var(--bdr); font-size: 13px; font-weight: 600; }
+.ops-sig.warn { color: var(--up); }
+.ops-sig.urgent { color: var(--na); }
+.ops-stepper { display: flex; align-items: center; gap: 8px; padding: 10px 14px; }
+.ops-stepper .more-lbl { flex: 1; font-size: 14px; color: var(--txt); }
+.ops-stepper button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--bdr2); background: var(--bg3); color: var(--txt); font-size: 18px; font-weight: 700; cursor: pointer; line-height: 1; }
+.ops-stepper button:active { background: var(--bg); }
+.cl-weather-banner, .board-cancel-flag { margin: 0 0 12px; padding: 11px 14px; border-radius: 12px; background: rgba(255,204,0,.10); border: 1px solid rgba(255,204,0,.35); color: var(--up); font-size: 13px; font-weight: 600; }
+.board-cancel-flag { display: none; }
 
 /* iOS segmented control (v60.44) */
 .seg-ctl { display: flex; background: var(--bg3); border-radius: 9px; padding: 2px; margin-bottom: 10px; gap: 2px; }
@@ -1926,6 +1936,8 @@ button { cursor: pointer; }
 ═══════════════════════════════════════════════════════════════ -->
 <div class="scr" id="screen-board">
   <h1 class="scr-title">Board</h1>
+  <!-- v60.60: outbound-cancellation → walk-up 1-way flag -->
+  <div id="board-cancel-flag" class="board-cancel-flag"></div>
 
   <!-- Ops header — v52: stripped down to just the print button.
        The "Completely Satisfied / Hot Alerts / Opening / Closing"
@@ -3448,7 +3460,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null,
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0,
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -3735,7 +3747,7 @@ function showTab(id) {
   if (btn) btn.classList.add('on');
 
   if (id === 'opening' && typeof renderNow === 'function') renderNow();  // v60.43
-  if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); }
+  if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); updateCancelFlag(); }
   if (id === 'schedule')  {
     try {
       const hasRotations = window._lastRotations && Object.keys(window._lastRotations).length > 0;
@@ -8217,6 +8229,39 @@ function weatherStripHtml() {
   return html;
 }
 
+// v60.60: Today's signals — cancellation → walk-up 1-way heads-up + a manual
+// cancellation counter (seed of the flight-data layer; works off manual entry).
+function setOutCancel(delta) {
+  const n = Math.max(0, (STATE.outCancel || 0) + delta);
+  STATE.outCancel = n;
+  if (typeof saveState === 'function') saveState();
+  if (typeof renderNow === 'function') renderNow();
+  updateCancelFlag();
+}
+function updateCancelFlag() {
+  const el = document.getElementById('board-cancel-flag');
+  if (!el) return;
+  const n = STATE.outCancel || 0;
+  if (n > 0) {
+    el.innerHTML = `✈️ ${n} outbound cancellation${n>1?'s':''} — expect <b>walk-up 1-way</b> requests. Check one-way fleet + consider opening walk-ups.`;
+    el.style.display = 'block';
+  } else { el.style.display = 'none'; }
+}
+function opsSignalsHtml() {
+  const n = STATE.outCancel || 0;
+  let alert = '';
+  if (n > 0) {
+    alert = `<div class="ops-sig warn"><span style="font-size:16px">✈️</span>
+      <span>${n} outbound cancellation${n>1?'s':''} — expect <b>walk-up 1-way</b> traffic. Check one-way fleet + consider walk-up policy.</span></div>`;
+  }
+  const stepper = `<div class="ops-stepper">
+    <span class="more-lbl">Outbound cancellations today</span>
+    <button onclick="setOutCancel(-1)" aria-label="minus">−</button>
+    <b style="min-width:18px;text-align:center">${n}</b>
+    <button onclick="setOutCancel(1)" aria-label="plus">+</button></div>`;
+  return `<div class="now-sec-hd">Today’s signals</div><div class="more-group">${alert}${stepper}</div>`;
+}
+
 function renderNow() {
   const el = document.getElementById('now-hero');
   if (!el) return;
@@ -8307,6 +8352,8 @@ function renderNow() {
   html += floorRow('🟩','Exit booth',exitHave,exitNeed,zones.exit, closed||exitHave>=exitNeed);
   html += floorRow('↩','Returns',zones.returns.length,0,zones.returns, true);
   html += `</div>`;
+
+  html += opsSignalsHtml(); // v60.60: cancellations → walk-up 1-way signal + counter
 
   html += `<div class="now-sec-hd">Coming up</div><div class="more-group">`;
   html += `<div class="more-row" style="cursor:default"><span class="more-ic">🍽</span><span class="more-lbl">Next lunch</span><span class="now-floor-val" style="color:var(--up)">${nextLunch?_nowFmtH(nextLunch.at)+' · '+nextLunch.who:'—'}</span></div>`;
@@ -8790,6 +8837,18 @@ function renderChecklist(mode) {
   }
 
   var htm = '';
+  // v60.60: weather reminder banner on adverse days (advisory — not a gated item).
+  var _w = STATE.weather;
+  if (_w && _w.ts && typeof WMO_CODES !== 'undefined') {
+    var _dc = WMO_CODES[_w.dayCode] || WMO_CODES[_w.code] || {};
+    if (_dc.adverse || (_w.popMax != null && _w.popMax >= 40)) {
+      var _m = _dc.hail ? '⛈ Hail risk today — move exposed cars under cover; push protection.'
+        : _dc.snow ? '❄️ Snow today — salt/scrape walkways; protection; slick-road safety.'
+        : _dc.ice ? '🧊 Ice today — de-ice cars; protection; drive-safe.'
+        : '🌧 Wet roads today — protection push; wipe-down returns.';
+      htm += '<div class="cl-weather-banner">' + _m + '</div>';
+    }
+  }
   (data||[]).forEach(function(sec) {
     // Email section gets action buttons
     if (sec.email) {
