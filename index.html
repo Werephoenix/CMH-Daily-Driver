@@ -3472,7 +3472,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[],
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -8282,12 +8282,20 @@ function opsSignalsHtml() {
   flightRow += `<button class="more-row" onclick="showFlightSheet()"><span class="more-ic">✈️</span><span class="more-lbl">Flight banks (arrivals / departures)</span><span class="more-ch">›</span></button>`;
   // v60.62: city events banner + editor entry
   let eventRow = '';
-  const evs = (typeof _events==='function') ? _events() : [];
-  if (evs.length) {
-    const heavy = evs.some(function(e){return e.level==='heavy';});
-    const names = evs.map(function(e){return e.name;}).slice(0,2).join(', ');
-    eventRow += `<div class="ops-sig ${heavy?'urgent':'warn'}"><span style="font-size:16px">🏟</span><span>Event day: <b>${names}${evs.length>2?'…':''}</b> — expect heavy travel demand + fleet pressure</span></div>`;
+  const pick = (typeof eventPickupList==='function') ? eventPickupList() : [];
+  const rets = (typeof eventReturnsList==='function') ? eventReturnsList() : [];
+  if (pick.length) {
+    const heavy = pick.some(function(e){return e.level==='heavy';});
+    const names = pick.map(function(e){return e.name;}).slice(0,2).join(', ');
+    eventRow += `<div class="ops-sig ${heavy?'urgent':'warn'}"><span style="font-size:16px">🏟</span><span><b>${names}${pick.length>2?'…':''}</b> coming — heavy <b>pickups</b> now (counter +${eventCounterBump()}); protect fleet</span></div>`;
   }
+  if (rets.length) {
+    const names = rets.map(function(e){return e.name;}).slice(0,2).join(', ');
+    eventRow += `<div class="ops-sig warn"><span style="font-size:16px">↩</span><span>Post-event <b>returns heavy</b> today (${names}${rets.length>2?'…':''}) — staff Returns</span></div>`;
+  }
+  // further-out heads-up (4–7 days) so staffing can plan ahead
+  const soon = (typeof _seededUpcoming==='function') ? _seededUpcoming(7).filter(function(u){return u.inDays>=4;}) : [];
+  if (soon.length) { const s=soon[0]; eventRow += `<div class="ops-sig"><span style="font-size:16px">🗓</span><span style="color:var(--txt3)"><b>${s.name}</b> in ${s.inDays} days — pickups build ~3 days prior</span></div>`; }
   eventRow += `<button class="more-row" onclick="showEventSheet()"><span class="more-ic">🏟</span><span class="more-lbl">City events (OSU games, concerts…)</span><span class="more-ch">›</span></button>`;
   return `<div class="now-sec-hd">Today’s signals</div><div class="more-group">${alert}${eventRow}${flightRow}${stepper}</div>`;
 }
@@ -8352,26 +8360,75 @@ function buildFlightSheet() {
 // ── v60.62: CITY EVENTS → demand (manual; OSU games, concerts, conventions) ──
 // A heavy/moderate Columbus event raises COUNTER demand in its window (like a
 // flight arrival bank) + flags fleet pressure. Advisory; never auto-reassigns.
-function _events() { return Array.isArray(STATE.cityEvents) ? STATE.cityEvents : []; }
-function eventBumpAt(h) {
-  let bump = 0;
-  _events().forEach(function(e){
-    const from = (e.from==null) ? 0 : e.from, to = (e.to==null) ? 24 : e.to;
-    if (h >= from && h < to) bump += (e.level==='heavy' ? 2 : 1);
-  });
-  return Math.min(bump, 3); // cap so one big day can't demand the whole floor
+// v60.63/64: seeded calendar of known annual Columbus-area events (VERIFIED 2026
+// dates — refresh yearly). DEMAND TIMING (Matt): festivals/holidays run busy a few
+// days BEFORE (pickups → COUNTER) + heavy RETURNS a day or two AFTER — not much
+// same-day. Game days: busy the day BEFORE and ON the day (counter), returns after.
+// kind: 'festival' (default) | 'holiday' (same profile) | 'game'.
+var SEEDED_EVENTS = [
+  { name:'Columbus Arts Festival',     kind:'festival', level:'moderate', dates:['2026-06-12','2026-06-13','2026-06-14'] },
+  { name:'Columbus Pride',             kind:'festival', level:'moderate', dates:['2026-06-19','2026-06-20'] },
+  { name:'Red, White & BOOM!',         kind:'holiday',  level:'moderate', dates:['2026-07-03'] },
+  { name:'Inkcarceration (Mansfield)', kind:'festival', level:'heavy',    dates:['2026-07-17','2026-07-18','2026-07-19'] },
+  { name:'Jazz & Rib Fest',            kind:'festival', level:'moderate', dates:['2026-07-24','2026-07-25','2026-07-26'] },
+  { name:'Lost Lands (Legend Valley)', kind:'festival', level:'heavy',    dates:['2026-09-18','2026-09-19','2026-09-20'] },
+];
+function _dateKey(d) { const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), da=String(d.getDate()).padStart(2,'0'); return y+'-'+m+'-'+da; }
+function _dayDiff(ds) { const p=ds.split('-'); const dt=new Date(+p[0],+p[1]-1,+p[2]); const t=new Date(); t.setHours(0,0,0,0); return Math.round((dt-t)/86400000); }
+function _eventBounds(ev) { const ds=ev.dates||(ev.date?[ev.date]:[]); if(!ds.length) return null; const ns=ds.map(_dayDiff).sort(function(a,b){return a-b;}); return {startDiff:ns[0], endDiff:ns[ns.length-1]}; }
+// Phase of an event RELATIVE TO TODAY: 'counter' (pre-event pickups / game day),
+// 'returns' (post-event dropoffs), or null.
+function _eventPhaseToday(ev) {
+  const b=_eventBounds(ev); if(!b) return null;
+  if (ev.kind==='game') {
+    if (b.startDiff===1 || (b.startDiff<=0 && b.endDiff>=0)) return 'counter'; // day-before + game day(s)
+    if (b.endDiff===-1) return 'returns';
+  } else { // festival / holiday
+    if (b.startDiff>=1 && b.startDiff<=3) return 'counter'; // busy the few days before (pickups)
+    if (b.endDiff<=-1 && b.endDiff>=-2) return 'returns';   // heavy returns a day/two after
+  }
+  return null;
 }
+function _dismissedToday() { return (STATE.eventDismiss||{})[_dateKey(new Date())]||[]; }
+function _manualDefs() {
+  const key=_dateKey(new Date());
+  return (Array.isArray(STATE.cityEvents)?STATE.cityEvents:[]).map(function(e){
+    return { name:e.name, level:e.level||'moderate', kind:e.kind||'festival', dates:(e.date?[e.date]:(e.dates||[key])) };
+  });
+}
+function _allEventDefs() { const dis=_dismissedToday(); return SEEDED_EVENTS.concat(_manualDefs()).filter(function(e){return dis.indexOf(e.name)===-1;}); }
+// Extra COUNTER need today from events in their pickup phase (heavy +2 / moderate +1, capped 3).
+function eventCounterBump() { let b=0; _allEventDefs().forEach(function(e){ if(_eventPhaseToday(e)==='counter') b+=(e.level==='heavy'?2:1); }); return Math.min(b,3); }
+function eventPickupList()  { return _allEventDefs().filter(function(e){return _eventPhaseToday(e)==='counter';}); }
+function eventReturnsList() { return _allEventDefs().filter(function(e){return _eventPhaseToday(e)==='returns';}); }
+// Events whose date is literally today (editor "happening today" list).
+function _seededToday() { const key=_dateKey(new Date()); const dis=_dismissedToday(); return SEEDED_EVENTS.filter(function(e){return e.dates.indexOf(key)>-1 && dis.indexOf(e.name)===-1;}); }
+// Upcoming seeded events (next N days) for the editor "coming up" list.
+function _seededUpcoming(days) { const out=[]; const seen={}; SEEDED_EVENTS.forEach(function(e){ e.dates.forEach(function(ds){ const diff=_dayDiff(ds); if(diff>0 && diff<=days && !seen[e.name]){ seen[e.name]=1; out.push({name:e.name,level:e.level,inDays:diff}); } }); }); return out.sort(function(a,b){return a.inDays-b.inDays;}); }
+function dismissSeeded(name) {
+  const key=_dateKey(new Date());
+  if(!STATE.eventDismiss) STATE.eventDismiss={};
+  if(!STATE.eventDismiss[key]) STATE.eventDismiss[key]=[];
+  if(STATE.eventDismiss[key].indexOf(name)===-1) STATE.eventDismiss[key].push(name);
+  if(typeof saveState==='function') saveState();
+  _eventsChanged();
+}
+function _events() { const manual=(Array.isArray(STATE.cityEvents)?STATE.cityEvents:[]).map(function(e){return Object.assign({seeded:false},e);}); return _seededToday().concat(manual); }
+// v60.64: counter demand from events uses the pre-event PICKUP phase (all-day),
+// not same-day — see eventCounterBump / _eventPhaseToday.
+function eventBumpAt(h) { return (typeof eventCounterBump==='function') ? eventCounterBump() : 0; }
 function _eventsChanged() {
   if (typeof buildCoverageTimeline==='function'){ try{ buildCoverageTimeline(); }catch(e){} }
   if (typeof renderNow==='function') renderNow();
   updateEventFlag();
   if (document.getElementById('event-sheet')) buildEventSheet();
 }
-function addCityEvent(name, level, from, to) {
+function addCityEvent(name, level, kind, date) {
   if (!STATE.cityEvents) STATE.cityEvents = [];
   name = String(name||'').trim(); if (!name) return;
   STATE.cityEvents.push({ name: name, level: (level==='heavy'?'heavy':'moderate'),
-    from: (from==null||from==='')?null:Number(from), to: (to==null||to==='')?null:Number(to) });
+    kind: (kind==='game'?'game':'festival'),
+    date: (date && String(date).trim()) ? String(date).trim() : _dateKey(new Date()) });
   if (typeof saveState==='function') saveState();
   _eventsChanged();
 }
@@ -8379,45 +8436,71 @@ function removeCityEvent(idx) { if (Array.isArray(STATE.cityEvents)) { STATE.cit
 function clearCityEvents() { STATE.cityEvents = []; if (typeof saveState==='function') saveState(); _eventsChanged(); if (typeof toast==='function') toast('Cleared events'); }
 function updateEventFlag() {
   const el = document.getElementById('board-event-flag'); if (!el) return;
-  const any = _events();
-  if (any.length) {
-    const names = any.map(function(e){return e.name;}).slice(0,2).join(', ');
-    el.innerHTML = `🏟 Event day (${names}${any.length>2?'…':''}) — expect high demand; protect fleet + watch one-ways.`;
-    el.style.display = 'block';
-  } else el.style.display = 'none';
+  const pick = (typeof eventPickupList==='function')?eventPickupList():[];
+  const rets = (typeof eventReturnsList==='function')?eventReturnsList():[];
+  let msg = '';
+  if (pick.length) msg = `🏟 ${pick.map(function(e){return e.name;}).slice(0,2).join(', ')} coming — heavy pickups; protect fleet + watch one-ways.`;
+  else if (rets.length) msg = `↩ Post-event returns heavy today (${rets.map(function(e){return e.name;}).slice(0,2).join(', ')}) — staff the returns lane.`;
+  if (msg) { el.innerHTML = msg; el.style.display = 'block'; } else el.style.display = 'none';
 }
 function showEventSheet() { if (typeof openModal!=='function') return; openModal('🏟 City events today', '<div id="event-sheet"></div>'); buildEventSheet(); }
-var _evtLevel = 'moderate';
+var _evtLevel = 'moderate', _evtKind = 'festival';
 function _evtLvl(l) { _evtLevel = l; ['moderate','heavy'].forEach(function(x){ const b=document.getElementById('evt-lvl-'+x); if(b) b.className='seg'+(x===l?' on':''); }); }
-function _evtAdd() { const nm=(document.getElementById('evt-name')||{}).value; const f=(document.getElementById('evt-from')||{}).value; const t=(document.getElementById('evt-to')||{}).value; addCityEvent(nm,_evtLevel,f,t); _evtLevel='moderate'; }
+function _evtKindSel(k) { _evtKind = k; ['festival','game'].forEach(function(x){ const b=document.getElementById('evt-kind-'+x); if(b) b.className='seg'+(x===k?' on':''); }); }
+function _evtAdd() { const nm=(document.getElementById('evt-name')||{}).value; const dt=(document.getElementById('evt-date')||{}).value; addCityEvent(nm,_evtLevel,_evtKind,dt); _evtLevel='moderate'; _evtKind='festival'; }
 function buildEventSheet() {
   const wrap = document.getElementById('event-sheet'); if (!wrap) return;
   const hLbl = h => { const hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };
   const evs = _events();
-  let html = `<p style="font-size:12px;color:var(--txt3);margin-bottom:10px">Log a major Columbus event (OSU game, concert, convention, festival). <b>Heavy</b> raises counter need +2 in-window, <b>Moderate</b> +1. Advisory — you decide.</p>`;
+  let html = `<p style="font-size:12px;color:var(--txt3);margin-bottom:10px">Log a major event by its <b>date</b>. The app raises <b>counter</b> demand in the days before (pickups) and flags heavy <b>returns</b> after — a <b>Game</b> is busy the day before + on the day. Advisory — you decide.</p>`;
   html += `<div class="more-group" style="padding:12px;margin-bottom:10px">
     <input id="evt-name" type="text" placeholder="Event name (e.g. OSU vs Michigan)" style="width:100%;padding:9px 11px;font-size:14px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:9px;color:var(--txt);margin-bottom:9px">
-    <div class="seg-ctl" style="margin-bottom:9px"><button class="seg on" id="evt-lvl-moderate" onclick="_evtLvl('moderate')">Moderate</button><button class="seg" id="evt-lvl-heavy" onclick="_evtLvl('heavy')">Heavy</button></div>
+    <div style="display:flex;gap:8px;margin-bottom:9px">
+      <div class="seg-ctl" style="flex:1;margin:0"><button class="seg on" id="evt-lvl-moderate" onclick="_evtLvl('moderate')">Moderate</button><button class="seg" id="evt-lvl-heavy" onclick="_evtLvl('heavy')">Heavy</button></div>
+      <div class="seg-ctl" style="flex:1;margin:0"><button class="seg on" id="evt-kind-festival" onclick="_evtKindSel('festival')">Festival</button><button class="seg" id="evt-kind-game" onclick="_evtKindSel('game')">Game</button></div>
+    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-      <span style="font-size:12px;color:var(--txt3)">Window (optional, 24h)</span>
-      <input id="evt-from" type="number" min="0" max="24" placeholder="from" style="width:66px;padding:7px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--txt)">
-      <span style="color:var(--txt3)">→</span>
-      <input id="evt-to" type="number" min="0" max="24" placeholder="to" style="width:66px;padding:7px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--txt)">
+      <span style="font-size:12px;color:var(--txt3)">Event date</span>
+      <input id="evt-date" type="date" value="${_dateKey(new Date())}" style="flex:1;padding:8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--txt)">
     </div>
     <button class="btn btn-g btn-sm" style="width:100%" onclick="_evtAdd()">+ Add event</button>
   </div>`;
-  if (evs.length) {
-    html += `<div class="more-group">`;
-    evs.forEach(function(e,i){
-      const win = (e.from!=null||e.to!=null) ? (hLbl(e.from==null?0:e.from)+'–'+hLbl(e.to==null?24:e.to)) : 'all day';
+  // Auto (seeded) events happening today — dismissable
+  const seeded = _seededToday();
+  if (seeded.length) {
+    html += `<div class="now-sec-hd" style="padding-left:2px">Auto — happening today</div><div class="more-group">`;
+    seeded.forEach(function(e){
       html += `<div class="more-row" style="cursor:default">
         <span class="more-ic">${e.level==='heavy'?'🏟':'🎫'}</span>
-        <span class="more-lbl">${e.name}<div style="font-size:12px;color:var(--txt3)">${e.level} · ${win}</div></span>
+        <span class="more-lbl">${e.name}<div style="font-size:12px;color:var(--txt3)">${e.level} · seeded</div></span>
+        <button onclick="dismissSeeded('${e.name.replace(/'/g,"\\'")}')" style="background:none;border:none;color:var(--txt3);font-size:12px;font-weight:700;cursor:pointer">Dismiss</button>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  // Upcoming seeded (next 7 days) — staffing heads-up
+  const up = _seededUpcoming(7);
+  if (up.length) {
+    html += `<div class="now-sec-hd" style="padding-left:2px">Coming up (7 days)</div><div class="more-group">`;
+    up.forEach(function(u){
+      html += `<div class="more-row" style="cursor:default"><span class="more-ic">🗓</span><span class="more-lbl">${u.name}<div style="font-size:12px;color:var(--txt3)">in ${u.inDays} day${u.inDays>1?'s':''} · ${u.level}</div></span></div>`;
+    });
+    html += `</div>`;
+  }
+  // Manual events (removable by real index)
+  const manual = Array.isArray(STATE.cityEvents) ? STATE.cityEvents : [];
+  if (manual.length) {
+    html += `<div class="now-sec-hd" style="padding-left:2px">Yours</div><div class="more-group">`;
+    manual.forEach(function(e,i){
+      html += `<div class="more-row" style="cursor:default">
+        <span class="more-ic">${e.level==='heavy'?'🏟':'🎫'}</span>
+        <span class="more-lbl">${e.name}<div style="font-size:12px;color:var(--txt3)">${e.level} · ${e.kind||'festival'} · ${e.date||'today'}</div></span>
         <button onclick="removeCityEvent(${i})" aria-label="remove" style="background:none;border:none;color:var(--na);font-size:20px;cursor:pointer;line-height:1">×</button>
       </div>`;
     });
-    html += `</div><button class="btn btn-gh btn-sm" style="width:100%;margin-top:12px" onclick="clearCityEvents()">Clear all events</button>`;
-  } else { html += `<div style="color:var(--txt3);font-size:13px;padding:8px;text-align:center">No events logged.</div>`; }
+    html += `</div><button class="btn btn-gh btn-sm" style="width:100%;margin-top:12px" onclick="clearCityEvents()">Clear my events</button>`;
+  }
+  if (!seeded.length && !up.length && !manual.length) { html += `<div style="color:var(--txt3);font-size:13px;padding:8px;text-align:center">Nothing today or coming up this week.</div>`; }
   wrap.innerHTML = html;
 }
 
@@ -9008,10 +9091,14 @@ function renderChecklist(mode) {
       htm += '<div class="cl-weather-banner">' + _m + '</div>';
     }
   }
-  // v60.62: heavy city-event reminder banner
-  var _heavyEv = (typeof _events==='function') ? _events().filter(function(e){return e.level==='heavy';}) : [];
-  if (_heavyEv.length) {
-    htm += '<div class="cl-weather-banner" style="background:rgba(175,156,255,.10);border-color:rgba(175,156,255,.35);color:var(--eb)">🏟 ' + _heavyEv.map(function(e){return e.name;}).join(', ') + ' today — expect high volume; brief the team + protect the fleet.</div>';
+  // v60.64: event demand banner (pre-event pickups / post-event returns)
+  var _evStyle = 'background:rgba(175,156,255,.10);border-color:rgba(175,156,255,.35);color:var(--eb)';
+  var _pick = (typeof eventPickupList==='function') ? eventPickupList() : [];
+  var _rets = (typeof eventReturnsList==='function') ? eventReturnsList() : [];
+  if (_pick.length) {
+    htm += '<div class="cl-weather-banner" style="'+_evStyle+'">🏟 ' + _pick.map(function(e){return e.name;}).join(', ') + ' coming — heavy pickups; brief the team + protect the fleet.</div>';
+  } else if (_rets.length) {
+    htm += '<div class="cl-weather-banner" style="'+_evStyle+'">↩ Post-event returns heavy today (' + _rets.map(function(e){return e.name;}).join(', ') + ') — staff the returns lane.</div>';
   }
   (data||[]).forEach(function(sec) {
     // Email section gets action buttons
@@ -13397,7 +13484,7 @@ function renderCoverageFirst() {
     let flightNote = '';
     if (q.arrBump > 0) flightNote += `<div class="cov-note flight">✈️ Arrival bank — counter need +${q.arrBump} this hour</div>`;
     if (q.depLoad >= 4) flightNote += `<div class="cov-note flight">🛫 Departure bank (${q.depLoad}) — expect heavy returns</div>`;
-    if (q.evtBump > 0) flightNote += `<div class="cov-note event">🏟 Event demand — counter need +${q.evtBump} this hour</div>`;
+    if (q.evtBump > 0) flightNote += `<div class="cov-note event">🏟 Pre-event pickups — counter need +${q.evtBump}</div>`;
     html += `<div class="cov-row${isNow?' nowrow':''}">
       <div class="cov-h">${fmtH(h)}</div>
       <div class="cov-cell"><span class="cov-tag" style="color:var(--exit)">EXIT</span> <span class="cov-n ${cls(q.ex,q.exN)}">${q.ex}/${q.exN}</span></div>
