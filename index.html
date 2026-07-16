@@ -294,6 +294,7 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .cov-note.movable:active { opacity: .55; }
 .cov-note.shortage { color: var(--na); }
 .cov-note.flight { color: var(--counter); }
+.cov-note.event { color: var(--eb); }
 /* Flight-banks editor (v60.61) */
 .flt-row { display: flex; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--bdr); gap: 8px; }
 .flt-row.flt-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--txt3); }
@@ -1947,6 +1948,8 @@ button { cursor: pointer; }
   <h1 class="scr-title">Board</h1>
   <!-- v60.60: outbound-cancellation → walk-up 1-way flag -->
   <div id="board-cancel-flag" class="board-cancel-flag"></div>
+  <!-- v60.62: city-event → fleet-pressure flag -->
+  <div id="board-event-flag" class="board-cancel-flag"></div>
 
   <!-- Ops header — v52: stripped down to just the print button.
        The "Completely Satisfied / Hot Alerts / Opening / Closing"
@@ -3469,7 +3472,7 @@ function loadState() {
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
-    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}},
+    dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[],
     closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
@@ -3756,7 +3759,7 @@ function showTab(id) {
   if (btn) btn.classList.add('on');
 
   if (id === 'opening' && typeof renderNow === 'function') renderNow();  // v60.43
-  if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); updateCancelFlag(); }
+  if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); updateCancelFlag(); updateEventFlag(); }
   if (id === 'schedule')  {
     try {
       const hasRotations = window._lastRotations && Object.keys(window._lastRotations).length > 0;
@@ -8277,7 +8280,16 @@ function opsSignalsHtml() {
   const hLbl = h => { const hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };
   if (nextBank) flightRow += `<div class="ops-sig warn"><span style="font-size:16px">✈️</span><span>Next arrival bank: <b>${hLbl(nextBank.h)}</b> (${nextBank.n} flight${nextBank.n>1?'s':''}) — counter demand incoming</span></div>`;
   flightRow += `<button class="more-row" onclick="showFlightSheet()"><span class="more-ic">✈️</span><span class="more-lbl">Flight banks (arrivals / departures)</span><span class="more-ch">›</span></button>`;
-  return `<div class="now-sec-hd">Today’s signals</div><div class="more-group">${alert}${flightRow}${stepper}</div>`;
+  // v60.62: city events banner + editor entry
+  let eventRow = '';
+  const evs = (typeof _events==='function') ? _events() : [];
+  if (evs.length) {
+    const heavy = evs.some(function(e){return e.level==='heavy';});
+    const names = evs.map(function(e){return e.name;}).slice(0,2).join(', ');
+    eventRow += `<div class="ops-sig ${heavy?'urgent':'warn'}"><span style="font-size:16px">🏟</span><span>Event day: <b>${names}${evs.length>2?'…':''}</b> — expect heavy travel demand + fleet pressure</span></div>`;
+  }
+  eventRow += `<button class="more-row" onclick="showEventSheet()"><span class="more-ic">🏟</span><span class="more-lbl">City events (OSU games, concerts…)</span><span class="more-ch">›</span></button>`;
+  return `<div class="now-sec-hd">Today’s signals</div><div class="more-group">${alert}${eventRow}${flightRow}${stepper}</div>`;
 }
 
 // ── v60.61: FLIGHT BANKS → per-hour demand (manual entry; no API needed) ────
@@ -8334,6 +8346,78 @@ function buildFlightSheet() {
     </div>`;
   }
   html += `</div><button class="btn btn-gh btn-sm" style="width:100%;margin-top:12px" onclick="clearFlights()">Clear all flight banks</button>`;
+  wrap.innerHTML = html;
+}
+
+// ── v60.62: CITY EVENTS → demand (manual; OSU games, concerts, conventions) ──
+// A heavy/moderate Columbus event raises COUNTER demand in its window (like a
+// flight arrival bank) + flags fleet pressure. Advisory; never auto-reassigns.
+function _events() { return Array.isArray(STATE.cityEvents) ? STATE.cityEvents : []; }
+function eventBumpAt(h) {
+  let bump = 0;
+  _events().forEach(function(e){
+    const from = (e.from==null) ? 0 : e.from, to = (e.to==null) ? 24 : e.to;
+    if (h >= from && h < to) bump += (e.level==='heavy' ? 2 : 1);
+  });
+  return Math.min(bump, 3); // cap so one big day can't demand the whole floor
+}
+function _eventsChanged() {
+  if (typeof buildCoverageTimeline==='function'){ try{ buildCoverageTimeline(); }catch(e){} }
+  if (typeof renderNow==='function') renderNow();
+  updateEventFlag();
+  if (document.getElementById('event-sheet')) buildEventSheet();
+}
+function addCityEvent(name, level, from, to) {
+  if (!STATE.cityEvents) STATE.cityEvents = [];
+  name = String(name||'').trim(); if (!name) return;
+  STATE.cityEvents.push({ name: name, level: (level==='heavy'?'heavy':'moderate'),
+    from: (from==null||from==='')?null:Number(from), to: (to==null||to==='')?null:Number(to) });
+  if (typeof saveState==='function') saveState();
+  _eventsChanged();
+}
+function removeCityEvent(idx) { if (Array.isArray(STATE.cityEvents)) { STATE.cityEvents.splice(idx,1); if (typeof saveState==='function') saveState(); _eventsChanged(); } }
+function clearCityEvents() { STATE.cityEvents = []; if (typeof saveState==='function') saveState(); _eventsChanged(); if (typeof toast==='function') toast('Cleared events'); }
+function updateEventFlag() {
+  const el = document.getElementById('board-event-flag'); if (!el) return;
+  const any = _events();
+  if (any.length) {
+    const names = any.map(function(e){return e.name;}).slice(0,2).join(', ');
+    el.innerHTML = `🏟 Event day (${names}${any.length>2?'…':''}) — expect high demand; protect fleet + watch one-ways.`;
+    el.style.display = 'block';
+  } else el.style.display = 'none';
+}
+function showEventSheet() { if (typeof openModal!=='function') return; openModal('🏟 City events today', '<div id="event-sheet"></div>'); buildEventSheet(); }
+var _evtLevel = 'moderate';
+function _evtLvl(l) { _evtLevel = l; ['moderate','heavy'].forEach(function(x){ const b=document.getElementById('evt-lvl-'+x); if(b) b.className='seg'+(x===l?' on':''); }); }
+function _evtAdd() { const nm=(document.getElementById('evt-name')||{}).value; const f=(document.getElementById('evt-from')||{}).value; const t=(document.getElementById('evt-to')||{}).value; addCityEvent(nm,_evtLevel,f,t); _evtLevel='moderate'; }
+function buildEventSheet() {
+  const wrap = document.getElementById('event-sheet'); if (!wrap) return;
+  const hLbl = h => { const hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };
+  const evs = _events();
+  let html = `<p style="font-size:12px;color:var(--txt3);margin-bottom:10px">Log a major Columbus event (OSU game, concert, convention, festival). <b>Heavy</b> raises counter need +2 in-window, <b>Moderate</b> +1. Advisory — you decide.</p>`;
+  html += `<div class="more-group" style="padding:12px;margin-bottom:10px">
+    <input id="evt-name" type="text" placeholder="Event name (e.g. OSU vs Michigan)" style="width:100%;padding:9px 11px;font-size:14px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:9px;color:var(--txt);margin-bottom:9px">
+    <div class="seg-ctl" style="margin-bottom:9px"><button class="seg on" id="evt-lvl-moderate" onclick="_evtLvl('moderate')">Moderate</button><button class="seg" id="evt-lvl-heavy" onclick="_evtLvl('heavy')">Heavy</button></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <span style="font-size:12px;color:var(--txt3)">Window (optional, 24h)</span>
+      <input id="evt-from" type="number" min="0" max="24" placeholder="from" style="width:66px;padding:7px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--txt)">
+      <span style="color:var(--txt3)">→</span>
+      <input id="evt-to" type="number" min="0" max="24" placeholder="to" style="width:66px;padding:7px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--txt)">
+    </div>
+    <button class="btn btn-g btn-sm" style="width:100%" onclick="_evtAdd()">+ Add event</button>
+  </div>`;
+  if (evs.length) {
+    html += `<div class="more-group">`;
+    evs.forEach(function(e,i){
+      const win = (e.from!=null||e.to!=null) ? (hLbl(e.from==null?0:e.from)+'–'+hLbl(e.to==null?24:e.to)) : 'all day';
+      html += `<div class="more-row" style="cursor:default">
+        <span class="more-ic">${e.level==='heavy'?'🏟':'🎫'}</span>
+        <span class="more-lbl">${e.name}<div style="font-size:12px;color:var(--txt3)">${e.level} · ${win}</div></span>
+        <button onclick="removeCityEvent(${i})" aria-label="remove" style="background:none;border:none;color:var(--na);font-size:20px;cursor:pointer;line-height:1">×</button>
+      </div>`;
+    });
+    html += `</div><button class="btn btn-gh btn-sm" style="width:100%;margin-top:12px" onclick="clearCityEvents()">Clear all events</button>`;
+  } else { html += `<div style="color:var(--txt3);font-size:13px;padding:8px;text-align:center">No events logged.</div>`; }
   wrap.innerHTML = html;
 }
 
@@ -8923,6 +9007,11 @@ function renderChecklist(mode) {
         : '🌧 Wet roads today — protection push; wipe-down returns.';
       htm += '<div class="cl-weather-banner">' + _m + '</div>';
     }
+  }
+  // v60.62: heavy city-event reminder banner
+  var _heavyEv = (typeof _events==='function') ? _events().filter(function(e){return e.level==='heavy';}) : [];
+  if (_heavyEv.length) {
+    htm += '<div class="cl-weather-banner" style="background:rgba(175,156,255,.10);border-color:rgba(175,156,255,.35);color:var(--eb)">🏟 ' + _heavyEv.map(function(e){return e.name;}).join(', ') + ' today — expect high volume; brief the team + protect the fleet.</div>';
   }
   (data||[]).forEach(function(sec) {
     // Email section gets action buttons
@@ -13270,7 +13359,8 @@ function renderCoverageFirst() {
     const r = typeof COVERAGE_BY_HOUR==='function' ? COVERAGE_BY_HOUR(h,dow,agents) : {exitMin:1,counterMin:2};
     const arrBump = (typeof flightArrBump==='function') ? flightArrBump(h) : 0; // v60.61: arrivals raise counter need
     const depLoad = (typeof flightDepLoad==='function') ? flightDepLoad(h) : 0;
-    return { ex, ct, exN: r.exitMin||0, ctN: (r.counterMin||0) + arrBump, closed: !!r.closed, arrBump, depLoad };
+    const evtBump = (typeof eventBumpAt==='function') ? eventBumpAt(h) : 0;      // v60.62: city events raise counter need
+    return { ex, ct, exN: r.exitMin||0, ctN: (r.counterMin||0) + arrBump + evtBump, closed: !!r.closed, arrBump, depLoad, evtBump };
   }
   const cls = (have,need) => need===0 ? 'cov-ok' : have<need ? 'cov-bad' : have===need ? 'cov-warn' : 'cov-ok';
   // Current-hour card
@@ -13307,6 +13397,7 @@ function renderCoverageFirst() {
     let flightNote = '';
     if (q.arrBump > 0) flightNote += `<div class="cov-note flight">✈️ Arrival bank — counter need +${q.arrBump} this hour</div>`;
     if (q.depLoad >= 4) flightNote += `<div class="cov-note flight">🛫 Departure bank (${q.depLoad}) — expect heavy returns</div>`;
+    if (q.evtBump > 0) flightNote += `<div class="cov-note event">🏟 Event demand — counter need +${q.evtBump} this hour</div>`;
     html += `<div class="cov-row${isNow?' nowrow':''}">
       <div class="cov-h">${fmtH(h)}</div>
       <div class="cov-cell"><span class="cov-tag" style="color:var(--exit)">EXIT</span> <span class="cov-n ${cls(q.ex,q.exN)}">${q.ex}/${q.exN}</span></div>
