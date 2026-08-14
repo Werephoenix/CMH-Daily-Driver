@@ -5039,7 +5039,7 @@ function autoSaveHistory() {
 function buildHistoryScreen() {
   const wrapper = document.getElementById('hist-content');
   if (!wrapper) return;
-  wrapper.innerHTML = '<div id="hist-grid"></div>';
+  wrapper.innerHTML = '<div id="history-list"></div>';
   const hist = loadHistory();
   const el = document.getElementById('history-list');
   if (!el) return;
