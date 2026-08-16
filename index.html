@@ -1706,6 +1706,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="showTab('reference')"><span class="more-ic">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('history')"><span class="more-ic">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openScheduleLog()"><span class="more-ic">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openBranchAsks()"><span class="more-ic">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('admin')"><span class="more-ic">⚙️</span><span class="more-lbl">Admin</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBranchInterview()"><span class="more-ic">🗒</span><span class="more-lbl">Branch Interview</span><span class="more-ch">›</span></button>
     </div>
@@ -2975,24 +2976,14 @@ var ROSTER_MGMT = [
   {id:'caitlin', name:'Caitlin Kelsey',          nick:'Caitlin', role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
    notes:'ABRM. Typical shifts: 530A-330P / 9A-7P / 10A-8P / 12P-10P / 4P-C.'},
-  {id:'carlos',  name:'Carlos Aviles',           nick:'Carlos',  role:'ABRM',
-   shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'ABRM. Typical shifts: 530A-330P / 8A-6P / 9A-7P / 10A-8P / 4P-C.'},
+  // ARCHIVED 2026-08-16 (Matt OK): Carlos Aviles (ABRM) — no longer on the branch. Recoverable via git / schedule log.
   {id:'khala',   name:'Khala Shackleford',       nick:'Khala',   role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
    notes:'ABRM. Typical shifts: 530A-330P / 7A-5P / 9A-7P / 10A-8P / 12P-10P / 4P-C.'},
   {id:'maddy',   name:'Madelyne (Maddy) Shirer', nick:'Maddy',   role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
    notes:'ABRM. Full name: Madelyne Shirer. Typical: 530A-330P / 7A-5P / 9A-7P / 10A-8P / 12P-10P / 4P-C.'},
-  {id:'josh',    name:'Joshua (Josh) Osei',      nick:'Josh',    role:'MT',
-   shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'MT. Full name: Joshua Osei. Typical shifts: 6A-4P / 10A-8P / 12P-10P / 4P-C.'},
-  {id:'brittney',name:'Britney Francis',         nick:'Britney',role:'MT',
-   shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'MT. Typical shifts: 6A-4P / 8A-6P / 10A-8P / 12P-10P / 4P-C.'},
-  {id:'lauren',  name:'Lauren Kretschman',       nick:'Lauren',  role:'MT',
-   shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'MT. Typical: 6A-4P / 8A-6P / 12P-10P / 4P-C.'},
+  // ARCHIVED 2026-08-16 (Matt OK): Josh Osei, Britney Francis, Lauren Kretschman (MTs) — no longer on the branch. Recoverable via git / schedule log.
   // v60.3: removed a stray double-comma here (was `},,`) that left a
   // sparse-array HOLE between Lauren and Ennis in ROSTER_MGMT. forEach/map
   // skip holes (so smoke passed), but the ~13 sites that SPREAD the roster
@@ -3000,14 +2991,11 @@ var ROSTER_MGMT = [
   // hole as `undefined` and crash with "Cannot read properties of undefined
   // (reading 'name')" — e.g. findMgrByName, schedule-paste matching, callout
   // suggestion. One char fixes all of them.
-  {id:'ennis_mt', name:'Ennis', nick:'Ennis', role:'MT',
-   shiftCode:'varies', shiftStart:null, shiftEnd:null,
-   defaultStation:'Counter Manager', active:true,
-   notes:'MT. Added May 2026.'},
+  // ARCHIVED 2026-08-16 (Matt OK): Ennis (MT) — no longer on the branch. Recoverable via git / schedule log.
   // ── Added 2026-08-16 (Matt): current ABRMs + MTs from the new manager schedule.
   //    First-name-only (as they appear on the grid); last names + hours pending the
-  //    branch questionnaire. Departures (Carlos, Josh, Britney, Lauren, Ennis) still
-  //    need Matt's explicit OK before archiving — additions only here. ──
+  //    branch questionnaire. Departures (Carlos, Josh, Britney, Lauren, Ennis) ARCHIVED
+  //    2026-08-16 per Matt's OK (removed from active roster; recoverable via git / log). ──
   {id:'preston', name:'Preston', nick:'Preston', role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager', active:true,
    notes:'ABRM. Added 2026-08-16. Last name + hours TBD (branch questionnaire).'},
@@ -17854,6 +17842,95 @@ function slViewEntry(idx){
   });
   h+='</table></div></div>'; o.innerHTML=h;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ASK THE BRANCH (v60.69) — refine-the-app feedback loop (phase 1).
+// Matt queues a question → it surfaces for the branch → they answer in-app →
+// answers save to STATE.branchAsks for Matt to review + mark applied → export
+// as the return channel. Reuses the overlay pattern. Prominent surface signal
+// (Now-screen nudge) + automated sync return are later phases.
+// ═══════════════════════════════════════════════════════════════════════════
+function baArr(){ if(!STATE.branchAsks) STATE.branchAsks=[]; return STATE.branchAsks; }
+function baFind(id){ return baArr().filter(function(a){ return a.id===id; })[0]; }
+function baOpenCount(){ return baArr().filter(function(a){ return !a.answered; }).length; }
+function baAdd(){
+  var el=document.getElementById('ba-new'); if(!el) return; var t=el.value.trim(); if(!t) return;
+  STATE.branchAskSeq=(STATE.branchAskSeq||0)+1;
+  baArr().push({ id:'ask-'+STATE.branchAskSeq, q:t, answer:'', answered:false, applied:false });
+  el.value=''; if(typeof saveState==='function') saveState(); baRender();
+  var n=document.getElementById('ba-new'); if(n) n.focus();
+}
+function baSaveAnswer(id){
+  var inp=document.getElementById('ba-in-'+id); var a=baFind(id); if(!inp||!a) return;
+  a.answer=inp.value; a.answered=!!inp.value.trim();
+  if(typeof saveState==='function') saveState(); baRender();
+}
+function baToggleApplied(id){ var a=baFind(id); if(!a) return; a.applied=!a.applied; if(typeof saveState==='function') saveState(); baRender(); }
+function baReopen(id){ var a=baFind(id); if(!a) return; a.answered=false; if(typeof saveState==='function') saveState(); baRender(); }
+function baDelete(id){ var arr=baArr(); var i=arr.findIndex(function(a){ return a.id===id; }); if(i>=0) arr.splice(i,1); if(typeof saveState==='function') saveState(); baRender(); }
+function baExport(){
+  try{ var data=JSON.stringify(baArr(),null,2); var blob=new Blob([data],{type:'application/json'});
+    var url=URL.createObjectURL(blob); var el=document.createElement('a'); el.href=url; el.download='cmh-branch-asks.json';
+    document.body.appendChild(el); el.click(); setTimeout(function(){ document.body.removeChild(el); URL.revokeObjectURL(url); },120);
+    if(typeof toast==='function') toast('Exported answers');
+  }catch(e){}
+}
+var _baStyled=false;
+function baInjectStyle(){
+  if(_baStyled) return; _baStyled=true;
+  var css=
+  '.ba-overlay{position:fixed;inset:0;z-index:9997;background:#000;display:none;flex-direction:column;font-family:-apple-system,"SF Pro Text",system-ui,Roboto,sans-serif}'
+  +'.ba-head{display:flex;align-items:center;padding:16px 18px 12px;border-bottom:1px solid rgba(255,255,255,.08);flex:none}'
+  +'.ba-kick{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8E8E93}'
+  +'.ba-title{font-size:22px;font-weight:700;color:#fff;letter-spacing:-.3px}'
+  +'.ba-x{margin-left:auto;background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:50%;width:34px;height:34px;font-size:15px;cursor:pointer;flex:none}'
+  +'.ba-body{flex:1;overflow:auto;padding:12px 16px 24px;-webkit-overflow-scrolling:touch}'
+  +'.ba-intro{font-size:13px;color:#AEAEB2;margin:2px 2px 14px}'
+  +'.ba-add{display:flex;gap:8px;margin-bottom:16px}'
+  +'.ba-add input{flex:1;background:#0E0E10;border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;font-size:15px;padding:11px 12px;font-family:inherit}'
+  +'.ba-add button,.ba-ans-in button{background:#0A84FF;color:#fff;border:none;border-radius:10px;padding:0 16px;font-size:14px;font-weight:700;cursor:pointer;flex:none}'
+  +'.ba-empty{color:#8E8E93;font-size:14px;text-align:center;padding:36px 20px;background:#1C1C1E;border-radius:14px}'
+  +'.ba-card{background:#1C1C1E;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:14px;margin-bottom:10px}'
+  +'.ba-q{font-size:15px;font-weight:600;color:#fff;margin-bottom:9px;display:flex;align-items:flex-start;gap:8px}'
+  +'.ba-q-txt{flex:1}'
+  +'.ba-del{background:none;border:none;color:#8E8E93;font-size:14px;cursor:pointer;flex:none;padding:0 2px}'
+  +'.ba-ans-in{display:flex;gap:8px}'
+  +'.ba-ans-in input{flex:1;background:#0E0E10;border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;font-size:14px;padding:9px 11px;font-family:inherit}'
+  +'.ba-answered{background:rgba(48,209,88,.12);border:1px solid rgba(48,209,88,.3);border-radius:10px;padding:9px 11px;color:#9be9b4;font-size:14px}'
+  +'.ba-status{display:flex;align-items:center;gap:7px;margin-top:8px;font-size:12px;color:#AEAEB2;cursor:pointer}'
+  +'.ba-reopen{background:none;border:none;color:#0A84FF;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto}'
+  +'.ba-foot{flex:none;display:flex;gap:10px;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.6)}'
+  +'.ba-btn{flex:1;background:#0A84FF;color:#fff;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}'
+  +'.ba-btn.gh{background:#1C1C1E;border:1px solid rgba(255,255,255,.14);color:#fff;flex:0 0 auto;padding:13px 16px}';
+  var s=document.createElement('style'); s.textContent=css; document.head.appendChild(s);
+}
+function baRender(){
+  var o=document.getElementById('ba-overlay'); if(!o) return; var arr=baArr();
+  var h='<div class="ba-head"><div><div class="ba-kick">Refine the app</div><div class="ba-title">Ask the Branch</div></div><button class="ba-x" onclick="closeBranchAsks()">✕</button></div><div class="ba-body">';
+  h+='<p class="ba-intro">Queue a question for the branch. They answer it in-app; answers save here for you to review, then apply.</p>';
+  h+='<div class="ba-add"><input id="ba-new" placeholder="Type a question for the branch…" onkeydown="if(event.key===\'Enter\')baAdd()"><button onclick="baAdd()">Add</button></div>';
+  if(!arr.length){ h+='<div class="ba-empty">No questions yet.<br>Add one above — it will surface for the branch to answer.</div>'; }
+  arr.forEach(function(a){
+    h+='<div class="ba-card"><div class="ba-q"><span class="ba-q-txt">'+biEsc(a.q)+'</span><button class="ba-del" onclick="baDelete(\''+a.id+'\')">✕</button></div>';
+    if(a.answered){
+      h+='<div class="ba-answered">✓ '+biEsc(a.answer)+'</div>'
+       +'<div class="ba-status"><label style="display:flex;align-items:center;gap:7px;cursor:pointer"><input type="checkbox" '+(a.applied?'checked':'')+' onchange="baToggleApplied(\''+a.id+'\')"> Reviewed &amp; applied</label>'
+       +'<button class="ba-reopen" onclick="baReopen(\''+a.id+'\')">re-open</button></div>';
+    } else {
+      h+='<div class="ba-ans-in"><input id="ba-in-'+a.id+'" value="'+biEsc(a.answer)+'" placeholder="Branch answers here…"><button onclick="baSaveAnswer(\''+a.id+'\')">Save</button></div>';
+    }
+    h+='</div>';
+  });
+  h+='</div><div class="ba-foot"><button class="ba-btn gh" onclick="baExport()">⤓ Export answers</button><button class="ba-btn" onclick="closeBranchAsks()">Done</button></div>';
+  o.innerHTML=h;
+}
+function openBranchAsks(){
+  baInjectStyle();
+  var o=document.getElementById('ba-overlay');
+  if(!o){ o=document.createElement('div'); o.id='ba-overlay'; o.className='ba-overlay'; document.body.appendChild(o); }
+  o.style.display='flex'; baRender(); document.body.style.overflow='hidden';
+}
+function closeBranchAsks(){ var o=document.getElementById('ba-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
 </script>
 </body>
