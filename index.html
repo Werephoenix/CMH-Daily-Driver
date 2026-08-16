@@ -287,6 +287,23 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .seg-ctl { display: flex; background: var(--bg3); border-radius: 9px; padding: 2px; margin-bottom: 10px; gap: 2px; }
 .seg { flex: 1; border: none; background: transparent; color: var(--txt2); font-family: var(--ff-ui); font-size: 13px; font-weight: 600; padding: 7px 4px; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
 .seg.on { background: var(--bg2); color: var(--txt); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+/* v60.66 (Board re-layout): colored active segments keep walk-up state meaning */
+.seg.on.g{color:var(--green)} .seg.on.a{color:var(--amber)} .seg.on.r{color:var(--red)} .seg.on.b{color:var(--acc)}
+.board-ctl-lbl{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--txt3);margin-bottom:6px}
+.board-stat-strip{display:flex;gap:8px;margin-bottom:12px}
+.board-stat-strip>div{flex:1;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:1px}
+.bss-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--txt3)}
+.bss-val{font-size:16px;font-weight:800;color:var(--txt)}
+.board-ov-grid{display:grid;grid-template-columns:1fr;gap:2px 16px}
+@media(min-width:560px){.board-ov-grid{grid-template-columns:1fr 1fr}}
+.board-ov-row{display:flex;align-items:center;gap:8px;padding:5px 0;min-height:36px;min-width:0}
+.board-ov-code{font-family:var(--font-mono,ui-monospace,Menlo,monospace);font-size:11px;font-weight:700;color:var(--txt3);min-width:40px;flex:none}
+.board-ov-name{flex:1;min-width:0;font-size:13px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.board-sw{position:relative;width:42px;height:26px;border-radius:13px;background:var(--bg3);border:1px solid var(--bdr2);cursor:pointer;flex:none;transition:background .15s}
+.board-sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .18s}
+.board-sw.on{background:var(--exit);border-color:var(--exit)}
+.board-sw.on::after{transform:translateX(16px)}
+.board-sw.forced{box-shadow:0 0 0 2px var(--amber) inset}
 /* Coverage-first per-hour list */
 .cov-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 10px; padding: 11px 14px; border-bottom: 1px solid var(--bdr); }
 .cov-note { flex-basis: 100%; font-size: 12px; font-weight: 600; margin-top: 2px; background: none; border: none; text-align: left; padding: 0; font-family: var(--ff-ui); }
@@ -1945,7 +1962,9 @@ button { cursor: pointer; }
      SCREEN: AVAILABILITY BOARD
 ═══════════════════════════════════════════════════════════════ -->
 <div class="scr" id="screen-board">
-  <h1 class="scr-title">Board</h1>
+  <!-- v60.65 (Design handoff §3.5): iOS kicker + timestamp over a "Live Board" large title -->
+  <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3);margin-bottom:1px">AVAILABILITY<span id="board-updated"></span></div>
+  <h1 class="scr-title">Live Board</h1>
   <!-- v60.60: outbound-cancellation → walk-up 1-way flag -->
   <div id="board-cancel-flag" class="board-cancel-flag"></div>
   <!-- v60.62: city-event → fleet-pressure flag -->
@@ -1962,45 +1981,49 @@ button { cursor: pointer; }
     <button class="btn btn-gh btn-sm" onclick="showTab('board');setTimeout(()=>window.print(),100)">🖨 Print Board</button>
   </div>
 
-  <!-- Combined Walk-Up + 24hr panel -->
-  <div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:8px;padding:8px 12px;margin-bottom:10px">
-    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-      <span style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">🚦 Walk-Ups</span>
-      <button class="wubtn" id="wu-open-b"    onclick="setWU('open')">✅ All Open</button>
-      <button class="wubtn"      id="wu-core-b"    onclick="setWU('core')">🔵 Core Only</button>
-      <button class="wubtn"      id="wu-noncore-b" onclick="setWU('noncore')">🔶 Non-Core</button>
-      <button class="wubtn"      id="wu-closed-b"  onclick="setWU('closed')">🔴 Closed</button>
+  <!-- v60.66 (Design §3.5): walk-up + 24hr as iOS segmented controls; 4-state + color preserved -->
+  <div class="card" style="padding:12px 14px;margin-bottom:10px">
+    <div class="board-ctl-lbl">🚦 Walk-ups · Emerald caps at Standard SUV</div>
+    <div class="seg-ctl" style="margin-bottom:0">
+      <button class="seg" id="wu-open-b"    onclick="setWU('open')">All Open</button>
+      <button class="seg" id="wu-core-b"    onclick="setWU('core')">Core</button>
+      <button class="seg" id="wu-noncore-b" onclick="setWU('noncore')">Non-Core</button>
+      <button class="seg" id="wu-closed-b"  onclick="setWU('closed')">Closed</button>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <span style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;letter-spacing:.06em">📅 24hr Booking</span>
-      <button class="wubtn" id="b24-open-b"       onclick="set24hr('open')">✅ Open</button>
-      <button class="wubtn" id="b24-restricted-b" onclick="set24hr('restricted')">🟡 Restricted</button>
-      <button class="wubtn" id="b24-emerald-b"    onclick="set24hr('emerald-only')">🌟 Emerald Only</button>
-      <button class="wubtn" id="b24-closed-b"     onclick="set24hr('closed')">🔴 Closed</button>
+    <div class="board-ctl-lbl" style="margin-top:12px">📅 24-hour booking</div>
+    <div class="seg-ctl" style="margin-bottom:0">
+      <button class="seg" id="b24-open-b"       onclick="set24hr('open')">Open</button>
+      <button class="seg" id="b24-restricted-b" onclick="set24hr('restricted')">Restricted</button>
+      <button class="seg" id="b24-emerald-b"    onclick="set24hr('emerald-only')">Emerald</button>
+      <button class="seg" id="b24-closed-b"     onclick="set24hr('closed')">Closed</button>
     </div>
   </div>
 
-  <!-- Core/Non-Core filter strip — given its own bordered container and
-       larger buttons in v50 because it was getting overlooked in the
-       prior thin-line layout. Matt: "I don't see where to filter those." -->
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:8px 12px;
-       background:var(--bg2);border:1px solid var(--bdr2);border-radius:6px;flex-wrap:wrap">
-    <span style="font-size:11px;font-weight:800;color:var(--txt2);text-transform:uppercase;letter-spacing:.05em">🔍 Show:</span>
-    <button id="av-filter-all"  onclick="setAvailFilter('all')"
-      style="font-size:11px;padding:6px 14px;border-radius:5px;border:1px solid var(--acc);background:var(--acc);color:#fff;cursor:pointer;font-weight:700">All Groups</button>
-    <button id="av-filter-core" onclick="setAvailFilter('core')"
-      style="font-size:11px;padding:6px 14px;border-radius:5px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);cursor:pointer;font-weight:700">◆ Core Only</button>
-    <button id="av-filter-non"  onclick="setAvailFilter('noncore')"
-      style="font-size:11px;padding:6px 14px;border-radius:5px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);cursor:pointer;font-weight:700">Non-Core</button>
-    <span style="font-size:10px;color:var(--txt3);margin-left:auto">Tap tile for details · tap ⚙ to override</span>
+  <!-- v60.66 (Design §3.5): per-group walk-up overrides surfaced as a 2-col switch grid.
+       ON = walk-ups allowed for this group (auto/forced-open) · OFF = forced closed.
+       Amber ring = a manual override is active (differs from the master policy). The
+       per-tile ⚙ still handles the rarer force-OPEN-against-a-closed-master case. -->
+  <div class="card" style="padding:12px 14px;margin-bottom:10px">
+    <div class="board-ctl-lbl">Walk-up by group · overrides</div>
+    <div id="board-ov-grid" class="board-ov-grid"></div>
+    <button id="board-ov-toggle" class="btn btn-gh btn-sm" style="margin-top:8px;width:100%" onclick="toggleOvShowAll()">Show all groups ›</button>
   </div>
 
-  <!-- Board totals -->
-  <div class="kpi-row" style="margin-bottom:12px">
-    <div class="kpi"><div class="kpi-lbl">Total Res</div><div class="kpi-val a" id="board-total-res">—</div></div>
-    <div class="kpi"><div class="kpi-lbl">Total Ret</div><div class="kpi-val g" id="board-total-ret">—</div></div>
-    <div class="kpi"><div class="kpi-lbl">Net</div><div class="kpi-val" id="board-total-net">—</div></div>
-    <div class="kpi"><div class="kpi-lbl">WU Open</div><div class="kpi-val g" id="board-groups-open">—</div></div>
+  <!-- v60.66 (Design §3.5): fleet filter as an iOS segmented control (was pill buttons) -->
+  <div class="board-ctl-lbl" style="margin-top:2px">🔍 Show on the board</div>
+  <div class="seg-ctl">
+    <button class="seg on" id="av-filter-all"  onclick="setAvailFilter('all')">All Groups</button>
+    <button class="seg"    id="av-filter-core" onclick="setAvailFilter('core')">◆ Core</button>
+    <button class="seg"    id="av-filter-non"  onclick="setAvailFilter('noncore')">Non-Core</button>
+  </div>
+  <div style="font-size:10px;color:var(--txt3);margin:-2px 0 12px">Tap a tile for details · tap ⚙ to override a group</div>
+
+  <!-- v60.66 (Design §3.5): board totals de-emphasized to a compact strip (glanceable, not hero) -->
+  <div class="board-stat-strip">
+    <div><span class="bss-lbl">Total Res</span><span class="bss-val" id="board-total-res">—</span></div>
+    <div><span class="bss-lbl">Total Ret</span><span class="bss-val" id="board-total-ret">—</span></div>
+    <div><span class="bss-lbl">Net</span><span class="bss-val" id="board-total-net">—</span></div>
+    <div><span class="bss-lbl">WU Open</span><span class="bss-val" id="board-groups-open">—</span></div>
   </div>
 
   <!-- Legend -->
@@ -3982,6 +4005,7 @@ function parseStep(stepNum) {
 
   if (!STATE.pasteData) STATE.pasteData = {};
   STATE.pasteData[key] = result;
+  STATE.boardUpdatedAt = Date.now();  // v60.65: powers the Live Board "· Updated HH:MM" header
 
   // Also try to parse brand section if present.
   // GUARD: GL hourly paste has a "Total" aggregate row at the top, which
@@ -4219,16 +4243,82 @@ function setAvailFilter(mode) {
     const b=document.getElementById('av-filter-'+id);
     if(!b)return;
     const active = id===mode || (id==='non' && mode==='noncore');
-    b.style.background = active ? 'var(--acc)' : 'var(--bg3)';
-    b.style.color = active ? '#fff' : 'var(--txt3)';
-    b.style.borderColor = active ? 'var(--acc)' : 'var(--bdr2)';
+    b.className = 'seg' + (active ? ' on' : '');   // v60.66: segmented control
   });
   buildBoardGrid();
+}
+
+// ── v60.66: per-group walk-up override switches (Board §3.5) ──────────────────
+// Reconciles the mockup's 2-col switch grid with the app's tri-state override
+// model. ON = walk-ups allowed (auto or forced-open); OFF = forced closed.
+// Amber ring = a manual override differs from the master policy.
+function walkUpAutoAllows(name){
+  const pol = STATE.walkUpPolicy || 'open';
+  const isCore = CORE_GROUPS && CORE_GROUPS.has(name);
+  if(pol==='closed') return false;
+  if(pol==='core')    return !!isCore;
+  if(pol==='noncore') return !isCore;
+  return true; // 'open'
+}
+function boardGroupOn(name){
+  const ov = STATE.groupOverrides && STATE.groupOverrides[name];
+  if(ov==='open')  return true;
+  if(ov==='close') return false;
+  return walkUpAutoAllows(name);
+}
+var _grpCodeRev = null;
+function groupRepCode(name){
+  if(!_grpCodeRev){ _grpCodeRev={}; try{ for(const c in CODE_MAP){ const g=CODE_MAP[c]; if(g && !_grpCodeRev[g]) _grpCodeRev[g]=c; } }catch(e){} }
+  return _grpCodeRev[name] || '';
+}
+function toggleOvShowAll(){ window._ovShowAll = !window._ovShowAll; buildBoardOverrides(); }
+function buildBoardOverrides(){
+  const grid = document.getElementById('board-ov-grid');
+  if(!grid || typeof GROUP_META==='undefined') return;
+  // v60.66: curated by default (core groups) with a "show all" expander — matches
+  // the mockup's clean feel; every group stays reachable + per-tile ⚙ still works.
+  const showAll = !!window._ovShowAll;
+  const groups = showAll ? GROUP_META : GROUP_META.filter(g=>CORE_GROUPS && CORE_GROUPS.has(g.name));
+  let html='';
+  groups.forEach(function(g){
+    const on = boardGroupOn(g.name);
+    const ov = STATE.groupOverrides && STATE.groupOverrides[g.name];
+    const forced = ov==='open' || ov==='close';
+    const safe = g.name.replace(/'/g,"\\'");
+    html += '<div class="board-ov-row">'
+      + '<span class="board-ov-code">'+groupRepCode(g.name)+'</span>'
+      + '<span class="board-ov-name">'+g.name+'</span>'
+      + '<div class="board-sw'+(on?' on':'')+(forced?' forced':'')+'" role="switch" aria-checked="'+on+'" '
+      + 'title="'+(forced?'Manual override — tap to return to auto':'Auto (follows master) — tap to override')+'" '
+      + 'onclick="toggleBoardOverride(\''+safe+'\')"></div>'
+      + '</div>';
+  });
+  grid.innerHTML = html;
+  const btn = document.getElementById('board-ov-toggle');
+  if(btn) btn.textContent = showAll ? 'Show core only' : ('Show all '+GROUP_META.length+' groups ›');
+}
+function toggleBoardOverride(name){
+  STATE.groupOverrides = STATE.groupOverrides || {};
+  if(boardGroupOn(name)){
+    STATE.groupOverrides[name]='close';               // turning OFF → force closed
+  } else if(walkUpAutoAllows(name)){
+    delete STATE.groupOverrides[name];                // turning ON, master allows → back to auto
+  } else {
+    STATE.groupOverrides[name]='open';                // turning ON against a closed master → force open
+  }
+  saveState();
+  buildBoardGrid();   // re-renders tiles + the override grid, keeping them in sync
 }
 
 function buildBoardGrid() {
   const grid = document.getElementById('board-grid');
   if (!grid) return;
+  // v60.65: Live Board "· Updated HH:MM" — reflects the last GreenLight paste.
+  const bu = document.getElementById('board-updated');
+  if (bu) bu.textContent = STATE.boardUpdatedAt
+    ? ' · Updated ' + new Date(STATE.boardUpdatedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
+    : '';
+  buildBoardOverrides();   // v60.66: keep the per-group switch grid in sync with tiles
   const data = getGroupNetData();
   let html = '';
 
@@ -10112,7 +10202,9 @@ function updateWUBtns() {
     if (!el) continue;
     const active = pol === v;
     const colorCls = v==='open'?'g':v==='closed'?'r':'a';
-    el.className = 'wubtn' + (active ? ' on ' + colorCls : '');
+    // v60.66: preserve base class — board control is now `.seg`, dashboard variants stay `.wubtn`
+    const base = el.classList.contains('seg') ? 'seg' : 'wubtn';
+    el.className = base + (active ? ' on ' + colorCls : '');
   }
 }
 
