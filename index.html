@@ -1705,6 +1705,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="showTab('inventory')"><span class="more-ic">🔢</span><span class="more-lbl">Physical Inventory</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('reference')"><span class="more-ic">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('history')"><span class="more-ic">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openMasterCalendar()"><span class="more-ic">📅</span><span class="more-lbl">Master Calendar</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openScheduleLog()"><span class="more-ic">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBranchAsks()"><span class="more-ic">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('admin')"><span class="more-ic">⚙️</span><span class="more-lbl">Admin</span><span class="more-ch">›</span></button>
@@ -17931,6 +17932,108 @@ function openBranchAsks(){
   o.style.display='flex'; baRender(); document.body.style.overflow='hidden';
 }
 function closeBranchAsks(){ var o=document.getElementById('ba-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MASTER CALENDAR (v60.70) — one month view layering everything the app knows:
+// shifts (getScheduleForDate), city events (SEEDED_EVENTS + STATE.cityEvents),
+// celebrations (STATE.celebrations). PTO layers in as a 4th source once the
+// approved tracker format is in hand. Reads REAL data; empty where none yet.
+// ═══════════════════════════════════════════════════════════════════════════
+var _mcCur = null;
+function _mcKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function mcEventsOn(key){
+  var out=[];
+  try{ if(typeof SEEDED_EVENTS!=='undefined') SEEDED_EVENTS.forEach(function(e){ if(e.dates && e.dates.indexOf(key)>-1) out.push({name:e.name,level:e.level,kind:e.kind}); }); }catch(e){}
+  try{ (STATE.cityEvents||[]).forEach(function(e){ if(e.date===key) out.push({name:e.name,level:e.level||'moderate',kind:e.kind}); }); }catch(e){}
+  return out;
+}
+function mcNormMD(s){ if(!s) return ''; var m=String(s).match(/(\d{1,2})[\/\-](\d{1,2})/); if(!m) return ''; return String(parseInt(m[1])).padStart(2,'0')+'-'+String(parseInt(m[2])).padStart(2,'0'); }
+function mcCelebsOn(key){ var md=key.slice(5); return (STATE.celebrations||[]).filter(function(c){ return mcNormMD(c.date)===md; }); }
+function mcScheduleObj(key){ try{ return (typeof getScheduleForDate==='function' ? getScheduleForDate(key) : null) || {}; }catch(e){ return {}; } }
+function mcStaffCount(key){ var s=mcScheduleObj(key); return Object.keys(s).filter(function(p){ var c=s[p]; return c && !/OFF|VACA/i.test(String(c)); }).length; }
+function _mcHr(h){ if(h==null) return '?'; var hh=((h%24)+24)%24; var ap=hh<12?'a':'p'; var h12=Math.floor(hh)%12; if(h12===0)h12=12; var m=Math.round((hh-Math.floor(hh))*60); return h12+(m?':'+String(m).padStart(2,'0'):'')+ap; }
+function mcFmtShift(c){ if(Array.isArray(c)) return c.length>=2 ? _mcHr(c[0])+'–'+_mcHr(c[1]) : String(c); return String(c); }
+var _mcStyled=false;
+function mcInjectStyle(){
+  if(_mcStyled) return; _mcStyled=true;
+  var css=
+  '.mc-overlay{position:fixed;inset:0;z-index:9996;background:#000;display:none;flex-direction:column;font-family:-apple-system,"SF Pro Text",system-ui,Roboto,sans-serif}'
+  +'.mc-head{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;border-bottom:1px solid rgba(255,255,255,.08);flex:none}'
+  +'.mc-nav{background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:9px;width:34px;height:34px;font-size:18px;cursor:pointer;flex:none}'
+  +'.mc-title,.mc-title2{font-size:19px;font-weight:700;color:#fff;flex:1;text-align:center}.mc-title2{font-size:17px}'
+  +'.mc-back{background:none;border:none;color:#0A84FF;font-size:15px;font-weight:600;cursor:pointer;flex:none}'
+  +'.mc-x{background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:50%;width:34px;height:34px;font-size:14px;cursor:pointer;flex:none}'
+  +'.mc-monthscroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}'
+  +'.mc-dow{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 8px 4px}'
+  +'.mc-dow>div{text-align:center;font-size:11px;font-weight:700;color:#8E8E93}'
+  +'.mc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:0 8px 8px}'
+  +'.mc-cell{position:relative;min-height:62px;background:#1C1C1E;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:4px;cursor:pointer;color:#fff;text-align:left;overflow:hidden}'
+  +'.mc-cell.mc-empty{background:transparent;border:none;cursor:default}'
+  +'.mc-today{border-color:#0A84FF;background:rgba(10,132,255,.12)}'
+  +'.mc-dnum{font-size:12px;font-weight:600;color:#fff}'
+  +'.mc-marks{display:flex;flex-wrap:wrap;gap:2px;margin-top:2px;align-items:center}'
+  +'.mc-dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex:none}'
+  +'.mc-cake{font-size:9px;line-height:1}'
+  +'.mc-staff{position:absolute;bottom:3px;right:4px;font-size:10px;font-weight:800;color:#64D2FF}'
+  +'.mc-legend{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:10px 12px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#AEAEB2;flex:none}'
+  +'.mc-legend span{display:flex;align-items:center;gap:5px}'
+  +'.mc-daybody{flex:1;overflow:auto;padding:12px 16px 24px}'
+  +'.mc-sec{background:#1C1C1E;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:12px 14px;margin-bottom:10px}'
+  +'.mc-sec-h{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#8E8E93;margin-bottom:8px}'
+  +'.mc-item{display:flex;align-items:center;gap:8px;font-size:14px;color:#fff;padding:4px 0}'
+  +'.mc-name{flex:1}.mc-code{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#AEAEB2}'
+  +'.mc-lvl{font-size:11px;color:#8E8E93;margin-left:auto}.mc-none{font-size:13px;color:#8E8E93}';
+  var s=document.createElement('style'); s.textContent=css; document.head.appendChild(s);
+}
+var _MC_MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function mcRender(){
+  var o=document.getElementById('mc-overlay'); if(!o) return;
+  var cur=_mcCur, y=cur.getFullYear(), m=cur.getMonth();
+  var startDow=new Date(y,m,1).getDay(), daysIn=new Date(y,m+1,0).getDate();
+  var todayKey=_mcKey(new Date());
+  var h='<div class="mc-head"><button class="mc-nav" onclick="mcNav(-1)">‹</button><div class="mc-title">'+_MC_MON[m]+' '+y+'</div><button class="mc-nav" onclick="mcNav(1)">›</button><button class="mc-x" onclick="closeMasterCalendar()">✕</button></div>';
+  h+='<div class="mc-monthscroll"><div class="mc-dow">'+['S','M','T','W','T','F','S'].map(function(d){return '<div>'+d+'</div>';}).join('')+'</div><div class="mc-grid">';
+  for(var i=0;i<startDow;i++) h+='<div class="mc-cell mc-empty"></div>';
+  for(var d=1;d<=daysIn;d++){
+    var key=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var evs=mcEventsOn(key), cels=mcCelebsOn(key), staff=mcStaffCount(key);
+    h+='<button class="mc-cell'+(key===todayKey?' mc-today':'')+'" onclick="mcDay(\''+key+'\')"><div class="mc-dnum">'+d+'</div><div class="mc-marks">';
+    evs.slice(0,3).forEach(function(e){ h+='<span class="mc-dot" style="background:'+(e.level==='heavy'?'#FF453A':'#FFCC00')+'"></span>'; });
+    if(cels.length) h+='<span class="mc-cake">🎂</span>';
+    h+='</div>'+(staff>0?'<div class="mc-staff">'+staff+'</div>':'')+'</button>';
+  }
+  h+='</div></div>';
+  h+='<div class="mc-legend"><span><span class="mc-dot" style="background:#FF453A"></span>Heavy event</span><span><span class="mc-dot" style="background:#FFCC00"></span>Event</span><span>🎂 Celebration</span><span><b style="color:#64D2FF">N</b> staff on</span></div>';
+  o.innerHTML=h;
+}
+function mcNav(delta){ _mcCur=new Date(_mcCur.getFullYear(), _mcCur.getMonth()+delta, 1); mcRender(); }
+function mcDay(key){
+  var o=document.getElementById('mc-overlay'); if(!o) return;
+  var evs=mcEventsOn(key), cels=mcCelebsOn(key), sched=mcScheduleObj(key);
+  var d=new Date(key+'T12:00:00');
+  var wd=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+  var h='<div class="mc-head"><button class="mc-back" onclick="mcRender()">‹ Month</button><div class="mc-title2">'+wd+' '+_MC_MON[d.getMonth()].slice(0,3)+' '+d.getDate()+'</div><button class="mc-x" onclick="closeMasterCalendar()">✕</button></div><div class="mc-daybody">';
+  h+='<div class="mc-sec"><div class="mc-sec-h">🏟 Events</div>';
+  if(evs.length) evs.forEach(function(e){ h+='<div class="mc-item"><span class="mc-dot" style="background:'+(e.level==='heavy'?'#FF453A':'#FFCC00')+'"></span><span class="mc-name">'+biEsc(e.name)+'</span><span class="mc-lvl">'+biEsc(e.level||'')+'</span></div>'; });
+  else h+='<div class="mc-none">None</div>';
+  h+='</div><div class="mc-sec"><div class="mc-sec-h">🎉 Celebrations</div>';
+  if(cels.length) cels.forEach(function(c){ h+='<div class="mc-item">'+(c.type==='anniversary'?'🎉':'🎂')+' <span class="mc-name">'+biEsc(c.name)+'</span><span class="mc-lvl">'+biEsc(c.type||'')+'</span></div>'; });
+  else h+='<div class="mc-none">None</div>';
+  h+='</div><div class="mc-sec"><div class="mc-sec-h">👥 Scheduled</div>';
+  var names=Object.keys(sched||{}).filter(function(p){ var c=sched[p]; return c && !/OFF|VACA/i.test(c); }).sort();
+  if(names.length) names.forEach(function(p){ h+='<div class="mc-item"><span class="mc-name">'+biEsc(p.replace(/_/g,' '))+'</span><span class="mc-code">'+biEsc(mcFmtShift(sched[p]))+'</span></div>'; });
+  else h+='<div class="mc-none">No schedule on file for this day</div>';
+  h+='</div><div class="mc-sec" style="opacity:.6"><div class="mc-sec-h">🌴 Time off (PTO)</div><div class="mc-none">Drop in your PTO tracker to show time off here.</div></div>';
+  h+='</div>'; o.innerHTML=h;
+}
+function openMasterCalendar(){
+  mcInjectStyle();
+  if(!_mcCur) _mcCur=new Date(); _mcCur=new Date(_mcCur.getFullYear(), _mcCur.getMonth(), 1);
+  var o=document.getElementById('mc-overlay');
+  if(!o){ o=document.createElement('div'); o.id='mc-overlay'; o.className='mc-overlay'; document.body.appendChild(o); }
+  o.style.display='flex'; mcRender(); document.body.style.overflow='hidden';
+}
+function closeMasterCalendar(){ var o=document.getElementById('mc-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
 </script>
 </body>
