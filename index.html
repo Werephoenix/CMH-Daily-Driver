@@ -17672,6 +17672,9 @@ function biInjectStyle(){
   +'.bi-choice.on{background:rgba(10,132,255,.18);border-color:#0A84FF;color:#4DA3FF}'
   +'.bi-in,.bi-ta{width:100%;background:#0E0E10;border:1px solid rgba(255,255,255,.14);border-radius:10px;color:#fff;font-size:15px;padding:10px 12px;font-family:inherit}'
   +'.bi-in{max-width:170px}.bi-ta{resize:vertical;min-height:44px}'
+  +'.bi-note{width:100%;margin-top:7px;background:transparent;border:none;border-bottom:1px dashed rgba(255,255,255,.18);color:#AEAEB2;font-size:12.5px;padding:5px 2px;font-family:inherit;font-style:italic}'
+  +'.bi-note:focus{outline:none;border-bottom-color:#0A84FF;color:#fff;font-style:normal}'
+  +'.bi-note.has{color:#FFCC00;border-bottom-color:rgba(255,204,0,.4);font-style:normal}'
   +'.bi-foot{flex:none;display:flex;gap:10px;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.6)}'
   +'.bi-btn{flex:1;background:#0A84FF;color:#fff;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}'
   +'.bi-btn.gh{background:#1C1C1E;border:1px solid rgba(255,255,255,.14);color:#fff;flex:0 0 auto;padding:13px 16px}'
@@ -17691,6 +17694,8 @@ function biUpdateProg(){
   var el=document.getElementById('bi-prog'); if(el) el.textContent=p.done+' of '+p.total+' answered'+(p.done===p.total?'  ·  ✓ complete':'');
 }
 function biSet(k,val){ biCfg()[k]=val; if(typeof saveState==='function') saveState(); biUpdateProg(); }
+function biNotes(){ if(!STATE.branchNotes) STATE.branchNotes={}; return STATE.branchNotes; }
+function biSetNote(k,val,el){ biNotes()[k]=val; if(typeof saveState==='function') saveState(); if(el){ if(val.trim()) el.classList.add('has'); else el.classList.remove('has'); } }
 function biPick(k,opt,btn){ biSet(k,opt); var p=btn.parentNode; Array.prototype.forEach.call(p.children,function(c){c.classList.remove('on');}); btn.classList.add('on'); }
 function biToggleMulti(k,opt,btn){
   var cur=biCfg()[k]; if(!Array.isArray(cur)) cur=[];
@@ -17719,13 +17724,14 @@ function biRender(){
   var h='<div class="bi-head"><div><div class="bi-kick">Branch Setup</div><div class="bi-title">Branch Interview</div></div>'
     +'<button class="bi-x" onclick="closeBranchInterview()">✕</button></div>'
     +'<div class="bi-progwrap"><div class="bi-track"><i id="bi-progbar"></i></div><div class="bi-prog" id="bi-prog"></div></div>'
-    +'<div class="bi-body"><p class="bi-intro">Answer what you can — skip anything and we\'ll use a smart default. Saves as you go; your answers tune the app to this branch.</p>';
+    +'<div class="bi-body"><p class="bi-intro">Answer what you can, and add a <b>note</b> beside anything that needs clarifying. Saves as you go. Your answers + notes come back for review — we may follow up with a few more questions in the next round.</p>';
   BRANCH_INTERVIEW.forEach(function(sec){
     h+='<div class="bi-sec"><div class="bi-sec-hd">'+biEsc(sec.title)+(sec.opt?' <span class="bi-optional">optional</span>':'')+(sec.tunes?'<span class="bi-tunes">→ '+biEsc(sec.tunes)+'</span>':'')+'</div>';
-    sec.qs.forEach(function(q){ h+='<div class="bi-q"><div class="bi-q-lbl">'+biEsc(q.q)+'</div>'+biField(q,c[q.k])+'</div>'; });
+    sec.qs.forEach(function(q){ var nt=biNotes()[q.k]||''; h+='<div class="bi-q"><div class="bi-q-lbl">'+biEsc(q.q)+'</div>'+biField(q,c[q.k])
+      +'<input class="bi-note'+(nt.trim()?' has':'')+'" placeholder="✎ Note / clarify (optional)…" value="'+biEsc(nt)+'" oninput="biSetNote(\''+q.k+'\',this.value,this)"></div>'; });
     h+='</div>';
   });
-  h+='</div><div class="bi-foot"><button class="bi-btn gh" onclick="biExport()">⤓ Export</button><button class="bi-btn" onclick="biApply()">Save &amp; close</button></div>';
+  h+='</div><div class="bi-foot"><button class="bi-btn gh" onclick="biExportWith()">⤓ Export</button><button class="bi-btn" onclick="biApply()">Save &amp; close</button></div>';
   o.innerHTML=h; biUpdateProg();
 }
 function openBranchInterview(){
@@ -17744,6 +17750,15 @@ function biExport(){
     a.href=url; a.download='cmh-branch-config.json'; document.body.appendChild(a); a.click();
     setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},120);
     if(typeof toast==='function') toast('Exported branch answers');
+  }catch(e){ if(typeof toast==='function') toast('Export failed'); }
+}
+function biExportWith(){ /* answers + notes together for review/follow-up */
+  try{
+    var out={ answers: biCfg(), notes: biNotes(), exportedFor:'review' };
+    var data=JSON.stringify(out,null,2); var blob=new Blob([data],{type:'application/json'});
+    var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='cmh-branch-interview.json';
+    document.body.appendChild(a); a.click(); setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); },120);
+    if(typeof toast==='function') toast('Exported answers + notes');
   }catch(e){ if(typeof toast==='function') toast('Export failed'); }
 }
 
