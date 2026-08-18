@@ -1720,6 +1720,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="openScheduleLog()"><span class="more-ic">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBranchAsks()"><span class="more-ic">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openRequests()"><span class="more-ic">📥</span><span class="more-lbl">Requests</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openSetupHub()"><span class="more-ic">🔧</span><span class="more-lbl">Setup (self-service)</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('admin')"><span class="more-ic">⚙️</span><span class="more-lbl">Admin</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBackup()"><span class="more-ic">💾</span><span class="more-lbl">Backup &amp; Restore</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBranchInterview()"><span class="more-ic">🗒</span><span class="more-lbl">Branch Interview</span><span class="more-ch">›</span></button>
@@ -18359,6 +18360,61 @@ function openBackup(){
   o.style.display='flex'; bkRender(); document.body.style.overflow='hidden';
 }
 function closeBackup(){ var o=document.getElementById('bk-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SETUP HUB (v60.79) — self-service "finish": one discoverable place showing the
+// branch's current config at a glance + a link to every existing editor. The
+// editors themselves already exist (Admin panel: staff, car codes, coverage
+// thresholds, PINs, schedule) and are engine-wired — this UNIFIES them.
+// ═══════════════════════════════════════════════════════════════════════════
+function suStaffCount(){ try{ return [].concat(ROSTER_CXR||[],ROSTER_MGMT||[],ROSTER_EXIT||[],ROSTER_RETURNS||[]).filter(function(p){return p&&p.active!==false;}).length; }catch(e){ return 0; } }
+function suCoverageSummary(){
+  try{ var t=(STATE.coverageThresholds&&STATE.coverageThresholds.peak)|| (typeof DEFAULT_THRESHOLDS!=='undefined'&&DEFAULT_THRESHOLDS.peak) || {exitMin:2,counterMin:2};
+    return 'Peak: Exit '+(t.exitMin!=null?t.exitMin:'—')+' · Counter '+(t.counterMin!=null?t.counterMin:'—'); }catch(e){ return 'set by time block'; }
+}
+function suHoursSummary(){ try{ var ext=STATE.closingExtension; var close=(ext&&ext.until)?ext.until:24.5; var ch=close%24; var ap=ch<12?'a':'p'; var h12=Math.floor(ch)%12||12; var m=Math.round((ch-Math.floor(ch))*60); return '6:00a – '+h12+(m?':'+String(m).padStart(2,'0'):':00')+ap; }catch(e){ return '6:00a – 12:30a'; } }
+function suBranchAnswers(){ try{ var c=STATE.branchConfig||{}; var done=Object.keys(c).filter(function(k){var v=c[k];return v!=null&&v!==''&&!(Array.isArray(v)&&!v.length);}).length; return done+' answered'; }catch(e){ return 'not started'; } }
+var _suStyled=false;
+function suInjectStyle(){
+  if(_suStyled) return; _suStyled=true;
+  var css=
+  '.su-overlay{position:fixed;inset:0;z-index:9993;background:#000;display:none;flex-direction:column;font-family:-apple-system,"SF Pro Text",system-ui,Roboto,sans-serif}'
+  +'.su-head{display:flex;align-items:center;padding:16px 18px 12px;border-bottom:1px solid rgba(255,255,255,.08)}'
+  +'.su-kick{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8E8E93}.su-title{font-size:22px;font-weight:700;color:#fff}'
+  +'.su-x{margin-left:auto;background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:50%;width:34px;height:34px;font-size:15px;cursor:pointer}'
+  +'.su-body{flex:1;overflow:auto;padding:14px 16px 24px}.su-body>p{font-size:13.5px;color:#AEAEB2;margin:0 0 16px;line-height:1.5}'
+  +'.su-card{display:flex;align-items:center;gap:12px;background:#1C1C1E;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:13px 14px;margin-bottom:10px;width:100%;text-align:left;color:#fff;cursor:pointer}'
+  +'.su-ic{font-size:22px;width:34px;text-align:center;flex:none}.su-main{flex:1;min-width:0}.su-lbl{display:block;font-size:15px;font-weight:700}.su-val{display:block;font-size:12.5px;color:#8E8E93;margin-top:2px}.su-edit{font-size:12px;font-weight:700;color:#0A84FF;flex:none}'
+  +'.su-sech{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:#8E8E93;margin:14px 2px 8px}';
+  var s=document.createElement('style'); s.textContent=css; document.head.appendChild(s);
+}
+function suRender(){
+  var o=document.getElementById('su-overlay'); if(!o) return;
+  function card(ic,lbl,val,fn){ return '<button class="su-card" onclick="'+fn+'"><span class="su-ic">'+ic+'</span><span class="su-main"><span class="su-lbl">'+lbl+'</span><span class="su-val">'+val+'</span></span><span class="su-edit">Edit ›</span></button>'; }
+  var goAdmin="closeSetupHub();showTab('admin')";
+  o.innerHTML='<div class="su-head"><div><div class="su-kick">Self-service</div><div class="su-title">Setup</div></div><button class="su-x" onclick="closeSetupHub()">✕</button></div>'
+    +'<div class="su-body"><p>Everything your branch might change lives here — edit it yourself, <b>no developer needed</b>. Your current settings are shown below.</p>'
+    +'<div class="su-sech">Coverage &amp; hours</div>'
+    +card('📊','Coverage targets', suCoverageSummary(), "closeSetupHub();openThresholdQuiz()")
+    +card('🕐','Hours of operation', suHoursSummary(), goAdmin)
+    +'<div class="su-sech">People &amp; schedule</div>'
+    +card('👥','Staff &amp; roles', suStaffCount()+' people', goAdmin)
+    +card('📅','Schedule', 'paste or edit by day', goAdmin)
+    +card('🗒','Branch setup answers', suBranchAnswers(), "closeSetupHub();openBranchInterview()")
+    +'<div class="su-sech">Fleet &amp; rules</div>'
+    +card('🚗','Car codes &amp; groups', 'map codes → groups', goAdmin)
+    +'<div class="su-sech">Security &amp; data</div>'
+    +card('🔑','Manager PINs', 'PIN-protected admin', goAdmin)
+    +card('💾','Backup, snapshots &amp; activity', 'protect &amp; move your data', "closeSetupHub();openBackup()")
+    +'</div>';
+}
+function openSetupHub(){
+  suInjectStyle();
+  var o=document.getElementById('su-overlay');
+  if(!o){ o=document.createElement('div'); o.id='su-overlay'; o.className='su-overlay'; document.body.appendChild(o); }
+  o.style.display='flex'; suRender(); document.body.style.overflow='hidden';
+}
+function closeSetupHub(){ var o=document.getElementById('su-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
 </script>
 </body>
