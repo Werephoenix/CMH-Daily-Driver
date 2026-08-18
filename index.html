@@ -10190,6 +10190,7 @@ function genTeamText() {
 }
 
 function setWU(v) {
+  if (typeof logAction==='function') logAction('Walk-up policy → '+v);
   if (typeof setWalkUp === 'function') setWalkUp(v);
   else { STATE.walkUpPolicy=v; if(!STATE.fields)STATE.fields={}; STATE.fields.wuSetManually='1'; saveState(); updateWUBtns(); buildBoardGrid(); }
 }
@@ -10199,6 +10200,7 @@ function setWU(v) {
 // 'emerald-only', 'closed'). Drives the badge shown on emails/print
 // when restrictions are active.
 function set24hr(v) {
+  if (typeof logAction==='function') logAction('24hr booking → '+v);
   if (!STATE.fields) STATE.fields = {};
   STATE.fields.book24hr = v;
   saveState();
@@ -16281,6 +16283,7 @@ function addDNR(name,reason){
   const list=getDNRList();
   list.unshift({id:Date.now(),name:name.trim(),reason,added:new Date().toLocaleDateString(),ts:Date.now(),acked:false});
   saveDNR(list);
+  if(typeof logAction==='function') logAction('DNR added: '+name.trim());
   refreshDNRDNQCards();
   toast('🚫 DNR added: '+name.trim());
 }
@@ -18030,7 +18033,7 @@ function mcDemandWhy(key){
 // (SEEDED_EVENTS) have no remove; only manager-added (STATE.cityEvents) do.
 function mcManualIdx(key,name){ var a=Array.isArray(STATE.cityEvents)?STATE.cityEvents:[]; for(var i=0;i<a.length;i++){ if(a[i].date===key && a[i].name===name) return i; } return -1; }
 function mcSetEvLevel(l){ window._mcEvLevel=(l==='heavy'?'heavy':'moderate'); var m=document.getElementById('mc-lvl-mod'), hh=document.getElementById('mc-lvl-heavy'); if(m&&hh){ m.classList.toggle('on',window._mcEvLevel==='moderate'); hh.classList.toggle('on',window._mcEvLevel==='heavy'); } }
-function mcAddEventFromUI(key){ var el=document.getElementById('mc-ev-name'); if(!el) return; var nm=el.value.trim(); if(!nm) return; if(typeof addCityEvent==='function') addCityEvent(nm, window._mcEvLevel||'moderate', 'festival', key); window._mcEvLevel='moderate'; mcDay(key); }
+function mcAddEventFromUI(key){ var el=document.getElementById('mc-ev-name'); if(!el) return; var nm=el.value.trim(); if(!nm) return; if(typeof addCityEvent==='function') addCityEvent(nm, window._mcEvLevel||'moderate', 'festival', key); if(typeof logAction==='function') logAction('Event added: '+nm+' ('+(window._mcEvLevel||'moderate')+', '+key+')'); window._mcEvLevel='moderate'; mcDay(key); }
 function mcRemoveEvent(key,name){ var i=mcManualIdx(key,name); if(i>=0 && typeof removeCityEvent==='function') removeCityEvent(i); mcDay(key); }
 var _mcStyled=false;
 function mcInjectStyle(){
@@ -18177,7 +18180,7 @@ function rqAdd(){
     date:(dt&&dt.value)||'', note:(nt&&nt.value.trim())||'', status:'open' });
   if(typeof saveState==='function') saveState(); window._rqType='off'; rqRender();
 }
-function rqDecide(id,st){ var r=rqArr().filter(function(x){return x.id===id;})[0]; if(r){ r.status=st; r.decidedAt=new Date().toLocaleDateString(); if(typeof saveState==='function') saveState(); rqRender(); } }
+function rqDecide(id,st){ var r=rqArr().filter(function(x){return x.id===id;})[0]; if(r){ r.status=st; r.decidedAt=new Date().toLocaleDateString(); if(typeof logAction==='function') logAction('Request '+st+': '+r.who+(r.date?' ('+r.date+')':'')); if(typeof saveState==='function') saveState(); rqRender(); } }
 function rqReopen(id){ var r=rqArr().filter(function(x){return x.id===id;})[0]; if(r){ r.status='open'; r.decidedAt=null; if(typeof saveState==='function') saveState(); rqRender(); } }
 function rqDelete(id){ var a=rqArr(); var i=a.findIndex(function(x){return x.id===id;}); if(i>=0) a.splice(i,1); if(typeof saveState==='function') saveState(); rqRender(); }
 var _RQ_TYPE={off:'Time off',early:'Leave early',swap:'Shift swap',other:'Other'};
@@ -18257,8 +18260,11 @@ function closeRequests(){ var o=document.getElementById('rq-overlay'); if(o) o.s
 // to one JSON file; restore replaces it and reloads. Key-agnostic so it captures
 // everything without knowing every key name. Supports moving the app / new device.
 // ═══════════════════════════════════════════════════════════════════════════
+// v60.78: lightweight change log (audit trail) — who/what/when for key actions
+function logAction(txt){ try{ if(!STATE.changeLog) STATE.changeLog=[]; STATE.changeLog.unshift({ts:Date.now(),txt:String(txt)}); if(STATE.changeLog.length>60) STATE.changeLog=STATE.changeLog.slice(0,60); if(typeof saveState==='function') saveState(); }catch(e){} }
 function bkExport(){
   try{
+    logAction('Backup taken');
     var dump={}; for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); dump[k]=localStorage.getItem(k); }
     var payload={ app:'CMH Daily Driver', kind:'full-backup', exported:new Date().toISOString(), keys:Object.keys(dump).length, data:dump };
     var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
@@ -18342,6 +18348,8 @@ function bkRender(){
     +'<button class="bk-btn gh" onclick="bkSnapNow()">📸 Save a snapshot now</button>'
     +(function(){ var a=bkSnaps(); if(!a.length) return '<div class="bk-last">No snapshots yet.</div>';
         return '<div style="margin-top:6px">'+a.map(function(s){ return '<div style="display:flex;align-items:center;gap:8px;padding:9px 2px;border-top:1px solid rgba(255,255,255,.06)"><span style="flex:1;font-size:13px;color:#EBEBF5">'+(s.label==='auto'?'🕑 Auto':'📸 Manual')+' · <span style="color:#8E8E93">'+bkRelTime(s.ts)+'</span></span><button class="dnr-ackbtn" onclick="bkRestoreSnapshot('+s.ts+')">Restore</button></div>'; }).join('')+'</div>'; })()
+    +'<div class="bk-div"></div><div class="bk-kick" style="margin-bottom:6px">Recent activity</div>'
+    +(function(){ var l=(STATE.changeLog||[]); if(!l.length) return '<div class="bk-last">No activity logged yet.</div>'; return '<div>'+l.slice(0,20).map(function(e){ return '<div style="display:flex;gap:8px;padding:6px 2px;border-top:1px solid rgba(255,255,255,.06);font-size:12.5px"><span style="flex:1;color:#EBEBF5">'+biEsc(e.txt)+'</span><span style="color:#8E8E93;white-space:nowrap">'+bkRelTime(e.ts)+'</span></div>'; }).join('')+'</div>'; })()
     +'</div>';
 }
 function openBackup(){
