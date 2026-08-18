@@ -304,6 +304,14 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .board-sw.on{background:var(--exit);border-color:var(--exit)}
 .board-sw.on::after{transform:translateX(16px)}
 .board-sw.forced{box-shadow:0 0 0 2px var(--amber) inset}
+/* v60.73 (Round 2): DNR/DNQ pulse-until-acknowledged */
+.dnr-unacked{animation:dnrPulse 2s ease-in-out infinite;border-radius:6px}
+@keyframes dnrPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,0)}50%{box-shadow:0 0 0 3px rgba(255,69,58,.28)}}
+.dnq-unacked{animation:dnqPulse 2s ease-in-out infinite;border-radius:6px}
+@keyframes dnqPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,204,0,0)}50%{box-shadow:0 0 0 3px rgba(255,204,0,.28)}}
+.dnr-ackbtn{font-size:10px;padding:3px 9px;border-radius:5px;border:1px solid var(--txt3);background:transparent;color:var(--txt2);cursor:pointer;font-weight:700;white-space:nowrap;flex-shrink:0}
+.dnr-ackd{font-size:9px;color:var(--ok);font-weight:700}
+@media(prefers-reduced-motion:reduce){.dnr-unacked,.dnq-unacked{animation:none}}
 /* Coverage-first per-hour list */
 .cov-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 10px; padding: 11px 14px; border-bottom: 1px solid var(--bdr); }
 .cov-note { flex-basis: 100%; font-size: 12px; font-weight: 600; margin-top: 2px; background: none; border: none; text-align: left; padding: 0; font-family: var(--ff-ui); }
@@ -16249,7 +16257,7 @@ function pruneDNQ(){
 function addDNR(name,reason){
   if(!name.trim())return;
   const list=getDNRList();
-  list.unshift({id:Date.now(),name:name.trim(),reason,added:new Date().toLocaleDateString(),ts:Date.now()});
+  list.unshift({id:Date.now(),name:name.trim(),reason,added:new Date().toLocaleDateString(),ts:Date.now(),acked:false});
   saveDNR(list);
   refreshDNRDNQCards();
   toast('🚫 DNR added: '+name.trim());
@@ -16258,7 +16266,7 @@ function addDNR(name,reason){
 function addDNQ(name,reason){
   if(!name.trim())return;
   const list=getDNQList();
-  list.unshift({id:Date.now(),name:name.trim(),reason,added:new Date().toLocaleString(),ts:Date.now()});
+  list.unshift({id:Date.now(),name:name.trim(),reason,added:new Date().toLocaleString(),ts:Date.now(),acked:false});
   saveDNQ(list);
   refreshDNRDNQCards();
   toast('⚠️ DNQ logged: '+name.trim());
@@ -16266,6 +16274,9 @@ function addDNQ(name,reason){
 
 function deleteDNR(id){saveDNR(getDNRList().filter(r=>r.id!==id));refreshDNRDNQCards();}
 function deleteDNQ(id){saveDNQ(getDNQList().filter(r=>r.id!==id));refreshDNRDNQCards();}
+// v60.73: acknowledge — stops the alert pulsing once a staffer has seen it
+function ackDNR(id){var l=getDNRList();var r=l.filter(function(x){return x.id===id;})[0];if(r){r.acked=true;saveDNR(l);refreshDNRDNQCards();}}
+function ackDNQ(id){var l=getDNQList();var r=l.filter(function(x){return x.id===id;})[0];if(r){r.acked=true;saveDNQ(l);refreshDNRDNQCards();}}
 
 function openAddDNR(){
   if(typeof isManagerMode==='function'&&!isManagerMode()){
@@ -16334,6 +16345,7 @@ function buildDNRDNQCards(){
   const dnq=getDNQList();
   const isMgr=typeof isManagerMode==='function'&&isManagerMode();
   const today=new Date().toLocaleDateString();
+  const calm=(typeof STATE!=='undefined'&&STATE.uiTheme==='calm'); // v60.73: no pulse in Calm Mode
 
   // DNR card
   let dnrHtml=`<div style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.4);
@@ -16350,12 +16362,14 @@ function buildDNRDNQCards(){
     dnrHtml+=`<div style="font-size:11px;color:var(--txt3);font-style:italic">No active alerts</div>`;
   } else {
     dnr.forEach(r=>{
-      dnrHtml+=`<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;
+      const un=!r.acked;
+      dnrHtml+=`<div class="${un&&!calm?'dnr-unacked':''}" style="display:flex;align-items:center;gap:8px;padding:6px 0;
         border-bottom:1px solid rgba(239,68,68,.15)">
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:800;color:#fca5a5">${r.name}</div>
+          <div style="font-size:13px;font-weight:800;color:#fca5a5">${r.name}${un?'':' <span class="dnr-ackd">✓ ack’d</span>'}</div>
           <div style="font-size:10px;color:var(--txt3)">${r.reason} · Added ${r.added}</div>
         </div>
+        ${un?`<button class="dnr-ackbtn" onclick="ackDNR(${r.id})">Acknowledge</button>`:''}
         ${isMgr?`<button onclick="if(confirm('Remove DNR for ${r.name}?'))deleteDNR(${r.id})"
           style="font-size:18px;background:none;border:none;color:var(--txt3);cursor:pointer;
             line-height:1;padding:0 2px;flex-shrink:0">×</button>`:''}
@@ -16379,12 +16393,14 @@ function buildDNRDNQCards(){
     </div>`;
 
   function dnqRow(r,dim){
-    return `<div style="display:flex;align-items:flex-start;gap:8px;padding:5px 0;
+    const un=!r.acked;
+    return `<div class="${un&&!calm&&!dim?'dnq-unacked':''}" style="display:flex;align-items:center;gap:8px;padding:5px 0;
       border-bottom:1px solid rgba(245,158,11,.12);opacity:${dim?.65:1}">
       <div style="flex:1;min-width:0">
-        <div style="font-size:${dim?11:13}px;font-weight:${dim?600:700};color:#fcd34d">${r.name}</div>
+        <div style="font-size:${dim?11:13}px;font-weight:${dim?600:700};color:#fcd34d">${r.name}${un?'':' <span class="dnr-ackd">✓</span>'}</div>
         <div style="font-size:10px;color:var(--txt3)">${r.reason}</div>
       </div>
+      ${un?`<button class="dnr-ackbtn" onclick="ackDNQ(${r.id})">Ack</button>`:''}
       <button onclick="deleteDNQ(${r.id})"
         style="font-size:18px;background:none;border:none;color:var(--txt3);cursor:pointer;
           line-height:1;padding:0 2px;flex-shrink:0">×</button>
