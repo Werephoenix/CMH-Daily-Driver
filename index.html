@@ -297,6 +297,10 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .board-search{width:100%;background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;color:var(--txt);font-size:14px;padding:9px 12px;margin:0 0 8px;font-family:var(--font-ui)}
 .board-search:focus{outline:none;border-color:var(--acc)}
 .board-policy{font-size:11px;color:var(--txt3);font-weight:600}
+/* v60.81 (Design §3.5): collapsed policy pill */
+.board-pill{display:flex;align-items:center;gap:8px;width:100%;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;padding:13px 14px;margin-bottom:12px;cursor:pointer;color:var(--txt);font-family:var(--font-ui);font-size:13px}
+.board-policy2{flex:1;text-align:left;font-weight:600}
+.board-pill-chev{font-size:12px;color:var(--acc);font-weight:700;white-space:nowrap}
 .board-ov-grid{display:grid;grid-template-columns:1fr;gap:2px 16px}
 @media(min-width:560px){.board-ov-grid{grid-template-columns:1fr 1fr}}
 .board-ov-row{display:flex;align-items:center;gap:8px;padding:5px 0;min-height:36px;min-width:0}
@@ -1989,6 +1993,10 @@ button { cursor: pointer; }
   <!-- v60.62: city-event → fleet-pressure flag -->
   <div id="board-event-flag" class="board-cancel-flag"></div>
 
+  <!-- v60.81 (Design §3.5): collapsed POLICY PILL — tap to expand walk-up + 24hr + overrides -->
+  <button class="board-pill" onclick="toggleBoardControls()"><span id="board-policy-line" class="board-policy2">🚦 Walk-ups</span><span class="board-pill-chev" id="board-pill-chev">Set ⌄</span></button>
+  <div id="board-controls" style="display:none">
+
   <!-- Ops header — v52: stripped down to just the print button.
        The "Completely Satisfied / Hot Alerts / Opening / Closing"
        summary that lived here was redundant with the same info on the
@@ -2027,6 +2035,7 @@ button { cursor: pointer; }
     <div id="board-ov-grid" class="board-ov-grid"></div>
     <button id="board-ov-toggle" class="btn btn-gh btn-sm" style="margin-top:8px;width:100%" onclick="toggleOvShowAll()">Show all groups ›</button>
   </div>
+  </div><!-- /board-controls -->
 
   <!-- v60.66 (Design §3.5): fleet filter as an iOS segmented control (was pill buttons) -->
   <div class="board-ctl-lbl" style="margin-top:2px">🔍 Show on the board</div>
@@ -2037,18 +2046,18 @@ button { cursor: pointer; }
   </div>
   <!-- v60.75 (Round 3 ⑥): board search + policy status line -->
   <input id="board-search" class="board-search" placeholder="🔍 Find a car group…" oninput="setBoardSearch(this.value)">
-  <div style="display:flex;align-items:center;gap:8px;margin:0 0 12px"><span id="board-policy-line" class="board-policy"></span><span style="font-size:10px;color:var(--txt3);margin-left:auto">tap ⚙ to override</span></div>
+  <div style="font-size:10px;color:var(--txt3);text-align:right;margin:0 0 12px">tap a tile for details · ⚙ to override a group</div>
 
-  <!-- v60.66 (Design §3.5): board totals de-emphasized to a compact strip (glanceable, not hero) -->
-  <div class="board-stat-strip">
+  <!-- v60.81: board totals hidden on the board (Design shows them in the flow readout) -->
+  <div class="board-stat-strip" style="display:none">
     <div><span class="bss-lbl">Total Res</span><span class="bss-val" id="board-total-res">—</span></div>
     <div><span class="bss-lbl">Total Ret</span><span class="bss-val" id="board-total-ret">—</span></div>
     <div><span class="bss-lbl">Net</span><span class="bss-val" id="board-total-net">—</span></div>
     <div><span class="bss-lbl">WU Open</span><span class="bss-val" id="board-groups-open">—</span></div>
   </div>
 
-  <!-- Legend -->
-  <div class="legend">
+  <!-- Legend — hidden on the board (Design uses self-evident status icons on tiles) -->
+  <div class="legend" style="display:none">
     <div><span class="ldot" style="background:var(--green)"></span><span style="color:var(--green)">Walk-Up + Upgrade</span></div>
     <div><span class="ldot" style="background:var(--amber)"></span><span style="color:var(--amber)">Upgrade Only</span></div>
     <div><span class="ldot" style="background:var(--red)"></span><span style="color:var(--red)">Not Available</span></div>
@@ -4304,6 +4313,7 @@ function groupRepCode(name){
 function toggleOvShowAll(){ window._ovShowAll = !window._ovShowAll; buildBoardOverrides(); }
 // v60.75 (Round 3 ⑥): board search + policy status line
 function setBoardSearch(v){ window._boardSearch=(v||'').trim().toLowerCase(); buildBoardGrid(); }
+function toggleBoardControls(){ var c=document.getElementById('board-controls'); if(!c) return; var show=(c.style.display==='none'); c.style.display=show?'block':'none'; var ch=document.getElementById('board-pill-chev'); if(ch) ch.textContent=show?'Hide ⌃':'Set ⌄'; }
 function updateBoardPolicyLine(){
   var el=document.getElementById('board-policy-line'); if(!el) return;
   var wu={open:'All Open',core:'Core only',noncore:'Non-Core',closed:'Closed'}[(STATE&&STATE.walkUpPolicy)||'open']||'All Open';
