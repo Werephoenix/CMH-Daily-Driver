@@ -294,6 +294,9 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .board-stat-strip>div{flex:1;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:1px}
 .bss-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--txt3)}
 .bss-val{font-size:16px;font-weight:800;color:var(--txt)}
+.board-search{width:100%;background:var(--bg2);border:1px solid var(--bdr2);border-radius:10px;color:var(--txt);font-size:14px;padding:9px 12px;margin:0 0 8px;font-family:var(--font-ui)}
+.board-search:focus{outline:none;border-color:var(--acc)}
+.board-policy{font-size:11px;color:var(--txt3);font-weight:600}
 .board-ov-grid{display:grid;grid-template-columns:1fr;gap:2px 16px}
 @media(min-width:560px){.board-ov-grid{grid-template-columns:1fr 1fr}}
 .board-ov-row{display:flex;align-items:center;gap:8px;padding:5px 0;min-height:36px;min-width:0}
@@ -2029,7 +2032,9 @@ button { cursor: pointer; }
     <button class="seg"    id="av-filter-core" onclick="setAvailFilter('core')">◆ Core</button>
     <button class="seg"    id="av-filter-non"  onclick="setAvailFilter('noncore')">Non-Core</button>
   </div>
-  <div style="font-size:10px;color:var(--txt3);margin:-2px 0 12px">Tap a tile for details · tap ⚙ to override a group</div>
+  <!-- v60.75 (Round 3 ⑥): board search + policy status line -->
+  <input id="board-search" class="board-search" placeholder="🔍 Find a car group…" oninput="setBoardSearch(this.value)">
+  <div style="display:flex;align-items:center;gap:8px;margin:0 0 12px"><span id="board-policy-line" class="board-policy"></span><span style="font-size:10px;color:var(--txt3);margin-left:auto">tap ⚙ to override</span></div>
 
   <!-- v60.66 (Design §3.5): board totals de-emphasized to a compact strip (glanceable, not hero) -->
   <div class="board-stat-strip">
@@ -4294,6 +4299,15 @@ function groupRepCode(name){
   return _grpCodeRev[name] || '';
 }
 function toggleOvShowAll(){ window._ovShowAll = !window._ovShowAll; buildBoardOverrides(); }
+// v60.75 (Round 3 ⑥): board search + policy status line
+function setBoardSearch(v){ window._boardSearch=(v||'').trim().toLowerCase(); buildBoardGrid(); }
+function updateBoardPolicyLine(){
+  var el=document.getElementById('board-policy-line'); if(!el) return;
+  var wu={open:'All Open',core:'Core only',noncore:'Non-Core',closed:'Closed'}[(STATE&&STATE.walkUpPolicy)||'open']||'All Open';
+  var b24={open:'Open',restricted:'Restricted','emerald-only':'Emerald only',closed:'Closed'}[((STATE&&STATE.fields&&STATE.fields.book24hr))||'open']||'Open';
+  var wuClosed=((STATE&&STATE.walkUpPolicy)==='closed'), b24Closed=((STATE&&STATE.fields&&STATE.fields.book24hr)==='closed');
+  el.innerHTML='🚦 Walk-ups <b style="color:'+(wuClosed?'var(--na)':'var(--ok)')+'">'+wu+'</b> · 📅 24hr <b style="color:'+(b24Closed?'var(--na)':'var(--txt2)')+'">'+b24+'</b>';
+}
 function buildBoardOverrides(){
   const grid = document.getElementById('board-ov-grid');
   if(!grid || typeof GROUP_META==='undefined') return;
@@ -4348,7 +4362,12 @@ function buildBoardGrid() {
   const groupsToShow = af==='all' ? GROUP_META :
                        af==='core' ? GROUP_META.filter(g=>CORE_GROUPS && CORE_GROUPS.has(g.name)) :
                        GROUP_META.filter(g=>!(CORE_GROUPS && CORE_GROUPS.has(g.name)));
-  groupsToShow.forEach(g => {
+  updateBoardPolicyLine(); // v60.75
+  // v60.75: board search filter (name or code)
+  const _bs = (window._boardSearch||'');
+  const _shown = _bs ? groupsToShow.filter(g=> g.name.toLowerCase().indexOf(_bs)>=0 || (typeof groupRepCode==='function' && (groupRepCode(g.name)||'').toLowerCase().indexOf(_bs)>=0)) : groupsToShow;
+  if(_bs && !_shown.length){ html += '<div style="grid-column:1/-1;color:var(--txt3);font-size:13px;padding:16px;text-align:center">No car group matches “'+_bs+'”.</div>'; }
+  _shown.forEach(g => {
     const d = data[g.name];
     const has = d && d.has;
     const net = has ? d.net : null;
@@ -10204,6 +10223,7 @@ function update24hrButtons() {
     el.classList.remove('on','g','b','a','r');
     if (v === val) el.classList.add('on', colorCls);
   });
+  if (typeof updateBoardPolicyLine==='function') updateBoardPolicyLine(); // v60.75
 }
 
 function calcBoard() {
