@@ -8702,6 +8702,7 @@ function renderNow() {
   html += opsSignalsHtml(); // v60.60: cancellations → walk-up 1-way signal + counter
 
   html += `<div class="now-sec-hd">Coming up</div><div class="more-group">`;
+  html += (typeof weekAheadRow==='function' ? weekAheadRow() : ''); // v60.72: week-ahead demand heads-up → calendar
   html += `<div class="more-row" style="cursor:default"><span class="more-ic">🍽</span><span class="more-lbl">Next lunch</span><span class="now-floor-val" style="color:var(--up)">${nextLunch?_nowFmtH(nextLunch.at)+' · '+nextLunch.who:'—'}</span></div>`;
   html += `<button class="more-row" onclick="showTab('checklist')"><span class="more-ic">✅</span><span class="more-lbl">${ritual} ritual</span><span class="more-ch">›</span></button>`;
   html += `</div>`;
@@ -17968,6 +17969,31 @@ function mcScheduleObj(key){ try{ return (typeof getScheduleForDate==='function'
 function mcStaffCount(key){ var s=mcScheduleObj(key); return Object.keys(s).filter(function(p){ var c=s[p]; return c && !/OFF|VACA/i.test(String(c)); }).length; }
 function _mcHr(h){ if(h==null) return '?'; var hh=((h%24)+24)%24; var ap=hh<12?'a':'p'; var h12=Math.floor(hh)%12; if(h12===0)h12=12; var m=Math.round((hh-Math.floor(hh))*60); return h12+(m?':'+String(m).padStart(2,'0'):'')+ap; }
 function mcFmtShift(c){ if(Array.isArray(c)) return c.length>=2 ? _mcHr(c[0])+'–'+_mcHr(c[1]) : String(c); return String(c); }
+// v60.72 (Round 1): demand model with event ripple (Design §7) — heavy event:
+// day-before +1 (prep) · day-of +4 · day-after +2 (returns wave); moderate: day-of +2.
+function mcShiftKey(key,delta){ var d=new Date(key+'T12:00:00'); d.setDate(d.getDate()+delta); return _mcKey(d); }
+function mcDemandOn(key){
+  var s=0;
+  mcEventsOn(key).forEach(function(e){ s += (e.level==='heavy'?4:2); });
+  mcEventsOn(mcShiftKey(key,1)).forEach(function(e){ if(e.level==='heavy') s+=1; });   // key = day BEFORE a heavy → prep
+  mcEventsOn(mcShiftKey(key,-1)).forEach(function(e){ if(e.level==='heavy') s+=2; });  // key = day AFTER a heavy → returns wave
+  return s;
+}
+function mcDemandLevel(key){ var s=mcDemandOn(key); return s>=4?'heavy':(s>=1?'elevated':'none'); }
+function mcDemandWhy(key){
+  var r=[];
+  mcEventsOn(key).forEach(function(e){ r.push('Event today: '+e.name+' ('+(e.level||'moderate')+')'); });
+  mcEventsOn(mcShiftKey(key,1)).forEach(function(e){ if(e.level==='heavy') r.push('Day before '+e.name+' — prep / early pickups'); });
+  mcEventsOn(mcShiftKey(key,-1)).forEach(function(e){ if(e.level==='heavy') r.push('Day after '+e.name+' — returns wave'); });
+  return r;
+}
+// v60.72 (Round 1 ②): manager event input on the calendar — reuses addCityEvent/
+// removeCityEvent so it feeds the SAME demand model + Now signals. Seeded events
+// (SEEDED_EVENTS) have no remove; only manager-added (STATE.cityEvents) do.
+function mcManualIdx(key,name){ var a=Array.isArray(STATE.cityEvents)?STATE.cityEvents:[]; for(var i=0;i<a.length;i++){ if(a[i].date===key && a[i].name===name) return i; } return -1; }
+function mcSetEvLevel(l){ window._mcEvLevel=(l==='heavy'?'heavy':'moderate'); var m=document.getElementById('mc-lvl-mod'), hh=document.getElementById('mc-lvl-heavy'); if(m&&hh){ m.classList.toggle('on',window._mcEvLevel==='moderate'); hh.classList.toggle('on',window._mcEvLevel==='heavy'); } }
+function mcAddEventFromUI(key){ var el=document.getElementById('mc-ev-name'); if(!el) return; var nm=el.value.trim(); if(!nm) return; if(typeof addCityEvent==='function') addCityEvent(nm, window._mcEvLevel||'moderate', 'festival', key); window._mcEvLevel='moderate'; mcDay(key); }
+function mcRemoveEvent(key,name){ var i=mcManualIdx(key,name); if(i>=0 && typeof removeCityEvent==='function') removeCityEvent(i); mcDay(key); }
 var _mcStyled=false;
 function mcInjectStyle(){
   if(_mcStyled) return; _mcStyled=true;
@@ -17997,7 +18023,16 @@ function mcInjectStyle(){
   +'.mc-sec-h{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:#8E8E93;margin-bottom:8px}'
   +'.mc-item{display:flex;align-items:center;gap:8px;font-size:14px;color:#fff;padding:4px 0}'
   +'.mc-name{flex:1}.mc-code{font-family:ui-monospace,Menlo,monospace;font-size:12px;color:#AEAEB2}'
-  +'.mc-lvl{font-size:11px;color:#8E8E93;margin-left:auto}.mc-none{font-size:13px;color:#8E8E93}';
+  +'.mc-lvl{font-size:11px;color:#8E8E93;margin-left:auto}.mc-none{font-size:13px;color:#8E8E93}'
+  +'.mc-cell.mc-elev{background:rgba(255,204,0,.10);border-color:rgba(255,204,0,.32)}'
+  +'.mc-cell.mc-heavy{background:rgba(255,69,58,.13);border-color:rgba(255,69,58,.42)}'
+  +'.mc-sw{width:11px;height:11px;border-radius:3px;display:inline-block}.mc-sw.heavy{background:rgba(255,69,58,.55)}.mc-sw.elev{background:rgba(255,204,0,.55)}'
+  +'.mc-rm{background:none;border:none;color:#8E8E93;font-size:13px;cursor:pointer;margin-left:6px;flex:none}'
+  +'.mc-addev{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}'
+  +'.mc-addev input{flex:1;min-width:130px;background:#0E0E10;border:1px solid rgba(255,255,255,.14);border-radius:9px;color:#fff;font-size:13px;padding:8px 10px;font-family:inherit}'
+  +'.mc-ev-lvls{display:flex;gap:2px;background:#0E0E10;border-radius:9px;padding:2px}'
+  +'.mc-lvlbtn{background:transparent;border:none;color:#8E8E93;font-size:12px;font-weight:600;padding:6px 10px;border-radius:7px;cursor:pointer}.mc-lvlbtn.on{background:#2C2C2E;color:#fff}'
+  +'.mc-addbtn{background:#0A84FF;color:#fff;border:none;border-radius:9px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;flex:none}';
   var s=document.createElement('style'); s.textContent=css; document.head.appendChild(s);
 }
 var _MC_MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -18011,14 +18046,15 @@ function mcRender(){
   for(var i=0;i<startDow;i++) h+='<div class="mc-cell mc-empty"></div>';
   for(var d=1;d<=daysIn;d++){
     var key=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    var evs=mcEventsOn(key), cels=mcCelebsOn(key), staff=mcStaffCount(key);
-    h+='<button class="mc-cell'+(key===todayKey?' mc-today':'')+'" onclick="mcDay(\''+key+'\')"><div class="mc-dnum">'+d+'</div><div class="mc-marks">';
+    var evs=mcEventsOn(key), cels=mcCelebsOn(key), staff=mcStaffCount(key), dem=mcDemandLevel(key);
+    var demCls = key===todayKey ? ' mc-today' : (dem==='heavy'?' mc-heavy':dem==='elevated'?' mc-elev':'');
+    h+='<button class="mc-cell'+demCls+'" onclick="mcDay(\''+key+'\')"><div class="mc-dnum">'+d+'</div><div class="mc-marks">';
     evs.slice(0,3).forEach(function(e){ h+='<span class="mc-dot" style="background:'+(e.level==='heavy'?'#FF453A':'#FFCC00')+'"></span>'; });
     if(cels.length) h+='<span class="mc-cake">🎂</span>';
     h+='</div>'+(staff>0?'<div class="mc-staff">'+staff+'</div>':'')+'</button>';
   }
   h+='</div></div>';
-  h+='<div class="mc-legend"><span><span class="mc-dot" style="background:#FF453A"></span>Heavy event</span><span><span class="mc-dot" style="background:#FFCC00"></span>Event</span><span>🎂 Celebration</span><span><b style="color:#64D2FF">N</b> staff on</span></div>';
+  h+='<div class="mc-legend"><span><span class="mc-sw heavy"></span>Heavy demand</span><span><span class="mc-sw elev"></span>Busy</span><span>🎂 Celebration</span><span><b style="color:#64D2FF">N</b> staff scheduled</span></div>';
   o.innerHTML=h;
 }
 function mcNav(delta){ _mcCur=new Date(_mcCur.getFullYear(), _mcCur.getMonth()+delta, 1); mcRender(); }
@@ -18028,9 +18064,26 @@ function mcDay(key){
   var d=new Date(key+'T12:00:00');
   var wd=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
   var h='<div class="mc-head"><button class="mc-back" onclick="mcRender()">‹ Month</button><div class="mc-title2">'+wd+' '+_MC_MON[d.getMonth()].slice(0,3)+' '+d.getDate()+'</div><button class="mc-x" onclick="closeMasterCalendar()">✕</button></div><div class="mc-daybody">';
+  // v60.72: readiness card — demand (events + ripple) vs staff scheduled
+  var dem=mcDemandLevel(key), staff=mcStaffCount(key);
+  if(dem!=='none'){
+    var col=dem==='heavy'?'#FF453A':'#FFCC00';
+    h+='<div class="mc-sec" style="border-color:'+col+'66"><div class="mc-sec-h" style="color:'+col+'">▲ '+(dem==='heavy'?'Heavy demand expected':'Busier than a normal day')+'</div>';
+    mcDemandWhy(key).forEach(function(r){ h+='<div class="mc-item" style="font-size:13px;color:#EBEBF5">• '+biEsc(r)+'</div>'; });
+    h+='<div class="mc-item" style="font-size:13px;color:#AEAEB2">'+staff+' staff scheduled'+(staff===0?' — no schedule loaded for this day yet':'')+'.</div>';
+    h+='</div>';
+  }
+  var evLvl = (window._mcEvLevel==='heavy'?'heavy':'moderate');
   h+='<div class="mc-sec"><div class="mc-sec-h">🏟 Events</div>';
-  if(evs.length) evs.forEach(function(e){ h+='<div class="mc-item"><span class="mc-dot" style="background:'+(e.level==='heavy'?'#FF453A':'#FFCC00')+'"></span><span class="mc-name">'+biEsc(e.name)+'</span><span class="mc-lvl">'+biEsc(e.level||'')+'</span></div>'; });
+  if(evs.length) evs.forEach(function(e){
+    var mi=mcManualIdx(key,e.name); var enm=biEsc(e.name);
+    h+='<div class="mc-item"><span class="mc-dot" style="background:'+(e.level==='heavy'?'#FF453A':'#FFCC00')+'"></span><span class="mc-name">'+enm+'</span><span class="mc-lvl">'+biEsc(e.level||'')+'</span>'
+      +(mi>=0?'<button class="mc-rm" title="Remove" onclick="mcRemoveEvent(\''+key+'\',\''+enm.replace(/'/g,"\\'")+'\')">✕</button>':'')+'</div>';
+  });
   else h+='<div class="mc-none">None</div>';
+  h+='<div class="mc-addev"><input id="mc-ev-name" placeholder="Add an event on this day…" onkeydown="if(event.key===\'Enter\')mcAddEventFromUI(\''+key+'\')">'
+    +'<div class="mc-ev-lvls"><button id="mc-lvl-mod" class="mc-lvlbtn'+(evLvl==='moderate'?' on':'')+'" onclick="mcSetEvLevel(\'moderate\')">Moderate</button><button id="mc-lvl-heavy" class="mc-lvlbtn'+(evLvl==='heavy'?' on':'')+'" onclick="mcSetEvLevel(\'heavy\')">Heavy</button></div>'
+    +'<button class="mc-addbtn" onclick="mcAddEventFromUI(\''+key+'\')">Add</button></div>';
   h+='</div><div class="mc-sec"><div class="mc-sec-h">🎉 Celebrations</div>';
   if(cels.length) cels.forEach(function(c){ h+='<div class="mc-item">'+(c.type==='anniversary'?'🎉':'🎂')+' <span class="mc-name">'+biEsc(c.name)+'</span><span class="mc-lvl">'+biEsc(c.type||'')+'</span></div>'; });
   else h+='<div class="mc-none">None</div>';
@@ -18049,6 +18102,27 @@ function openMasterCalendar(){
   o.style.display='flex'; mcRender(); document.body.style.overflow='hidden';
 }
 function closeMasterCalendar(){ var o=document.getElementById('mc-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+function mcOpenTo(key){ openMasterCalendar(); try{ var d=new Date(key+'T12:00:00'); _mcCur=new Date(d.getFullYear(),d.getMonth(),1); }catch(e){} mcDay(key); }
+// v60.72 (Round 1 ③): week-ahead quick look for the Now screen — first elevated/heavy
+// demand day in the next 7, taps into the calendar. (Coverage-shortfall compare comes
+// with the staffing targets from the questionnaire; for now it's a demand heads-up.)
+function weekAheadRow(){
+  try{
+    var t=new Date();
+    for(var i=1;i<=7;i++){
+      var d=new Date(t.getFullYear(),t.getMonth(),t.getDate()+i);
+      var key=_mcKey(d), lvl=mcDemandLevel(key);
+      if(lvl!=='none'){
+        var evs=mcEventsOn(key); var nm=evs.length?evs[0].name:(lvl==='heavy'?'Heavy demand':'Busy');
+        var wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+        var col=lvl==='heavy'?'var(--na)':'var(--up)';
+        var when=(i===1?'tomorrow':wd+' · '+i+'d out');
+        return '<button class="more-row" onclick="mcOpenTo(\''+key+'\')"><span class="more-ic">🔭</span><span class="more-lbl">Week ahead</span><span class="now-floor-val" style="color:'+col+'">'+biEsc(nm)+' · '+when+' ›</span></button>';
+      }
+    }
+    return '<button class="more-row" onclick="openMasterCalendar()"><span class="more-ic">🔭</span><span class="more-lbl">Week ahead</span><span class="now-floor-val" style="color:var(--txt3)">clear next 7 days ›</span></button>';
+  }catch(e){ return ''; }
+}
 
 </script>
 </body>
