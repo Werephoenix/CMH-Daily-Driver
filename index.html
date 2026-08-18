@@ -301,6 +301,20 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .board-pill{display:flex;align-items:center;gap:8px;width:100%;background:var(--bg2);border:1px solid var(--bdr2);border-radius:12px;padding:13px 14px;margin-bottom:12px;cursor:pointer;color:var(--txt);font-family:var(--font-ui);font-size:13px}
 .board-policy2{flex:1;text-align:left;font-weight:600}
 .board-pill-chev{font-size:12px;color:var(--acc);font-weight:700;white-space:nowrap}
+/* v60.82: fleet-groups header + grid/list toggle + list rows */
+.board-fleet-hd{display:flex;align-items:center;gap:8px;margin:2px 0 8px}
+.board-fleet-lbl{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
+.board-fleet-count{font-size:11px;color:var(--txt3);font-weight:600}
+.board-view-toggle{margin-left:auto;display:flex;gap:2px;background:var(--bg3);border-radius:8px;padding:2px}
+.bv-btn{background:transparent;border:none;color:var(--txt3);font-size:14px;padding:4px 10px;border-radius:6px;cursor:pointer;line-height:1}
+.bv-btn.on{background:var(--bg2);color:var(--txt);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+#board-grid.board-list,.board-list{display:flex;flex-direction:column;gap:4px}
+.board-lrow{display:flex;align-items:center;gap:10px;background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:11px 13px;cursor:pointer}
+.board-lrow .bl-code{font-family:var(--font-mono,ui-monospace,Menlo,monospace);font-size:11px;font-weight:700;color:var(--txt3);min-width:44px}
+.board-lrow .bl-name{flex:1;font-size:14px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.board-lrow .bl-net{font-size:15px;font-weight:800;min-width:34px;text-align:right}
+.board-lrow .bl-net.positive{color:var(--green)}.board-lrow .bl-net.negative{color:var(--red)}.board-lrow .bl-net.no-data{color:var(--txt3)}
+.board-lrow .bl-st{font-size:13px;min-width:16px;text-align:center}
 .board-ov-grid{display:grid;grid-template-columns:1fr;gap:2px 16px}
 @media(min-width:560px){.board-ov-grid{grid-template-columns:1fr 1fr}}
 .board-ov-row{display:flex;align-items:center;gap:8px;padding:5px 0;min-height:36px;min-width:0}
@@ -2065,6 +2079,15 @@ button { cursor: pointer; }
 
   </div>
 
+  <!-- v60.82 (Design §3.5): fleet-groups header — count + grid/list view toggle -->
+  <div class="board-fleet-hd">
+    <span class="board-fleet-lbl">Fleet groups</span>
+    <span id="board-groups-count" class="board-fleet-count"></span>
+    <div class="board-view-toggle">
+      <button id="bv-grid" class="bv-btn on" title="Grid" onclick="setBoardView('grid')">▦</button>
+      <button id="bv-list" class="bv-btn" title="List" onclick="setBoardView('list')">☰</button>
+    </div>
+  </div>
   <div id="board-grid" class="board-wrap"></div>
 
   <!-- Group Flow Chart — inline below board tiles -->
@@ -4314,6 +4337,7 @@ function toggleOvShowAll(){ window._ovShowAll = !window._ovShowAll; buildBoardOv
 // v60.75 (Round 3 ⑥): board search + policy status line
 function setBoardSearch(v){ window._boardSearch=(v||'').trim().toLowerCase(); buildBoardGrid(); }
 function toggleBoardControls(){ var c=document.getElementById('board-controls'); if(!c) return; var show=(c.style.display==='none'); c.style.display=show?'block':'none'; var ch=document.getElementById('board-pill-chev'); if(ch) ch.textContent=show?'Hide ⌃':'Set ⌄'; }
+function setBoardView(v){ window._boardView=(v==='list'?'list':'grid'); var g=document.getElementById('bv-grid'),l=document.getElementById('bv-list'); if(g)g.classList.toggle('on',window._boardView==='grid'); if(l)l.classList.toggle('on',window._boardView==='list'); buildBoardGrid(); }
 function updateBoardPolicyLine(){
   var el=document.getElementById('board-policy-line'); if(!el) return;
   var wu={open:'All Open',core:'Core only',noncore:'Non-Core',closed:'Closed'}[(STATE&&STATE.walkUpPolicy)||'open']||'All Open';
@@ -4376,9 +4400,12 @@ function buildBoardGrid() {
                        af==='core' ? GROUP_META.filter(g=>CORE_GROUPS && CORE_GROUPS.has(g.name)) :
                        GROUP_META.filter(g=>!(CORE_GROUPS && CORE_GROUPS.has(g.name)));
   updateBoardPolicyLine(); // v60.75
+  const _view = window._boardView || 'grid';   // v60.82: grid/list toggle
+  grid.className = (_view==='list') ? 'board-list' : 'board-wrap';
   // v60.75: board search filter (name or code)
   const _bs = (window._boardSearch||'');
   const _shown = _bs ? groupsToShow.filter(g=> g.name.toLowerCase().indexOf(_bs)>=0 || (typeof groupRepCode==='function' && (groupRepCode(g.name)||'').toLowerCase().indexOf(_bs)>=0)) : groupsToShow;
+  var _gc=document.getElementById('board-groups-count'); if(_gc) _gc.textContent=_shown.length+(_shown.length===1?' group':' groups');
   if(_bs && !_shown.length){ html += '<div style="grid-column:1/-1;color:var(--txt3);font-size:13px;padding:16px;text-align:center">No car group matches “'+_bs+'”.</div>'; }
   _shown.forEach(g => {
     const d = data[g.name];
@@ -4404,6 +4431,12 @@ function buildBoardGrid() {
                   : '⚙ Override';
     const ovCls = override==='open'?'open':override==='close'?'close':'auto';
 
+    if(_view==='list'){   // v60.82: compact list row
+      const _icn = st==='wu'?'▲':st==='up'?'▶':st==='na'?'■':'○';
+      const _icc = st==='wu'?'var(--green)':st==='up'?'var(--amber)':st==='na'?'var(--red)':'var(--txt3)';
+      html += `<div class="board-lrow ${st}" onclick="tileClick('${g.name.replace(/'/g,"\\'")}')"><span class="bl-code">${(typeof groupRepCode==='function'?groupRepCode(g.name):'')||''}</span><span class="bl-name">${g.name}</span><span class="bl-net ${netClass}">${netDisplay}</span><span class="bl-st" style="color:${_icc}">${_icn}</span></div>`;
+      return;
+    }
     html += `<div class="group-tile ${st}" style="padding-bottom:24px">
       ${coreTag}
       <div class="tile-name">${g.name}</div>
