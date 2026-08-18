@@ -1768,7 +1768,8 @@ button { cursor: pointer; }
        "consolidate and eliminate the need for the walk-ups open box").
        Indicators are colored pills, tap to jump to their setter.
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <div class="mgr-bar" style="flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:stretch" id="dash-res-bar" title="Tap a section to navigate">
+  <!-- v60.80: hidden on Now — redundant with Board/Rituals (Design's Now is attention-only) -->
+  <div class="mgr-bar" style="display:none;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:stretch" id="dash-res-bar" title="Tap a section to navigate">
     <div class="mgr-item" onclick="showTab('board')" style="cursor:pointer">
       <div class="mgr-item-lbl">Total Res</div>
       <div class="mgr-item-val" id="db-totalres" style="font-size:22px;color:var(--amber)">—</div>
@@ -1811,7 +1812,7 @@ button { cursor: pointer; }
        hover a column to see exact res/ret for that hour. v56: All/Core/
        Non-Core filter pills moved here from the now-removed lower chart
        so users can filter the dashboard view directly.) -->
-  <div class="card" style="padding:12px 14px;margin-bottom:8px">
+  <div class="card" style="display:none;padding:12px 14px;margin-bottom:8px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;flex-wrap:wrap;gap:8px">
       <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt2);cursor:pointer"
            onclick="showTab('board')">
@@ -1844,7 +1845,7 @@ button { cursor: pointer; }
        previously THREE bars (mgrs+policy, walk-ups+checklist cards,
        and the OOS/FBO/Inv inline strip) into one row.
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <div class="mgr-bar" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
+  <div class="mgr-bar" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:8px">
     <div class="mgr-item"><div class="mgr-item-lbl">Opening Mgr</div><div class="mgr-item-val" id="db-openmgr">—</div></div>
     <div class="mgr-item"><div class="mgr-item-lbl">Closing Mgr</div><div class="mgr-item-val" id="db-closemgr">—</div></div>
     <div class="mgr-item"><div class="mgr-item-lbl">Yesterday's Sales</div><div class="mgr-item-val" id="db-sales">—</div></div>
@@ -1869,7 +1870,7 @@ button { cursor: pointer; }
        numbers managers most want at a glance), Specials on the right.
        OOS / FBOs / Inv moved up to the ops bar in v53.
        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
-  <div class="card" style="padding:10px 14px;margin-bottom:8px;cursor:pointer" onclick="showTab('checklist')">
+  <div class="card" style="display:none;padding:10px 14px;margin-bottom:8px;cursor:pointer" onclick="showTab('checklist')">
     <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center">
       <span title="Customer Service receipts received" style="font-size:14px;font-weight:700;color:var(--text2)">
         Completely Satisfied: <b id="sum-cs" style="color:var(--green);font-family:var(--ff-mono);font-size:16px">—</b></span>
@@ -1887,8 +1888,8 @@ button { cursor: pointer; }
   <!-- DNR/DNQ ALERTS — slot reserved for future banner-style new-alert UI -->
   <div id="dnr-dnq-section" style="margin-bottom:8px"></div>
 
-  <!-- TODAY'S COVERAGE MINI -->
-  <div id="dash-sched-mini" class="card" style="margin-bottom:8px;padding:10px 12px;cursor:pointer" onclick="showTab('schedule')">
+  <!-- TODAY'S COVERAGE MINI — hidden on Now (now-hero attention card + floor list cover this) -->
+  <div id="dash-sched-mini" class="card" style="display:none;margin-bottom:8px;padding:10px 12px;cursor:pointer" onclick="showTab('schedule')">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3)">📋 Today's Coverage</div>
       <span style="font-size:9px;color:var(--acc)">→ Schedule</span>
@@ -1898,7 +1899,7 @@ button { cursor: pointer; }
 
   <!-- QUICK ACTIONS — Coverage button removed (the mini above already
        links to it; redundant entry point added clutter) -->
-  <div class="quick-links">
+  <div class="quick-links" style="display:none">
     <div class="ql-btn" onclick="showTab('paste')">
       <span class="ql-icon">📋</span>
       <div class="ql-label">Paste Game Plan</div>
