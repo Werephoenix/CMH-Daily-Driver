@@ -1721,6 +1721,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="openBranchAsks()"><span class="more-ic">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openRequests()"><span class="more-ic">📥</span><span class="more-lbl">Requests</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('admin')"><span class="more-ic">⚙️</span><span class="more-lbl">Admin</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openBackup()"><span class="more-ic">💾</span><span class="more-lbl">Backup &amp; Restore</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBranchInterview()"><span class="more-ic">🗒</span><span class="more-lbl">Branch Interview</span><span class="more-ch">›</span></button>
     </div>
     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:20px 0 6px 4px">Appearance</div>
@@ -18249,6 +18250,82 @@ function openRequests(){
   o.style.display='flex'; rqRender(); document.body.style.overflow='hidden';
 }
 function closeRequests(){ var o=document.getElementById('rq-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BACKUP & RESTORE (v60.76) — Admin safety net. Dumps ALL of this device's
+// localStorage (schedules, settings, alerts, celebrations, requests, config…)
+// to one JSON file; restore replaces it and reloads. Key-agnostic so it captures
+// everything without knowing every key name. Supports moving the app / new device.
+// ═══════════════════════════════════════════════════════════════════════════
+function bkExport(){
+  try{
+    var dump={}; for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); dump[k]=localStorage.getItem(k); }
+    var payload={ app:'CMH Daily Driver', kind:'full-backup', exported:new Date().toISOString(), keys:Object.keys(dump).length, data:dump };
+    var blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    var url=URL.createObjectURL(blob), a=document.createElement('a');
+    var d=new Date(), p=function(n){return String(n).padStart(2,'0');};
+    a.href=url; a.download='cmh-backup-'+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+p(d.getHours())+p(d.getMinutes())+'.json';
+    document.body.appendChild(a); a.click(); setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},150);
+    try{ localStorage.setItem('cmhLastBackup', new Date().toISOString()); }catch(e){}
+    if(typeof toast==='function') toast('✓ Backup downloaded'); bkRender();
+  }catch(e){ if(typeof toast==='function') toast('Backup failed'); }
+}
+function bkPick(){ var f=document.getElementById('bk-file'); if(f) f.click(); }
+function bkRestoreFile(input){
+  var file=input.files&&input.files[0]; if(!file) return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    try{
+      var pj=JSON.parse(rd.result);
+      var data=(pj&&pj.data&&typeof pj.data==='object')?pj.data:null;
+      if(!data){ if(typeof toast==='function') toast('Not a valid CMH backup file'); input.value=''; return; }
+      var n=Object.keys(data).length;
+      if(!confirm('Restore this backup?\n\nIt REPLACES all current data on this device ('+n+' items) and reloads the app.')){ input.value=''; return; }
+      try{ localStorage.clear(); }catch(e){}
+      Object.keys(data).forEach(function(k){ try{ localStorage.setItem(k, data[k]); }catch(e){} });
+      location.reload();
+    }catch(e){ if(typeof toast==='function') toast('Restore failed — file unreadable'); input.value=''; }
+  };
+  rd.readAsText(file);
+}
+var _bkStyled=false;
+function bkInjectStyle(){
+  if(_bkStyled) return; _bkStyled=true;
+  var css=
+  '.bk-overlay{position:fixed;inset:0;z-index:9994;background:#000;display:none;flex-direction:column;font-family:-apple-system,"SF Pro Text",system-ui,Roboto,sans-serif}'
+  +'.bk-head{display:flex;align-items:center;padding:16px 18px 12px;border-bottom:1px solid rgba(255,255,255,.08)}'
+  +'.bk-kick{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8E8E93}.bk-title{font-size:22px;font-weight:700;color:#fff}'
+  +'.bk-x{margin-left:auto;background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:50%;width:34px;height:34px;font-size:15px;cursor:pointer}'
+  +'.bk-body{flex:1;overflow:auto;padding:16px}'
+  +'.bk-body p{font-size:13.5px;color:#AEAEB2;margin:0 0 14px;line-height:1.5}'
+  +'.bk-btn{width:100%;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;border:none}'
+  +'.bk-btn.primary{background:#0A84FF;color:#fff}.bk-btn.gh{background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.16)}'
+  +'.bk-last{font-size:12px;color:#8E8E93;text-align:center;margin:4px 0 18px}'
+  +'.bk-div{height:1px;background:rgba(255,255,255,.08);margin:8px 0 16px}'
+  +'.bk-warn{font-size:12px!important;color:#FF9F0A!important}';
+  var s=document.createElement('style'); s.textContent=css; document.head.appendChild(s);
+}
+function bkRender(){
+  var o=document.getElementById('bk-overlay'); if(!o) return;
+  var last=''; try{ var lb=localStorage.getItem('cmhLastBackup'); if(lb) last='Last backup: '+new Date(lb).toLocaleString(); else last='No backup taken yet.'; }catch(e){}
+  o.innerHTML='<div class="bk-head"><div><div class="bk-kick">Admin</div><div class="bk-title">Backup &amp; Restore</div></div><button class="bk-x" onclick="closeBackup()">✕</button></div>'
+    +'<div class="bk-body">'
+    +'<p>Save <b>everything on this device</b> — schedules, settings, alerts, celebrations, requests, branch answers — to one file. Keep it safe, or use it to move the app to another device or host.</p>'
+    +'<button class="bk-btn primary" onclick="bkExport()">💾 Back up all data</button>'
+    +'<div class="bk-last">'+last+'</div>'
+    +'<div class="bk-div"></div>'
+    +'<button class="bk-btn gh" onclick="bkPick()">↥ Restore from a backup file</button>'
+    +'<input type="file" id="bk-file" accept="application/json,.json" style="display:none" onchange="bkRestoreFile(this)">'
+    +'<p class="bk-warn">⚠ Restoring replaces all current data on this device with the backup, then reloads.</p>'
+    +'</div>';
+}
+function openBackup(){
+  bkInjectStyle();
+  var o=document.getElementById('bk-overlay');
+  if(!o){ o=document.createElement('div'); o.id='bk-overlay'; o.className='bk-overlay'; document.body.appendChild(o); }
+  o.style.display='flex'; bkRender(); document.body.style.overflow='hidden';
+}
+function closeBackup(){ var o=document.getElementById('bk-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
 </script>
 </body>
