@@ -18271,6 +18271,25 @@ function bkExport(){
   }catch(e){ if(typeof toast==='function') toast('Backup failed'); }
 }
 function bkPick(){ var f=document.getElementById('bk-file'); if(f) f.click(); }
+// v60.77: in-app snapshots — quick restore points on the device (last 5)
+function bkSnaps(){ try{ return JSON.parse(localStorage.getItem('cmhSnapshots'))||[]; }catch(e){ return []; } }
+function bkTakeSnapshot(label){
+  try{ var dump={}; for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k!=='cmhSnapshots') dump[k]=localStorage.getItem(k); }
+    var a=bkSnaps(); a.unshift({ts:Date.now(),label:label||'manual',dump:dump}); a=a.slice(0,5);
+    localStorage.setItem('cmhSnapshots', JSON.stringify(a)); return true; }catch(e){ return false; }
+}
+function bkMaybeAuto(){ var a=bkSnaps(); if(!a.length || (Date.now()-a[0].ts > 12*60*60*1000)) bkTakeSnapshot('auto'); }
+function bkSnapNow(){ if(bkTakeSnapshot('manual')){ if(typeof toast==='function') toast('✓ Snapshot saved'); bkRender(); } }
+function bkRelTime(ts){ var m=Math.floor((Date.now()-ts)/60000); if(m<1)return 'just now'; if(m<60)return m+'m ago'; var h=Math.floor(m/60); if(h<24)return h+'h ago'; return Math.floor(h/24)+'d ago'; }
+function bkRestoreSnapshot(ts){
+  var s=bkSnaps().filter(function(x){return x.ts===ts;})[0]; if(!s) return;
+  if(!confirm('Restore this snapshot?\n\nReplaces current data on this device and reloads.')) return;
+  var keep=localStorage.getItem('cmhSnapshots');
+  try{ localStorage.clear(); }catch(e){}
+  Object.keys(s.dump).forEach(function(k){ try{ localStorage.setItem(k, s.dump[k]); }catch(e){} });
+  if(keep) try{ localStorage.setItem('cmhSnapshots', keep); }catch(e){}   // keep history through a restore
+  location.reload();
+}
 function bkRestoreFile(input){
   var file=input.files&&input.files[0]; if(!file) return;
   var rd=new FileReader();
@@ -18317,10 +18336,16 @@ function bkRender(){
     +'<button class="bk-btn gh" onclick="bkPick()">↥ Restore from a backup file</button>'
     +'<input type="file" id="bk-file" accept="application/json,.json" style="display:none" onchange="bkRestoreFile(this)">'
     +'<p class="bk-warn">⚠ Restoring replaces all current data on this device with the backup, then reloads.</p>'
+    +'<div class="bk-div"></div>'
+    +'<div class="bk-kick" style="margin-bottom:6px">In-app snapshots</div>'
+    +'<p>Quick restore points kept on this device (last 5, plus a daily auto-save). Take one before a big change.</p>'
+    +'<button class="bk-btn gh" onclick="bkSnapNow()">📸 Save a snapshot now</button>'
+    +(function(){ var a=bkSnaps(); if(!a.length) return '<div class="bk-last">No snapshots yet.</div>';
+        return '<div style="margin-top:6px">'+a.map(function(s){ return '<div style="display:flex;align-items:center;gap:8px;padding:9px 2px;border-top:1px solid rgba(255,255,255,.06)"><span style="flex:1;font-size:13px;color:#EBEBF5">'+(s.label==='auto'?'🕑 Auto':'📸 Manual')+' · <span style="color:#8E8E93">'+bkRelTime(s.ts)+'</span></span><button class="dnr-ackbtn" onclick="bkRestoreSnapshot('+s.ts+')">Restore</button></div>'; }).join('')+'</div>'; })()
     +'</div>';
 }
 function openBackup(){
-  bkInjectStyle();
+  bkInjectStyle(); if(typeof bkMaybeAuto==='function') bkMaybeAuto();
   var o=document.getElementById('bk-overlay');
   if(!o){ o=document.createElement('div'); o.id='bk-overlay'; o.className='bk-overlay'; document.body.appendChild(o); }
   o.style.display='flex'; bkRender(); document.body.style.overflow='hidden';
