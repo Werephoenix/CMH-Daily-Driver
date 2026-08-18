@@ -1716,6 +1716,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="openMasterCalendar()"><span class="more-ic">📅</span><span class="more-lbl">Master Calendar</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openScheduleLog()"><span class="more-ic">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBranchAsks()"><span class="more-ic">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openRequests()"><span class="more-ic">📥</span><span class="more-lbl">Requests</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('admin')"><span class="more-ic">⚙️</span><span class="more-lbl">Admin</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBranchInterview()"><span class="more-ic">🗒</span><span class="more-lbl">Branch Interview</span><span class="more-ch">›</span></button>
     </div>
@@ -18139,6 +18140,95 @@ function weekAheadRow(){
     return '<button class="more-row" onclick="openMasterCalendar()"><span class="more-ic">🔭</span><span class="more-lbl">Week ahead</span><span class="now-floor-val" style="color:var(--txt3)">clear next 7 days ›</span></button>';
   }catch(e){ return ''; }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// REQUESTS (v60.74, Round 2 ④) — structured staff requests with coverage-impact
+// Approve/Deny. Impact NOW = day's demand level (Round-1 model) + staff-count drop;
+// upgrades to "below your target" once the questionnaire staffing targets land.
+// ═══════════════════════════════════════════════════════════════════════════
+function rqArr(){ if(!STATE.requests) STATE.requests=[]; return STATE.requests; }
+function rqOpenCount(){ return rqArr().filter(function(r){return r.status==='open';}).length; }
+function rqSetType(t){ window._rqType=t; ['off','early','swap','other'].forEach(function(k){ var b=document.getElementById('rq-t-'+k); if(b) b.classList.toggle('on',k===t); }); }
+function rqAdd(){
+  var who=document.getElementById('rq-who'), dt=document.getElementById('rq-date'), nt=document.getElementById('rq-note');
+  if(!who||!who.value.trim()) return;
+  rqArr().unshift({ id:Date.now(), who:who.value.trim(), type:(window._rqType||'off'),
+    date:(dt&&dt.value)||'', note:(nt&&nt.value.trim())||'', status:'open' });
+  if(typeof saveState==='function') saveState(); window._rqType='off'; rqRender();
+}
+function rqDecide(id,st){ var r=rqArr().filter(function(x){return x.id===id;})[0]; if(r){ r.status=st; r.decidedAt=new Date().toLocaleDateString(); if(typeof saveState==='function') saveState(); rqRender(); } }
+function rqReopen(id){ var r=rqArr().filter(function(x){return x.id===id;})[0]; if(r){ r.status='open'; r.decidedAt=null; if(typeof saveState==='function') saveState(); rqRender(); } }
+function rqDelete(id){ var a=rqArr(); var i=a.findIndex(function(x){return x.id===id;}); if(i>=0) a.splice(i,1); if(typeof saveState==='function') saveState(); rqRender(); }
+var _RQ_TYPE={off:'Time off',early:'Leave early',swap:'Shift swap',other:'Other'};
+function rqImpactHtml(r){
+  if(!r.date) return '<div class="rq-impact">No date given — add one to see coverage impact.</div>';
+  try{
+    var d=new Date(r.date+'T12:00:00'); var wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    var staff=(typeof mcStaffCount==='function')?mcStaffCount(r.date):0;
+    var sched=(typeof mcScheduleObj==='function')?mcScheduleObj(r.date):{};
+    var on=Object.keys(sched).some(function(p){ return !/OFF|VACA/i.test(String(sched[p])) && p.replace(/_/g,' ').toLowerCase().indexOf(String(r.who).toLowerCase())>=0; });
+    var dem=(typeof mcDemandLevel==='function')?mcDemandLevel(r.date):'none';
+    var demTxt = dem==='heavy'?'<span class="dem-heavy">⚠ Heavy demand</span> · ':(dem==='elevated'?'<span class="dem-elev">Busy</span> · ':'');
+    var impact = on ? (staff+' scheduled → <b>'+(staff-1)+'</b> if approved') : (staff>0? staff+' scheduled (this person isn\'t on that day)' : 'no schedule loaded for that day');
+    return '<div class="rq-impact">'+wd+' '+r.date.slice(5).replace('-','/')+' · '+demTxt+impact+'</div>';
+  }catch(e){ return ''; }
+}
+var _rqStyled=false;
+function rqInjectStyle(){
+  if(_rqStyled) return; _rqStyled=true;
+  var css=
+  '.rq-overlay{position:fixed;inset:0;z-index:9995;background:#000;display:none;flex-direction:column;font-family:-apple-system,"SF Pro Text",system-ui,Roboto,sans-serif}'
+  +'.rq-head{display:flex;align-items:center;padding:16px 18px 12px;border-bottom:1px solid rgba(255,255,255,.08);flex:none}'
+  +'.rq-kick{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8E8E93}.rq-title{font-size:22px;font-weight:700;color:#fff}'
+  +'.rq-x{margin-left:auto;background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:50%;width:34px;height:34px;font-size:15px;cursor:pointer}'
+  +'.rq-body{flex:1;overflow:auto;padding:12px 16px 24px}'
+  +'.rq-form{background:#1C1C1E;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:12px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px}'
+  +'.rq-form input,.rq-form textarea{background:#0E0E10;border:1px solid rgba(255,255,255,.14);border-radius:9px;color:#fff;font-size:14px;padding:9px 11px;font-family:inherit;width:100%}'
+  +'.rq-row2{display:flex;gap:8px}.rq-row2>*{flex:1;min-width:0}'
+  +'.rq-types{display:flex;gap:6px;flex-wrap:wrap}'
+  +'.rq-typebtn{background:#2C2C2E;color:#8E8E93;border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}.rq-typebtn.on{background:rgba(10,132,255,.18);border-color:#0A84FF;color:#4DA3FF}'
+  +'.rq-submit{background:#0A84FF;color:#fff;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer}'
+  +'.rq-empty{color:#8E8E93;font-size:14px;text-align:center;padding:28px 16px;background:#1C1C1E;border-radius:14px}'
+  +'.rq-card{background:#1C1C1E;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:13px;margin-bottom:10px}.rq-card.open{border-left:3px solid #FFCC00}'
+  +'.rq-top{display:flex;align-items:baseline;gap:8px}.rq-who{font-size:15px;font-weight:700;color:#fff;flex:1}.rq-type{font-size:11px;color:#8E8E93;font-weight:600}.rq-del{background:none;border:none;color:#8E8E93;cursor:pointer;font-size:13px}'
+  +'.rq-note{font-size:13px;color:#AEAEB2;margin-top:3px;font-style:italic}'
+  +'.rq-impact{font-size:12px;color:#EBEBF5;margin-top:8px;padding:7px 10px;border-radius:9px;background:#0E0E10}'
+  +'.dem-heavy{color:#FF453A;font-weight:700}.dem-elev{color:#FFCC00;font-weight:700}'
+  +'.rq-actions{display:flex;gap:8px;margin-top:10px}'
+  +'.rq-approve{flex:1;background:rgba(48,209,88,.15);border:1px solid #30D158;color:#30D158;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer}'
+  +'.rq-deny{flex:1;background:rgba(255,69,58,.12);border:1px solid #FF453A;color:#FF453A;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer}'
+  +'.rq-status{font-size:12px;font-weight:700;margin-top:8px;display:flex;align-items:center;gap:8px}.rq-status.approved{color:#30D158}.rq-status.denied{color:#FF453A}'
+  +'.rq-reopen{background:none;border:none;color:#0A84FF;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto}';
+  var s=document.createElement('style'); s.textContent=css; document.head.appendChild(s);
+}
+function rqRender(){
+  var o=document.getElementById('rq-overlay'); if(!o) return; var arr=rqArr(); var ty=(window._rqType||'off');
+  var h='<div class="rq-head"><div><div class="rq-kick">Coverage-aware</div><div class="rq-title">Requests</div></div><button class="rq-x" onclick="closeRequests()">✕</button></div><div class="rq-body">';
+  h+='<div class="rq-form"><input id="rq-who" placeholder="Who is requesting?">'
+    +'<div class="rq-types">'+['off','early','swap','other'].map(function(k){return '<button id="rq-t-'+k+'" class="rq-typebtn'+(ty===k?' on':'')+'" onclick="rqSetType(\''+k+'\')">'+_RQ_TYPE[k]+'</button>';}).join('')+'</div>'
+    +'<div class="rq-row2"><input id="rq-date" type="date"><input id="rq-note" placeholder="Note (optional)"></div>'
+    +'<button class="rq-submit" onclick="rqAdd()">Submit request</button></div>';
+  var open=arr.filter(function(r){return r.status==='open';}), done=arr.filter(function(r){return r.status!=='open';});
+  if(!arr.length) h+='<div class="rq-empty">No requests yet. Submit one above — you\'ll see its coverage impact before deciding.</div>';
+  function card(r){
+    var s='<div class="rq-card'+(r.status==='open'?' open':'')+'"><div class="rq-top"><span class="rq-who">'+biEsc(r.who)+'</span><span class="rq-type">'+biEsc(_RQ_TYPE[r.type]||r.type)+'</span><button class="rq-del" onclick="rqDelete('+r.id+')">✕</button></div>';
+    if(r.note) s+='<div class="rq-note">'+biEsc(r.note)+'</div>';
+    s+=rqImpactHtml(r);
+    if(r.status==='open') s+='<div class="rq-actions"><button class="rq-approve" onclick="rqDecide('+r.id+',\'approved\')">Approve</button><button class="rq-deny" onclick="rqDecide('+r.id+',\'denied\')">Deny</button></div>';
+    else s+='<div class="rq-status '+r.status+'">'+(r.status==='approved'?'✓ Approved':'✕ Denied')+(r.decidedAt?' · '+r.decidedAt:'')+'<button class="rq-reopen" onclick="rqReopen('+r.id+')">re-open</button></div>';
+    return s+'</div>';
+  }
+  if(open.length){ h+='<div class="now-sec-hd" style="color:#FFCC00">Open ('+open.length+')</div>'; open.forEach(function(r){ h+=card(r); }); }
+  if(done.length){ h+='<div class="now-sec-hd">Decided</div>'; done.forEach(function(r){ h+=card(r); }); }
+  h+='</div>'; o.innerHTML=h;
+}
+function openRequests(){
+  rqInjectStyle(); if(!window._rqType) window._rqType='off';
+  var o=document.getElementById('rq-overlay');
+  if(!o){ o=document.createElement('div'); o.id='rq-overlay'; o.className='rq-overlay'; document.body.appendChild(o); }
+  o.style.display='flex'; rqRender(); document.body.style.overflow='hidden';
+}
+function closeRequests(){ var o=document.getElementById('rq-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
 </script>
 </body>
