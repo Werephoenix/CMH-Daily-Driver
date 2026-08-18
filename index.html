@@ -315,6 +315,9 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .board-lrow .bl-net{font-size:15px;font-weight:800;min-width:34px;text-align:right}
 .board-lrow .bl-net.positive{color:var(--green)}.board-lrow .bl-net.negative{color:var(--red)}.board-lrow .bl-net.no-data{color:var(--txt3)}
 .board-lrow .bl-st{font-size:13px;min-width:16px;text-align:center}
+/* v60.83: desktop-only floor map on Now — mobile stays attention-only (Design), desktop gets the who's-where map */
+.desk-floor-map{display:none}
+@media (min-width:900px){ .desk-floor-map{display:block} }
 .board-ov-grid{display:grid;grid-template-columns:1fr;gap:2px 16px}
 @media(min-width:560px){.board-ov-grid{grid-template-columns:1fr 1fr}}
 .board-ov-row{display:flex;align-items:center;gap:8px;padding:5px 0;min-height:36px;min-width:0}
@@ -1906,10 +1909,12 @@ button { cursor: pointer; }
   <!-- DNR/DNQ ALERTS — slot reserved for future banner-style new-alert UI -->
   <div id="dnr-dnq-section" style="margin-bottom:8px"></div>
 
-  <!-- TODAY'S COVERAGE MINI — hidden on Now (now-hero attention card + floor list cover this) -->
-  <div id="dash-sched-mini" class="card" style="display:none;margin-bottom:8px;padding:10px 12px;cursor:pointer" onclick="showTab('schedule')">
+  <!-- TODAY'S COVERAGE / FLOOR MAP — v60.83: mobile Now stays attention-only (now-hero's 3-row
+       floor list covers it); on DESKTOP where there's room, show the full visual floor map of
+       who's-where (Counter/Emerald/Exit/Returns/Lunch/Floater station cards). Matt 2026-08-18. -->
+  <div id="dash-sched-mini" class="card desk-floor-map" style="margin-bottom:8px;padding:10px 12px;cursor:pointer" onclick="showTab('schedule')">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3)">📋 Today's Coverage</div>
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3)">🗺 On the Floor — Who's Where</div>
       <span style="font-size:9px;color:var(--acc)">→ Schedule</span>
     </div>
     <div id="dash-sched-content" style="font-size:11px;color:var(--txt3)">Loading...</div>
