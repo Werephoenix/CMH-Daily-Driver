@@ -1794,10 +1794,8 @@ button { cursor: pointer; }
     </div>
     <div class="now-sec-hd" style="margin:16px 0 6px 4px">Manage</div>
     <div class="more-group">
-      <button class="more-row" onclick="openSetupHub()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">🔧</span><span class="more-lbl">Setup (self-service)</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="showTab('admin')"><span class="more-ic tile" style="background:rgba(255,69,58,.16)">⚙️</span><span class="more-lbl">Admin</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openSetupHub()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">⚙️</span><span class="more-lbl">Setup<span class="more-sub">Staff, schedule, car groups, rules, PINs &amp; more</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBackup()"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">💾</span><span class="more-lbl">Backup &amp; Restore</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openBranchInterview()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">🗒</span><span class="more-lbl">Branch Interview</span><span class="more-ch">›</span></button>
     </div>
     <div class="now-sec-hd" style="margin:16px 0 6px 4px">Appearance</div>
     <div class="more-group">
@@ -12287,6 +12285,26 @@ function lockAdmin() {
   if (content) content.style.display = 'none';
 }
 
+// ── v60.93: MERGED Setup+Admin. One "Setup" home (openSetupHub) is the single door.
+// Viewing the summary is free; opening any editor is PIN-gated here (PIN prompted only when
+// you go to CHANGE something, not to look). Reveals the admin editor for the chosen section.
+function openAdminSection(sec) {
+  const lock    = document.getElementById('admin-lock');
+  const content = document.getElementById('admin-content');
+  if (lock)    lock.style.display    = 'none';
+  if (content) content.style.display = 'block';
+  if (typeof closeSetupHub === 'function') closeSetupHub();
+  if (typeof showTab === 'function') showTab('admin');
+  if (typeof showAdminSection === 'function') showAdminSection(sec);
+}
+function setupEdit(fn) {
+  if (_adminUnlocked) { fn(); return; }
+  const pin = prompt('Enter Manager PIN to make changes:');
+  if (pin === null) return;               // cancelled — stay in read-only view
+  if (pin === getAdminPin()) { _adminUnlocked = true; fn(); }
+  else if (typeof toast === 'function') { toast('Incorrect PIN'); }
+}
+
 function changeAdminPin() {
   const cur  = document.getElementById('pin-current');
   const nw   = document.getElementById('pin-new');
@@ -18571,21 +18589,28 @@ function suInjectStyle(){
 function suRender(){
   var o=document.getElementById('su-overlay'); if(!o) return;
   function card(ic,lbl,val,fn){ return '<button class="su-card" onclick="'+fn+'"><span class="su-ic">'+ic+'</span><span class="su-main"><span class="su-lbl">'+lbl+'</span><span class="su-val">'+val+'</span></span><span class="su-edit">Edit ›</span></button>'; }
-  var goAdmin="closeSetupHub();showTab('admin')";
+  // v60.93: one Setup home (merged with Admin). Viewing the summary is free; each Edit is
+  // PIN-gated via setupEdit → PIN prompted only when you actually change something.
+  function adm(sec){ return "setupEdit(function(){openAdminSection('"+sec+"')})"; }
+  function ovl(fn){ return "setupEdit(function(){closeSetupHub();"+fn+"})"; }
   o.innerHTML='<div class="su-head"><div><div class="su-kick">Self-service</div><div class="su-title">Setup</div></div><button class="su-x" onclick="closeSetupHub()">✕</button></div>'
-    +'<div class="su-body"><p>Everything your branch might change lives here — edit it yourself, <b>no developer needed</b>. Your current settings are shown below.</p>'
+    +'<div class="su-body"><p>Everything a branch changes — <b>no code, ever</b>. Your current settings show below; the Manager PIN is asked only when you change something, and every change snapshots first — undo anytime from Backup.</p>'
     +'<div class="su-sech">Coverage &amp; hours</div>'
-    +card('📊','Coverage targets', suCoverageSummary(), "closeSetupHub();openThresholdQuiz()")
-    +card('🕐','Hours of operation', suHoursSummary(), goAdmin)
+    +card('📊','Coverage targets', suCoverageSummary(), ovl("openThresholdQuiz()"))
+    +card('🕐','Hours of operation', suHoursSummary(), adm('sched'))
     +'<div class="su-sech">People &amp; schedule</div>'
-    +card('👥','Staff &amp; roles', suStaffCount()+' people', goAdmin)
-    +card('📅','Schedule', 'paste or edit by day', goAdmin)
-    +card('🗒','Branch setup answers', suBranchAnswers(), "closeSetupHub();openBranchInterview()")
+    +card('👥','Staff &amp; roles', suStaffCount()+' people', adm('staff'))
+    +card('📅','Schedule', 'paste or edit by day', adm('sched'))
+    +card('🗒','Branch setup answers', suBranchAnswers(), ovl("openBranchInterview()"))
     +'<div class="su-sech">Fleet &amp; rules</div>'
-    +card('🚗','Car codes &amp; groups', 'map codes → groups', goAdmin)
+    +card('🚗','Car codes &amp; groups', 'map codes → groups', adm('codes'))
+    +card('📸','Car photos', 'reference images', adm('photos'))
+    +'<div class="su-sech">Content</div>'
+    +card('📣','Announcements', 'post to the team', adm('annc'))
+    +card('🎂','Celebrations', 'birthdays &amp; anniversaries', adm('celeb'))
     +'<div class="su-sech">Security &amp; data</div>'
-    +card('🔑','Manager PINs', 'PIN-protected admin', goAdmin)
-    +card('💾','Backup, snapshots &amp; activity', 'protect &amp; move your data', "closeSetupHub();openBackup()")
+    +card('🔑','Manager PINs', 'PIN-protected', adm('pin'))
+    +card('💾','Backup, snapshots &amp; activity', 'protect &amp; move your data', ovl("openBackup()"))
     +'</div>';
 }
 function openSetupHub(){
