@@ -315,9 +315,8 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .board-lrow .bl-net{font-size:15px;font-weight:800;min-width:34px;text-align:right}
 .board-lrow .bl-net.positive{color:var(--green)}.board-lrow .bl-net.negative{color:var(--red)}.board-lrow .bl-net.no-data{color:var(--txt3)}
 .board-lrow .bl-st{font-size:13px;min-width:16px;text-align:center}
-/* v60.83: desktop-only floor map on Now — mobile stays attention-only (Design), desktop gets the who's-where map */
-.desk-floor-map{display:none}
-@media (min-width:900px){ .desk-floor-map{display:block} }
+/* v60.84: floor map on Now — Matt wants the who's-where map on phone AND desktop (not desktop-only) */
+.desk-floor-map{display:block}
 .board-ov-grid{display:grid;grid-template-columns:1fr;gap:2px 16px}
 @media(min-width:560px){.board-ov-grid{grid-template-columns:1fr 1fr}}
 .board-ov-row{display:flex;align-items:center;gap:8px;padding:5px 0;min-height:36px;min-width:0}
