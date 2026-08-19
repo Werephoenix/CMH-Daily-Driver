@@ -317,6 +317,24 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .board-lrow .bl-st{font-size:13px;min-width:16px;text-align:center}
 /* v60.84: floor map on Now — Matt wants the who's-where map on phone AND desktop (not desktop-only) */
 .desk-floor-map{display:block}
+/* v60.85: Design "FLOOR MAP · LIVE" look — accent-bordered station cards, count badges, people as pills */
+.fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.fm-zone{background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;padding:9px 10px;min-height:52px}
+.fm-zone-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.fm-zone-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.fm-zone-cnt{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}
+.fm-pills{display:flex;flex-wrap:wrap;gap:4px}
+.fm-pill{display:inline-flex;align-items:center;gap:4px;background:var(--bg3);border-radius:7px;padding:3px 8px;font-size:12px;font-weight:600;color:var(--txt);white-space:nowrap}
+.fm-pill.fm-off{opacity:.5;text-decoration:line-through}
+.fm-badge{font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.fm-empty{font-size:11px;color:var(--txt3);opacity:.7}
+.fm-stats{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px}
+.fm-stat{font-size:12px;color:var(--txt3);background:var(--bg3);border-radius:7px;padding:4px 9px;cursor:pointer;white-space:nowrap}
+.fm-stat b{color:var(--txt);font-weight:800;font-variant-numeric:tabular-nums;margin-left:2px}
+.fm-comingup{display:flex;flex-wrap:wrap;align-items:center;gap:5px;padding-top:7px;border-top:1px solid var(--bdr);margin-top:2px}
+.fm-cu-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)}
+.fm-cu-chip{font-size:11px;background:var(--bg3);border-radius:6px;padding:2px 7px;color:var(--txt2)}
+.fm-cu-chip b{font-family:var(--ff-mono);color:var(--txt3);font-weight:600}
 .board-ov-grid{display:grid;grid-template-columns:1fr;gap:2px 16px}
 @media(min-width:560px){.board-ov-grid{grid-template-columns:1fr 1fr}}
 .board-ov-row{display:flex;align-items:center;gap:8px;padding:5px 0;min-height:36px;min-width:0}
@@ -1912,9 +1930,9 @@ button { cursor: pointer; }
        floor list covers it); on DESKTOP where there's room, show the full visual floor map of
        who's-where (Counter/Emerald/Exit/Returns/Lunch/Floater station cards). Matt 2026-08-18. -->
   <div id="dash-sched-mini" class="card desk-floor-map" style="margin-bottom:8px;padding:10px 12px;cursor:pointer" onclick="showTab('schedule')">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3)">🗺 On the Floor — Who's Where</div>
-      <span style="font-size:9px;color:var(--acc)">→ Schedule</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">Floor map · <span style="color:var(--exit)">live</span></div>
+      <span style="font-size:13px;font-weight:700;color:var(--exit)">Reassign →</span>
     </div>
     <div id="dash-sched-content" style="font-size:11px;color:var(--txt3)">Loading...</div>
   </div>
@@ -11663,6 +11681,10 @@ function buildDashSchedMini() {
   const mods     = STATE.shiftMod       || {};
   const nowH     = new Date().getHours() + new Date().getMinutes()/60;
   const dow      = new Date().getDay();
+  // v60.85: fold Open/Close manager into the floor map as OPENER/CLOSER badges (Design pattern).
+  const _mgrs    = typeof getAutoManagers==='function' ? getAutoManagers() : {};
+  const _openNick  = _mgrs.open  || null;
+  const _closeNick = _mgrs.close || null;
 
   if (!Object.keys(exp).length) {
     el.innerHTML='<div style="color:var(--txt3);font-size:11px">📅 No schedule loaded &mdash; <span style="color:var(--acc);text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showTab(\'admin\');showAdminSection(\'sched\')">Import schedule →</span></div>';
@@ -11777,44 +11799,35 @@ function buildDashSchedMini() {
     else onShift.push(item);
   });
 
+  // v60.85: Design floor-map "pill" — name chip + one optional badge.
+  // Open/Close mgr fold-in: opener/closer shown as a role tag (Design's CLOSER pattern).
   function personRow(item) {
-    const {nick,info,shiftStr,callout,isMgmt}=item;
-    const dimmed=info.zone==='off'||info.zone==='callout';
-    // For managers show their station assignment label
-    const mgmtStation=isMgmt&&info.label&&info.label!=='Off shift'?info.label:'';
-    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;
-      border-bottom:1px solid rgba(255,255,255,.04);opacity:${dimmed?.5:1}">
-      <div style="width:8px;height:8px;border-radius:50%;background:${info.color};flex-shrink:0;
-        box-shadow:${info.zone!=='off'&&info.zone!=='callout'?'0 0 4px '+info.color+'88':'none'}"></div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:11px;font-weight:${isMgmt?500:700};
-          color:${callout?'var(--red)':isMgmt?'var(--txt2)':'var(--txt)'};
-          text-decoration:${callout?'line-through':'none'};
-          white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          ${nick}${isMgmt&&mgmtStation?` <span style="font-size:9px;color:${info.color};font-weight:600">· ${mgmtStation}</span>`:''}
-          ${info.zone==='lunch' && !(isMgmt && /lunch/i.test(mgmtStation))?'<span style="color:var(--amber);font-size:9px"> · Lunch</span>':''}
-        </div>
-        ${!isMgmt?`<div style="font-size:9px;color:var(--txt3);display:flex;gap:6px;align-items:center">
-          <span style="color:${info.color};font-weight:600">${info.label}</span>
-          ${info.timeNote?`<span>${info.timeNote}</span>`:''}
-          ${info.lunchNote?`<span style="color:var(--amber)">${info.lunchNote}</span>`:''}
-        </div>`:''}
-      </div>
-    </div>`;
+    const {nick,info,callout}=item;
+    // One badge max. Lunch is NOT tagged per-pill — lunch folks are grouped in the single
+    // "On Lunch" zone card, so a per-pill lunch tag would double-label (isMgmt && /lunch/i.test(mgmtStation)
+    // was the old guard for the same double-lunch problem; the grouping supersedes it).
+    let badge='';
+    if(callout)                              badge=`<b class="fm-badge" style="color:var(--na)">off</b>`;
+    else if(_closeNick && nick===_closeNick) badge=`<b class="fm-badge" style="color:var(--eb)">closer</b>`;
+    else if(_openNick  && nick===_openNick)  badge=`<b class="fm-badge" style="color:var(--up)">opener</b>`;
+    return `<span class="fm-pill${callout?' fm-off':''}">${nick}${badge}</span>`;
   }
 
   const rules=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(Math.floor(nowH),dow):{exitMin:1,counterMin:2};
   const exitOk=onShift.filter(i=>i.info.zone==='exit').length>=rules.exitMin;
   const ctrOk=onShift.filter(i=>(i.info.zone==='counter'||i.info.zone==='mgmt')&&!i.isMgmt).length>=rules.counterMin;
 
-  function zoneCard(title,icon,people,borderColor,minReq) {
+  // v60.85: Design "FLOOR MAP · LIVE" zone card — accent border/label, count badge (red if short), people as pills.
+  function zoneCard(title,icon,people,accent,minReq) {
     const ok=people.length>=(minReq||0);
-    const hc=minReq?(ok?borderColor:'var(--red)'):borderColor;
-    return `<div style="background:var(--bg3);border:1px solid ${borderColor}33;border-top:2px solid ${borderColor};border-radius:6px;padding:8px;min-height:52px">
-      <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:${hc};margin-bottom:5px;display:flex;justify-content:space-between">
-        <span>${icon} ${title}</span>${minReq?`<span style="color:${hc}">${people.length}/${minReq}</span>`:''}
+    const cntCol=minReq?(ok?accent:'var(--na)'):'var(--txt3)';
+    const cnt=minReq?`${people.length}/${minReq}`:`${people.length}`;
+    return `<div class="fm-zone" style="border-color:${accent}40">
+      <div class="fm-zone-hd">
+        <span class="fm-zone-lbl" style="color:${accent}">${icon} ${title}</span>
+        <span class="fm-zone-cnt" style="color:${cntCol}">${cnt}</span>
       </div>
-      ${people.length?people.map(personRow).join(''):`<div style="font-size:9px;color:var(--red);opacity:.7">⚠ Empty</div>`}
+      <div class="fm-pills">${people.length?people.map(personRow).join(''):`<span class="fm-empty">— empty</span>`}</div>
     </div>`;
   }
 
@@ -11825,51 +11838,55 @@ function buildDashSchedMini() {
   const lunchPeople   =onShift.filter(i=>i.info.zone==='lunch');
   const floatPeople   =mgmtOn.filter(i=>i.info.zone==='floater'||(STATE.staffStation||{})[i.pid]==='Floater');
 
-  let out='';
-
-  // Row 1: Exit | Emerald | Counter
-  out+=`<div style="display:grid;grid-template-columns:2fr 1fr 2fr;gap:5px;margin-bottom:6px">`;
-  out+=zoneCard('Counter','🟦',ctrPeople,'var(--acc)',rules.counterMin);
-  out+=zoneCard('Emerald','🌟',emeraldPeople,'#6366f1',0);
-  out+=zoneCard('Exit','🟩',exitPeople,'var(--green)',rules.exitMin);
-  out+=`</div>`;
-
-  // Row 2: Returns | Lunch | Floater (only if occupied)
-  if(returnsPeople.length||lunchPeople.length||floatPeople.length){
-    out+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:6px">`;
-    out+=zoneCard('Returns','↩',returnsPeople,'#06b6d4',0);
-    out+=zoneCard('On Lunch','🍽',lunchPeople,'var(--amber)',0);
-    out+=zoneCard('Floater','🚗',floatPeople,'var(--txt3)',0);
-    out+=`</div>`;
-  }
-
-  // Managers row
-  // Managers in dedicated zone cards (don't show in management row)
+  // v60.85: managers NOT already shown in a dedicated zone card → their own "Office/Mgmt" card
   const mgmtInZones=new Set([
     ...emeraldPeople.map(i=>i.pid),
     ...returnsPeople.map(i=>i.pid),
     ...exitPeople.filter(i=>i.isMgmt).map(i=>i.pid),
   ]);
-  // Management row: managers NOT in a specific zone card and NOT counter managers
-  // Counter managers go in counter zone, emerald goes in emerald, etc.
   const activeMgmt=mgmtOn.filter(i=>!mgmtInZones.has(i.pid));
-  if(activeMgmt.length){
-    out+=`<div style="background:var(--bg3);border:1px solid var(--bdr);border-radius:6px;padding:6px 8px;margin-bottom:6px">
-      <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:4px">🎯 Management</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">${activeMgmt.map(personRow).join('')}</div>
-    </div>`;
-  }
 
-  // Coming up
-  // Only show people whose shift starts in the future
+  // v60.85: Design "FLOOR MAP · LIVE" — one 2-col grid of accent-colored station cards.
+  // Counter + Exit always show (empty renders red "— empty"); the rest only when occupied.
+  const zoneDefs=[
+    {t:'Counter', i:'🟦', p:ctrPeople,     a:'var(--counter)', m:rules.counterMin, always:true},
+    {t:'Exit',    i:'🟩', p:exitPeople,    a:'var(--exit)',    m:rules.exitMin,    always:true},
+    {t:'Office',  i:'🎯', p:activeMgmt,    a:'var(--eb)',      m:0},
+    {t:'Emerald', i:'🌟', p:emeraldPeople, a:'var(--eb)',      m:0},
+    {t:'Returns', i:'↩', p:returnsPeople, a:'var(--returns)', m:0},
+    {t:'On Lunch',i:'🍽', p:lunchPeople,   a:'var(--up)',      m:0},
+    {t:'Floater', i:'🚗', p:floatPeople,   a:'var(--txt3)',    m:0},
+  ];
+  // v60.85: condensed quick-glance strip — Res · Ret · Net · CS · Hot (Matt: keep these, streamlined,
+  // "glance once", each links to its deeper page). Reuses the same math as refreshDash's totals.
+  const _fld=STATE.fields||{};
+  const _pd=STATE.pasteData||{}, _brT=(_pd.brands||{}).total||{};
+  const _gd=typeof getGroupNetData==='function'?getGroupNetData():{};
+  let _rs=0,_rt=0,_has=false; Object.values(_gd).forEach(d=>{if(d&&d.has){_rs+=d.res;_rt+=d.ret;_has=true;}});
+  const _res=_has?_rs:(_brT.totalRes||_fld.totalRes||'—');
+  const _ret=_has?_rt:(_brT.totRet||_fld.totalRet||'—');
+  const _net=_has?(_rt-_rs):null;
+  const _netStr=_net===null?'—':(_net>0?'+':'')+_net;
+  const _netCol=_net===null?'var(--txt3)':_net>0?'var(--wu)':'var(--na)';
+  const _cs=_fld.cs||'—', _hot=_fld.hot||'—';
+  const _stop='event.stopPropagation();';
+  let out=`<div class="fm-stats">
+    <span class="fm-stat" onclick="${_stop}showTab('board')">Res <b>${_res}</b></span>
+    <span class="fm-stat" onclick="${_stop}showTab('board')">Ret <b>${_ret}</b></span>
+    <span class="fm-stat" onclick="${_stop}showTab('board')">Net <b style="color:${_netCol}">${_netStr}</b></span>
+    <span class="fm-stat" onclick="${_stop}showTab('checklist')">CS <b style="color:var(--wu)">${_cs}</b></span>
+    <span class="fm-stat" onclick="${_stop}showTab('checklist')">Hot <b style="color:${_hot!=='—'&&+_hot>0?'var(--na)':'var(--txt3)'}">${_hot}</b></span>
+  </div>`;
+  out+=`<div class="fm-grid">`;
+  zoneDefs.forEach(z=>{ if(!z.always && !z.p.length) return; out+=zoneCard(z.t,z.i,z.p,z.a,z.m); });
+  out+=`</div>`;
+
+  // Coming up — who's arriving next (compact chips)
   const upcoming=offShift.filter(i=>
     !i.callout&&i.info.zone==='off'&&i.ss!=null&&i.ss>nowH
   ).sort((a,b)=>a.ss-b.ss).slice(0,4);
   if(upcoming.length){
-    out+=`<div style="padding:4px 0;border-top:1px solid var(--bdr);margin-top:2px">
-      <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:4px">Coming Up</div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px">${upcoming.map(i=>`<span style="font-size:9px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:3px;padding:2px 6px;color:var(--txt3)">${i.nick} <span style="font-family:var(--ff-mono)">${i.shiftStr}</span></span>`).join('')}</div>
-    </div>`;
+    out+=`<div class="fm-comingup"><span class="fm-cu-lbl">Coming up</span>${upcoming.map(i=>`<span class="fm-cu-chip">${i.nick} <b>${i.shiftStr}</b></span>`).join('')}</div>`;
   }
 
   const calledOff=offShift.filter(i=>i.callout);
