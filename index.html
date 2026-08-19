@@ -646,76 +646,54 @@ select option { background: var(--bg3); }
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 8px;
 }
+/* v60.88: Design Live-Board tile — code + status badge (top), big colored number, group name.
+   Card surface with a subtle status-tinted border; larger status icons per Matt. */
 .group-tile {
-  border-radius: 6px;
-  padding: 7px 9px 6px;
+  background: var(--bg2);
+  border: 1px solid var(--bdr);
+  border-radius: 12px;
+  padding: 11px 12px 12px;
   cursor: pointer;
-  transition: transform 0.1s, box-shadow 0.1s;
-  border: 1px solid;
+  transition: transform 0.1s, box-shadow 0.1s, border-color 0.1s;
   position: relative;
   overflow: hidden;
 }
 .group-tile:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
-.group-tile.wu {
-  background: var(--wu-bg);
-  border-color: var(--wu-border);
+.group-tile.wu { border-color: rgba(48,209,88,.30); }
+.group-tile.up { border-color: rgba(255,204,0,.30); }
+.group-tile.na { border-color: rgba(255,69,58,.32); }
+.group-tile.no-data { border-color: var(--bdr); opacity: .7; }
+.group-tile.gt-ov { box-shadow: inset 0 0 0 1.5px var(--up); }   /* manual override active */
+.gt-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
+.gt-code { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--txt3); text-transform: uppercase; }
+.gt-badge {
+  width: 26px; height: 26px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px; line-height: 1;
 }
-.group-tile.up {
-  background: var(--up-bg);
-  border-color: var(--up-border);
+.gt-badge.wu { background: rgba(48,209,88,.18);  color: var(--wu); }
+.gt-badge.up { background: rgba(255,204,0,.18);  color: var(--up); }
+.gt-badge.na { background: rgba(255,69,58,.18);  color: var(--na); }
+.gt-badge.no-data { background: var(--bg3); color: var(--txt3); }
+.gt-num { font-size: 30px; font-weight: 800; line-height: 1; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+.gt-num.wu { color: var(--txt); }
+.gt-num.up { color: var(--up); }
+.gt-num.na { color: var(--na); }
+.gt-num.no-data { color: var(--txt3); font-size: 22px; }
+.gt-name { font-size: 12px; color: var(--txt3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* v60.88: filter pills (All · Available · W/up only · Core · Non-Core) */
+.board-fpills { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 10px; }
+.board-fpills::-webkit-scrollbar { display: none; }
+.fpill {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg2); border: 1px solid var(--bdr); color: var(--txt2);
+  font-family: var(--ff-ui); font-size: 13px; font-weight: 600;
+  padding: 7px 14px; border-radius: 999px; cursor: pointer; white-space: nowrap;
 }
-.group-tile.na {
-  background: var(--na-bg);
-  border-color: var(--na-border);
-}
-.group-tile.no-data {
-  background: var(--bg3);
-  border-color: var(--border);
-}
-.tile-flag {
-  font-size: 10px;
-  opacity: 0.7;
-  margin-bottom: 1px;
-}
-.tile-name {
-  font-family: var(--font-hd);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.15;
-  margin-bottom: 3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tile-net {
-  font-family: var(--font-mono);
-  font-size: 17px;
-  font-weight: 500;
-  line-height: 1;
-  margin-bottom: 2px;
-}
-.tile-net.positive { color: var(--wu); }
-.tile-net.negative { color: var(--na); }
-.tile-net.zero { color: var(--text3); }
-.tile-net.no-data { color: var(--text3); font-size: 13px; }
-.tile-status {
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-.tile-status.wu { color: var(--wu); }
-.tile-status.up { color: var(--up); }
-.tile-status.na { color: var(--na); }
-.tile-override {
-  position: absolute;
-  top: 6px; right: 6px;
-  font-size: 9px;
-  background: rgba(0,0,0,0.4);
-  padding: 1px 5px;
-  border-radius: 3px;
-  color: var(--text3);
-}
+.fpill.on { border-color: var(--accent); color: var(--accent); background: rgba(35,201,131,.10); }
+.fp-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--wu); flex-shrink: 0; }
+.bv-solo { background: var(--bg3); border-radius: 8px; padding: 5px 9px; }
+.bv-solo.on { background: var(--accent); color: #04160e; }
 
 /* ── WALK-UP MASTER TOGGLE ─────────────────────────────────────────────── */
 #wu-toggle-bar {
@@ -1609,9 +1587,10 @@ select option{background:var(--bg3)}
     font-size: 16px !important;
   }
 
-  /* Board tiles — 2 columns on phone, 3 on iPad */
-  .board-wrap {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  /* Board tiles — v60.88: 3 columns on phone (Design). #board-grid ID specificity to beat the
+     base #board-grid auto-fill rule. */
+  #board-grid.board-wrap {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   /* KPI row — 2x2 on mobile */
@@ -2119,16 +2098,7 @@ button { cursor: pointer; }
   </div>
   </div><!-- /board-controls -->
 
-  <!-- v60.66 (Design §3.5): fleet filter as an iOS segmented control (was pill buttons) -->
-  <div class="board-ctl-lbl" style="margin-top:2px">🔍 Show on the board</div>
-  <div class="seg-ctl">
-    <button class="seg on" id="av-filter-all"  onclick="setAvailFilter('all')">All Groups</button>
-    <button class="seg"    id="av-filter-core" onclick="setAvailFilter('core')">◆ Core</button>
-    <button class="seg"    id="av-filter-non"  onclick="setAvailFilter('noncore')">Non-Core</button>
-  </div>
-  <!-- v60.75 (Round 3 ⑥): board search + policy status line -->
-  <input id="board-search" class="board-search" placeholder="🔍 Find a car group…" oninput="setBoardSearch(this.value)">
-  <div style="font-size:10px;color:var(--txt3);text-align:right;margin:0 0 12px">tap a tile for details · ⚙ to override a group</div>
+  <!-- v60.88: filter moved to Design pill row in the fleet header below -->
 
   <!-- v60.81: board totals hidden on the board (Design shows them in the flow readout) -->
   <div class="board-stat-strip" style="display:none">
@@ -2147,20 +2117,32 @@ button { cursor: pointer; }
 
   </div>
 
-  <!-- v60.82 (Design §3.5): fleet-groups header — count + grid/list view toggle -->
+  <!-- v60.88 (Design board): FLEET GROUPS header — label · count · search icon · list/grid toggle -->
   <div class="board-fleet-hd">
     <span class="board-fleet-lbl">Fleet groups</span>
     <span id="board-groups-count" class="board-fleet-count"></span>
-    <div class="board-view-toggle">
-      <button id="bv-grid" class="bv-btn on" title="Grid" onclick="setBoardView('grid')">▦</button>
-      <button id="bv-list" class="bv-btn" title="List" onclick="setBoardView('list')">☰</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <button class="bv-btn bv-solo" id="board-search-btn" title="Search" onclick="toggleBoardSearch()">🔍</button>
+      <div class="board-view-toggle">
+        <button id="bv-list" class="bv-btn" title="List view" onclick="setBoardView('list')">☰</button>
+        <button id="bv-grid" class="bv-btn on" title="Grid view" onclick="setBoardView('grid')">▦</button>
+      </div>
     </div>
   </div>
+  <!-- v60.88 (Design board): filter pills — All · Available · W/up only · Core · Non-Core -->
+  <div class="board-fpills">
+    <button class="fpill on" id="fp-all"       onclick="setAvailFilter('all')">All</button>
+    <button class="fpill"    id="fp-available" onclick="setAvailFilter('available')"><span class="fp-dot"></span>Available</button>
+    <button class="fpill"    id="fp-wup"       onclick="setAvailFilter('wup')"><span class="fp-dot"></span>W/up only</button>
+    <button class="fpill"    id="fp-core"      onclick="setAvailFilter('core')">Core</button>
+    <button class="fpill"    id="fp-noncore"   onclick="setAvailFilter('noncore')">Non-Core</button>
+  </div>
+  <input id="board-search" class="board-search" placeholder="Find a car group…" oninput="setBoardSearch(this.value)" style="display:none">
   <div id="board-grid" class="board-wrap"></div>
 
-  <!-- Group Flow Chart — inline below board tiles -->
-  <div class="card" style="margin-top:14px">
-    <div class="ch">📊 Group Flow
+  <!-- Group Flow Chart — inline below board tiles (v60.88: Design "HOURLY FLOW" kicker) -->
+  <div class="card" style="margin-top:16px">
+    <div class="ch" style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)">HOURLY FLOW · OUT VS. RETURNS
       <div style="display:flex;gap:8px;margin-left:auto;align-items:center">
         <select id="board-flow-type" onchange="buildBoardFlow()"
           style="font-size:11px;padding:4px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt)">
@@ -4372,13 +4354,20 @@ function getGroupStatus(groupName, net) {
 
 function setAvailFilter(mode) {
   window._availFilter = mode;
-  ['all','core','non'].forEach(id=>{
-    const b=document.getElementById('av-filter-'+id);
-    if(!b)return;
-    const active = id===mode || (id==='non' && mode==='noncore');
-    b.className = 'seg' + (active ? ' on' : '');   // v60.66: segmented control
+  // v60.88: Design filter pills — All · Available · W/up only · Core · Non-Core
+  [['fp-all','all'],['fp-available','available'],['fp-wup','wup'],['fp-core','core'],['fp-noncore','noncore']].forEach(([id,m])=>{
+    const b=document.getElementById(id); if(!b) return;
+    b.classList.toggle('on', m===mode);
   });
   buildBoardGrid();
+}
+// v60.88: Design fleet header — 🔍 icon reveals/focuses the search field (was always-on box)
+function toggleBoardSearch(){
+  const inp=document.getElementById('board-search'); if(!inp) return;
+  const show=(inp.style.display==='none'||!inp.style.display);
+  inp.style.display=show?'block':'none';
+  const btn=document.getElementById('board-search-btn'); if(btn) btn.classList.toggle('on',show);
+  if(show){ inp.focus(); } else { inp.value=''; if(typeof setBoardSearch==='function') setBoardSearch(''); }
 }
 
 // ── v60.66: per-group walk-up override switches (Board §3.5) ──────────────────
@@ -4467,9 +4456,20 @@ function buildBoardGrid() {
   let html = '';
 
   const af = window._availFilter || 'all';
-  const groupsToShow = af==='all' ? GROUP_META :
-                       af==='core' ? GROUP_META.filter(g=>CORE_GROUPS && CORE_GROUPS.has(g.name)) :
-                       GROUP_META.filter(g=>!(CORE_GROUPS && CORE_GROUPS.has(g.name)));
+  // v60.88: Design filters incl. Available (wu/up) + W/up only (wu). Status uses live net + overrides.
+  const _isCore = g => !!(CORE_GROUPS && CORE_GROUPS.has(g.name));
+  const _grpSt = g => {
+    const d=data[g.name]; const ov=STATE.groupOverrides?STATE.groupOverrides[g.name]:null;
+    if(ov==='close') return 'na';
+    if(!(d&&d.has)) return ov==='open'?'wu':'no-data';
+    return getGroupStatus(g.name, d.net);
+  };
+  const groupsToShow =
+    af==='core'      ? GROUP_META.filter(_isCore) :
+    af==='noncore'   ? GROUP_META.filter(g=>!_isCore(g)) :
+    af==='available' ? GROUP_META.filter(g=>{const s=_grpSt(g); return s==='wu'||s==='up';}) :
+    af==='wup'       ? GROUP_META.filter(g=>_grpSt(g)==='wu') :
+                       GROUP_META;
   updateBoardPolicyLine(); // v60.75
   const _view = window._boardView || 'grid';   // v60.82: grid/list toggle
   grid.className = (_view==='list') ? 'board-list' : 'board-wrap';
@@ -4508,13 +4508,19 @@ function buildBoardGrid() {
       html += `<div class="board-lrow ${st}" onclick="tileClick('${g.name.replace(/'/g,"\\'")}')"><span class="bl-code">${(typeof groupRepCode==='function'?groupRepCode(g.name):'')||''}</span><span class="bl-name">${g.name}</span><span class="bl-net ${netClass}">${netDisplay}</span><span class="bl-st" style="color:${_icc}">${_icn}</span></div>`;
       return;
     }
-    html += `<div class="group-tile ${st}" style="padding-bottom:24px">
-      ${coreTag}
-      <div class="tile-name">${g.name}</div>
-      <div class="tile-net ${netClass}">${netDisplay}</div>
-      <div class="tile-status ${st}">${stLbls[st]||'—'}</div>
-      ${has ? `<div style="font-size:9px;color:var(--text3);margin-top:1px;font-family:var(--font-mono)">R${d.res} · ↩${d.ret}</div>` : ''}
-      <button class="tile-override-btn ${ovCls}" onclick="event.stopPropagation();cycleGroupOverride('${g.name}')">${ovLabel}</button>
+    // v60.88: Design tile — code + status badge (top), big colored number, group name (bottom).
+    // Long-press / the override grid behind the policy pill still handle forced open/close.
+    const _icn = st==='wu'?'▲':st==='up'?'▶':st==='na'?'■':'○';
+    const _num = net===null?'—':String(net);
+    const _ovRing = (override==='open'||override==='close') ? ' gt-ov' : '';
+    html += `<div class="group-tile ${st}${_ovRing}" onclick="tileClick('${g.name.replace(/'/g,"\\'")}')"
+        oncontextmenu="event.preventDefault();cycleGroupOverride('${g.name.replace(/'/g,"\\'")}')">
+      <div class="gt-top">
+        <span class="gt-code">${(typeof groupRepCode==='function'?groupRepCode(g.name):'')||''}</span>
+        <span class="gt-badge ${st}">${_icn}</span>
+      </div>
+      <div class="gt-num ${st}">${_num}</div>
+      <div class="gt-name">${g.name}</div>
     </div>`;
   });
 
