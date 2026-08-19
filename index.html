@@ -4335,17 +4335,20 @@ function getGroupStatus(groupName, net) {
     return net >= thresh[1] ? (net >= thresh[0] ? 'wu' : 'up') : 'up'; // at least up
   }
 
-  // Level 2: master walk-up policy
+  // Level 2: master walk-up policy governs WALK-UPS only. Upgrades are a SEPARATE channel —
+  // a group still shows "upgrade only" if its threshold is met, even when walk-ups are closed
+  // or restricted for it. (Bug fix, Matt 2026-08-19: closing walk-ups was wrongly zeroing out
+  // groups that were still upgradable.)
   const pol = STATE.walkUpPolicy || 'open';
   const isCore = typeof CORE !== 'undefined' ? CORE.has(groupName) : false;
-  if (pol === 'closed')               return 'na';
-  if (pol === 'core' && !isCore)      return 'na';
-  if (pol === 'noncore' && isCore)    return 'na';
+  const wuAllowed = pol==='open' || (pol==='core' && isCore) || (pol==='noncore' && !isCore);
 
   // Level 3: threshold calculation
   const thresh = THRESHOLDS[groupName] || [3,2];
-  if (net >= thresh[0]) return 'wu';
-  if (net >= thresh[1]) return 'up';
+  if (net >= thresh[1]) {
+    // threshold met for at least an upgrade; walk-up only if the policy also allows it
+    return (wuAllowed && net >= thresh[0]) ? 'wu' : 'up';
+  }
   return 'na';
 }
 
