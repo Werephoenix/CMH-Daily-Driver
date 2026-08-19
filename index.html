@@ -244,7 +244,15 @@ body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 .more-row:last-child { border-bottom: none; }
 .more-row:active { background: var(--bg3); }
 .more-ic { font-size: 20px; width: 26px; text-align: center; flex-shrink: 0; }
+/* v60.92: Design "More" colored icon tiles — emoji sits in a tinted rounded square */
+.more-ic.tile { width: 30px; height: 30px; border-radius: 8px; font-size: 15px; display: flex; align-items: center; justify-content: center; }
 .more-lbl { flex: 1; }
+.more-sub { display:block; font-size: 12px; color: var(--txt3); font-weight: 400; margin-top: 1px; }
+/* v60.92: Calm Mode switch on the More screen (works at all widths) */
+.more-calm-sw { width: 42px; height: 25px; border-radius: 999px; background: var(--bg3); position: relative; flex-shrink: 0; transition: background .15s; display: inline-block; }
+.more-calm-sw.on { background: var(--accent); }
+.more-calm-sw .nav-calm-knob { position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.more-calm-sw.on .nav-calm-knob { transform: translateX(17px); }
 .more-ch { color: var(--txt3); font-size: 20px; }
 
 /* Now hero (v60.43) */
@@ -1771,25 +1779,38 @@ button { cursor: pointer; }
 <!-- SCREEN: MORE (v60.42) — hub for secondary destinations + appearance -->
 <div class="scr" id="screen-more">
   <div style="max-width:640px;margin:0 auto">
-    <h1 style="font-size:34px;font-weight:700;letter-spacing:-.8px;margin:6px 0 16px;color:var(--txt)">More</h1>
+    <h1 style="font-size:34px;font-weight:700;letter-spacing:-.8px;margin:6px 0 8px;color:var(--txt)">More</h1>
+    <!-- v60.92: Design More hub — DATA section, colored icon tiles, APPEARANCE w/ Calm switch -->
+    <div class="now-sec-hd" style="margin:14px 0 6px 4px">Data</div>
     <div class="more-group">
-      <button class="more-row" onclick="showTab('paste')"><span class="more-ic">📋</span><span class="more-lbl">Paste Data</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="showTab('inventory')"><span class="more-ic">🔢</span><span class="more-lbl">Physical Inventory</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="showTab('reference')"><span class="more-ic">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="showTab('history')"><span class="more-ic">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openMasterCalendar()"><span class="more-ic">📅</span><span class="more-lbl">Master Calendar</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openScheduleLog()"><span class="more-ic">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openBranchAsks()"><span class="more-ic">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openRequests()"><span class="more-ic">📥</span><span class="more-lbl">Requests</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openSetupHub()"><span class="more-ic">🔧</span><span class="more-lbl">Setup (self-service)</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="showTab('admin')"><span class="more-ic">⚙️</span><span class="more-lbl">Admin</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openBackup()"><span class="more-ic">💾</span><span class="more-lbl">Backup &amp; Restore</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openBranchInterview()"><span class="more-ic">🗒</span><span class="more-lbl">Branch Interview</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('paste')"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📋</span><span class="more-lbl">Paste Data</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('inventory')"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🔢</span><span class="more-lbl">Physical Inventory</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('reference')"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('history')"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openMasterCalendar()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">📅</span><span class="more-lbl">Master Calendar</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openScheduleLog()"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openBranchAsks()"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openRequests()"><span class="more-ic tile" style="background:rgba(255,159,10,.16)">📥</span><span class="more-lbl">Requests</span><span class="more-ch">›</span></button>
     </div>
-    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:20px 0 6px 4px">Appearance</div>
+    <div class="now-sec-hd" style="margin:16px 0 6px 4px">Manage</div>
     <div class="more-group">
-      <button class="more-row" onclick="toggleTheme()"><span class="more-ic">🌙</span><span class="more-lbl">Calm Mode / Bold theme</span><span class="more-ch">⇄</span></button>
-      <button class="more-row" onclick="toggleDensity()"><span class="more-ic">⊟</span><span class="more-lbl">Compact / Comfortable spacing</span><span class="more-ch">⇄</span></button>
+      <button class="more-row" onclick="openSetupHub()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">🔧</span><span class="more-lbl">Setup (self-service)</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('admin')"><span class="more-ic tile" style="background:rgba(255,69,58,.16)">⚙️</span><span class="more-lbl">Admin</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openBackup()"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">💾</span><span class="more-lbl">Backup &amp; Restore</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openBranchInterview()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">🗒</span><span class="more-lbl">Branch Interview</span><span class="more-ch">›</span></button>
+    </div>
+    <div class="now-sec-hd" style="margin:16px 0 6px 4px">Appearance</div>
+    <div class="more-group">
+      <button class="more-row" onclick="toggleTheme()">
+        <span class="more-ic tile" style="background:rgba(175,156,255,.16)">🌙</span>
+        <span class="more-lbl">Calm Mode<span class="more-sub">Removes glow &amp; motion. Static &amp; quiet.</span></span>
+        <span class="nav-calm-sw more-calm-sw" id="more-calm-toggle" aria-hidden="true"><span class="nav-calm-knob"></span></span>
+      </button>
+      <button class="more-row" onclick="toggleDensity()">
+        <span class="more-ic tile" style="background:rgba(142,142,147,.16)">⊟</span>
+        <span class="more-lbl">Compact spacing<span class="more-sub">Tighter rows &amp; cards.</span></span>
+        <span class="more-ch">⇄</span>
+      </button>
     </div>
   </div>
 </div>
@@ -3650,6 +3671,9 @@ function applyTheme() {
   // v60.86: reflect Calm Mode on the desktop sidebar toggle (calm = on).
   var calmSw = document.getElementById('nav-calm-toggle');
   if (calmSw) calmSw.classList.toggle('on', !bold);
+  // v60.92: same for the More-screen Calm switch.
+  var moreCalm = document.getElementById('more-calm-toggle');
+  if (moreCalm) moreCalm.classList.toggle('on', !bold);
 }
 function toggleTheme() {
   STATE.uiTheme = (STATE.uiTheme === 'bold') ? 'calm' : 'bold';
