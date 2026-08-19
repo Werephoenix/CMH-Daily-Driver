@@ -316,8 +316,13 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .board-lrow .bl-net{font-size:15px;font-weight:800;min-width:34px;text-align:right}
 .board-lrow .bl-net.positive{color:var(--green)}.board-lrow .bl-net.negative{color:var(--red)}.board-lrow .bl-net.no-data{color:var(--txt3)}
 .board-lrow .bl-st{font-size:13px;min-width:16px;text-align:center}
-/* v60.84: floor map on Now — Matt wants the who's-where map on phone AND desktop (not desktop-only) */
-.desk-floor-map{display:block}
+/* v60.87: floor section now lives inside the Now hero (toggleable List/Map), so the separate
+   lower card is retired. Kept in the DOM (hidden) as the legacy #dash-sched-content holder. */
+.desk-floor-map{display:none}
+/* v60.87: List/Map segmented toggle in the floor section header */
+.floor-seg{display:inline-flex;background:var(--bg3);border-radius:8px;padding:2px}
+.fseg{background:none;border:none;color:var(--txt3);font-family:var(--ff-ui);font-size:12px;font-weight:700;padding:3px 11px;border-radius:6px;cursor:pointer;line-height:1.4}
+.fseg.on{background:rgba(255,255,255,.16);color:var(--txt)}
 /* v60.85: Design "FLOOR MAP · LIVE" look — accent-bordered station cards, count badges, people as pills */
 .fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
 .fm-zone{background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;padding:9px 10px;min-height:52px}
@@ -8829,15 +8834,33 @@ function renderNow() {
     <span class="more-ic">${ic}</span>
     <span class="more-lbl">${label}<div style="font-size:12px;color:var(--txt3);margin-top:1px">${names.length?names.join(', '):'—'}</div></span>
     <span class="now-floor-val" style="color:${ok?'var(--wu)':'var(--na)'}">${have}${need?'/'+need:''}</span></div>`;
-  // v60.56: header shows ACTUAL-aware coverage + a tap to update who's really where.
-  html += `<div class="now-sec-hd" style="display:flex;align-items:center;justify-content:space-between">
+  // v60.87: floor section = one-touch toggle between the quick List and the detailed Design
+  // "FLOOR MAP · LIVE". Choice persists (STATE.floorView). Default = map (what Matt asked to see).
+  // The glance strip (Res/Ret/Net/CS/Hot) shows in both modes. ✋Update keeps the tap-in.
+  const _fv = (STATE.floorView==='list') ? 'list' : 'map';
+  const _fs = (typeof floorSection==='function') ? floorSection() : {strip:'',body:''};
+  html += `<div class="now-sec-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
     <span>On the floor right now${offPlan?` · <span style="color:var(--up)">${offPlan} off-plan</span>`:''}</span>
-    <button onclick="showFloorSheet()" style="background:none;border:none;color:var(--exit);font-family:var(--ff-ui);font-size:13px;font-weight:700;cursor:pointer;padding:0">✋ Update</button>
-  </div><div class="more-group">`;
-  html += floorRow('🟦','Counter',ctrHave,ctrNeed,zones.counter, closed||ctrHave>=ctrNeed);
-  html += floorRow('🟩','Exit booth',exitHave,exitNeed,zones.exit, closed||exitHave>=exitNeed);
-  html += floorRow('↩','Returns',zones.returns.length,0,zones.returns, true);
-  html += `</div>`;
+    <span style="display:flex;align-items:center;gap:10px">
+      <span class="floor-seg">
+        <button class="fseg${_fv==='list'?' on':''}" onclick="setFloorView('list')">List</button>
+        <button class="fseg${_fv==='map'?' on':''}" onclick="setFloorView('map')">Map</button>
+      </span>
+      <button onclick="showFloorSheet()" style="background:none;border:none;color:var(--exit);font-family:var(--ff-ui);font-size:13px;font-weight:700;cursor:pointer;padding:0">✋ Update</button>
+    </span>
+  </div>`;
+  html += _fs.strip || '';
+  if (_fs.empty) {
+    html += _fs.empty;
+  } else if (_fv==='map') {
+    html += _fs.body;
+  } else {
+    html += `<div class="more-group">`;
+    html += floorRow('🟦','Counter',ctrHave,ctrNeed,zones.counter, closed||ctrHave>=ctrNeed);
+    html += floorRow('🟩','Exit booth',exitHave,exitNeed,zones.exit, closed||exitHave>=exitNeed);
+    html += floorRow('↩','Returns',zones.returns.length,0,zones.returns, true);
+    html += `</div>`;
+  }
 
   html += opsSignalsHtml(); // v60.60: cancellations → walk-up 1-way signal + counter
 
@@ -11715,10 +11738,11 @@ function applyCustomStation(pid) {
 
 
 
-function buildDashSchedMini() {
-  const el = document.getElementById('dash-sched-content');
-  if (!el) return;
-
+// v60.87: floorSection() is the reusable engine for the who's-where floor view. Returns
+// {strip, body} (or {empty}) so BOTH the Now hero (renderNow, live/toggled) and the legacy
+// #dash-sched-content holder can render it. strip = Res/Ret/Net/CS/Hot glance chips; body =
+// the Design "FLOOR MAP · LIVE" zone grid + coming-up.
+function floorSection() {
   const exp      = typeof buildExpectedToday==='function'?buildExpectedToday():{};
   const stations = STATE.staffStation   || {};
   const callouts = STATE.todayOverrides || {};
@@ -11731,8 +11755,7 @@ function buildDashSchedMini() {
   const _closeNick = _mgrs.close || null;
 
   if (!Object.keys(exp).length) {
-    el.innerHTML='<div style="color:var(--txt3);font-size:11px">📅 No schedule loaded &mdash; <span style="color:var(--acc);text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showTab(\'admin\');showAdminSection(\'sched\')">Import schedule →</span></div>';
-    return;
+    return {empty:'<div style="color:var(--txt3);font-size:11px">📅 No schedule loaded &mdash; <span style="color:var(--acc);text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();showTab(\'admin\');showAdminSection(\'sched\')">Import schedule →</span></div>'};
   }
 
   function fmtH(h) {
@@ -11914,14 +11937,14 @@ function buildDashSchedMini() {
   const _netCol=_net===null?'var(--txt3)':_net>0?'var(--wu)':'var(--na)';
   const _cs=_fld.cs||'—', _hot=_fld.hot||'—';
   const _stop='event.stopPropagation();';
-  let out=`<div class="fm-stats">
+  const _strip=`<div class="fm-stats">
     <span class="fm-stat" onclick="${_stop}showTab('board')">Res <b>${_res}</b></span>
     <span class="fm-stat" onclick="${_stop}showTab('board')">Ret <b>${_ret}</b></span>
     <span class="fm-stat" onclick="${_stop}showTab('board')">Net <b style="color:${_netCol}">${_netStr}</b></span>
     <span class="fm-stat" onclick="${_stop}showTab('checklist')">CS <b style="color:var(--wu)">${_cs}</b></span>
     <span class="fm-stat" onclick="${_stop}showTab('checklist')">Hot <b style="color:${_hot!=='—'&&+_hot>0?'var(--na)':'var(--txt3)'}">${_hot}</b></span>
   </div>`;
-  out+=`<div class="fm-grid">`;
+  let out=`<div class="fm-grid">`;
   zoneDefs.forEach(z=>{ if(!z.always && !z.p.length) return; out+=zoneCard(z.t,z.i,z.p,z.a,z.m); });
   out+=`</div>`;
 
@@ -11936,7 +11959,20 @@ function buildDashSchedMini() {
   const calledOff=offShift.filter(i=>i.callout);
   if(calledOff.length) out+=`<div style="margin-top:4px;font-size:9px;color:var(--red)">❌ Off: ${calledOff.map(i=>i.nick).join(', ')}</div>`;
 
-  el.innerHTML=out;
+  return {strip:_strip, body:out};
+}
+// v60.87: thin wrapper — keeps the (now hidden) legacy #dash-sched-content in sync.
+// The live, toggleable floor section renders inside the Now hero (renderNow → floorSection()).
+function buildDashSchedMini(){
+  const el=document.getElementById('dash-sched-content'); if(!el) return;
+  const r=floorSection(); el.innerHTML = r.empty || (r.strip + r.body);
+}
+// v60.87: one-touch List/Map toggle for the Now floor section (persists per device; a full
+// per-user preference comes with the accounts/setup phase). See [[accounts]] future work.
+function setFloorView(v){
+  STATE.floorView = (v==='list') ? 'list' : 'map';
+  if (typeof saveState==='function') saveState();
+  if (typeof renderNow==='function') renderNow();
 }
 
 function showCLEmail(mode) {
