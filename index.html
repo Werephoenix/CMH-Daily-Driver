@@ -391,7 +391,7 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .ros-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; flex-shrink: 0; }
 
 /* Rituals finish card + REQ badge (v60.45) */
-.req-badge { font-size: 9px; font-weight: 800; letter-spacing: .04em; color: var(--na); background: rgba(255,69,58,.14); border: 1px solid rgba(255,69,58,.4); border-radius: 5px; padding: 1px 5px; vertical-align: middle; white-space: nowrap; }
+.req-badge { font-size: 9px; font-weight: 800; letter-spacing: .04em; color: var(--up); background: rgba(255,204,0,.13); border: 1px solid rgba(255,204,0,.4); border-radius: 5px; padding: 1px 5px; vertical-align: middle; white-space: nowrap; } /* v60.89: Design amber REQ */
 .finish-card { margin-top: 16px; background: var(--bg2); border: 1px solid var(--bdr); border-radius: 16px; padding: 16px; }
 .finish-card.ready { border-color: rgba(48,209,88,.5); background: linear-gradient(180deg, rgba(48,209,88,.10), var(--bg2)); }
 .finish-hd { font-size: 18px; font-weight: 700; color: var(--txt); letter-spacing: -.3px; }
@@ -1365,8 +1365,8 @@ select option{background:var(--bg3)}
   border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt2);
   cursor:pointer;transition:all .15s}
 .cl-tab:hover{color:var(--txt);border-color:var(--bdr2)}
-.cl-tab.on{background:var(--bg3);border-color:var(--acc);color:var(--txt);
-  box-shadow:0 0 0 1px rgba(37,99,235,.3)}
+.cl-tab.on{background:rgba(35,201,131,.12);border-color:var(--accent);color:var(--txt);
+  box-shadow:0 0 0 1px rgba(35,201,131,.3)} /* v60.89: Design green active */
 
 /* Progress bar */
 .prog-wrap{background:var(--bg3);border-radius:3px;height:5px;margin-bottom:6px;overflow:hidden;
@@ -1386,49 +1386,47 @@ select option{background:var(--bg3)}
   margin-top:10px;
 }
 
+/* v60.89: Design Rituals — grouped inset list card holding the checklist rows */
+.cl-group{ background:var(--bg2); border:1px solid var(--bdr); border-radius:12px; overflow:hidden; margin-bottom:8px; }
 /* Checklist item */
 .ci{
-  display:flex;align-items:flex-start;gap:14px;
-  padding:14px 12px;
-  border-radius:5px;
+  display:flex;align-items:flex-start;gap:13px;
+  padding:14px 14px;
   cursor:pointer;
   transition:background .12s;
   border-bottom:1px solid var(--bdr);
-  background:var(--bg2);
+  background:transparent;
 }
 .ci:hover{background:var(--bg3);}
-.ci:last-child{border-bottom:none;border-radius:0 0 4px 4px}
-.ci.done{
-  background:rgba(22,163,74,.06);
-  border-bottom-color:rgba(22,163,74,.15);
-}
-.ci.done:hover{background:rgba(22,163,74,.1)}
+.ci:last-child{border-bottom:none}
+.ci.done{ background:rgba(48,209,88,.06); border-bottom-color:rgba(48,209,88,.14); }
+.ci.done:hover{background:rgba(48,209,88,.1)}
 
-/* Checkbox */
+/* Checkbox — v60.89: Design circle (fills green with a check when done) */
 .cbox{
-  width:26px;height:26px;border-radius:5px;
+  width:25px;height:25px;border-radius:50%;
   border:2px solid var(--bdr2);
   flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
   font-size:14px;font-weight:700;
   transition:all .15s;
   margin-top:1px;
-  background:var(--bg3);
+  background:transparent;
 }
-.ci:hover .cbox{border-color:var(--acc)}
-.ci.done .cbox{background:var(--green);border-color:var(--green);color:#fff;
-  box-shadow:0 0 0 2px rgba(22,163,74,.2)}
+.ci:hover .cbox{border-color:var(--accent)}
+.ci.done .cbox{background:var(--wu);border-color:var(--wu);color:#04160e;
+  box-shadow:0 0 0 2px rgba(48,209,88,.18)}
 
 /* Item text */
 .ci-txt{
-  font-size:13px;flex:1;line-height:1.5;
+  font-size:14px;flex:1;line-height:1.45;
   color:var(--txt);
-  font-weight:400;
+  font-weight:500;
 }
 .ci.done .ci-txt{
   color:var(--txt2);
   text-decoration:line-through;
-  text-decoration-color:rgba(22,163,74,.4);
+  text-decoration-color:rgba(48,209,88,.4);
 }
 .ci-photo{
   font-size:11px;color:var(--acc);flex-shrink:0;
@@ -9399,6 +9397,7 @@ function renderChecklist(mode) {
         secDone + '/' + secTotal + '</span>' +
         '</div>';
     }
+    htm += '<div class="cl-group">';   // v60.89: Design grouped inset list card
     (sec.items||[]).forEach(function(it) {
       if (it.days && !it.days.includes(dow)) return;
       var done = cl[it.t] === true;
@@ -9416,6 +9415,7 @@ function renderChecklist(mode) {
         (it.p ? '<div class="ci-photo">📷</div>' : '') +
         '</div>';
     });
+    htm += '</div>';
   });
 
   // ── v60.45: guided finish card ────────────────────────────────────────────
