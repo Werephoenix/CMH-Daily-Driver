@@ -18490,8 +18490,8 @@ function rqInjectStyle(){
   +'.rq-form input,.rq-form textarea{background:#0E0E10;border:1px solid rgba(255,255,255,.14);border-radius:9px;color:#fff;font-size:14px;padding:9px 11px;font-family:inherit;width:100%}'
   +'.rq-row2{display:flex;gap:8px}.rq-row2>*{flex:1;min-width:0}'
   +'.rq-types{display:flex;gap:6px;flex-wrap:wrap}'
-  +'.rq-typebtn{background:#2C2C2E;color:#8E8E93;border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}.rq-typebtn.on{background:rgba(10,132,255,.18);border-color:#0A84FF;color:#4DA3FF}'
-  +'.rq-submit{background:#0A84FF;color:#fff;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:700;cursor:pointer}'
+  +'.rq-typebtn{background:#2C2C2E;color:#8E8E93;border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}.rq-typebtn.on{background:rgba(35,201,131,.16);border-color:#23C983;color:#23C983}' /* v60.95: Design green active */
+  +'.rq-submit{background:#23C983;color:#04160e;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:800;cursor:pointer}' /* v60.95: Design green primary */
   +'.rq-empty{color:#8E8E93;font-size:14px;text-align:center;padding:28px 16px;background:#1C1C1E;border-radius:14px}'
   +'.rq-card{background:#1C1C1E;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:13px;margin-bottom:10px}.rq-card.open{border-left:3px solid #FFCC00}'
   +'.rq-top{display:flex;align-items:baseline;gap:8px}.rq-who{font-size:15px;font-weight:700;color:#fff;flex:1}.rq-type{font-size:11px;color:#8E8E93;font-weight:600}.rq-del{background:none;border:none;color:#8E8E93;cursor:pointer;font-size:13px}'
@@ -18604,7 +18604,7 @@ function bkInjectStyle(){
   +'.bk-body{flex:1;overflow:auto;padding:16px}'
   +'.bk-body p{font-size:13.5px;color:#AEAEB2;margin:0 0 14px;line-height:1.5}'
   +'.bk-btn{width:100%;border-radius:12px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;border:none}'
-  +'.bk-btn.primary{background:#0A84FF;color:#fff}.bk-btn.gh{background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.16)}'
+  +'.bk-btn.primary{background:#23C983;color:#04160e}.bk-btn.gh{background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.16)}' /* v60.95: Design green primary */
   +'.bk-last{font-size:12px;color:#8E8E93;text-align:center;margin:4px 0 18px}'
   +'.bk-div{height:1px;background:rgba(255,255,255,.08);margin:8px 0 16px}'
   +'.bk-warn{font-size:12px!important;color:#FF9F0A!important}';
@@ -18613,7 +18613,7 @@ function bkInjectStyle(){
 function bkRender(){
   var o=document.getElementById('bk-overlay'); if(!o) return;
   var last=''; try{ var lb=localStorage.getItem('cmhLastBackup'); if(lb) last='Last backup: '+new Date(lb).toLocaleString(); else last='No backup taken yet.'; }catch(e){}
-  o.innerHTML='<div class="bk-head"><div><div class="bk-kick">Admin</div><div class="bk-title">Backup &amp; Restore</div></div><button class="bk-x" onclick="closeBackup()">✕</button></div>'
+  o.innerHTML='<div class="bk-head"><div><div class="bk-kick">Setup</div><div class="bk-title">Backup &amp; Restore</div></div><button class="bk-x" onclick="closeBackup()">✕</button></div>'
     +'<div class="bk-body">'
     +'<p>Save <b>everything on this device</b> — schedules, settings, alerts, celebrations, requests, branch answers — to one file. Keep it safe, or use it to move the app to another device or host.</p>'
     +'<button class="bk-btn primary" onclick="bkExport()">💾 Back up all data</button>'
