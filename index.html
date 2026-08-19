@@ -253,6 +253,19 @@ body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 .more-calm-sw.on { background: var(--accent); }
 .more-calm-sw .nav-calm-knob { position: absolute; top: 3px; left: 3px; width: 19px; height: 19px; border-radius: 50%; background: #fff; transition: transform .15s; }
 .more-calm-sw.on .nav-calm-knob { transform: translateX(17px); }
+/* v60.94: Setup · Staff roster rows (Design) — avatar + name/role + Archive; Former-staff dimmed */
+.stf-group{ background: var(--bg2); border: 1px solid var(--bdr); border-radius: 12px; overflow: hidden; }
+.stf-row{ display: flex; align-items: center; gap: 12px; padding: 11px 13px; border-bottom: 1px solid var(--bdr); }
+.stf-row:last-child{ border-bottom: none; }
+.stf-row.stf-arch{ opacity: .62; }
+.stf-av{ width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; letter-spacing: .01em; }
+.stf-main{ flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.stf-name{ font-size: 14px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stf-sub{ font-size: 12px; color: var(--txt3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.stf-btn{ font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--bdr2); background: var(--bg3); color: var(--txt2); cursor: pointer; flex-shrink: 0; }
+.stf-btn.stf-archbtn{ color: var(--txt3); }
+.stf-btn.stf-reinst{ color: var(--accent); border-color: rgba(35,201,131,.4); }
+.stf-new{ font-size: 9px; background: rgba(48,209,88,.14); color: var(--wu); border-radius: 3px; padding: 1px 5px; margin-left: 5px; font-weight: 800; }
 .more-ch { color: var(--txt3); font-size: 20px; }
 
 /* Now hero (v60.43) */
@@ -2378,9 +2391,9 @@ button { cursor: pointer; }
 
   <!-- SCREEN: Closing -->
   
-  <!-- SCREEN: Admin -->
+  <!-- SCREEN: Admin (v60.93: reached via the merged "Setup" hub — titled Setup for consistency) -->
   <div class="scr" id="screen-admin">
-    <h1 class="scr-title">Admin</h1>
+    <h1 class="scr-title">Setup</h1>
 
     <!-- PIN lock -->
     <div id="admin-lock" class="card" style="text-align:center;padding:28px 16px">
@@ -12501,7 +12514,9 @@ function _doPrePopulate(replaceAll) {
 }
 
 // ── Get effective roster (admin overrides merged with hardcoded) ───────────
-function getEffectiveRoster() {
+// v60.94: merged roster BEFORE the active/deleted filter, so departures (archived
+// = active:false) can be listed separately without losing their data.
+function _buildMergedRoster() {
   const overrides = (STATE.adminRoster || []);
   const exitArr    = typeof ROSTER_EXIT    !== 'undefined' ? ROSTER_EXIT    : [];
   const returnsArr = typeof ROSTER_RETURNS !== 'undefined' ? ROSTER_RETURNS : [];
@@ -12520,7 +12535,14 @@ function getEffectiveRoster() {
     if (clone.preferredName && clone.preferredName.trim()) clone.nick = clone.preferredName.trim();
     base.push(clone);
   });
-  return base.filter(p => p && p.active !== false && p._deleted !== true);
+  return base;
+}
+function getEffectiveRoster() {
+  return _buildMergedRoster().filter(p => p && p.active !== false && p._deleted !== true);
+}
+// v60.94: departures — people who left (active:false), kept with their data for history.
+function getArchivedRoster() {
+  return _buildMergedRoster().filter(p => p && p.active === false && p._deleted !== true);
 }
 
 // Returns the preferred display name for a person object
@@ -12533,30 +12555,43 @@ function displayName(p) {
 function buildAdminStaffList() {
   const el = document.getElementById('adm-staff-list');
   if (!el) return;
-  const roster = getEffectiveRoster();
-  const days = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-  const roleColors = {ARM:'var(--acc)',BRM:'var(--acc)',ABRM:'var(--acc)',MT:'var(--acc)',CXR:'var(--green)',EXIT:'var(--amber)'};
-
-  el.innerHTML = roster.map(p => {
-    const daysStr = p.daysOn && p.daysOn.length ? p.daysOn.map(d=>days[d]).join('/') : '—';
-    const roleColor = roleColors[p.role] || 'var(--txt3)';
-    const isNew = p._new ? ' <span style="font-size:9px;background:rgba(22,163,74,.1);color:var(--green);border-radius:3px;padding:1px 4px">NEW</span>' : '';
-    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:700;color:var(--txt)">${p.nick||p.name.split(' ')[0]}
-          ${p.preferredName && p.preferredName !== p.nick ? `<span style="font-size:9px;background:rgba(37,99,235,.12);color:var(--acc);border-radius:3px;padding:1px 5px;margin-left:3px">goes by ${p.preferredName}</span>` : ''}
-          <span style="font-size:10px;color:${roleColor};margin-left:4px">${p.role}</span>${isNew}
-        </div>
-        <div style="font-size:10px;color:var(--txt3)">${p.name} · ${p.shiftCode||'varies'} · ${daysStr}</div>
-      </div>
-      <button onclick="showEditStaffModal('${p.id}')"
-        style="font-size:11px;padding:4px 10px;border-radius:4px;border:1px solid var(--bdr2);
-          background:var(--bg2);color:var(--txt3);cursor:pointer;flex-shrink:0">Edit</button>
-      <button onclick="removeStaff('${p.id}')"
-        style="font-size:11px;padding:4px 8px;border-radius:4px;border:1px solid rgba(220,38,38,.3);
-          background:rgba(220,38,38,.06);color:var(--red);cursor:pointer;flex-shrink:0">✕</button>
+  // v60.94: Design "Setup · Staff" — colored initials avatar, name, role·shift subtitle,
+  // and Archive (departures) instead of a hard delete. Former staff listed below, reinstatable.
+  const roleColor = r => ({ARM:'var(--eb)',BRM:'var(--eb)',ABRM:'var(--eb)',MT:'var(--eb)',
+    CXR:'var(--counter)',EXIT:'var(--exit)',RETURNS:'var(--returns)'}[r] || 'var(--txt3)');
+  function initials(p){
+    // Design 2-char avatar: first letter of each of two names, else first two letters of one.
+    var n=(p.nick||p.name||'').replace(/[^A-Za-z\s].*$/,'').trim(); // drop trailing parenthetical/junk
+    var w=n.split(/\s+/).filter(Boolean);
+    if (w.length>=2) return (w[0][0]+w[1][0]).toUpperCase();
+    if (w.length===1) return w[0].slice(0,2).toUpperCase();
+    return '—';
+  }
+  function row(p, archived){
+    const col=roleColor(p.role);
+    const nm=p.nick||(p.name||'').split(' ')[0];
+    const isNew = (!archived && p._new) ? ' <span class="stf-new">NEW</span>' : '';
+    const sub = archived
+      ? 'Left '+(p.departedDate||'—')+(p.departedReason?(' · '+p.departedReason):'')
+      : (p.role+' · '+(p.shiftCode||'varies'));
+    return `<div class="stf-row${archived?' stf-arch':''}">
+      <span class="stf-av" style="background:color-mix(in srgb, ${col} 22%, transparent);color:${col}">${initials(p)}</span>
+      <span class="stf-main"><span class="stf-name">${nm}${isNew}</span><span class="stf-sub">${sub}</span></span>
+      ${archived
+        ? `<button class="stf-btn stf-reinst" onclick="reinstateStaff('${p.id}')">Reinstate</button>`
+        : `<button class="stf-btn" onclick="showEditStaffModal('${p.id}')">Edit</button>`
+          +`<button class="stf-btn stf-archbtn" onclick="archiveStaff('${p.id}')">Archive</button>`}
     </div>`;
-  }).join('');
+  }
+  const active = getEffectiveRoster();
+  const archived = (typeof getArchivedRoster==='function') ? getArchivedRoster() : [];
+  let html = '<div class="now-sec-hd" style="margin:2px 0 6px 2px">Roster · '+active.length+' active</div>'
+    + '<div class="stf-group">' + active.map(p=>row(p,false)).join('') + '</div>';
+  if (archived.length) {
+    html += '<div class="now-sec-hd" style="margin:16px 0 6px 2px">Former staff · '+archived.length+'</div>'
+      + '<div class="stf-group">' + archived.map(p=>row(p,true)).join('') + '</div>';
+  }
+  el.innerHTML = html;
 }
 
 function showAddStaffModal()      { showEditStaffModal(null); }
@@ -12677,7 +12712,7 @@ function saveStaff(id) {
 }
 
 function removeStaff(id) {
-  if (!confirm('Remove this person from the roster?')) return;
+  if (!confirm('Permanently delete this person? Use Archive instead if they just left — Archive keeps their data.')) return;
   if (!STATE.adminRoster) STATE.adminRoster = [];
   const idx = STATE.adminRoster.findIndex(o=>o.id===id);
   if (idx>=0) STATE.adminRoster[idx]._deleted = true;
@@ -12688,7 +12723,45 @@ function removeStaff(id) {
   // Also refresh schedule/timeline since removed person should no longer appear
   if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
   if (typeof refreshDash === 'function') refreshDash();
-  toast('Removed from roster');
+  toast('Deleted');
+}
+
+// v60.94: DEPARTURES — archive someone who left. Keeps the record + their data (Matt's rule),
+// just marks them inactive with a left-date + reason. They drop out of active rosters,
+// schedules, celebrations and pickers automatically (everything derives from the active
+// roster), but stay recoverable under "Former staff" and available for history/data.
+function archiveStaff(id) {
+  const p = getEffectiveRoster().find(x=>x.id===id);
+  const nm = p ? (p.nick || (p.name||'').split(' ')[0]) : 'this person';
+  const reason = prompt('Archive '+nm+' — they left the branch.\nReason (optional, kept for your records):', '');
+  if (reason === null) return; // cancelled
+  if (!STATE.adminRoster) STATE.adminRoster = [];
+  const today = new Date().toISOString().slice(0,10);
+  const patch = { active:false, departedDate:today, departedReason:(reason||'').trim() };
+  const idx = STATE.adminRoster.findIndex(o=>o.id===id);
+  if (idx>=0) STATE.adminRoster[idx] = Object.assign(STATE.adminRoster[idx], patch);
+  else STATE.adminRoster.push(Object.assign({ id }, patch));
+  saveState();
+  if (typeof logAction === 'function') logAction('Archived '+nm+(reason?(' — '+reason.trim()):''));
+  rebuildRosters();
+  buildAdminStaffList();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof refreshDash === 'function') refreshDash();
+  toast(nm+' archived — data kept');
+}
+function reinstateStaff(id) {
+  if (!STATE.adminRoster) STATE.adminRoster = [];
+  const patch = { active:true, departedDate:null, departedReason:null };
+  const idx = STATE.adminRoster.findIndex(o=>o.id===id);
+  if (idx>=0) STATE.adminRoster[idx] = Object.assign(STATE.adminRoster[idx], patch);
+  else STATE.adminRoster.push(Object.assign({ id }, patch));
+  saveState();
+  if (typeof logAction === 'function') logAction('Reinstated staff '+id);
+  rebuildRosters();
+  buildAdminStaffList();
+  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
+  if (typeof refreshDash === 'function') refreshDash();
+  toast('Reinstated to active roster');
 }
 
 // ── SCHEDULE EDITOR (v54) ───────────────────────────────────────────────
@@ -13048,7 +13121,15 @@ function renderDashAnnouncements() {
 function renderDashCelebrations() {
   const wrap = document.getElementById('dash-celebrations');
   if (!wrap) return;
-  const list = STATE.celebrations || [];
+  // v60.94: departures cascade — archived (departed) staff drop off celebrations too.
+  const _rawCeleb = STATE.celebrations || [];
+  var _archN = {};
+  try {
+    (typeof getArchivedRoster==='function' ? getArchivedRoster() : []).forEach(function(p){
+      [p.name, p.nick, (p.name||'').split(' ')[0]].forEach(function(n){ if(n) _archN[String(n).trim().toLowerCase()]=1; });
+    });
+  } catch(e){}
+  const list = _rawCeleb.filter(function(c){ return !_archN[String(c.name||'').trim().toLowerCase()]; });
   if (!list.length) { wrap.style.display = 'none'; return; }
   const today = new Date();
   const yr = today.getFullYear();
