@@ -14086,9 +14086,11 @@ function buildCoverageTimeline() {
     return'counter';
   }
 
-  const zColor={counter:'var(--acc)',exit:'var(--green)',emerald:'#6366f1',
-    returns:'#06b6d4',lunch:'var(--amber)',shuttling:'#f59e0b',break:'#78716c',
-    training:'#8b5cf6',mgmt:'#7c3aed',off:'transparent'};
+  // v60.91: Design Gantt palette — iOS tokens (Counter blue · Exit green · Returns cyan ·
+  // Emerald/Mgmt purple · Lunch yellow) so the schedule bars match the mockup.
+  const zColor={counter:'var(--counter)',exit:'var(--exit)',emerald:'var(--eb)',
+    returns:'var(--returns)',lunch:'var(--up)',shuttling:'#FF9F0A',break:'#8E8E93',
+    training:'#BF5AF2',mgmt:'var(--eb)',off:'transparent'};
 
   // Auto-assign Emerald to currently on-shift manager (show runner)
   {
@@ -14455,7 +14457,7 @@ function buildCoverageTimeline() {
     // leave an empty header.
     if(!grp._shown){
       grp._shown=true;
-      htm+=`<div style="display:flex;margin:8px 0 3px"><div style="width:${LABEL_W}px;flex-shrink:0"></div><div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:${grp.color};border-bottom:1px solid var(--bdr);padding-bottom:2px;flex:1">— ${grp.label} —</div></div>`;
+      htm+=`<div style="display:flex;align-items:center;margin:12px 0 4px"><div style="width:${LABEL_W}px;flex-shrink:0"></div><div style="flex:1;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr);padding-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:${grp.color};flex-shrink:0"></span><span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">${grp.label}</span></div></div>`;
     }
 
     htm+=`<div style="display:flex;align-items:center;margin-bottom:2px;cursor:pointer"
