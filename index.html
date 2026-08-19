@@ -219,14 +219,15 @@ body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
   min-height: 49px;
 }
 .nbtn:hover { color: var(--txt2); }
-.nbtn.on { color: var(--acc); }
-/* v60.16/42: active tab adopts its section's accent color. */
-#tab-opening.on   { color: var(--tab-dashboard); }
-#tab-schedule.on  { color: var(--tab-coverage); }
-#tab-board.on     { color: var(--tab-board); }
-#tab-checklist.on { color: var(--tab-checklist); }
-#tab-more.on      { color: var(--txt); }
-.ni { font-size: 21px; line-height: 1; }
+/* v60.86: Design nav — consistent green active state (was per-section colors). */
+.nbtn.on { color: var(--accent); }
+.ni { font-size: 21px; line-height: 1; display: inline-flex; }
+/* v60.86: monochrome SVG line icons (currentColor → green when active) */
+.ni-svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.ni-svg.ni-fill { fill: currentColor; stroke: none; }
+.nbtn-lbl { display: block; }
+/* Brand + Calm rows only appear in the desktop sidebar (hidden in the phone bar) */
+#nav-brand, #nav-calm { display: none; }
 
 /* v60.48: iOS large title for each screen */
 .scr-title { font-size: 34px; font-weight: 700; letter-spacing: -.8px; margin: 2px 0 14px; color: var(--txt); }
@@ -1232,7 +1233,7 @@ input.autofill{background:rgba(22,163,74,.06);border-color:var(--green3);color:v
 #nav::-webkit-scrollbar{display:none}
 .nbtn{font-family:var(--ff-ui);font-size:12px;font-weight:600;letter-spacing:.03em;color:var(--txt3);background:none;border:none;border-bottom:2px solid transparent;padding:10px 12px;white-space:nowrap;display:flex;align-items:center;gap:5px;cursor:pointer;transition:color .15s,border-color .15s}
 .nbtn:hover{color:var(--txt2)}
-.nbtn.on{color:var(--acc);border-bottom-color:var(--acc)}
+.nbtn.on{color:var(--accent);border-bottom-color:transparent} /* v60.86: Design green active (was blue --acc underline) */
 .ni{font-size:13px}
 
 /* ── TOPBAR ── */
@@ -1625,6 +1626,42 @@ select option{background:var(--bg3)}
   }
 }
 
+/* v60.86: DESKTOP SIDEBAR — Design "reflow for the big screen". At >=900px the bottom
+   tab bar becomes a left sidebar (brand at top, nav rows, Calm Mode toggle at bottom),
+   active row = green with a soft green fill. Phone bar is untouched below this width. */
+@media (min-width: 900px) {
+  body { padding-bottom: 0; padding-left: 216px; }
+  #nav {
+    flex-direction: column; align-items: stretch;
+    top: 0; bottom: 0; right: auto; width: 216px;
+    border-top: none; border-right: 1px solid var(--bdr);
+    padding: 16px 12px 12px; gap: 3px; overflow-y: auto;
+  }
+  #nav-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; }
+  .nav-brand-tile { width: 34px; height: 34px; border-radius: 9px; background: var(--accent);
+    display: flex; align-items: center; justify-content: center; color: #04160e; flex-shrink: 0; }
+  .nav-brand-tile .ni-svg { width: 20px; height: 20px; }
+  .nav-brand-txt { font-size: 17px; font-weight: 800; color: var(--txt); letter-spacing: -.02em; }
+  .nbtn {
+    flex: none; flex-direction: row; justify-content: flex-start;
+    gap: 13px; padding: 11px 12px; border-radius: 10px; min-height: 0;
+  }
+  .nbtn-lbl { font-size: 15px; font-weight: 600; }
+  .nbtn.on { background: rgba(35,201,131,.14); color: var(--accent); }
+  .nbtn:hover:not(.on) { background: var(--bg3); color: var(--txt); }
+  #nav-calm { display: flex; align-items: center; justify-content: space-between;
+    margin-top: auto; padding: 12px 10px 4px; gap: 10px; }
+  .nav-calm-lbl { font-size: 13px; color: var(--txt2); }
+  .nav-calm-sw { width: 42px; height: 25px; border-radius: 999px; background: var(--bg3);
+    border: none; position: relative; cursor: pointer; transition: background .15s; padding: 0; flex-shrink: 0; }
+  .nav-calm-sw.on { background: var(--accent); }
+  .nav-calm-knob { position: absolute; top: 3px; left: 3px; width: 19px; height: 19px;
+    border-radius: 50%; background: #fff; transition: transform .15s; }
+  .nav-calm-sw.on .nav-calm-knob { transform: translateX(17px); }
+  /* topbar keeps time/on-duty/shift on the right; brand lives in the sidebar now */
+  #topbar #logo { display: none; }
+}
+
 /* Fix iOS Safari rubber-band scroll on nav */
 #nav { -webkit-overflow-scrolling: touch; }
 
@@ -1738,11 +1775,15 @@ button { cursor: pointer; }
 <!-- v60.42: iOS 5-item bottom tab bar. Secondary screens (Paste, Inventory,
      Reference, History, Admin) live under More. -->
 <div id="nav">
-  <button class="nbtn on" id="tab-opening"  onclick="showTab('opening')"><span class="ni">🏠</span>Now</button>
-  <button class="nbtn"    id="tab-schedule" onclick="showTab('schedule')"><span class="ni">📅</span>Schedule</button>
-  <button class="nbtn"    id="tab-board"    onclick="showTab('board')"><span class="ni">🚗</span>Board</button>
-  <button class="nbtn"    id="tab-checklist" onclick="showTab('checklist')"><span class="ni">✅</span>Rituals</button>
-  <button class="nbtn"    id="tab-more"     onclick="showTab('more')"><span class="ni">⋯</span>More</button>
+  <!-- v60.86: Design-look nav — monochrome SVG line icons, consistent green active state.
+       Desktop (>=900px) reflows this bar into a left sidebar (see @media below). -->
+  <div id="nav-brand"><span class="nav-brand-tile"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><path d="M13 2 L4 13.5 h6 l-1.5 8.5 L18 10 h-6 l1-8z"/></svg></span><span class="nav-brand-txt">Daily Driver</span></div>
+  <button class="nbtn on" id="tab-opening"  onclick="showTab('opening')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><path d="M13 2 L4 13.5 h6 l-1.5 8.5 L18 10 h-6 l1-8z"/></svg></span><span class="nbtn-lbl">Now</span></button>
+  <button class="nbtn"    id="tab-schedule" onclick="showTab('schedule')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="nbtn-lbl">Schedule</span></button>
+  <button class="nbtn"    id="tab-board"    onclick="showTab('board')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><path d="M5 11l1.4-4.2A2 2 0 018.3 5.4h7.4a2 2 0 011.9 1.4L19 11M5 11h14v4.6a1 1 0 01-1 1h-1.4a1 1 0 01-1-1V15H8.4v.6a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><circle cx="8.2" cy="13.6" r="1"/><circle cx="15.8" cy="13.6" r="1"/></svg></span><span class="nbtn-lbl">Board</span></button>
+  <button class="nbtn"    id="tab-checklist" onclick="showTab('checklist')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M8 12.2l2.8 2.8L16.5 9"/></svg></span><span class="nbtn-lbl">Rituals</span></button>
+  <button class="nbtn"    id="tab-more"     onclick="showTab('more')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg></span><span class="nbtn-lbl">More</span></button>
+  <div id="nav-calm"><span class="nav-calm-lbl">Calm Mode</span><button id="nav-calm-toggle" class="nav-calm-sw" onclick="toggleTheme()" aria-label="Toggle Calm Mode"><span class="nav-calm-knob"></span></button></div>
 </div>
 
 <!-- SCREEN: MORE (v60.42) — hub for secondary destinations + appearance -->
@@ -3621,6 +3662,9 @@ function applyTheme() {
     btn.textContent = bold ? '🎨' : '🌙';
     btn.title = bold ? 'Bold brand theme — tap for Calm Mode' : 'Calm Mode — tap for Bold theme';
   }
+  // v60.86: reflect Calm Mode on the desktop sidebar toggle (calm = on).
+  var calmSw = document.getElementById('nav-calm-toggle');
+  if (calmSw) calmSw.classList.toggle('on', !bold);
 }
 function toggleTheme() {
   STATE.uiTheme = (STATE.uiTheme === 'bold') ? 'calm' : 'bold';
