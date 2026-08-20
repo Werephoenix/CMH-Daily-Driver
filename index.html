@@ -3234,71 +3234,50 @@ var COVERAGE_RULES = {
   6: { label:'Saturday',  monday:false },
 };
 
+// v60.98: FLOOR STAFFING TARGETS — Matt's branch-38N6 HARD MINIMUMS (2026-08 questionnaire).
+// Weekday (Mon–Fri) + Weekend (Sat/Sun) × 5 blocks × {c:counter, e:exit, r:returns, eMax:ideal exit}.
+// Ranges on the sheet (e.g. exit 4/5) → min is the hard floor, eMax the ideal.
+var FLOOR_TARGETS = {
+  weekday: {
+    open: {c:1, e:2, r:2, eMax:2},   // Open–9a
+    amid: {c:3, e:4, r:3, eMax:4},   // 9a–12p
+    mid:  {c:3, e:4, r:3, eMax:5},   // 12p–4p (exit 4–5, returns 3–4)
+    pm:   {c:2, e:3, r:2, eMax:3},   // 4p–8p
+    night:{c:2, e:2, r:1, eMax:3},   // 8p–Close (exit 2–3)
+  },
+  weekend: {
+    open: {c:1, e:2, r:1, eMax:2},
+    amid: {c:2, e:3, r:2, eMax:3},
+    mid:  {c:3, e:4, r:2, eMax:4},
+    pm:   {c:2, e:3, r:2, eMax:4},   // exit 3–4
+    night:{c:1, e:2, r:1, eMax:3},   // exit 2–3
+  }
+};
+var FLOOR_BLOCK_LABELS = { open:'Open–9a', amid:'9a–12p', mid:'12p–4p', pm:'4p–8p', night:'8p–Close' };
+function floorBlockKey(h){ if(h<9) return 'open'; if(h<12) return 'amid'; if(h<16) return 'mid'; if(h<20) return 'pm'; return 'night'; }
+
 var COVERAGE_BY_HOUR = function(hour, dow, exitAgentCount) {
-  // exitAgentCount = dedicated exit agents (Genesis, Shawnee, etc.) already covering exit
-  // exitMin = total bodies needed at exit (agents + CXRs combined)
-  // counterMin = minimum bodies needed at counter
-  // closed = true means no one needs to be staffed
-  const isMonday = dow === 1;
-  const ea = exitAgentCount || 0;
+  // Returns {exitMin, exitMax, counterMin, returnsMin, closed, label}. returnsMin is new (v60.98);
+  // older callers that only read exitMin/counterMin/closed keep working.
   const h  = hour % 24;
 
-  // Use manager-configured thresholds if available
-  if (STATE && STATE.coverageThresholds) {
-    const t = STATE.coverageThresholds;
-    let block = isMonday&&h>=6&&h<13 ? t.mon_peak :
-                h<6 ? t.night :
-                h<8 ? t.early :
-                h<11 ? t.morning :
-                h<14 ? t.peak :
-                h<17 ? t.midday :
-                h<21 ? t.evening : t.night;
-    if(block&&block.exitMin!=null)
-      return { exitMin:block.exitMin, exitMax:block.exitMax||5,
-               counterMin:block.counterMin||0, closed:block.closed||false, label:block.label||'' };
-  }
-
-  // ── Hardcoded rules per your specs ───────────────────────────────────────
-  // CLOSED: before 6am OR after 12:30am (with optional extension up to 2:30am)
+  // CLOSED windows — before 6am / after 12:30am (with optional closing extension up to ~2:30am)
   const ext = (STATE && STATE.closingExtension) || null;
   const closingHour = ext && ext.until ? ext.until : 24.5; // 12:30am default
   if (h < 6 && hour < closingHour) {
-    // Pre-6am — closed unless extension covers it
-    if (hour > 24 && hour < closingHour) {
-      // Extension active
-      return { exitMin:1, exitMax:2, counterMin:0, closed:false, label:'Extended' };
-    }
-    return { exitMin:0, exitMax:0, counterMin:0, closed:true, label:'Closed' };
+    if (hour > 24 && hour < closingHour) return { exitMin:1, exitMax:2, counterMin:0, returnsMin:0, closed:false, label:'Extended' };
+    return { exitMin:0, exitMax:0, counterMin:0, returnsMin:0, closed:true, label:'Closed' };
   }
-  if (hour >= closingHour || h >= 26) {
-    return { exitMin:0, exitMax:0, counterMin:0, closed:true, label:'Closed' };
-  }
+  if (hour >= closingHour || h >= 26) return { exitMin:0, exitMax:0, counterMin:0, returnsMin:0, closed:true, label:'Closed' };
 
-  // Open hours: 6am – ~12:30am (hour 24.5 = 12:30am)
-  const closing = 24.5; // 12:30am — after this, buffer only
-
-  // MONDAY — target 5 exit booths staffed (CMH's peak exit day).
-  // Per Matt (v57): exit gets filled FIRST after 9am, counter is what's
-  // left. Counter is OK at 1 before 8:30am (early arrivals + returning
-  // car prep). After 8:30am, counter min 2 holds until 4pm. After 4pm
-  // exit need ramps down but counter stays at 2 through the evening.
-  // Before 9am, exits are ramping up so exitMin is lower (the actual
-  // bodies are arriving), but exitMax stays at 5 throughout the day.
-  if (isMonday) {
-    if (h >= 6   && h < 8.5)  return { exitMin:2, exitMax:5, counterMin:1, closed:false, label:'Mon Open' };
-    if (h >= 8.5 && h < 9)    return { exitMin:3, exitMax:5, counterMin:2, closed:false, label:'Mon Ramp' };
-    if (h >= 9   && h < 16)   return { exitMin:5, exitMax:5, counterMin:2, closed:false, label:'Mon Peak' };
-    if (h >= 16  && h < 20)   return { exitMin:3, exitMax:5, counterMin:2, closed:false, label:'Mon PM' };
-    if (h >= 20)              return { exitMin:1, exitMax:5, counterMin:1, closed:false, label:'Mon Night' };
-  }
-
-  // OTHER DAYS — even split, exit priority
-  if (h >= 6  && h < 8)  return { exitMin:1, exitMax:2, counterMin:0, closed:false, label:'Early' };
-  if (h >= 8  && h < 12) return { exitMin:1, exitMax:3, counterMin:1, closed:false, label:'Morning' };
-  if (h >= 12 && h < 18) return { exitMin:2, exitMax:3, counterMin:2, closed:false, label:'Peak' };
-  if (h >= 18 && h < 21) return { exitMin:1, exitMax:2, counterMin:2, closed:false, label:'Evening' };
-  // 9pm–close (12:30am)
-  return { exitMin:1, exitMax:2, counterMin:1, closed:false, label:'Night' };
+  // OPEN — Matt's floor-staffing hard-minimums. Weekday = Mon–Fri, Weekend = Sat/Sun.
+  const isWeekend = (dow === 0 || dow === 6);
+  const dtype = isWeekend ? 'weekend' : 'weekday';
+  const set = ((STATE && STATE.floorTargets && STATE.floorTargets[dtype]) || FLOOR_TARGETS[dtype]);
+  const bk  = floorBlockKey(h);
+  const b   = set[bk] || FLOOR_TARGETS[dtype][bk];
+  return { exitMin:b.e, exitMax:(b.eMax||b.e), counterMin:b.c, returnsMin:b.r, closed:false,
+           label:(isWeekend?'Wknd · ':'Wkdy · ')+FLOOR_BLOCK_LABELS[bk] };
 };
 
 var SPECIAL_ASSIGNMENTS = [
@@ -3654,7 +3633,7 @@ function loadState() {
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
-    closeFields:{}, coverageThresholds:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
+    closeFields:{}, coverageThresholds:null, floorTargets:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
   };
 }
 
@@ -6172,6 +6151,9 @@ function buildSmartRotation() {
           b1To: cand.b1 ? cand.b1.to : null,
           b2From: cand.b2 ? cand.b2.from : null,
         };
+        // v60.98: baseline worst-case concurrency, so an understaffed branch can still
+        // spread lunches (smooth the unavoidable dip) without ever making it worse.
+        const worstBefore = totalConcurrentLunches();
         // Try positive (later) deltas FIRST — preserves counter time
         // (Matt's "4 hours at counter if possible, never below 3.5h").
         // Negative deltas only as a fallback. shiftLunch enforces the
@@ -6189,7 +6171,13 @@ function buildSmartRotation() {
           // window from min(orig, new) to max(orig, new) plus lunch duration.
           const probeFrom = Math.min(orig.lunchFrom, cand.lunch.from) - 0.01;
           const probeTo   = Math.max(orig.lunchTo,   cand.lunch.to)   + 0.01;
-          if (!coverageOkInWindow(Math.max(6, probeFrom), Math.min(24, probeTo))) {
+          // v60.98: primary rule — don't create a coverage gap. BUT when the branch is
+          // understaffed (coverage can't meet exitMin no matter what), still allow a spread
+          // that does NOT worsen the worst-case simultaneous exit lunches — smoothing an
+          // unavoidable dip beats clustering everyone's lunch into one slot.
+          let _covOk = coverageOkInWindow(Math.max(6, probeFrom), Math.min(24, probeTo));
+          if (!_covOk && totalConcurrentLunches() <= worstBefore) _covOk = true;
+          if (!_covOk) {
             // Revert
             cand.lunch.from = orig.lunchFrom; cand.lunch.to = orig.lunchTo;
             if (cand.b1) { cand.b1.to = orig.b1To; cand.b1.hours = Math.max(0, cand.b1.to - cand.b1.from); }
@@ -11984,7 +11972,7 @@ function floorSection() {
     {t:'Exit',    i:'🟩', p:exitPeople,    a:'var(--exit)',    m:rules.exitMin,    always:true},
     {t:'Office',  i:'🎯', p:activeMgmt,    a:'var(--eb)',      m:0},
     {t:'Emerald', i:'🌟', p:emeraldPeople, a:'var(--eb)',      m:0},
-    {t:'Returns', i:'↩', p:returnsPeople, a:'var(--returns)', m:0},
+    {t:'Returns', i:'↩', p:returnsPeople, a:'var(--returns)', m:(rules.returnsMin||0)},  // v60.98: Matt's returns hard-min
     {t:'On Lunch',i:'🍽', p:lunchPeople,   a:'var(--up)',      m:0},
     {t:'Floater', i:'🚗', p:floatPeople,   a:'var(--txt3)',    m:0},
   ];
@@ -17514,47 +17502,55 @@ var DEFAULT_THRESHOLDS = {
   mon_peak:{ label:'Mon Peak (10a–2p)',exitMin:5, exitMax:5, counterMin:3, closed:false },
 };
 
+// v60.98: Floor-staffing-targets editor — weekday/weekend × 5 blocks × Counter/Exit/Returns.
+// Edits STATE.floorTargets (defaults to FLOOR_TARGETS = Matt's branch hard-minimums).
 function openThresholdQuiz() {
-  const t = Object.assign({}, DEFAULT_THRESHOLDS, STATE.coverageThresholds||{});
-  const blocks=['early','morning','peak','midday','evening','night'];
-  const sel=(key,field,val)=>[0,1,2,3,4,5].map(n=>`<option value="${n}"${(val||0)===n?' selected':''}>${n}</option>`).join('');
-  const row=(key)=>{const b=t[key]||DEFAULT_THRESHOLDS[key];return `
-    <div style="display:grid;grid-template-columns:1fr 52px 52px 52px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bdr)">
-      <div style="font-size:12px;font-weight:600;color:var(--txt)">${b.label}</div>
-      <select onchange="updateThreshold('${key}','exitMin',+this.value)"
-        style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--green);font-size:13px;text-align:center">
-        ${sel(key,'exitMin',b.exitMin)}</select>
-      <select onchange="updateThreshold('${key}','exitMax',+this.value)"
-        style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--amber);font-size:13px;text-align:center">
-        ${sel(key,'exitMax',b.exitMax)}</select>
-      <select onchange="updateThreshold('${key}','counterMin',+this.value)"
-        style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--acc);font-size:13px;text-align:center">
-        ${sel(key,'counterMin',b.counterMin)}</select>
-    </div>`; };
-  const monB=t.mon_peak||DEFAULT_THRESHOLDS.mon_peak;
-  openModal('📊 Coverage Thresholds',`
+  window._ftDaytype = (window._ftDaytype === 'weekend') ? 'weekend' : 'weekday';
+  ftRenderModal();
+}
+function setFtDaytype(dt){ window._ftDaytype = (dt==='weekend'?'weekend':'weekday'); ftRenderModal(); }
+function ftRenderModal(){
+  const dt = window._ftDaytype || 'weekday';
+  const T  = (STATE.floorTargets) || FLOOR_TARGETS;
+  const blocks=[['open','Open–9a'],['amid','9a–12p'],['mid','12p–4p'],['pm','4p–8p'],['night','8p–Close']];
+  const sel=(bk,field,val,color)=>`<select onchange="updateFloorTarget('${dt}','${bk}','${field}',+this.value)" style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:${color};font-size:13px;text-align:center">${[0,1,2,3,4,5,6].map(n=>`<option value="${n}"${(val||0)===n?' selected':''}>${n}</option>`).join('')}</select>`;
+  const row=(bk,lbl)=>{const b=(T[dt]&&T[dt][bk])||FLOOR_TARGETS[dt][bk];return `<div style="display:grid;grid-template-columns:1fr 52px 52px 52px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bdr)"><div style="font-size:12px;font-weight:600;color:var(--txt)">${lbl}</div>${sel(bk,'c',b.c,'var(--counter)')}${sel(bk,'e',b.e,'var(--exit)')}${sel(bk,'r',b.r,'var(--returns)')}</div>`;};
+  openModal('📊 Floor staffing targets',`
     <div>
+      <div class="seg-ctl" style="margin-bottom:12px">
+        <button class="seg${dt==='weekday'?' on':''}" onclick="setFtDaytype('weekday')">Weekday (Mon–Fri)</button>
+        <button class="seg${dt==='weekend'?' on':''}" onclick="setFtDaytype('weekend')">Weekend (Sat–Sun)</button>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 52px 52px 52px;gap:8px;padding:4px 0 8px;border-bottom:2px solid var(--bdr);margin-bottom:2px">
         <div style="font-size:9px;font-weight:800;color:var(--txt3)">TIME BLOCK</div>
-        <div style="font-size:9px;font-weight:800;color:var(--green);text-align:center">EXIT<br>MIN</div>
-        <div style="font-size:9px;font-weight:800;color:var(--amber);text-align:center">EXIT<br>MAX</div>
-        <div style="font-size:9px;font-weight:800;color:var(--acc);text-align:center">CTR<br>MIN</div>
+        <div style="font-size:9px;font-weight:800;color:var(--counter);text-align:center">CTR</div>
+        <div style="font-size:9px;font-weight:800;color:var(--exit);text-align:center">EXIT</div>
+        <div style="font-size:9px;font-weight:800;color:var(--returns);text-align:center">RET</div>
       </div>
-      ${blocks.map(k=>row(k)).join('')}
-      <div style="margin-top:10px;padding:8px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.3);border-radius:6px">
-        <div style="font-size:9px;font-weight:800;color:#818cf8;margin-bottom:6px">🗓 MONDAY OVERRIDE</div>
-        <div style="display:grid;grid-template-columns:1fr 52px 52px 52px;gap:8px;align-items:center">
-          <div style="font-size:12px;font-weight:600;color:var(--txt)">${monB.label}</div>
-          <select onchange="updateThreshold('mon_peak','exitMin',+this.value)" style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--green);font-size:13px;text-align:center">${sel('mon_peak','exitMin',monB.exitMin)}</select>
-          <select onchange="updateThreshold('mon_peak','exitMax',+this.value)" style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--amber);font-size:13px;text-align:center">${sel('mon_peak','exitMax',monB.exitMax)}</select>
-          <select onchange="updateThreshold('mon_peak','counterMin',+this.value)" style="padding:5px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--acc);font-size:13px;text-align:center">${sel('mon_peak','counterMin',monB.counterMin)}</select>
-        </div>
-      </div>
+      ${blocks.map(([k,l])=>row(k,l)).join('')}
+      <div style="font-size:11px;color:var(--txt3);margin-top:8px">Hard minimums — the Board &amp; floor map flag anything below these. Weekday and weekend set separately.</div>
       <div style="display:flex;gap:8px;margin-top:12px">
-        <button onclick="saveThresholds()" style="flex:1;padding:11px;border-radius:6px;border:none;background:var(--green);color:#fff;font-size:13px;font-weight:700;cursor:pointer">✓ Save &amp; Apply</button>
+        <button onclick="saveFloorTargets()" style="flex:1;padding:11px;border-radius:6px;border:none;background:var(--accent);color:#04160e;font-size:13px;font-weight:800;cursor:pointer">✓ Save &amp; Apply</button>
         <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
       </div>
     </div>`);
+}
+function updateFloorTarget(dt, bk, field, val){
+  if(!STATE.floorTargets) STATE.floorTargets = JSON.parse(JSON.stringify(FLOOR_TARGETS));
+  if(!STATE.floorTargets[dt]) STATE.floorTargets[dt] = JSON.parse(JSON.stringify(FLOOR_TARGETS[dt]));
+  if(!STATE.floorTargets[dt][bk]) STATE.floorTargets[dt][bk] = Object.assign({}, FLOOR_TARGETS[dt][bk]);
+  STATE.floorTargets[dt][bk][field] = val;
+  // keep the exit "ideal" (eMax) at least the min
+  if(field==='e' && val > (STATE.floorTargets[dt][bk].eMax||0)) STATE.floorTargets[dt][bk].eMax = val;
+}
+function saveFloorTargets(){
+  saveState();
+  if(typeof toast==='function') toast('Floor targets saved ✓');
+  closeModal();
+  if(typeof buildDashSchedMini==='function') buildDashSchedMini();
+  if(typeof renderNow==='function') renderNow();
+  if(typeof buildBoardGrid==='function') buildBoardGrid();
+  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
 }
 
 function updateThreshold(blockKey, field, val) {
@@ -18668,8 +18664,9 @@ function closeBackup(){ var o=document.getElementById('bk-overlay'); if(o) o.sty
 // ═══════════════════════════════════════════════════════════════════════════
 function suStaffCount(){ try{ return [].concat(ROSTER_CXR||[],ROSTER_MGMT||[],ROSTER_EXIT||[],ROSTER_RETURNS||[]).filter(function(p){return p&&p.active!==false;}).length; }catch(e){ return 0; } }
 function suCoverageSummary(){
-  try{ var t=(STATE.coverageThresholds&&STATE.coverageThresholds.peak)|| (typeof DEFAULT_THRESHOLDS!=='undefined'&&DEFAULT_THRESHOLDS.peak) || {exitMin:2,counterMin:2};
-    return 'Peak: Exit '+(t.exitMin!=null?t.exitMin:'—')+' · Counter '+(t.counterMin!=null?t.counterMin:'—'); }catch(e){ return 'set by time block'; }
+  // v60.98: read the weekday midday block from the floor-staffing targets
+  try{ var T=(STATE.floorTargets)||FLOOR_TARGETS; var m=(T.weekday&&T.weekday.mid)||FLOOR_TARGETS.weekday.mid;
+    return 'Wkdy peak: Ctr '+m.c+' · Exit '+m.e+' · Ret '+m.r; }catch(e){ return 'set by block'; }
 }
 function suHoursSummary(){ try{ var ext=STATE.closingExtension; var close=(ext&&ext.until)?ext.until:24.5; var ch=close%24; var ap=ch<12?'a':'p'; var h12=Math.floor(ch)%12||12; var m=Math.round((ch-Math.floor(ch))*60); return '6:00a – '+h12+(m?':'+String(m).padStart(2,'0'):':00')+ap; }catch(e){ return '6:00a – 12:30a'; } }
 function suBranchAnswers(){ try{ var c=STATE.branchConfig||{}; var done=Object.keys(c).filter(function(k){var v=c[k];return v!=null&&v!==''&&!(Array.isArray(v)&&!v.length);}).length; return done+' answered'; }catch(e){ return 'not started'; } }
