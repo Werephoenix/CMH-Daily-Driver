@@ -3026,10 +3026,11 @@ var ROSTER_CXR = [
 
   {id:'umesh',    name:'Umesh Acharya',            nick:'Umesh',   role:'CXR',
    shiftCode:'430P-100A', shiftStart:16.5, shiftEnd:25.0,
-   daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat — confirmed from Excel
+   daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat
    pref:'none', exitFairness:0,
    lunchCode:'30min',
-   notes:'Sun/Mon/Thu/Fri/Sat 4:30p-1:00a.'},
+   active:false, departedDate:'2026-08-20', departedReason:'On leave — returning',
+   notes:'ON LEAVE 2026-08-20 (returning) — off the active schedule while out; Reinstate when back. Was Sun/Mon/Thu/Fri/Sat 4:30p-1:00a.'},
 
   {id:'leslie',   name:'Leslie Hamler',            nick:'Leslie',  role:'CXR',
    shiftCode:'430P-100A', shiftStart:16.5, shiftEnd:25.0,
@@ -3088,18 +3089,25 @@ var ROSTER_RETURNS = [
 
 
 var ROSTER_EXIT = [
+  // v60.99: Zina + Fatuma are the ONLY current exit agents (Matt 2026-08-20); all others quit → archived, data kept.
+  {id:'zina', name:'Zina Kellen', nick:'Zina', role:'EXIT',
+   daysOn:[0,1,4,5,6], shiftStart:10, shiftEnd:18,
+   shiftCode:'10A-600P',
+   notes:'Exit agent. Thu–Mon (off Tue/Wed). 10a-6p. No counter rotation.', active:true},
+  {id:'fatuma', name:'Fatuma', nick:'Fatuma', role:'EXIT',
+   daysOn:[0,1,2,3,6], shiftStart:7, shiftEnd:16,
+   shiftCode:'7A-400P',
+   notes:'Exit agent. Sat–Wed (off Thu/Fri). 7a-4p. No counter rotation. Last name TBD.', active:true},
   {id:'lisa_exit', name:'Lisa (Exit)', nick:'Lisa', role:'EXIT',
    daysOn:[0], shiftStart:16.5, shiftEnd:24.5,
    shiftCode:'430P-1230A',
-   notes:'Exit agent. Sunday only.', active:true},
-  {id:'zina', name:'Zina Kellen', nick:'Zina', role:'EXIT',
-   daysOn:[0,1,4,5,6], shiftStart:10, shiftEnd:18.5,
-   shiftCode:'10A-630P',
-   notes:'Exit agent. Sun/Mon/Thu/Fri/Sat. 10a-6:30p. No counter rotation.', active:true},
+   active:false, departedDate:'2026-08-20', departedReason:'Quit',
+   notes:'ARCHIVED 2026-08-20 — quit (data kept). Was Sunday-only 4:30p-12:30a.'},
   {id:'duria', name:'Duria', nick:'Duria', role:'EXIT',
    daysOn:[], shiftStart:18, shiftEnd:26.5,
    shiftCode:'TBD',
-   notes:'New evening exit agent. Schedule TBD — Matt to provide on next schedule paste.', active:true},
+   active:false, departedDate:'2026-08-20', departedReason:'Quit',
+   notes:'ARCHIVED 2026-08-20 — quit (data kept). Was a new evening exit agent; schedule never finalized.'},
 ];
 
 var ROSTER_MGMT = [
