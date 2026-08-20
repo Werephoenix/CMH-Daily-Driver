@@ -341,6 +341,13 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
    lower card is retired. Kept in the DOM (hidden) as the legacy #dash-sched-content holder. */
 .desk-floor-map{display:none}
 /* v60.87: List/Map segmented toggle in the floor section header */
+/* v60.96: desktop cockpit — main (attention + floor) beside a signals/coming-up rail at >=900px.
+   Mobile keeps a plain block so everything stacks in the original order. */
+.now-cockpit{ display:block; }
+@media (min-width:900px){
+  .now-cockpit{ display:grid; grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr); gap:20px; align-items:start; }
+  .now-rail{ position:sticky; top:60px; }
+}
 .floor-seg{display:inline-flex;background:var(--bg3);border-radius:8px;padding:2px}
 .fseg{background:none;border:none;color:var(--txt3);font-family:var(--ff-ui);font-size:12px;font-weight:700;padding:3px 11px;border-radius:6px;cursor:pointer;line-height:1.4}
 .fseg.on{background:rgba(255,255,255,.16);color:var(--txt)}
@@ -8904,15 +8911,19 @@ function renderNow() {
     html += `</div>`;
   }
 
-  html += opsSignalsHtml(); // v60.60: cancellations → walk-up 1-way signal + counter
+  // v60.96: DESKTOP COCKPIT — at >=900px the secondary info (Today's Signals + Coming up)
+  // becomes a right rail beside the attention card + floor map. On mobile .now-cockpit is a
+  // plain block, so main then rail stack in the SAME order as before (weather stays up top in
+  // main) — mobile layout is byte-identical.
+  let rail = '';
+  rail += opsSignalsHtml(); // v60.60: cancellations → walk-up 1-way signal + counter
+  rail += `<div class="now-sec-hd">Coming up</div><div class="more-group">`;
+  rail += (typeof weekAheadRow==='function' ? weekAheadRow() : ''); // v60.72: week-ahead demand heads-up → calendar
+  rail += `<div class="more-row" style="cursor:default"><span class="more-ic">🍽</span><span class="more-lbl">Next lunch</span><span class="now-floor-val" style="color:var(--up)">${nextLunch?_nowFmtH(nextLunch.at)+' · '+nextLunch.who:'—'}</span></div>`;
+  rail += `<button class="more-row" onclick="showTab('checklist')"><span class="more-ic">✅</span><span class="more-lbl">${ritual} ritual</span><span class="more-ch">›</span></button>`;
+  rail += `</div>`;
 
-  html += `<div class="now-sec-hd">Coming up</div><div class="more-group">`;
-  html += (typeof weekAheadRow==='function' ? weekAheadRow() : ''); // v60.72: week-ahead demand heads-up → calendar
-  html += `<div class="more-row" style="cursor:default"><span class="more-ic">🍽</span><span class="more-lbl">Next lunch</span><span class="now-floor-val" style="color:var(--up)">${nextLunch?_nowFmtH(nextLunch.at)+' · '+nextLunch.who:'—'}</span></div>`;
-  html += `<button class="more-row" onclick="showTab('checklist')"><span class="more-ic">✅</span><span class="more-lbl">${ritual} ritual</span><span class="more-ch">›</span></button>`;
-  html += `</div>`;
-
-  el.innerHTML = html;
+  el.innerHTML = `<div class="now-cockpit"><div class="now-main">${html}</div><div class="now-rail">${rail}</div></div>`;
 }
 
 function autoRoute() { if(typeof autoRouteByTime==="function") autoRouteByTime(); }
