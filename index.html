@@ -2962,12 +2962,12 @@ var ROSTER_CXR = [
   // Mini Carr — resigned. Removed from active roster 2026-05-26.
 
   {id:'laura',    name:'Laura Gonzalez',          nick:'Laura',   role:'CXR',
-   shiftCode:'530A-230P/5P-1A', shiftStart:5.5, shiftEnd:14.5,
-   daysOn:[0,2,3,4,6],  // Sun/Tue/Wed/Thu/Sat — confirmed ✓ marks
-   dayShifts:{0:'530A-230P', 6:'530A-230P', 2:'5P-1A', 3:'5P-1A', 4:'5P-1A'},  // v60.25: AM Sun/Sat, PM Tue/Wed/Thu
+   shiftCode:'530A-230P/530P-2A', shiftStart:5.5, shiftEnd:14.5,
+   daysOn:[0,2,3,4,6],  // Sun/Tue/Wed/Thu/Sat — NEW bid shift #16 SPLIT (2026-08)
+   dayShifts:{0:'530A-230P', 6:'530A-230P', 2:'530P-2A', 3:'530P-2A', 4:'530P-2A'},  // AM Sun/Sat, PM Tue/Wed/Thu (now 5:30p-2a)
    pref:'none', exitFairness:0,
    lunchCode:'30min',
-   notes:'DUAL SHIFT: AM 5:30a-2:30p (Sun/Sat). Evening 5:00p-1:00a (Tue/Wed/Thu). Two patterns.'},
+   notes:'DUAL SHIFT: AM 5:30a-2:30p (Sun/Sat). Evening 5:30p-2:00a (Tue/Wed/Thu). New bid shift #16 split (2026-08).'},
 
   // Guenther Meyer — restored 2026-05-26 (still active, error in prior edit)
   {id:'guenther', name:'Guenther Meyer',          nick:'Guenther',role:'CXR',
@@ -2987,11 +2987,11 @@ var ROSTER_CXR = [
    notes:'Tue-Sat 8:30a-5:00p.'},
 
   {id:'cece',     name:'Ceandra (CeCe) Smith',    nick:'CeCe',    role:'CXR',
-   shiftCode:'830A-500P', shiftStart:8.5, shiftEnd:17.0,
-   daysOn:[1,2,3,4,5],  // Mon-Fri — confirmed from Excel
+   shiftCode:'530A-230P', shiftStart:5.5, shiftEnd:14.5,
+   daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat — NEW bid shift #1 (2026-08), off Tue/Wed
    pref:'none', exitFairness:0,
    lunchCode:'30min',
-   notes:'Mon-Fri 8:30a-5:00p. Off Sat/Sun.'},
+   notes:'5:30a-2:30p. Off Tue/Wed. New bid shift #1 (2026-08 CXR bid).'},
 
   {id:'mariam',   name:'Mariam Mbye',              nick:'Mariam',  role:'CXR',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
@@ -3002,17 +3002,18 @@ var ROSTER_CXR = [
 
   {id:'tt',       name:'Tighisty (TT) Haile',     nick:'TT',      role:'CXR',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
-   daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat — confirmed from Excel
+   daysOn:[0,1,2,3,4],  // Sun-Thu — NEW bid shift #7 (2026-08), off Fri/Sat
    pref:'none', exitFairness:0,
    lunchCode:'30min',
-   notes:'Sun/Mon/Thu/Fri/Sat 10a-6:30p. Last name Haile (not Hale).'},
+   notes:'Sun-Thu 10a-6:30p. Off Fri/Sat. New bid shift #7 (2026-08). Last name Haile (not Hale).'},
 
   {id:'sammi',    name:'Samantha (Sammi) Smith',  nick:'Sammi',   role:'CXR',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
-   daysOn:[1,2,3,5,6],  // Mon/Tue/Wed/Fri/Sat — confirmed from Excel
+   daysOn:[1,2,3,5,6],  // Mon/Tue/Wed/Fri/Sat
    pref:'none', exitFairness:0,
    lunchCode:'30min',
-   notes:'Mon/Tue/Wed/Fri/Sat 10a-6:30p.'},
+   active:false, departedDate:'2026-08-17', departedReason:'No longer with the branch',
+   notes:'ARCHIVED 2026-08-17 — left the branch (data kept). Was Mon/Tue/Wed/Fri/Sat 10a-6:30p.'},
 
   {id:'jay',      name:'JaJuantae (Jay) Young',   nick:'Jay',     role:'CXR',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
@@ -3032,10 +3033,10 @@ var ROSTER_CXR = [
 
   {id:'leslie',   name:'Leslie Hamler',            nick:'Leslie',  role:'CXR',
    shiftCode:'430P-100A', shiftStart:16.5, shiftEnd:25.0,
-   daysOn:[0,1,2,3,6],  // Sun/Mon/Tue/Wed/Sat — confirmed from Excel
+   daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat — NEW bid shift #13 (2026-08), off Tue/Wed
    pref:'none', exitFairness:0,
    lunchCode:'30min',
-   notes:'Sun/Mon/Tue/Wed/Sat 4:30p-1:00a.'},
+   notes:'4:30p-1:00a. Off Tue/Wed. New bid shift #13 (2026-08).'},
 
   {id:'feven',    name:'Feven Dubale',             nick:'Feven',   role:'CXR',
    shiftCode:'600P-100A', shiftStart:18.0, shiftEnd:25.0,
@@ -3050,6 +3051,14 @@ var ROSTER_CXR = [
    pref:'none', exitFairness:0,
    lunchCode:'30min',
    notes:'Fri/Sat confirmed. Sparse/variable schedule. 4:30p-1:00a. Part-time.'},
+
+  // v60.97: NEW HIRE (2026-08 CXR bid). Corey — bid shift #11, noon-8p, off Thu/Fri.
+  {id:'corey',    name:'Corey',                    nick:'Corey',   role:'CXR',
+   shiftCode:'12P-800P', shiftStart:12.0, shiftEnd:20.0,
+   daysOn:[0,1,2,3,6],  // Sun/Mon/Tue/Wed/Sat — off Thu/Fri
+   pref:'none', exitFairness:0, _new:true,
+   lunchCode:'30min',
+   notes:'New hire 2026-08. Noon-8:00p. Off Thu/Fri. Bid shift #11. Last name TBD.'},
 
   // ═══ EXIT AGENTS — Full shift at Exit, no counter rotation ══════════════════,
 ];
