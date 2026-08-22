@@ -266,6 +266,7 @@ body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 .stf-btn.stf-archbtn{ color: var(--txt3); }
 .stf-btn.stf-reinst{ color: var(--accent); border-color: rgba(35,201,131,.4); }
 .stf-new{ font-size: 9px; background: rgba(48,209,88,.14); color: var(--wu); border-radius: 3px; padding: 1px 5px; margin-left: 5px; font-weight: 800; }
+.stf-leave{ font-size: 9px; background: rgba(255,204,0,.14); color: var(--up); border-radius: 3px; padding: 1px 5px; margin-left: 5px; font-weight: 800; letter-spacing:.03em; } /* v60.101: on-leave badge */
 .more-ch { color: var(--txt3); font-size: 20px; }
 
 /* Now hero (v60.43) */
@@ -3029,7 +3030,7 @@ var ROSTER_CXR = [
    daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat
    pref:'none', exitFairness:0,
    lunchCode:'30min',
-   active:false, departedDate:'2026-08-20', departedReason:'On leave — returning',
+   active:false, onLeave:true, departedDate:'2026-08-20', departedReason:'On leave — returning',
    notes:'ON LEAVE 2026-08-20 (returning) — off the active schedule while out; Reinstate when back. Was Sun/Mon/Thu/Fri/Sat 4:30p-1:00a.'},
 
   {id:'leslie',   name:'Leslie Hamler',            nick:'Leslie',  role:'CXR',
@@ -3098,7 +3099,8 @@ var ROSTER_RETURNS = [
 
 
 var ROSTER_EXIT = [
-  // v60.99: Zina + Fatuma are the ONLY current exit agents (Matt 2026-08-20); all others quit → archived, data kept.
+  // v60.99/101: current exit agents = Zina + Fatuma (set shifts) + Duria (still here, shift TBD).
+  // Lisa quit → archived, data kept (Matt 2026-08-20).
   {id:'zina', name:'Zina Kellen', nick:'Zina', role:'EXIT',
    daysOn:[0,1,4,5,6], shiftStart:10, shiftEnd:18,
    shiftCode:'10A-600P',
@@ -3107,16 +3109,16 @@ var ROSTER_EXIT = [
    daysOn:[0,1,2,3,6], shiftStart:7, shiftEnd:16,
    shiftCode:'7A-400P',
    notes:'Exit agent. Sat–Wed (off Thu/Fri). 7a-4p. No counter rotation. Last name TBD.', active:true},
+  {id:'duria', name:'Duria', nick:'Duria', role:'EXIT',
+   daysOn:[], shiftStart:18, shiftEnd:26.5,
+   shiftCode:'TBD',
+   active:true, _new:true,
+   notes:'Exit agent (still here). Evening. Shift TBD — Matt to provide. No counter rotation.'},
   {id:'lisa_exit', name:'Lisa (Exit)', nick:'Lisa', role:'EXIT',
    daysOn:[0], shiftStart:16.5, shiftEnd:24.5,
    shiftCode:'430P-1230A',
    active:false, departedDate:'2026-08-20', departedReason:'Quit',
    notes:'ARCHIVED 2026-08-20 — quit (data kept). Was Sunday-only 4:30p-12:30a.'},
-  {id:'duria', name:'Duria', nick:'Duria', role:'EXIT',
-   daysOn:[], shiftStart:18, shiftEnd:26.5,
-   shiftCode:'TBD',
-   active:false, departedDate:'2026-08-20', departedReason:'Quit',
-   notes:'ARCHIVED 2026-08-20 — quit (data kept). Was a new evening exit agent; schedule never finalized.'},
 ];
 
 var ROSTER_MGMT = [
@@ -12592,29 +12594,38 @@ function buildAdminStaffList() {
     if (w.length===1) return w[0].slice(0,2).toUpperCase();
     return '—';
   }
-  function row(p, archived){
+  // v60.101: mode = 'active' | 'leave' | 'former'
+  function row(p, mode){
+    const archived = (mode!=='active');
     const col=roleColor(p.role);
     const nm=p.nick||(p.name||'').split(' ')[0];
     const isNew = (!archived && p._new) ? ' <span class="stf-new">NEW</span>' : '';
+    const leaveTag = (mode==='leave') ? ' <span class="stf-leave">ON LEAVE</span>' : '';
     const sub = archived
-      ? 'Left '+(p.departedDate||'—')+(p.departedReason?(' · '+p.departedReason):'')
+      ? (mode==='leave' ? 'Since ' : 'Left ')+(p.departedDate||'—')+(p.departedReason?(' · '+p.departedReason):'')
       : (p.role+' · '+(p.shiftCode||'varies'));
     return `<div class="stf-row${archived?' stf-arch':''}">
       <span class="stf-av" style="background:color-mix(in srgb, ${col} 22%, transparent);color:${col}">${initials(p)}</span>
-      <span class="stf-main"><span class="stf-name">${nm}${isNew}</span><span class="stf-sub">${sub}</span></span>
+      <span class="stf-main"><span class="stf-name">${nm}${isNew}${leaveTag}</span><span class="stf-sub">${sub}</span></span>
       ${archived
-        ? `<button class="stf-btn stf-reinst" onclick="reinstateStaff('${p.id}')">Reinstate</button>`
+        ? `<button class="stf-btn stf-reinst" onclick="reinstateStaff('${p.id}')">${mode==='leave'?'Back':'Reinstate'}</button>`
         : `<button class="stf-btn" onclick="showEditStaffModal('${p.id}')">Edit</button>`
           +`<button class="stf-btn stf-archbtn" onclick="archiveStaff('${p.id}')">Archive</button>`}
     </div>`;
   }
   const active = getEffectiveRoster();
-  const archived = (typeof getArchivedRoster==='function') ? getArchivedRoster() : [];
+  const archivedAll = (typeof getArchivedRoster==='function') ? getArchivedRoster() : [];
+  const onLeave = archivedAll.filter(p=>p.onLeave);
+  const former  = archivedAll.filter(p=>!p.onLeave);
   let html = '<div class="now-sec-hd" style="margin:2px 0 6px 2px">Roster · '+active.length+' active</div>'
-    + '<div class="stf-group">' + active.map(p=>row(p,false)).join('') + '</div>';
-  if (archived.length) {
-    html += '<div class="now-sec-hd" style="margin:16px 0 6px 2px">Former staff · '+archived.length+'</div>'
-      + '<div class="stf-group">' + archived.map(p=>row(p,true)).join('') + '</div>';
+    + '<div class="stf-group">' + active.map(p=>row(p,'active')).join('') + '</div>';
+  if (onLeave.length) {
+    html += '<div class="now-sec-hd" style="margin:16px 0 6px 2px">🌴 On leave · '+onLeave.length+'</div>'
+      + '<div class="stf-group">' + onLeave.map(p=>row(p,'leave')).join('') + '</div>';
+  }
+  if (former.length) {
+    html += '<div class="now-sec-hd" style="margin:16px 0 6px 2px">Former staff · '+former.length+'</div>'
+      + '<div class="stf-group">' + former.map(p=>row(p,'former')).join('') + '</div>';
   }
   el.innerHTML = html;
 }
@@ -12758,25 +12769,28 @@ function removeStaff(id) {
 function archiveStaff(id) {
   const p = getEffectiveRoster().find(x=>x.id===id);
   const nm = p ? (p.nick || (p.name||'').split(' ')[0]) : 'this person';
-  const reason = prompt('Archive '+nm+' — they left the branch.\nReason (optional, kept for your records):', '');
+  // v60.101: distinguish a temporary LEAVE (returning) from a permanent departure.
+  const onLeave = confirm('Is '+nm+' on TEMPORARY leave (coming back)?\n\n  OK  = On leave (returning)\n  Cancel = Left the branch');
+  const reason = prompt((onLeave?'On leave':'Left the branch')+' — '+nm+'. Reason (optional, kept for your records):',
+                        onLeave ? 'On leave — returning' : '');
   if (reason === null) return; // cancelled
   if (!STATE.adminRoster) STATE.adminRoster = [];
   const today = new Date().toISOString().slice(0,10);
-  const patch = { active:false, departedDate:today, departedReason:(reason||'').trim() };
+  const patch = { active:false, onLeave:!!onLeave, departedDate:today, departedReason:(reason||'').trim() };
   const idx = STATE.adminRoster.findIndex(o=>o.id===id);
   if (idx>=0) STATE.adminRoster[idx] = Object.assign(STATE.adminRoster[idx], patch);
   else STATE.adminRoster.push(Object.assign({ id }, patch));
   saveState();
-  if (typeof logAction === 'function') logAction('Archived '+nm+(reason?(' — '+reason.trim()):''));
+  if (typeof logAction === 'function') logAction((onLeave?'On leave: ':'Archived ')+nm+(reason?(' — '+reason.trim()):''));
   rebuildRosters();
   buildAdminStaffList();
   if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
   if (typeof refreshDash === 'function') refreshDash();
-  toast(nm+' archived — data kept');
+  toast(nm+(onLeave?' set to on-leave' : ' archived')+' — data kept');
 }
 function reinstateStaff(id) {
   if (!STATE.adminRoster) STATE.adminRoster = [];
-  const patch = { active:true, departedDate:null, departedReason:null };
+  const patch = { active:true, onLeave:false, departedDate:null, departedReason:null };
   const idx = STATE.adminRoster.findIndex(o=>o.id===id);
   if (idx>=0) STATE.adminRoster[idx] = Object.assign(STATE.adminRoster[idx], patch);
   else STATE.adminRoster.push(Object.assign({ id }, patch));
