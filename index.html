@@ -18947,14 +18947,14 @@ function asBuildWeek(seed){
         var w = _asParseWin(code); if(w){ start=w[0]; end=w[1]; }
       }
       if(start==null) return; // e.g. Duria TBD — skip until known
-      people.push({nick:p.nick||p.name, role:p.role, start:start, end:end, win:code, proposed:false});
+      people.push({nick:p.nick||p.name, name:p.name, role:p.role, start:start, end:end, win:code, proposed:false});
     });
     // 2) Area Managers (fixed 8A-6P on their days).
     roster.forEach(function(p){
       if(p.role!=='ARM') return;
       if(!_asMgrWorksDay(p, dow, seed)) return;
       var w = _asParseWin(p.patternWindows && p.patternWindows[0] || '8A-6P') || [8,18];
-      people.push({nick:p.nick||p.name, role:'ARM', start:w[0], end:w[1], win:p.patternWindows?p.patternWindows[0]:'8A-6P', proposed:false, sunEO:(dow===0)});
+      people.push({nick:p.nick||p.name, name:p.name, role:'ARM', start:w[0], end:w[1], win:p.patternWindows?p.patternWindows[0]:'8A-6P', proposed:false, sunEO:(dow===0)});
     });
     // 3) Rotating managers (BRM/ABRM/MT) — the PROPOSED piece. One window each,
     //    biased so index 0 opens and index 1 closes; rest fill mids. Rotated by
@@ -18969,7 +18969,7 @@ function asBuildWeek(seed){
       var win = priority[i] || '8A-6P';
       if(p.patternWindows.indexOf(win)<0) win = p.patternWindows[i % p.patternWindows.length];
       var w = _asParseWin(win) || [8,18];
-      people.push({nick:p.nick||p.name, role:p.role, start:w[0], end:w[1], win:win, proposed:true});
+      people.push({nick:p.nick||p.name, name:p.name, role:p.role, start:w[0], end:w[1], win:win, proposed:true});
     });
     // Coverage check per block vs COVERAGE_BY_HOUR.
     var exitCnt = people.filter(function(x){return x.role==='EXIT';}).length;
@@ -19068,8 +19068,9 @@ function openAutoScheduler(){
   '</div>' +
   '<div class="as-body">' +
     '<div class="as-tools">' +
-      '<button class="as-btn pri" onclick="_asSeed++; openAutoScheduler();">↻ Regenerate</button>' +
-      '<span class="as-note">CXR / Exit / Returns are placed from their bids. <b style="color:var(--up,#FFCC00)">◇ proposed</b> = a manager slot the scheduler filled — adjust as needed.</span>' +
+      '<button class="as-btn pri" onclick="asApplyWeek()">✓ Apply week →</button>' +
+      '<button class="as-btn" onclick="_asSeed++; openAutoScheduler();">↻ Regenerate</button>' +
+      '<span class="as-note">CXR / Exit / Returns are placed from their bids. <b style="color:var(--up,#FFCC00)">◇ proposed</b> = a manager slot the scheduler filled — adjust as needed. <b>Apply</b> writes this draft into the upcoming Sun–Sat schedule (undo any day in Setup → Edit Schedule).</span>' +
     '</div>' +
     '<div class="as-grid">' + daysHtml + '</div>' +
     '<p class="as-note" style="margin-top:14px">Coverage chips read against the branch floor targets (E = exit, C = counter, R = returns) for each block. ⚠ = below minimum for that block. This is a starting draft — the real week still runs through the schedule editor.</p>' +
@@ -19079,6 +19080,45 @@ function openAutoScheduler(){
   o.innerHTML=html; o.style.display='flex'; document.body.style.overflow='hidden';
 }
 function closeAutoScheduler(){ var o=document.getElementById('as-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+
+// v60.108: write the current draft into STATE.scheduleOverrides for the upcoming
+// Sun–Sat week. Positive assignments only ([start,end] per person) — people not
+// in the draft fall back to base/roster, and nothing is force-marked OFF. Fully
+// reversible per-day via Setup → Schedule editor ("Reset this day"). Requires
+// confirm; if a written date is today, live "today" reloads.
+function _asDateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function asApplyWeek(){
+  var wk = asBuildWeek(_asSeed);
+  var today = new Date(); today.setHours(0,0,0,0);
+  var daysUntilSun = (7 - today.getDay()) % 7;     // 0 if today is Sunday
+  var sunday = new Date(today); sunday.setDate(today.getDate()+daysUntilSun);
+  var endSat = new Date(sunday); endSat.setDate(sunday.getDate()+6);
+  var totalAssign = wk.days.reduce(function(n,d){return n + d.people.length;},0);
+  var range = _asDateKey(sunday) + ' → ' + _asDateKey(endSat);
+  if(!confirm('Apply this draft to the week '+range+'?\n\n'+totalAssign+' shift assignments will be written into the schedule '+
+    '(managers included). Existing people keep their base shift unless the draft changes it — no one is force-marked OFF. '+
+    'You can undo any day in Setup → Edit Schedule ("Reset this day").')){ return; }
+  if(!STATE.scheduleOverrides) STATE.scheduleOverrides = {};
+  var touchedToday = false;
+  var todayK = _asDateKey(today);
+  wk.days.forEach(function(d, i){
+    var dt = new Date(sunday); dt.setDate(sunday.getDate()+i);
+    var key = _asDateKey(dt);
+    if(!STATE.scheduleOverrides[key]) STATE.scheduleOverrides[key] = {};
+    d.people.forEach(function(p){
+      if(!p.name || p.start==null || p.end==null) return;
+      var pid = p.name.replace(/\s/g,'_');
+      STATE.scheduleOverrides[key][pid] = [p.start, p.end];
+    });
+    if(key === todayK) touchedToday = true;
+  });
+  if(typeof saveState==='function') saveState();
+  if(touchedToday && typeof loadScheduleForToday==='function') loadScheduleForToday(false);
+  if(typeof toast==='function') toast('✓ Draft applied to '+range);
+  closeAutoScheduler();
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETUP HUB (v60.79) — self-service "finish": one discoverable place showing the
