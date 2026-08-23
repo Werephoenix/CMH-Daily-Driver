@@ -1807,6 +1807,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="showTab('paste')"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📋</span><span class="more-lbl">Paste Data</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('inventory')"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🔢</span><span class="more-lbl">Physical Inventory</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('reference')"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openEmeraldGuide()"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">💚</span><span class="more-lbl">Emerald Club<span class="more-sub">LOS by tier · MOD codes · aisle rules</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('history')"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openMasterCalendar()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">📅</span><span class="more-lbl">Master Calendar</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openScheduleLog()"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
@@ -18699,6 +18700,104 @@ function openBackup(){
   o.style.display='flex'; bkRender(); document.body.style.overflow='hidden';
 }
 function closeBackup(){ var o=document.getElementById('bk-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.105: EMERALD CLUB CHEAT-SHEET — in-app quick reference for the aisle/exit
+// booth (source: Enterprise "Emerald Club Program" Airport Operations, 2026-08).
+// Level of service by tier, aisle stocking rules, MOD delivery codes, greeting
+// scripts, membership tiers, booth standards. Read-only reference overlay.
+// ═══════════════════════════════════════════════════════════════════════════
+var _ecStyled=false;
+function ecInjectStyle(){
+  if(_ecStyled) return; _ecStyled=true;
+  var css=
+   '.ec-overlay{position:fixed;inset:0;z-index:9994;background:#000;display:none;flex-direction:column;font-family:-apple-system,"SF Pro Text",system-ui,Roboto,sans-serif}'
+  +'.ec-head{display:flex;align-items:center;padding:16px 18px 12px;border-bottom:1px solid rgba(255,255,255,.08)}'
+  +'.ec-kick{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8E8E93}.ec-title{font-size:22px;font-weight:700;color:#fff}'
+  +'.ec-x{margin-left:auto;background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:50%;width:34px;height:34px;font-size:15px;cursor:pointer}'
+  +'.ec-body{flex:1;overflow:auto;padding:16px;max-width:760px;margin:0 auto;width:100%}'
+  +'.ec-sech{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8E8E93;margin:20px 0 8px 2px}'
+  +'.ec-card{background:#1C1C1E;border:1px solid #38383A;border-radius:12px;padding:12px 14px;margin-bottom:8px}'
+  +'.ec-tier{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}'
+  +'.ec-badge{font-size:10px;font-weight:800;letter-spacing:.04em;padding:2px 7px;border-radius:5px}'
+  +'.ec-name{font-size:15px;font-weight:700;color:#fff}'
+  +'.ec-line{font-size:13px;color:#EBEBF5;line-height:1.5}.ec-line b{color:#fff}.ec-mut{color:#8E8E93}'
+  +'.ec-mod{display:grid;grid-template-columns:44px 1fr;gap:2px 10px;font-size:13px;color:#EBEBF5;align-items:baseline}'
+  +'.ec-mod b{color:#23C983;font-weight:800;font-family:ui-monospace,Menlo,monospace}'
+  +'.ec-li{font-size:13px;color:#EBEBF5;line-height:1.6;padding-left:16px;position:relative}.ec-li:before{content:"•";position:absolute;left:2px;color:#8E8E93}'
+  +'.ec-quote{font-size:13px;color:#EBEBF5;font-style:italic;line-height:1.5}';
+  var s=document.createElement('style'); s.textContent=css; document.head.appendChild(s);
+}
+function _ecTier(badge,bg,col,name,lines){
+  return '<div class="ec-card"><div class="ec-tier"><span class="ec-badge" style="background:'+bg+';color:'+col+'">'+badge+'</span><span class="ec-name">'+name+'</span></div>'
+    + lines.map(function(l){return '<div class="ec-line">'+l+'</div>';}).join('') + '</div>';
+}
+function openEmeraldGuide(){
+  ecInjectStyle();
+  var o=document.getElementById('ec-overlay');
+  if(!o){ o=document.createElement('div'); o.id='ec-overlay'; o.className='ec-overlay'; document.body.appendChild(o); }
+  o.innerHTML='<div class="ec-head"><div><div class="ec-kick">Reference · Airport Ops</div><div class="ec-title">Emerald Club — who gets what</div></div><button class="ec-x" onclick="closeEmeraldGuide()">✕</button></div>'
+    +'<div class="ec-body">'
+    +'<div class="ec-sech">Level of service — the car they get</div>'
+    +_ecTier('EC','rgba(48,209,88,.16)','#30D158','Emerald Club',[
+        '<b>Reserve</b> ICAR · <b>Drive</b> any car on the Aisle (min ICAR) · <b>Pay</b> ICAR.',
+        '<span class="ec-mut">Off the Aisle: reserve any class except ICAR → drive/pay the car reserved.</span>'])
+    +_ecTier('CE','rgba(10,132,255,.16)','#0A84FF','Executive',[
+        '<b>Guaranteed FCAR or larger</b> — even on an ICAR reservation. <b>Pay</b> ICAR.',
+        'Executive area: drive any car there (min FCAR).',
+        '<span class="ec-mut">Reserve-service (non-ICAR/FCAR): pay ONE class LESS than the car driven (full-size→luxury).</span>'])
+    +_ecTier('EE','rgba(175,156,255,.16)','#AF9CFF','Executive Elite',[
+        'Everything Executive gets, <b>plus FBO delivery</b> + guaranteed vehicle on 24-hr notice.',
+        'Same LOS: FCAR or larger, pay ICAR (or one class less than driven on reserve-service).'])
+    +_ecTier('EV','rgba(255,204,0,.16)','#FFCC00','VIP',[
+        '<b>Pay one class LESS</b> than the car driven (full-size→luxury); ICAR-or-lower = pay what you drive.',
+        'Eligible for Meet &amp; Greet, FBO, Local Delivery, Reserve (Greet).'])
+    +'<div class="ec-sech">Aisle &amp; Executive stocking</div>'
+    +'<div class="ec-card">'
+      +'<div class="ec-li"><b>Aisle</b> — stock ICAR or larger.</div>'
+      +'<div class="ec-li"><b>Executive</b> — stock FCAR or larger.</div>'
+      +'<div class="ec-li">Mileage under 20,000; no visible damage; Complete Clean Pledge.</div>'
+      +'<div class="ec-li">No licensee vehicles. Vans/SUVs OK but not the only choice; vans ≤10% of the mix.</div>'
+    +'</div>'
+    +'<div class="ec-sech">Method of Delivery (MOD) codes — on the reservation</div>'
+    +'<div class="ec-card ec-mod">'
+      +'<b>EA</b><span>Emerald Aisle</span>'
+      +'<b>ES</b><span>Executive Selection</span>'
+      +'<b>EB</b><span>Emerald Booth Service / Priority</span>'
+      +'<b>EC</b><span>Emerald Counter</span>'
+      +'<b>FB</b><span>FBO Delivery Service</span>'
+      +'<b>MG</b><span>Meet &amp; Greet</span>'
+      +'<b>GR</b><span>Reserve (Greet) Service</span>'
+      +'<b>LD</b><span>Local Delivery</span>'
+      +'<b>VA</b><span>Virtual Aisle / Emerald Checkout <span class="ec-mut">(set at time of rental)</span></span>'
+    +'</div>'
+    +'<div class="ec-sech">Membership tiers (auto-upgrade by annual rentals / days)</div>'
+    +'<div class="ec-card">'
+      +'<div class="ec-line"><b>Emerald Club</b> — 0–11 rentals / 1–39 days.</div>'
+      +'<div class="ec-line"><b>Executive</b> — 12–24 / 40–84. Guaranteed up to FCAR (48-hr notice); one class less on FCAR–LCAR.</div>'
+      +'<div class="ec-line"><b>Executive Elite</b> — 25+ / 85+. Above + FBO delivery + guaranteed (up to FCAR) on 24-hr notice.</div>'
+    +'</div>'
+    +'<div class="ec-sech">Greeting by tier</div>'
+    +'<div class="ec-card">'
+      +'<div class="ec-quote">EC — "Mr./Mrs. (Name), thank you for being an EC member and customer. We appreciate your business."</div><br>'
+      +'<div class="ec-quote">Executive — "Mr./Mrs. (Name), I see you are an EC Executive member. We value your continued business."</div><br>'
+      +'<div class="ec-quote">Executive Elite — "Mr./Mrs. (Name), I see you are an EC Executive Elite member."</div>'
+    +'</div>'
+    +'<div class="ec-sech">Exit-booth standards</div>'
+    +'<div class="ec-card">'
+      +'<div class="ec-li">Fewer than <b>5 cars in line</b>; under a <b>5-minute wait</b> to exit.</div>'
+      +'<div class="ec-li">No upsell charge unless the customer picks larger than what\'s on the Aisle/Executive.</div>'
+      +'<div class="ec-li">Use the brand name + customer name <b>twice</b>; offer GPS/SXM; ask if they need anything else.</div>'
+    +'</div>'
+    +'<div class="ec-sech">Aisle &amp; Executive hours (recommended)</div>'
+    +'<div class="ec-card">'
+      +'<div class="ec-line">Open <b>7:00a–11:00p</b>, 7 days (later if the exit booth is staffed later).</div>'
+      +'<div class="ec-line ec-mut">ECSS staffing: Sun 3:00p–11:00p · Mon–Wed 7:00a–11:00p · Thu 7:00a–3:00p.</div>'
+    +'</div>'
+    +'<div style="height:24px"></div></div>';
+  o.style.display='flex'; document.body.style.overflow='hidden';
+}
+function closeEmeraldGuide(){ var o=document.getElementById('ec-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETUP HUB (v60.79) — self-service "finish": one discoverable place showing the
