@@ -19005,6 +19005,37 @@ function asBuildWeek(seed){
   return {days:days, seed:seed};
 }
 
+// v60.109: short-rest / "clopening" detector. Per the shift-science brief
+// (Grimoire 2026-08-23), <11h between consecutive shifts is a harmful "quick
+// return"; a close→open turnaround (e.g. 4P-C then 5:30A) is the worst case.
+// Walk each person across the draft week and flag adjacent days with rest <11h.
+var AS_MIN_REST = 11, AS_TARGET_REST = 12;
+function asRestWarnings(wk){
+  var byName = {};
+  wk.days.forEach(function(d){
+    d.people.forEach(function(p){
+      if(!p.name) return;
+      if(!byName[p.name]) byName[p.name] = {};
+      byName[p.name][d.dow] = {start:p.start, end:p.end, nick:p.nick, role:p.role};
+    });
+  });
+  var warns = [];
+  Object.keys(byName).forEach(function(name){
+    var days = byName[name];
+    for(var dow=0; dow<6; dow++){
+      var a = days[dow], b = days[dow+1];
+      if(!a || !b) continue;
+      var rest = (b.start + 24) - a.end;   // a.end may be >24 (overnight)
+      if(rest < AS_MIN_REST){
+        warns.push({nick:a.nick||name, role:a.role, dowA:dow, dowB:dow+1, rest:rest,
+          aWin:_asHr(a.start)+'–'+_asHr(a.end), bWin:_asHr(b.start)+'–'+_asHr(b.end)});
+      }
+    }
+  });
+  warns.sort(function(x,y){return x.rest-y.rest;});
+  return warns;
+}
+
 function asInjectStyle(){
   if(_asStyled) return; _asStyled=true;
   var css = '' +
@@ -19018,6 +19049,13 @@ function asInjectStyle(){
   '.as-btn{border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;background:var(--bg3,#2C2C2E);color:var(--txt,#fff)}' +
   '.as-btn.pri{background:var(--accent,#23C983);color:#00301c}' +
   '.as-note{font-size:11.5px;color:var(--txt3,rgba(235,235,245,.5));line-height:1.5}' +
+  '.as-warn{background:rgba(255,69,58,.1);border:1px solid rgba(255,69,58,.4);border-radius:12px;padding:12px 13px;margin-bottom:14px}' +
+  '.as-warn h4{margin:0 0 8px;font-size:13px;font-weight:800;color:var(--na,#FF453A);display:flex;align-items:center;gap:7px}' +
+  '.as-warn .wl{font-size:12px;color:var(--txt,#fff);padding:4px 0;line-height:1.45;border-top:1px solid rgba(255,69,58,.15)}' +
+  '.as-warn .wl:first-of-type{border-top:none}' +
+  '.as-warn .wr{color:var(--na,#FF453A);font-weight:700}' +
+  '.as-warn.clear{background:rgba(35,201,131,.1);border-color:rgba(35,201,131,.35)}' +
+  '.as-warn.clear h4{color:var(--accent,#23C983)}' +
   '.as-day{background:var(--bg2,#1C1C1E);border:1px solid var(--bdr,#38383A);border-radius:12px;padding:12px 13px;margin-bottom:12px}' +
   '.as-day h3{font-size:15px;font-weight:800;margin:0 0 8px;color:var(--txt,#fff);display:flex;align-items:center;gap:8px}' +
   '.as-cov{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 10px}' +
@@ -19043,6 +19081,17 @@ function _asRoleColor(r){
 function openAutoScheduler(){
   asInjectStyle();
   var wk = asBuildWeek(_asSeed);
+  var warns = asRestWarnings(wk);
+  var warnHtml;
+  if(warns.length){
+    warnHtml = '<div class="as-warn"><h4>⚠ '+warns.length+' short-rest turnaround'+(warns.length>1?'s':'')+' (under '+AS_MIN_REST+'h rest)</h4>' +
+      warns.map(function(w){
+        return '<div class="wl">'+w.nick+' — '+AS_DOW[w.dowA]+' <b>'+w.aWin+'</b> → '+AS_DOW[w.dowB]+' <b>'+w.bWin+'</b> · <span class="wr">only '+(Math.round(w.rest*10)/10)+'h rest</span></div>';
+      }).join('') +
+      '<p class="as-note" style="margin-top:8px">Aim for ≥'+AS_MIN_REST+'h between shifts (≥'+AS_TARGET_REST+'h ideal). Close→open flips like these are the ones to smooth out — try ↻ Regenerate, or hand-adjust these managers.</p></div>';
+  } else {
+    warnHtml = '<div class="as-warn clear"><h4>✓ No short-rest turnarounds</h4><p class="as-note" style="margin:0">Everyone gets at least '+AS_MIN_REST+'h between shifts this week.</p></div>';
+  }
   var daysHtml = wk.days.map(function(d){
     var covHtml = d.cov.map(function(c){
       if(c.closed) return '<span class="as-chip closed">'+c.lbl+' · closed</span>';
@@ -19072,6 +19121,7 @@ function openAutoScheduler(){
       '<button class="as-btn" onclick="_asSeed++; openAutoScheduler();">↻ Regenerate</button>' +
       '<span class="as-note">CXR / Exit / Returns are placed from their bids. <b style="color:var(--up,#FFCC00)">◇ proposed</b> = a manager slot the scheduler filled — adjust as needed. <b>Apply</b> writes this draft into the upcoming Sun–Sat schedule (undo any day in Setup → Edit Schedule).</span>' +
     '</div>' +
+    warnHtml +
     '<div class="as-grid">' + daysHtml + '</div>' +
     '<p class="as-note" style="margin-top:14px">Coverage chips read against the branch floor targets (E = exit, C = counter, R = returns) for each block. ⚠ = below minimum for that block. This is a starting draft — the real week still runs through the schedule editor.</p>' +
   '</div>';
