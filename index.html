@@ -18889,8 +18889,22 @@ function closeEmeraldGuide(){ var o=document.getElementById('ec-overlay'); if(o)
 // planner: coverage is checked against FLOOR_TARGETS/COVERAGE_BY_HOUR per block and
 // gaps are flagged. "Regenerate" reshuffles the manager rotation seed.
 // ═══════════════════════════════════════════════════════════════════════════
-var _asSeed = 0, _asStyled = false;
+var _asSeed = 0, _asStyled = false, _asWeekOffset = 0;
 var AS_DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var AS_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+// v60.113: the draft plans a SPECIFIC dated week. offset 0 = the upcoming Sun–Sat
+// (this week if today is Sunday), 1 = the week after, etc.
+function _asWeekStart(){
+  var today = new Date(); today.setHours(0,0,0,0);
+  var daysUntilSun = (7 - today.getDay()) % 7;
+  var sun = new Date(today); sun.setDate(today.getDate() + daysUntilSun + _asWeekOffset*7);
+  return sun;
+}
+function _asDateKeyOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function _asWeekRangeLabel(){
+  var s=_asWeekStart(), e=new Date(s); e.setDate(s.getDate()+6);
+  return AS_MON[s.getMonth()]+' '+s.getDate()+'–'+(s.getMonth()===e.getMonth()?e.getDate():(AS_MON[e.getMonth()]+' '+e.getDate()));
+}
 
 function _asHr(h){
   if(h==null) return '?';
@@ -18941,8 +18955,26 @@ function asBuildWeek(seed){
   var roster = (typeof getEffectiveRoster==='function') ? getEffectiveRoster() : [];
   var days = [];
   var mgrPrev = {};   // pid -> {dow, end} of the manager's most recent worked day
+  var weekStart = _asWeekStart();
   for(var dow=0; dow<7; dow++){
     var people = [];
+    // Real date for this day of the planned week (date-aware, v60.113).
+    var dateObj = new Date(weekStart); dateObj.setDate(weekStart.getDate()+dow);
+    var dateKey = _asDateKeyOf(dateObj);
+    var dateLabel = AS_MON[dateObj.getMonth()]+' '+dateObj.getDate();
+    // Time-off / PTO: anyone marked OFF/VACA (or in a PTO store) for this DATE is
+    // not schedulable. This is the hook the PTO tracker will feed once we have it.
+    var offSet = {};
+    try{
+      var sched = (typeof getScheduleForDate==='function') ? getScheduleForDate(dateKey) : null;
+      if(sched) Object.keys(sched).forEach(function(pid){ if(/OFF|VACA|PTO/i.test(String(sched[pid]))) offSet[pid] = true; });
+    }catch(e){}
+    try{ // optional future PTO store: STATE.pto[dateKey] = {pid:true,...} or [pid,...]
+      var pto = (STATE.pto||{})[dateKey];
+      if(Array.isArray(pto)) pto.forEach(function(pid){ offSet[pid]=true; });
+      else if(pto && typeof pto==='object') Object.keys(pto).forEach(function(pid){ if(pto[pid]) offSet[pid]=true; });
+    }catch(e){}
+    var _isOff = function(name){ return !!offSet[(name||'').replace(/\s/g,'_')]; };
     // 1) Fixed-shift staff: CXR / EXIT / RETURNS — placed exactly as bid.
     roster.forEach(function(p){
       if(['CXR','EXIT','RETURNS'].indexOf(p.role)<0) return;
@@ -18953,12 +18985,14 @@ function asBuildWeek(seed){
         var w = _asParseWin(code); if(w){ start=w[0]; end=w[1]; }
       }
       if(start==null) return; // e.g. Duria TBD — skip until known
+      if(_isOff(p.name)) return; // off / PTO this date
       people.push({nick:p.nick||p.name, name:p.name, role:p.role, start:start, end:end, win:code, proposed:false});
     });
     // 2) Area Managers (fixed 8A-6P on their days).
     roster.forEach(function(p){
       if(p.role!=='ARM') return;
       if(!_asMgrWorksDay(p, dow, seed)) return;
+      if(_isOff(p.name)) return; // off / PTO this date
       var w = _asParseWin(p.patternWindows && p.patternWindows[0] || '8A-6P') || [8,18];
       people.push({nick:p.nick||p.name, name:p.name, role:'ARM', start:w[0], end:w[1], win:p.patternWindows?p.patternWindows[0]:'8A-6P', proposed:false, sunEO:(dow===0)});
     });
@@ -18968,7 +19002,7 @@ function asBuildWeek(seed){
     //    turnaround, and lean forward (a late finish never gets an early start
     //    the next day). Still one window each, still cover an opener + a closer.
     var pool = roster.filter(function(p){
-      return ['BRM','ABRM','MT'].indexOf(p.role)>=0 && p.patternWindows && _asMgrWorksDay(p,dow,seed);
+      return ['BRM','ABRM','MT'].indexOf(p.role)>=0 && p.patternWindows && _asMgrWorksDay(p,dow,seed) && !_isOff(p.name);
     });
     if(pool.length){
       var order = pool.map(function(_,i){ return pool[(i+dow+seed) % pool.length]; }); // rotate for fairness
@@ -19053,9 +19087,10 @@ function asBuildWeek(seed){
     });
     // sort people by start time for readability
     people.sort(function(a,b){return a.start-b.start;});
-    days.push({dow:dow, label:AS_DOW[dow], people:people, cov:cov});
+    var offCount = Object.keys(offSet).length;
+    days.push({dow:dow, label:AS_DOW[dow], date:dateKey, dateLabel:dateLabel, offCount:offCount, people:people, cov:cov});
   }
-  return {days:days, seed:seed};
+  return {days:days, seed:seed, weekStart:_asDateKeyOf(weekStart)};
 }
 
 // v60.109: short-rest / "clopening" detector. Per the shift-science brief
@@ -19160,19 +19195,21 @@ function openAutoScheduler(){
         '<span class="as-tm">'+_asHr(p.start)+'–'+_asHr(p.end)+'</span>' +
       '</div>';
     }).join('') || '<div class="as-note">No one scheduled.</div>';
-    return '<div class="as-day"><h3>'+d.label+' <span class="as-note">· '+d.people.length+' staff</span></h3>' +
+    return '<div class="as-day"><h3>'+d.label+' <span style="font-weight:600;color:var(--txt3,rgba(235,235,245,.55))">'+d.dateLabel+'</span> <span class="as-note">· '+d.people.length+' staff'+(d.offCount?' · '+d.offCount+' off':'')+'</span></h3>' +
       '<div class="as-cov">'+covHtml+'</div>' + rowsHtml + '</div>';
   }).join('');
   var html =
   '<div class="as-hd">' +
-    '<div><div class="as-eyebrow">Planner · beta</div><h2>Weekly Auto-Scheduler</h2></div>' +
+    '<div><div class="as-eyebrow">Planner · beta · '+_asWeekRangeLabel()+'</div><h2>Weekly Auto-Scheduler</h2></div>' +
     '<button class="as-x" onclick="closeAutoScheduler()" aria-label="Close">✕</button>' +
   '</div>' +
   '<div class="as-body">' +
     '<div class="as-tools">' +
-      '<button class="as-btn pri" onclick="asApplyWeek()">✓ Apply week →</button>' +
-      '<button class="as-btn" onclick="_asSeed++; openAutoScheduler();">↻ Regenerate</button>' +
-      '<span class="as-note">CXR / Exit / Returns are placed from their bids. <b style="color:var(--up,#FFCC00)">◇ proposed</b> = a manager slot the scheduler filled — adjust as needed. <b>Apply</b> writes this draft into the upcoming Sun–Sat schedule (undo any day in Setup → Edit Schedule).</span>' +
+      '<button class="as-btn" style="'+(_asWeekOffset===0?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=0;openAutoScheduler();">This week</button>' +
+      '<button class="as-btn" style="'+(_asWeekOffset===1?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=1;openAutoScheduler();">Next week</button>' +
+      '<button class="as-btn pri" onclick="asApplyWeek()">✓ Apply →</button>' +
+      '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeed++; openAutoScheduler();">↻ Regenerate</button>' +
+      '<span class="as-note">Planning <b>'+_asWeekRangeLabel()+'</b>. CXR / Exit / Returns placed from bids; <b style="color:var(--up,#FFCC00)">◇ proposed</b> = a manager slot the scheduler filled. Anyone marked <b>OFF / VACA / PTO</b> for a date is left out automatically. <b>Apply</b> writes this week into the schedule (and the Master Calendar reads the same data). Undo any day in Setup → Edit Schedule.</span>' +
     '</div>' +
     warnHtml +
     '<div class="as-grid">' + daysHtml + '</div>' +
@@ -19182,7 +19219,7 @@ function openAutoScheduler(){
   if(!o){ o=document.createElement('div'); o.id='as-overlay'; document.body.appendChild(o); }
   o.innerHTML=html; o.style.display='flex'; document.body.style.overflow='hidden';
 }
-function closeAutoScheduler(){ var o=document.getElementById('as-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+function closeAutoScheduler(){ _asWeekOffset=0; var o=document.getElementById('as-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
 // v60.108: write the current draft into STATE.scheduleOverrides for the upcoming
 // Sun–Sat week. Positive assignments only ([start,end] per person) — people not
@@ -19195,8 +19232,7 @@ function _asDateKey(d){
 function asApplyWeek(){
   var wk = asBuildWeek(_asSeed);
   var today = new Date(); today.setHours(0,0,0,0);
-  var daysUntilSun = (7 - today.getDay()) % 7;     // 0 if today is Sunday
-  var sunday = new Date(today); sunday.setDate(today.getDate()+daysUntilSun);
+  var sunday = _asWeekStart();                       // honors the This/Next-week toggle
   var endSat = new Date(sunday); endSat.setDate(sunday.getDate()+6);
   var totalAssign = wk.days.reduce(function(n,d){return n + d.people.length;},0);
   var range = _asDateKey(sunday) + ' → ' + _asDateKey(endSat);
