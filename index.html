@@ -18428,7 +18428,34 @@ function mcEventsOn(key){
 function mcNormMD(s){ if(!s) return ''; var m=String(s).match(/(\d{1,2})[\/\-](\d{1,2})/); if(!m) return ''; return String(parseInt(m[1])).padStart(2,'0')+'-'+String(parseInt(m[2])).padStart(2,'0'); }
 function mcCelebsOn(key){ var md=key.slice(5); return (STATE.celebrations||[]).filter(function(c){ return mcNormMD(c.date)===md; }); }
 function mcScheduleObj(key){ try{ return (typeof getScheduleForDate==='function' ? getScheduleForDate(key) : null) || {}; }catch(e){ return {}; } }
-function mcStaffCount(key){ var s=mcScheduleObj(key); return Object.keys(s).filter(function(p){ var c=s[p]; return c && !/OFF|VACA/i.test(String(c)); }).length; }
+function mcStaffCount(key){ var s=mcScheduleObj(key); return Object.keys(s).filter(function(p){ var c=s[p]; return c && !/OFF|VACA|PTO/i.test(String(c)); }).length; }
+// v60.115: time-off layer — who's OFF/VACA/PTO on a date (schedule markers +
+// the optional PTO store), for the calendar's 🌴 marker + day detail.
+function mcTimeOffOn(key){
+  var out={}; var s=mcScheduleObj(key);
+  Object.keys(s).forEach(function(p){ var c=s[p]; if(c && /OFF|VACA|PTO/i.test(String(c))) out[p]=(/VACA|PTO/i.test(String(c))?'PTO':'Off'); });
+  try{ var pto=(STATE.pto||{})[key];
+    if(Array.isArray(pto)) pto.forEach(function(p){ out[p]='PTO'; });
+    else if(pto&&typeof pto==='object') Object.keys(pto).forEach(function(p){ if(pto[p]) out[p]='PTO'; });
+  }catch(e){}
+  return Object.keys(out).map(function(p){ return {name:p.replace(/_/g,' '), kind:out[p]}; }).sort(function(a,b){return a.name<b.name?-1:1;});
+}
+// Open the Auto-Scheduler focused on the week that contains `key`.
+function _asOffsetForKey(key){
+  try{
+    var today=new Date(); today.setHours(0,0,0,0);
+    var curSun=new Date(today); curSun.setDate(today.getDate()-today.getDay());
+    var d=new Date(key+'T12:00:00'); d.setHours(0,0,0,0);
+    var dSun=new Date(d); dSun.setDate(d.getDate()-d.getDay());
+    return Math.round((dSun-curSun)/(7*86400000));
+  }catch(e){ return 0; }
+}
+function openAutoSchedulerForWeekOf(key){
+  if(typeof openAutoScheduler!=='function') return;
+  _asWeekOffset = Math.max(0, _asOffsetForKey(key));
+  closeMasterCalendar();
+  openAutoScheduler();
+}
 function _mcHr(h){ if(h==null) return '?'; var hh=((h%24)+24)%24; var ap=hh<12?'a':'p'; var h12=Math.floor(hh)%12; if(h12===0)h12=12; var m=Math.round((hh-Math.floor(hh))*60); return h12+(m?':'+String(m).padStart(2,'0'):'')+ap; }
 function mcFmtShift(c){ if(Array.isArray(c)) return c.length>=2 ? _mcHr(c[0])+'–'+_mcHr(c[1]) : String(c); return String(c); }
 // v60.72 (Round 1): demand model with event ripple (Design §7) — heavy event:
@@ -18508,11 +18535,12 @@ function mcRender(){
   for(var i=0;i<startDow;i++) h+='<div class="mc-cell mc-empty"></div>';
   for(var d=1;d<=daysIn;d++){
     var key=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    var evs=mcEventsOn(key), cels=mcCelebsOn(key), staff=mcStaffCount(key), dem=mcDemandLevel(key);
+    var evs=mcEventsOn(key), cels=mcCelebsOn(key), staff=mcStaffCount(key), dem=mcDemandLevel(key), off=mcTimeOffOn(key);
     var demCls = key===todayKey ? ' mc-today' : (dem==='heavy'?' mc-heavy':dem==='elevated'?' mc-elev':'');
     h+='<button class="mc-cell'+demCls+'" onclick="mcDay(\''+key+'\')"><div class="mc-dnum">'+d+'</div><div class="mc-marks">';
     evs.slice(0,3).forEach(function(e){ h+='<span class="mc-dot" style="background:'+(e.level==='heavy'?'#FF453A':'#FFCC00')+'"></span>'; });
     if(cels.length) h+='<span class="mc-cake">🎂</span>';
+    if(off.length) h+='<span class="mc-cake" title="'+off.length+' off">🌴'+(off.length>1?'<span style="font-size:8px;vertical-align:top">'+off.length+'</span>':'')+'</span>';
     h+='</div>'+(staff>0?'<div class="mc-staff">'+staff+'</div>':'')+'</button>';
   }
   h+='</div></div>';
@@ -18550,11 +18578,21 @@ function mcDay(key){
   if(cels.length) cels.forEach(function(c){ h+='<div class="mc-item">'+(c.type==='anniversary'?'🎉':'🎂')+' <span class="mc-name">'+biEsc(c.name)+'</span><span class="mc-lvl">'+biEsc(c.type||'')+'</span></div>'; });
   else h+='<div class="mc-none">None</div>';
   h+='</div><div class="mc-sec"><div class="mc-sec-h">👥 Scheduled</div>';
-  var names=Object.keys(sched||{}).filter(function(p){ var c=sched[p]; return c && !/OFF|VACA/i.test(c); }).sort();
+  var names=Object.keys(sched||{}).filter(function(p){ var c=sched[p]; return c && !/OFF|VACA|PTO/i.test(c); }).sort();
   if(names.length) names.forEach(function(p){ h+='<div class="mc-item"><span class="mc-name">'+biEsc(p.replace(/_/g,' '))+'</span><span class="mc-code">'+biEsc(mcFmtShift(sched[p]))+'</span></div>'; });
   else h+='<div class="mc-none">No schedule on file for this day</div>';
-  h+='</div><div class="mc-sec" style="opacity:.6"><div class="mc-sec-h">🌴 Time off (PTO)</div><div class="mc-none">Drop in your PTO tracker to show time off here.</div></div>';
-  h+='</div>'; o.innerHTML=h;
+  // v60.115: real time-off layer + planning access, all in this one place.
+  var offList = mcTimeOffOn(key);
+  h+='</div><div class="mc-sec"><div class="mc-sec-h">🌴 Time off'+(offList.length?' · '+offList.length:'')+'</div>';
+  if(offList.length) offList.forEach(function(x){ h+='<div class="mc-item"><span class="mc-name">'+biEsc(x.name)+'</span><span class="mc-lvl" style="color:'+(x.kind==='PTO'?'#23C983':'#8E8E93')+'">'+x.kind+'</span></div>'; });
+  else h+='<div class="mc-none">Nobody off this day</div>';
+  h+='</div><div class="mc-sec"><div class="mc-sec-h">🗓 Plan</div>'+
+     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+       '<button class="mc-addbtn" style="background:#23C983;color:#00301c" onclick="openAutoSchedulerForWeekOf(\''+key+'\')">🤖 Plan this week</button>'+
+       '<button class="mc-addbtn" style="background:#AF9CFF;color:#1a0f33" onclick="closeMasterCalendar();openStationFairness()">🔀 Station fairness</button>'+
+     '</div>'+
+     '<div class="mc-none" style="margin-top:6px">Draft the week this day belongs to, or check station fairness. Applied drafts show up right here on the calendar.</div>';
+  h+='</div></div>'; o.innerHTML=h;
 }
 function openMasterCalendar(){
   mcInjectStyle();
