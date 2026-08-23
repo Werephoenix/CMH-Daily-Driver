@@ -2711,7 +2711,7 @@ Genesis Cochran, 5/14</pre>
         <button class="btn btn-gh btn-sm" id="ref-tab-loyalty" onclick="showRefSection('loyalty')">🏆 Loyalty</button>
       </div>
       <div id="ref-sec-codes">
-        <input id="code-search" placeholder="🔍 Search codes, groups..." oninput="filterCodes()"
+        <input id="code-search" placeholder="🔍 Search codes, groups, or a car model…" oninput="filterCodes()"
           style="width:100%;padding:7px 10px;background:var(--bg3);border:1px solid var(--bdr2);
             border-radius:4px;color:var(--txt);font-size:12px;margin-bottom:8px">
         <div id="code-grid"></div>
@@ -3133,33 +3133,55 @@ var ROSTER_EXIT = [
    notes:'ARCHIVED 2026-08-20 — quit (data kept). Was Sunday-only 4:30p-12:30a.'},
 ];
 
+// v60.106: manager shift-window catalog (decimal hours, 24h). The auto-scheduler
+// and roster read patternWindows[] against this map. Source: branch questionnaire
+// Section 1 (Matt Johnson BRM, 2026-08-20).
+var MGR_SHIFT_WINDOWS = {
+  '530A-330P': {start:5.5,  end:15.5, tag:'Open'},
+  '6A-4P':     {start:6,    end:16,   tag:'Open'},
+  '7A-5P':     {start:7,    end:17,   tag:'Mid'},
+  '8A-6P':     {start:8,    end:18,   tag:'Mid'},
+  '9A-7P':     {start:9,    end:19,   tag:'Mid'},
+  '10A-8P':    {start:10,   end:20,   tag:'Amid'},
+  '12P-10P':   {start:12,   end:22,   tag:'PM'},
+  '4P-C':      {start:16,   end:23.5, tag:'Close'}
+};
 var ROSTER_MGMT = [
   // Source: Excel ROSTER sheet v16.4 — variable schedules, paste weekly
+  // v60.106: patternWindows[]/patternDays added per branch questionnaire Section 1.
   {id:'vada',    name:'Vada Griffith',           nick:'Vada',    role:'ARM',
-   shiftCode:'varies', shiftStart:null, defaultStation:'Off Site',
-   notes:'ARM. Mon-Fri typically. Occasionally fills station manager role.'},
+   shiftCode:'8A-6P', shiftStart:8, defaultStation:'Off Site',
+   patternWindows:['8A-6P'], patternDays:'M/W/Th/F+eoSun',
+   notes:'Area Mgr. 8A-6P, days Mon/Wed/Thu/Fri + every other Sun. Occasionally fills station manager role.'},
   {id:'pat-mcginnis', name:'Pat McGinnis',        nick:'Pat',     role:'ARM',
-   shiftCode:'varies', shiftStart:null, defaultStation:'Off Site',
-   notes:'ARM. New 2nd Area Manager alongside Vada (added 2026-08-16). Hours/days TBD — pending branch questionnaire.'},
+   shiftCode:'8A-6P', shiftStart:8, defaultStation:'Off Site',
+   patternWindows:['8A-6P'], patternDays:'M/W/Th/F+eoSun',
+   notes:'Area Mgr (2nd, added 2026-08-16). 8A-6P, same pattern as Vada: Mon/Wed/Thu/Fri + every other Sun.'},
   {id:'ami',     name:'Ami Lhom',                nick:'Ami',     role:'BRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'BRM. Typical shifts: 530A-330P / 8A-6P / 9A-7P / 10A-8P / 4P-C.'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','4P-C'], patternDays:'Tue/Wed EOW',
+   notes:'BRM. Rotates 530A-330P / 6A-4P / 8A-6P / 4P-C, Tue/Wed every-other-week.'},
   {id:'matt-b',  name:'Matt Johnson (BRM)',       nick:'Matt B',  role:'BRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Emerald Booth Manager',
-   notes:'BRM. Typical shifts: 530A-330P / 8A-6P / 9A-7P / 4A-2P / 4P-C. Different from CXR Matt.'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','4P-C'], patternDays:'Tue/Wed EOW',
+   notes:'BRM. Same rotation as Ami: 530A-330P / 6A-4P / 8A-6P / 4P-C, Tue/Wed EOW. Different from CXR Matt.'},
   {id:'ty',      name:'Ty Lumpkin',              nick:'Ty',      role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'ABRM. Typical shifts: 6A-4P / 9A-7P / 10A-8P / 12P-10P / 530A-330P / 4P-C.'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','10A-8P','4P-C'], patternDays:'varies',
+   notes:'ABRM. Rotates 530A-330P / 6A-4P / 8A-6P / 10A-8P / 4P-C, any day varies, every other weekend.'},
   {id:'caitlin', name:'Caitlin Kelsey',          nick:'Caitlin', role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'ABRM. Typical shifts: 530A-330P / 9A-7P / 10A-8P / 12P-10P / 4P-C.'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','10A-8P','4P-C'], patternDays:'varies',
+   notes:'ABRM. Rotates 530A-330P / 6A-4P / 8A-6P / 10A-8P / 4P-C, any day varies, every other weekend.'},
   // ARCHIVED 2026-08-16 (Matt OK): Carlos Aviles (ABRM) — no longer on the branch. Recoverable via git / schedule log.
   {id:'khala',   name:'Khala Shackleford',       nick:'Khala',   role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'ABRM. Typical shifts: 530A-330P / 7A-5P / 9A-7P / 10A-8P / 12P-10P / 4P-C.'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','10A-8P','4P-C'], patternDays:'varies',
+   notes:'ABRM. Rotates 530A-330P / 6A-4P / 8A-6P / 10A-8P / 4P-C, any day varies, every other weekend.'},
   {id:'maddy',   name:'Madelyne (Maddy) Shirer', nick:'Maddy',   role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager',
-   notes:'ABRM. Full name: Madelyne Shirer. Typical: 530A-330P / 7A-5P / 9A-7P / 10A-8P / 12P-10P / 4P-C.'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','10A-8P','4P-C'], patternDays:'varies',
+   notes:'ABRM. Full name: Madelyne Shirer. Rotates 530A-330P / 6A-4P / 8A-6P / 10A-8P / 4P-C, any day varies, every other weekend.'},
   // ARCHIVED 2026-08-16 (Matt OK): Josh Osei, Britney Francis, Lauren Kretschman (MTs) — no longer on the branch. Recoverable via git / schedule log.
   // v60.3: removed a stray double-comma here (was `},,`) that left a
   // sparse-array HOLE between Lauren and Ennis in ROSTER_MGMT. forEach/map
@@ -3175,19 +3197,24 @@ var ROSTER_MGMT = [
   //    2026-08-16 per Matt's OK (removed from active roster; recoverable via git / log). ──
   {id:'preston', name:'Preston', nick:'Preston', role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager', active:true,
-   notes:'ABRM. Added 2026-08-16. Last name + hours TBD (branch questionnaire).'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','10A-8P','4P-C'], patternDays:'varies',
+   notes:'ABRM. Added 2026-08-16. Rotates 530A-330P / 6A-4P / 8A-6P / 10A-8P / 4P-C, any day. Last name TBD.'},
   {id:'austin', name:'Austin', nick:'Austin', role:'ABRM',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager', active:true,
-   notes:'ABRM. Added 2026-08-16. Last name + hours TBD.'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','10A-8P','4P-C'], patternDays:'varies',
+   notes:'ABRM. Added 2026-08-16. Rotates 530A-330P / 6A-4P / 8A-6P / 10A-8P / 4P-C, any day. Last name TBD.'},
   {id:'kevin', name:'Kevin', nick:'Kevin', role:'MT',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager', active:true,
-   notes:'MT. Added 2026-08-16. Last name + hours TBD.'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','10A-8P','4P-C'], patternDays:'varies',
+   notes:'MT. Added 2026-08-16. Rotates like ABRMs: 530A-330P / 6A-4P / 8A-6P / 10A-8P / 4P-C, any day. Last name TBD.'},
   {id:'james', name:'James', nick:'James', role:'MT',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager', active:true,
-   notes:'MT. Added 2026-08-16. Last name + hours TBD.'},
+   patternWindows:['530A-330P','6A-4P','8A-6P','10A-8P','4P-C'], patternDays:'varies',
+   notes:'MT. Added 2026-08-16. Rotates like ABRMs: 530A-330P / 6A-4P / 8A-6P / 10A-8P / 4P-C, any day. Last name TBD.'},
   {id:'collin', name:'Collin', nick:'Collin', role:'MT',
    shiftCode:'varies', shiftStart:null, defaultStation:'Counter Manager', active:true,
-   notes:'MT. Added 2026-08-16. Last name + hours TBD.'}
+   patternWindows:['530A-330P','6A-4P','8A-6P','10A-8P','4P-C'], patternDays:'varies',
+   notes:'MT. Added 2026-08-16. Rotates like ABRMs: 530A-330P / 6A-4P / 8A-6P / 10A-8P / 4P-C, any day. Last name TBD.'}
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -9225,6 +9252,51 @@ function buildCodeCompendium() {
   renderCodes(FLEET_CODES);
 }
 
+// v60.106: MODEL_INDEX — model names per SIPP code (from the Enterprise SIPP master catalog,
+// 2026-08). Lets the Reference search resolve a car model ("Sorento", "RAV4") to its code.
+// One lowercase string per code; filterCodes does a substring match against it.
+var MODEL_INDEX = {
+  ECAR:'chevrolet spark kia rio mitsubishi mirage fiat 500 ford fiesta chevrolet sonic hyundai accent nissan versa note nissan versa sedan',
+  CCAR:'fiat 500 ford fiesta chevrolet sonic hyundai accent nissan versa',
+  ICAR:'dodge dart ford focus chevrolet cruze hyundai elantra honda civic hyundai veloster kia forte mazda3 mitsubishi lancer nissan sentra scion xd toyota corolla volkswagen golf',
+  ICAE:'ford focus electric chevrolet volt chevrolet spark electric nissan leaf',
+  SCAR:'chrysler 200 buick verano nissan cube kia soul fiat 500l volkswagen jetta',
+  SCAH:'ford c-max kia soul electric toyota prius volkswagen golf electric hybrid',
+  SXAR:'mazda5 subaru impreza volkswagen beetle',
+  RXAR:'bmw 2 series coupe audi a3 acura tsx volvo c30',
+  FCAR:'ford fusion dodge charger chevrolet malibu hyundai sonata kia optima mazda6 nissan altima toyota camry volkswagen passat',
+  FCAH:'ford fusion hybrid hyundai sonata hybrid chevrolet malibu hybrid nissan altima hybrid kia optima hybrid toyota camry hybrid',
+  GXAR:'lincoln mks bmw 3 series infiniti q50 infiniti g37 infiniti m35 volvo s60 acura tlx audi a4 mercedes c class volvo v60',
+  PCAR:'buick lacrosse buick regal hyundai azera kia cadenza nissan maxima subaru legacy toyota avalon honda accord volkswagen cc acura integra',
+  PXAR:'ford taurus chrysler 300 chevrolet impala premium special',
+  UXAR:'kia k900 bmw 5 series audi a6 mercedes e-class infiniti q70 infiniti g90 volvo s80 lincoln continental lincoln mkt',
+  LCAR:'hyundai genesis cadillac ats cadillac cts cadillac xts lincoln mkz',
+  CTAR:'mazda miata mazda miata rf fiat 124 spider',
+  ITAR:'volkswagen beetle convertible mini cooper convertible',
+  STAR:'mini cooper convertible ford mustang convertible chevrolet camaro convertible',
+  SSAR:'mini cooper hardtop volkswagen gti dodge challenger ford mustang chevrolet camaro',
+  IFAR:'jeep compass jeep patriot jeep cherokee ford escape chevrolet captiva hyundai tucson kia sportage mazda cx-5 mitsubishi outlander nissan rogue honda crv toyota rav4',
+  IJAR:'jeep wrangler 2 door two door',
+  FJAR:'jeep wrangler 4 door jeep wrangler unlimited four door',
+  FJBR:'jeep wrangler unlimited 4 door ford bronco four door 4wd',
+  SFAR:'dodge journey jeep grand cherokee ford explorer ford edge chevrolet equinox gmc terrain hyundai santa fe kia sorento nissan murano nissan xterra nissan pathfinder gmc acadia toyota highlander toyota 4runner',
+  RFAR:'lincoln mkc infiniti qx30 infiniti qx50 acura rdx bmw x1',
+  FFAR:'ford expedition chevrolet tahoe gmc yukon honda pilot nissan armada',
+  PFAR:'ford expedition el chevrolet suburban gmc yukon xl toyota sequoia',
+  UFAR:'cadillac srx lincoln mkx bmw x3 infiniti qx70 volkswagen touareg volvo xc60 volvo xc70',
+  LFAR:'lincoln navigator cadillac escalade infiniti qx80',
+  WFAR:'bmw x5 mercedes gle mercedes m-class infiniti q7 volvo xc90',
+  UDAR:'genesis gv80 range rover velar land rover defender land rover discovery bmw x5 mercedes gle range rover evoque porsche macan jaguar f-pace lincoln aviator',
+  UGAR:'genesis gv80 range rover velar land rover defender land rover discovery bmw x5 mercedes gle range rover evoque porsche macan jaguar f-pace lincoln aviator premium elite crossover',
+  CFAR:'mitsubishi outlander sport jeep renegade chevrolet trax fiat 500x nissan juke',
+  PGAR:'dodge durango ford flex buick enclave chevrolet traverse gmc acadia limited infiniti qx60',
+  MVAR:'chrysler town and country chrysler pacifica dodge grand caravan kia sedona nissan quest honda odyssey volkswagen routan toyota sienna',
+  RVAR:'ford transit chevrolet express 2500 ford econoline 350 nissan nv passenger 12',
+  FVAR:'chevrolet express 3500 ford transit ford econoline 350 15 passenger',
+  SPAR:'chevrolet colorado gmc canyon jeep gladiator nissan frontier toyota tacoma',
+  PPAR:'ram 1500 ford f150 chevrolet silverado 1500 nissan titan toyota tundra',
+  QPAR:'ford f250 dodge ram gmc sierra chevrolet silverado 2500 hd'
+};
 function filterCodes() {
   const q      = (document.getElementById('code-search')?.value || '').toLowerCase();
   const grp    = document.getElementById('code-filter-group')?.value || '';
@@ -9238,7 +9310,8 @@ function filterCodes() {
     const code = (c && c.code  ? String(c.code).toLowerCase()  : '');
     const grpL = (c && c.group ? String(c.group).toLowerCase() : '');
     const desc = (c && c.desc  ? String(c.desc).toLowerCase()  : '');
-    const matchQ = !q || code.includes(q) || grpL.includes(q) || desc.includes(q);
+    const models = (c && c.code && MODEL_INDEX[c.code]) ? MODEL_INDEX[c.code] : '';
+    const matchQ = !q || code.includes(q) || grpL.includes(q) || desc.includes(q) || models.includes(q);
     const matchG = !grp || (c && c.group === grp);
     const matchC = !core ||
       (core === 'core' && c && c.core) ||
@@ -9341,6 +9414,7 @@ function renderCodes(codes) {
               <span style="font-family:var(--ff-mono);font-size:12px;font-weight:500;
                 color:${(c.code||'').includes('⚠')||(c.group||'').includes('Pending')?'var(--amber)':'var(--txt)'}">${c.code||''}</span>
               <span style="font-size:9px;color:var(--txt3);line-height:1.3">${(c.desc||'').split('—')[0].trim()}</span>
+              ${MODEL_INDEX[c.code] ? `<span style="font-size:8.5px;color:var(--txt3);opacity:.65;line-height:1.3">e.g. ${MODEL_INDEX[c.code].split(' ').slice(0,4).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ').replace(/(\w+) (\w+) (\w+) (\w+)/,'$1 $2, $3 $4')}…</span>` : ''}
             </div>
           </div>`;
         }).join('')}
