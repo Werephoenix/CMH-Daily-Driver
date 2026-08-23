@@ -1811,6 +1811,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="showTab('history')"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openMasterCalendar()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">📅</span><span class="more-lbl">Master Calendar</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openScheduleLog()"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openAutoScheduler()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">🤖</span><span class="more-lbl">Auto-Scheduler<span class="more-sub">Draft a week from bids + coverage · beta</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBranchAsks()"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openRequests()"><span class="more-ic tile" style="background:rgba(255,159,10,.16)">📥</span><span class="more-lbl">Requests</span><span class="more-ch">›</span></button>
     </div>
@@ -18872,6 +18873,212 @@ function openEmeraldGuide(){
   o.style.display='flex'; document.body.style.overflow='hidden';
 }
 function closeEmeraldGuide(){ var o=document.getElementById('ec-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// WEEKLY AUTO-SCHEDULER (v60.107, beta) — builds a Sun–Sat proposed schedule
+// from the three data sources we now hold: (1) CXR bid days+times (deterministic),
+// (2) Exit/Returns fixed shifts, (3) manager rotation patterns (patternWindows +
+// patternDays, from the branch questionnaire). CXR/Exit/Returns are placed exactly
+// as bid; managers are the only piece we PROPOSE — one window each per working day,
+// rotated for fairness and biased to always cover an opener + a closer. Read-only
+// planner: coverage is checked against FLOOR_TARGETS/COVERAGE_BY_HOUR per block and
+// gaps are flagged. "Regenerate" reshuffles the manager rotation seed.
+// ═══════════════════════════════════════════════════════════════════════════
+var _asSeed = 0, _asStyled = false;
+var AS_DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function _asHr(h){
+  if(h==null) return '?';
+  h = ((h % 24) + 24) % 24;
+  var ap = h < 12 || h >= 24 ? 'a' : 'p';
+  var hh = h % 12; if(hh===0) hh=12;
+  var m = Math.round((h - Math.floor(h))*60);
+  return Math.floor(hh) + (m? ':'+(m<10?'0'+m:m) : '') + ap;
+}
+// Parse a shift-code window like "530A-230P" / "4P-C" / "10A-600P" → [start,end] (decimal 24h).
+function _asParseWin(code){
+  if(!code || typeof code!=='string') return null;
+  var mw = MGR_SHIFT_WINDOWS[code];
+  if(mw) return [mw.start, mw.end];
+  var parts = code.split('/')[0].split('-');
+  if(parts.length<2) return null;
+  function p(s){
+    s = s.trim().toUpperCase();
+    if(s==='C') return 23.5; // Close
+    var m = s.match(/^(\d{1,2})(\d{2})?\s*(A|P)?$/);
+    if(!m) return null;
+    var hr = parseInt(m[1],10); var min = m[2]?parseInt(m[2],10):0;
+    if(m[3]==='P' && hr!==12) hr+=12;
+    if(m[3]==='A' && hr===12) hr=0;
+    return hr + min/60;
+  }
+  var a=p(parts[0]), b=p(parts[1]);
+  if(a==null||b==null) return null;
+  if(b<=a) b+=24; // overnight
+  return [a,b];
+}
+
+// Which weekdays does a manager work? Area mgrs = M/W/Th/F + every-other Sun.
+// Tue/Wed EOW = BRMs. "varies" = available any day (proposer decides).
+function _asMgrWorksDay(p, dow, seed){
+  var pd = (p.patternDays||'').toLowerCase();
+  if(pd.indexOf('m/w/th/f')>=0){
+    if([1,3,4,5].indexOf(dow)>=0) return true;
+    if(dow===0) return (seed % 2)===0; // every-other Sun
+    return false;
+  }
+  if(pd.indexOf('tue/wed')>=0) return dow===2 || dow===3;
+  return true; // varies — treat as available
+}
+
+// Build the whole week. Returns {days:[{dow,label,people:[{nick,role,start,end,win,proposed}], cov:[...]}]}
+function asBuildWeek(seed){
+  var roster = (typeof getEffectiveRoster==='function') ? getEffectiveRoster() : [];
+  var days = [];
+  for(var dow=0; dow<7; dow++){
+    var people = [];
+    // 1) Fixed-shift staff: CXR / EXIT / RETURNS — placed exactly as bid.
+    roster.forEach(function(p){
+      if(['CXR','EXIT','RETURNS'].indexOf(p.role)<0) return;
+      if(!p.daysOn || p.daysOn.indexOf(dow)<0) return;
+      var start=p.shiftStart, end=p.shiftEnd, code=p.shiftCode;
+      if(p.dayShifts && p.dayShifts[dow]){ // per-day split (e.g. Laura AM/PM)
+        code = p.dayShifts[dow];
+        var w = _asParseWin(code); if(w){ start=w[0]; end=w[1]; }
+      }
+      if(start==null) return; // e.g. Duria TBD — skip until known
+      people.push({nick:p.nick||p.name, role:p.role, start:start, end:end, win:code, proposed:false});
+    });
+    // 2) Area Managers (fixed 8A-6P on their days).
+    roster.forEach(function(p){
+      if(p.role!=='ARM') return;
+      if(!_asMgrWorksDay(p, dow, seed)) return;
+      var w = _asParseWin(p.patternWindows && p.patternWindows[0] || '8A-6P') || [8,18];
+      people.push({nick:p.nick||p.name, role:'ARM', start:w[0], end:w[1], win:p.patternWindows?p.patternWindows[0]:'8A-6P', proposed:false, sunEO:(dow===0)});
+    });
+    // 3) Rotating managers (BRM/ABRM/MT) — the PROPOSED piece. One window each,
+    //    biased so index 0 opens and index 1 closes; rest fill mids. Rotated by
+    //    (dow+seed) so the same person isn't always the opener.
+    var pool = roster.filter(function(p){
+      return ['BRM','ABRM','MT'].indexOf(p.role)>=0 && p.patternWindows && _asMgrWorksDay(p,dow,seed);
+    });
+    var priority = ['530A-330P','4P-C','8A-6P','10A-8P','6A-4P']; // opener, closer, mids
+    var n = pool.length;
+    pool.forEach(function(_,i){
+      var p = pool[(i + dow + seed) % n];
+      var win = priority[i] || '8A-6P';
+      if(p.patternWindows.indexOf(win)<0) win = p.patternWindows[i % p.patternWindows.length];
+      var w = _asParseWin(win) || [8,18];
+      people.push({nick:p.nick||p.name, role:p.role, start:w[0], end:w[1], win:win, proposed:true});
+    });
+    // Coverage check per block vs COVERAGE_BY_HOUR.
+    var exitCnt = people.filter(function(x){return x.role==='EXIT';}).length;
+    var blocks = [{lbl:'Open',h:7},{lbl:'AMid',h:10},{lbl:'Mid',h:14},{lbl:'PM',h:18},{lbl:'Night',h:21}];
+    var cov = blocks.map(function(b){
+      var need = (typeof COVERAGE_BY_HOUR==='function') ? COVERAGE_BY_HOUR(b.h, dow, exitCnt) : null;
+      if(!need || need.closed) return {lbl:b.lbl, closed:true};
+      // CMH staffs exit by ROTATING CXRs into it — exit isn't covered by the 2-3
+      // dedicated EXIT agents alone. So at the weekly-draft level the meaningful
+      // check is the FLOOR POOL (CXR + EXIT + counter-managers) vs the combined
+      // exit+counter need, plus exit-CAPABLE headcount vs exitMin, plus dedicated
+      // Returns vs returnsMin. Off-site Area Mgrs (ARM) are not floor.
+      var floorNeed = (need.exitMin||0) + (need.counterMin||0);
+      var floorHave=0, exitCap=0, retHave=0;
+      people.forEach(function(x){
+        if(!(b.h>=x.start && b.h<x.end)) return;
+        if(x.role==='RETURNS'){ retHave++; return; }
+        if(x.role==='ARM') return;               // area mgr, off-site
+        floorHave++;                              // CXR / EXIT / BRM / ABRM / MT
+        if(x.role==='EXIT' || x.role==='CXR') exitCap++;
+      });
+      var floorGap = floorHave < floorNeed;
+      var exitGap  = exitCap  < (need.exitMin||0);
+      var retGap   = (need.returnsMin||0) > 0 && retHave < need.returnsMin;
+      return {lbl:b.lbl, floorNeed:floorNeed, floorHave:floorHave,
+              exitMin:need.exitMin||0, exitCap:exitCap, returnsMin:need.returnsMin||0, retHave:retHave,
+              gap:(floorGap||exitGap||retGap), floorGap:floorGap, exitGap:exitGap, retGap:retGap};
+    });
+    // sort people by start time for readability
+    people.sort(function(a,b){return a.start-b.start;});
+    days.push({dow:dow, label:AS_DOW[dow], people:people, cov:cov});
+  }
+  return {days:days, seed:seed};
+}
+
+function asInjectStyle(){
+  if(_asStyled) return; _asStyled=true;
+  var css = '' +
+  '#as-overlay{position:fixed;inset:0;z-index:100060;background:var(--bg,#000);display:flex;flex-direction:column;overflow:hidden}' +
+  '.as-hd{padding:16px 16px 12px;border-bottom:1px solid var(--bdr,#38383A);display:flex;align-items:flex-start;gap:12px;flex-shrink:0}' +
+  '.as-hd .as-eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3,rgba(235,235,245,.5))}' +
+  '.as-hd h2{font-size:22px;font-weight:800;margin:2px 0 0;line-height:1.15;color:var(--txt,#fff)}' +
+  '.as-x{margin-left:auto;width:34px;height:34px;flex-shrink:0;border-radius:50%;border:none;background:var(--bg3,#2C2C2E);color:var(--txt,#fff);font-size:17px;cursor:pointer}' +
+  '.as-body{flex:1;overflow-y:auto;padding:14px 16px 40px;-webkit-overflow-scrolling:touch}' +
+  '.as-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}' +
+  '.as-btn{border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;background:var(--bg3,#2C2C2E);color:var(--txt,#fff)}' +
+  '.as-btn.pri{background:var(--accent,#23C983);color:#00301c}' +
+  '.as-note{font-size:11.5px;color:var(--txt3,rgba(235,235,245,.5));line-height:1.5}' +
+  '.as-day{background:var(--bg2,#1C1C1E);border:1px solid var(--bdr,#38383A);border-radius:12px;padding:12px 13px;margin-bottom:12px}' +
+  '.as-day h3{font-size:15px;font-weight:800;margin:0 0 8px;color:var(--txt,#fff);display:flex;align-items:center;gap:8px}' +
+  '.as-cov{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 10px}' +
+  '.as-chip{font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;border:1px solid var(--bdr,#38383A);color:var(--txt3,rgba(235,235,245,.6))}' +
+  '.as-chip.ok{background:rgba(35,201,131,.14);border-color:rgba(35,201,131,.4);color:var(--accent,#23C983)}' +
+  '.as-chip.gap{background:rgba(255,69,58,.14);border-color:rgba(255,69,58,.45);color:var(--na,#FF453A)}' +
+  '.as-chip.closed{opacity:.4}' +
+  '.as-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.05);font-size:12.5px}' +
+  '.as-row:first-of-type{border-top:none}' +
+  '.as-rl{font-size:8px;font-weight:800;letter-spacing:.04em;padding:2px 5px;border-radius:4px;flex-shrink:0;width:44px;text-align:center}' +
+  '.as-nm{font-weight:600;color:var(--txt,#fff);flex:1;min-width:0}' +
+  '.as-tm{font-family:var(--ff-mono,monospace);font-size:11px;color:var(--txt3,rgba(235,235,245,.6))}' +
+  '.as-prop{font-size:9px;font-weight:700;color:var(--up,#FFCC00);margin-left:4px}' +
+  '@media(min-width:900px){.as-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.as-day{margin-bottom:0}}';
+  var s=document.createElement('style'); s.id='as-style'; s.textContent=css; document.head.appendChild(s);
+}
+
+function _asRoleColor(r){
+  var m={CXR:'#0A84FF',EXIT:'#23C983',RETURNS:'#64D2FF',ARM:'#AF9CFF',BRM:'#AF9CFF',ABRM:'#FFCC00',MT:'#FF9F0A'};
+  return m[r]||'#8E8E93';
+}
+
+function openAutoScheduler(){
+  asInjectStyle();
+  var wk = asBuildWeek(_asSeed);
+  var daysHtml = wk.days.map(function(d){
+    var covHtml = d.cov.map(function(c){
+      if(c.closed) return '<span class="as-chip closed">'+c.lbl+' · closed</span>';
+      var cls = c.gap ? 'gap' : 'ok';
+      var detail = 'Floor '+c.floorHave+'/'+c.floorNeed+' · exit-capable '+c.exitCap+'/'+c.exitMin + (c.returnsMin?(' · returns '+c.retHave+'/'+c.returnsMin):'');
+      var why = c.floorGap ? (c.floorHave+'/'+c.floorNeed) : c.exitGap ? 'exit' : c.retGap ? 'ret' : '';
+      return '<span class="as-chip '+cls+'" title="'+detail+'">'+c.lbl+' '+(c.gap?('⚠'+(why?' '+why:'')):'✓')+'</span>';
+    }).join('');
+    var rowsHtml = d.people.map(function(p){
+      return '<div class="as-row">' +
+        '<span class="as-rl" style="background:'+_asRoleColor(p.role)+'22;color:'+_asRoleColor(p.role)+'">'+p.role+'</span>' +
+        '<span class="as-nm">'+p.nick+(p.proposed?'<span class="as-prop">◇ proposed</span>':'')+'</span>' +
+        '<span class="as-tm">'+_asHr(p.start)+'–'+_asHr(p.end)+'</span>' +
+      '</div>';
+    }).join('') || '<div class="as-note">No one scheduled.</div>';
+    return '<div class="as-day"><h3>'+d.label+' <span class="as-note">· '+d.people.length+' staff</span></h3>' +
+      '<div class="as-cov">'+covHtml+'</div>' + rowsHtml + '</div>';
+  }).join('');
+  var html =
+  '<div class="as-hd">' +
+    '<div><div class="as-eyebrow">Planner · beta</div><h2>Weekly Auto-Scheduler</h2></div>' +
+    '<button class="as-x" onclick="closeAutoScheduler()" aria-label="Close">✕</button>' +
+  '</div>' +
+  '<div class="as-body">' +
+    '<div class="as-tools">' +
+      '<button class="as-btn pri" onclick="_asSeed++; openAutoScheduler();">↻ Regenerate</button>' +
+      '<span class="as-note">CXR / Exit / Returns are placed from their bids. <b style="color:var(--up,#FFCC00)">◇ proposed</b> = a manager slot the scheduler filled — adjust as needed.</span>' +
+    '</div>' +
+    '<div class="as-grid">' + daysHtml + '</div>' +
+    '<p class="as-note" style="margin-top:14px">Coverage chips read against the branch floor targets (E = exit, C = counter, R = returns) for each block. ⚠ = below minimum for that block. This is a starting draft — the real week still runs through the schedule editor.</p>' +
+  '</div>';
+  var o=document.getElementById('as-overlay');
+  if(!o){ o=document.createElement('div'); o.id='as-overlay'; document.body.appendChild(o); }
+  o.innerHTML=html; o.style.display='flex'; document.body.style.overflow='hidden';
+}
+function closeAutoScheduler(){ var o=document.getElementById('as-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETUP HUB (v60.79) — self-service "finish": one discoverable place showing the
