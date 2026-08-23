@@ -18892,12 +18892,13 @@ function closeEmeraldGuide(){ var o=document.getElementById('ec-overlay'); if(o)
 var _asSeed = 0, _asStyled = false, _asWeekOffset = 0;
 var AS_DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var AS_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-// v60.113: the draft plans a SPECIFIC dated week. offset 0 = the upcoming Sun–Sat
-// (this week if today is Sunday), 1 = the week after, etc.
+// v60.113/114: the draft plans a SPECIFIC dated week. offset 0 = THIS week
+// (the Sunday on/just before today, so today always falls inside it), 1 = next
+// week, etc. Anchoring to the current week is what lets the Station-Fairness
+// "today" suggestion and PTO all share the same dated spine.
 function _asWeekStart(){
   var today = new Date(); today.setHours(0,0,0,0);
-  var daysUntilSun = (7 - today.getDay()) % 7;
-  var sun = new Date(today); sun.setDate(today.getDate() + daysUntilSun + _asWeekOffset*7);
+  var sun = new Date(today); sun.setDate(today.getDate() - today.getDay() + _asWeekOffset*7);
   return sun;
 }
 function _asDateKeyOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -19244,6 +19245,7 @@ function asApplyWeek(){
   var todayK = _asDateKey(today);
   wk.days.forEach(function(d, i){
     var dt = new Date(sunday); dt.setDate(sunday.getDate()+i);
+    if(dt < today) return;   // don't rewrite days already in the past
     var key = _asDateKey(dt);
     if(!STATE.scheduleOverrides[key]) STATE.scheduleOverrides[key] = {};
     d.people.forEach(function(p){
@@ -19341,11 +19343,15 @@ var SF_APPLY_LABEL = {'Emerald Booth':'Emerald Booth Manager','Returns':'Returns
 function _sfHrs(pid, bucket){ return (((STATE.mgrStationLog||{})[pid])||{})[bucket] || 0; }
 function _sfTotal(pid){ var t=((STATE.mgrStationLog||{})[pid])||{}; return Object.keys(t).reduce(function(s,k){return s+(t[k]||0);},0); }
 function sfSuggestStations(){
-  // Who's working today? Reuse the tested weekly engine and take today's row;
-  // stations are for floor managers only (BRM/ABRM/MT) — Area Mgrs are off-site.
+  // Who's working today? Reuse the tested weekly engine, anchored to THIS week,
+  // and take the row whose DATE is today — so this inherits the scheduler's PTO/
+  // time-off awareness (someone off today is already absent). Stations are for
+  // floor managers only (BRM/ABRM/MT) — Area Mgrs are off-site.
+  var _savedOff = _asWeekOffset; _asWeekOffset = 0;
   var wk = (typeof asBuildWeek==='function') ? asBuildWeek(0) : {days:[]};
-  var dow = new Date().getDay();
-  var day = wk.days[dow] || {people:[]};
+  _asWeekOffset = _savedOff;
+  var todayKey = _asDateKeyOf(new Date());
+  var day = (wk.days||[]).filter(function(d){return d.date===todayKey;})[0] || wk.days[new Date().getDay()] || {people:[]};
   var pool = day.people.filter(function(p){ return ['BRM','ABRM','MT'].indexOf(p.role)>=0; })
     .map(function(p){ return {nick:p.nick, pid:(p.name||'').replace(/\s/g,'_'), start:p.start, end:p.end}; });
   var out = [];
