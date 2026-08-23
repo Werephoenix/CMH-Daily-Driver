@@ -2817,7 +2817,7 @@ var CODE_MAP = {
   // Luxury Elite SUV
   WFAR:'Luxury Elite SUV',UFAR:'Luxury Elite SUV',
   // Jeep Wrangler
-  JWAR:'Jeep Wrangler',JXAR:'Jeep Wrangler',
+  JWAR:'Wrangler / Bronco',JXAR:'Wrangler / Bronco',
   // Minivan 7-Seat
   MVAR:'Minivan 7-Seat',
   // Minivan 8-Seat
@@ -2839,12 +2839,13 @@ var CODE_MAP = {
   PRAR:'Premium SUV',
   // ── NEW CODES FROM EMAIL EXAMPLES ─────────────────────────────────────
   PGAR:'Crossovers',         PGDR:'Crossovers',
-  FJAR:'Jeep Wrangler',      FJDR:'Jeep Wrangler',
+  FJAR:'Wrangler / Bronco',      FJDR:'Wrangler / Bronco',
+  FJBR:'Wrangler / Bronco',      // v60.102: FJBR replaces FJAR (Wrangler Unlimited 4dr + Ford Bronco 4dr, both 4WD), eff 2026-08-25
   LFAR:'Luxury SUV',         LFDR:'Luxury SUV',
   UXAR:'Luxury Elite SUV',   UXDR:'Luxury Elite SUV',
   WCAR:'Luxury Car',         WDAR:'Luxury Elite SUV',
   PPAR:'Large Pickup',       PPBR:'Large Pickup',  PPDR:'Large Pickup',
-  UDAR:'Luxury SUV',
+  UDAR:'Luxury SUV',         UGAR:'Luxury SUV',   // v60.102: UGAR replaces UDAR (Premium Elite Crossover), eff 2026-08-25
   WFAR:'Luxury Elite SUV',   WFDR:'Luxury Elite SUV',
   PRAR:'Premium SUV',  BFAR:'⚠ Possible GL Error',
   SPBR:'Standard Pickup',
@@ -2881,7 +2882,7 @@ var THRESHOLDS = {
   'Sports Car':          [3,2], 'Compact SUV':         [3,2], 'Midsize SUV':         [3,2],
   'Standard SUV':        [3,2], 'Crossovers':          [3,2], 'Standard Elite SUV':  [3,2],
   'Premium SUV':         [4,3], 'Fullsize SUV':        [4,3], 'Luxury SUV':          [4,3],
-  'Luxury Elite SUV':    [4,3], 'Jeep Wrangler':       [3,2], 'Minivan 7-Seat':      [3,2],
+  'Luxury Elite SUV':    [4,3], 'Wrangler / Bronco':       [3,2], 'Minivan 7-Seat':      [3,2],
   'Minivan 8-Seat':      [3,2], 'Passenger Van':       [3,2], 'Standard Pickup':     [3,2],
   'Large Pickup':        [3,2], 'Exotic':              [4,3], 'Premium Elite Car':   [4,3],
   'Premium Large SUV':   [4,3], 'Premium Elite SUV':   [4,3],
@@ -2927,7 +2928,7 @@ var GROUP_META = [
   {n:'Fullsize SUV',name:'Fullsize SUV',flag:'🚙',core:false},
   {n:'Luxury SUV',name:'Luxury SUV',flag:'👑',core:false},
   {n:'Luxury Elite SUV',name:'Luxury Elite SUV',flag:'👑✨',core:false},
-  {n:'Jeep Wrangler',name:'Jeep Wrangler',flag:'🪨',core:false},
+  {n:'Wrangler / Bronco',name:'Wrangler / Bronco',flag:'🪨',core:false},
   {n:'Minivan 7-Seat',name:'Minivan 7-Seat',flag:'👨‍👩‍👧',core:false},
   {n:'Minivan 8-Seat',name:'Minivan 8-Seat',flag:'👨‍👩‍👧',core:false},
   {n:'Passenger Van',name:'Passenger Van',flag:'🚌',core:false},
@@ -4986,7 +4987,7 @@ function buildEmailData(type) {
                                        'Premium Large SUV','Luxury Elite SUV']},
       {label:'Crossover',      groups:['Crossovers','Standard Elite SUV']},
       {label:'Minivans',       groups:['Minivan 7-Seat','Minivan 8-Seat']},
-      {label:'Sports',         groups:['Sports Car','Convertibles','Jeep Wrangler']},
+      {label:'Sports',         groups:['Sports Car','Convertibles','Wrangler / Bronco']},
       {label:'Luxury Cars',    groups:['Luxury Car','Premium Car','Premium Elite Car','Electric/Hybrid']},
       {label:'Trucks',         groups:['Standard Pickup','Large Pickup']},
     ];
@@ -9092,14 +9093,14 @@ var FLEET_CODES = [
   {code:'FCAH', group:'Full-Size Car',      core:true,  desc:'Full-Size Car — Alternate vehicle type.'},
   {code:'FDAR', group:'Full-Size Car',      core:true,  desc:'Full-Size Car — Debit rate.'},
   // ── PREMIUM CAR ─────────────────────────────────────────────────────
-  {code:'PCAR', group:'Premium Car',        core:false, desc:'Premium Car — Lincoln MKZ, Chrysler 300C or similar. Above full-size.'},
+  {code:'PCAR', group:'Premium Car',        core:false, desc:'Premium Car — Lincoln MKZ, Chrysler 300C or similar. Above full-size. (Acura Integra moved here from PXAR eff 2026-08-25.)'},
   {code:'PDAR', group:'Premium Car',        core:false, desc:'Premium Car — Debit rate.'},
   {code:'PCDR', group:'Premium Car',        core:false, desc:'Premium Car — CDW variant.'},
   // ── STANDARD ELITE CAR ──────────────────────────────────────────────
   {code:'RXAR', group:'Standard Elite Car', core:false, desc:'Standard Elite Car — Elevated standard class. Often a sport-trim sedan.'},
   // ── LUXURY CAR ──────────────────────────────────────────────────────
   {code:'LCAR', group:'Luxury Car',         core:false, desc:'Luxury Car — Cadillac CT5, Lincoln Continental or similar.'},
-  {code:'PXAR', group:'No Supply',          core:false, desc:'Premium Special Car — confirmed CMH. Special assignment code (like XXAR/SXAR). Manager-assigned, no walk-up inventory.'},
+  {code:'PXAR', group:'No Supply',          core:false, desc:'Premium Car SPECIAL — a discount-rate Premium Car "sale" (Matt). Manager-assigned, no walk-up inventory (like XXAR/SXAR). The Acura Integra LEFT this code for PCAR on 2026-08-25; PXAR stays for other premium specials.'},
   {code:'GXAR', group:'Luxury Car',         core:false, desc:'Luxury Car — alternate luxury code.'},
   {code:'LDAR', group:'Luxury Car',         core:false, desc:'Luxury Car — Debit rate.'},
   // ── PREMIUM ELITE CAR ───────────────────────────────────────────────
@@ -9150,9 +9151,10 @@ var FLEET_CODES = [
   {code:'OFDR', group:'Premium Large SUV',  core:false, desc:'Premium Large SUV — CDW variant.'},
   // ── PREMIUM ELITE SUV ───────────────────────────────────────────────
   {code:'PRAR', group:'Premium SUV',        core:false, desc:'Premium SUV 2WD — confirmed CMH. Maps to Premium SUV group.'},
-  // ── JEEP WRANGLER ───────────────────────────────────────────────────
-  {code:'JWAR', group:'Jeep Wrangler',      core:false, desc:'Jeep Wrangler 4-door — Off-road capable, open-air option. High demand, low supply at CMH.'},
-  {code:'JXAR', group:'Jeep Wrangler',      core:false, desc:'Jeep Wrangler — alternate rate code.'},
+  // ── WRANGLER / BRONCO (4WD) ─────────────────────────────────────────
+  {code:'JWAR', group:'Wrangler / Bronco',      core:false, desc:'Jeep Wrangler 4-door (4WD) — off-road capable, open-air. High demand, low supply at CMH.'},
+  {code:'JXAR', group:'Wrangler / Bronco',      core:false, desc:'Jeep Wrangler — alternate rate code.'},
+  {code:'FJBR', group:'Wrangler / Bronco',      core:false, desc:'NEW eff 2026-08-25 — REPLACES FJAR. Jeep Wrangler Unlimited 4-door + Ford Bronco 4-door, both labeled 4WD.'},
   // ── MINIVAN 7-SEAT ──────────────────────────────────────────────────
   {code:'MVAR', group:'Minivan 7-Seat',     core:false, desc:'Minivan 7-Passenger — Chrysler Pacifica or similar. Family trips, sports teams.'},
   // ── MINIVAN 8-SEAT ──────────────────────────────────────────────────
@@ -9174,11 +9176,12 @@ var FLEET_CODES = [
   // ── PENDING AM VERIFICATION ─────────────────────────────────────────
   {code:'BFAR', group:'⚠ Possible GL Error',core:false, desc:'⚠ Unknown code — not found in GL or email data. May be a GL system error. Do not assign to any group until confirmed.'},
   {code:'WDAR', group:'Luxury Elite SUV',   core:false, desc:'Midsize Elite Luxury SUV — confirmed CMH. Maps to Luxury Elite SUV group.'},
-  {code:'UDAR', group:'Luxury SUV',         core:false, desc:'Midsize Luxury SUV — confirmed CMH. Maps to Luxury SUV group.'},
+  {code:'UDAR', group:'Luxury SUV',         core:false, desc:'LEGACY (replaced by UGAR eff 2026-08-25). Midsize — Luxury SUV group. Kept for open tickets through the switch.'},
+  {code:'UGAR', group:'Luxury SUV',         core:false, desc:'NEW eff 2026-08-25 — REPLACES UDAR. "Premium Elite Crossover / Crossover SUV": Genesis GV80, RR Velar, Defender 110, Discovery, BMW X5, GLE, RR Evoque, Macan, F-Pace, Lincoln Aviator. Maps to Luxury SUV group.'},
   // ── ADDITIONAL CODES FROM EMAIL EXAMPLES ──────────────────────────────────
   {code:'PGAR', group:'Crossovers',         core:false, desc:'Premium Crossover — Buick Envision, Acura RDX or similar. Counts toward Crossovers group at CMH.'},
   {code:'PGDR', group:'Crossovers',         core:false, desc:'Premium Crossover CDW variant. Counts toward Crossovers group at CMH.'},
-  {code:'FJAR', group:'Jeep Wrangler',      core:false, desc:'Jeep Wrangler — alternate rate code. Same vehicle, different billing.'},
+  {code:'FJAR', group:'Wrangler / Bronco',      core:false, desc:'LEGACY (replaced by FJBR eff 2026-08-25). Wrangler 4-door rate code. Kept for open tickets through the switch.'},
   {code:'LFAR', group:'Luxury SUV',         core:false, desc:'Luxury SUV — alternate code. Cadillac Escalade, Lincoln Navigator or similar.'},
   {code:'UXAR', group:'Luxury Elite SUV',   core:false, desc:'Luxury Elite SUV — top tier. Range Rover, BMW X7 or similar.'},
   {code:'WCAR', group:'Luxury Car',         core:false, desc:'Luxury Car — alternate code. Cadillac CT5, Lincoln Continental or similar.'},
