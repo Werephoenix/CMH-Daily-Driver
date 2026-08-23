@@ -18935,6 +18935,7 @@ function _asMgrWorksDay(p, dow, seed){
 function asBuildWeek(seed){
   var roster = (typeof getEffectiveRoster==='function') ? getEffectiveRoster() : [];
   var days = [];
+  var mgrPrev = {};   // pid -> {dow, end} of the manager's most recent worked day
   for(var dow=0; dow<7; dow++){
     var people = [];
     // 1) Fixed-shift staff: CXR / EXIT / RETURNS — placed exactly as bid.
@@ -18956,21 +18957,68 @@ function asBuildWeek(seed){
       var w = _asParseWin(p.patternWindows && p.patternWindows[0] || '8A-6P') || [8,18];
       people.push({nick:p.nick||p.name, name:p.name, role:'ARM', start:w[0], end:w[1], win:p.patternWindows?p.patternWindows[0]:'8A-6P', proposed:false, sunEO:(dow===0)});
     });
-    // 3) Rotating managers (BRM/ABRM/MT) — the PROPOSED piece. One window each,
-    //    biased so index 0 opens and index 1 closes; rest fill mids. Rotated by
-    //    (dow+seed) so the same person isn't always the opener.
+    // 3) Rotating managers (BRM/ABRM/MT) — the PROPOSED piece (v60.110 rest-aware).
+    //    Assigned SEQUENTIALLY across the week with memory (mgrPrev) so we honor the
+    //    shift-science rules (Grimoire 2026-08-23): never seat a <11h close→open
+    //    turnaround, and lean forward (a late finish never gets an early start
+    //    the next day). Still one window each, still cover an opener + a closer.
     var pool = roster.filter(function(p){
       return ['BRM','ABRM','MT'].indexOf(p.role)>=0 && p.patternWindows && _asMgrWorksDay(p,dow,seed);
     });
-    var priority = ['530A-330P','4P-C','8A-6P','10A-8P','6A-4P']; // opener, closer, mids
-    var n = pool.length;
-    pool.forEach(function(_,i){
-      var p = pool[(i + dow + seed) % n];
-      var win = priority[i] || '8A-6P';
-      if(p.patternWindows.indexOf(win)<0) win = p.patternWindows[i % p.patternWindows.length];
-      var w = _asParseWin(win) || [8,18];
-      people.push({nick:p.nick||p.name, name:p.name, role:p.role, start:w[0], end:w[1], win:win, proposed:true});
-    });
+    if(pool.length){
+      var order = pool.map(function(_,i){ return pool[(i+dow+seed) % pool.length]; }); // rotate for fairness
+      var assigned = {};
+      var _dow = dow;
+      var restIfStart = function(p, startH){
+        var prev = mgrPrev[p.id];
+        if(!prev || prev.dow !== _dow-1) return 99;     // off yesterday → unconstrained
+        return (startH + 24) - prev.end;
+      };
+      var seat = function(p, win){
+        var w = _asParseWin(win) || [8,18];
+        people.push({nick:p.nick||p.name, name:p.name, role:p.role, start:w[0], end:w[1], win:win, proposed:true});
+        assigned[p.id] = true; mgrPrev[p.id] = {dow:_dow, end:w[1]};
+      };
+      // OPENER (prefer 530A-330P, else 6A-4P) — must clear ≥11h rest.
+      var opener = null;
+      for(var oi=0; oi<order.length && !opener; oi++){
+        var p = order[oi]; if(assigned[p.id]) continue;
+        var ow = p.patternWindows.indexOf('530A-330P')>=0 ? '530A-330P'
+               : p.patternWindows.indexOf('6A-4P')>=0 ? '6A-4P' : null;
+        if(!ow) continue;
+        var os = ow==='530A-330P' ? 5.5 : 6;
+        if(restIfStart(p, os) >= AS_MIN_REST){ seat(p, ow); opener = p; }
+      }
+      if(!opener){ // nobody fully legal — seat whoever gets the MOST rest (least-bad)
+        var best=null, bestR=-1;
+        order.forEach(function(p){ if(assigned[p.id]) return; var r=restIfStart(p,5.5); if(r>bestR){bestR=r;best=p;} });
+        if(best) seat(best, '530A-330P');
+      }
+      // CLOSER (4P-C) — closing is rest-safe today, and seating them here excludes
+      // them from tomorrow's opener (this is what actually breaks close→open).
+      for(var ci=0; ci<order.length; ci++){
+        var pc = order[ci]; if(assigned[pc.id]) continue;
+        if(pc.patternWindows.indexOf('4P-C')<0) continue;
+        seat(pc, '4P-C'); break;
+      }
+      // MIDS — everyone else gets a mid window that clears ≥11h rest; if none does,
+      // give their LATEST-start pattern window to maximize rest (never an early one).
+      var mids = ['8A-6P','10A-8P','6A-4P'];
+      var mi = 0;
+      order.forEach(function(p){
+        if(assigned[p.id]) return;
+        var choice = null;
+        for(var k=0; k<mids.length && !choice; k++){
+          var w = mids[(mi+k) % mids.length];
+          if(p.patternWindows.indexOf(w)<0) continue;
+          if(restIfStart(p, _asParseWin(w)[0]) >= AS_MIN_REST) choice = w;
+        }
+        if(!choice){
+          choice = p.patternWindows.slice().sort(function(a,b){ return _asParseWin(b)[0] - _asParseWin(a)[0]; })[0];
+        }
+        seat(p, choice); mi++;
+      });
+    }
     // Coverage check per block vs COVERAGE_BY_HOUR.
     var exitCnt = people.filter(function(x){return x.role==='EXIT';}).length;
     var blocks = [{lbl:'Open',h:7},{lbl:'AMid',h:10},{lbl:'Mid',h:14},{lbl:'PM',h:18},{lbl:'Night',h:21}];
