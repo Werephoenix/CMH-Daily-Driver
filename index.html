@@ -2790,14 +2790,16 @@ var CODE_MAP = {
   PCAR:'Premium Car',PDAR:'Premium Car',PCDR:'Premium Car',
   // Standard Elite Car
   RXAR:'Standard Elite Car',
+  // Fullsize Elite Car (v60.104: GXAR per master — BMW 3-Series, C-Class, A4, TLX; sits between Standard Elite and Premium Elite)
+  GXAR:'Fullsize Elite Car',
   // Luxury Car
-  LCAR:'Luxury Car',GXAR:'Luxury Car',LDAR:'Luxury Car',
+  LCAR:'Luxury Car',LDAR:'Luxury Car',
   // Electric/Hybrid
   EVAR:'Electric/Hybrid',EHAR:'Electric/Hybrid',EBAR:'Electric/Hybrid',
   // Convertibles
-  XCAR:'Convertibles',XDAR:'Convertibles',COAR:'Convertibles',
+  XCAR:'Convertibles',XDAR:'Convertibles',COAR:'Convertibles',STAR:'Convertibles',  // v60.104: STAR = Convertible (Mustang/Camaro conv) per master
   // Sports Car
-  SSCAR:'Sports Car',SSAR:'Sports Car',STAR:'Sports Car',
+  SSAR:'Sports Car',  // v60.104: removed SSCAR (invalid 5-char code); STAR moved to Convertibles
   // Compact SUV (CORE)
   CFAR:'Compact SUV',CFDR:'Compact SUV',CFAH:'Compact SUV',CDAR2:'Compact SUV',
   // Midsize SUV (CORE)
@@ -2812,10 +2814,10 @@ var CODE_MAP = {
   PFAR:'Premium SUV',PFDR:'Premium SUV',PFAR2:'Premium SUV',
   // Fullsize SUV
   FFAR:'Fullsize SUV',FFDR:'Fullsize SUV',FRAR:'Fullsize SUV',
-  // Luxury SUV
-  RFAR:'Luxury SUV',RFDR:'Luxury SUV',
-  // Luxury Elite SUV
-  WFAR:'Luxury Elite SUV',UFAR:'Luxury Elite SUV',
+  // Standard Elite SUV (v60.104: RFAR per master — MKC, QX30/50, RDX, X1; was mis-mapped to Luxury SUV)
+  RFAR:'Standard Elite SUV',RFDR:'Standard Elite SUV',
+  // Luxury Elite SUV — WFAR only. UFAR moved to Premium Elite SUV (v60.104, per master).
+  WFAR:'Luxury Elite SUV',UFAR:'Premium Elite SUV',
   // Jeep Wrangler
   JWAR:'Wrangler / Bronco',JXAR:'Wrangler / Bronco',
   // Minivan 7-Seat
@@ -2842,7 +2844,7 @@ var CODE_MAP = {
   FJAR:'Wrangler / Bronco',      FJDR:'Wrangler / Bronco',
   FJBR:'Wrangler / Bronco',      // v60.102: FJBR replaces FJAR (Wrangler Unlimited 4dr + Ford Bronco 4dr, both 4WD), eff 2026-08-25
   LFAR:'Luxury SUV',         LFDR:'Luxury SUV',
-  UXAR:'Luxury Elite SUV',   UXDR:'Luxury Elite SUV',
+  UXAR:'Premium Elite Car',  UXDR:'Premium Elite Car',   // v60.104: UXAR is a Premium Elite CAR/sedan (A6, 5-Series, E-Class) per master, not an SUV
   WCAR:'Luxury Car',         WDAR:'Luxury Elite SUV',
   PPAR:'Large Pickup',       PPBR:'Large Pickup',  PPDR:'Large Pickup',
   UDAR:'Luxury SUV',         UGAR:'Luxury SUV',   // v60.102: UGAR replaces UDAR (Premium Elite Crossover), eff 2026-08-25
@@ -2891,6 +2893,7 @@ var THRESHOLDS = {
   'Luxury Elite SUV':    [4,3], 'Wrangler / Bronco':       [3,2], 'Minivan 7-Seat':      [3,2],
   'Minivan 8-Seat':      [3,2], 'Passenger Van':       [3,2], 'Standard Pickup':     [3,2],
   'Large Pickup':        [3,2], 'Exotic':              [4,3], 'Premium Elite Car':   [4,3],
+  'Fullsize Elite Car':  [3,2],  // v60.104: GXAR (Fullsize Elite) per master
   'Premium Large SUV':   [4,3], 'Premium Elite SUV':   [4,3],
 };
 
@@ -2921,6 +2924,7 @@ var GROUP_META = [
   {n:'Full-Size Car',name:'Full-Size Car',flag:'◆',core:true},
   {n:'Premium Car',name:'Premium Car',flag:'💎',core:false},
   {n:'Standard Elite Car',name:'Standard Elite Car',flag:'⭐',core:false},
+  {n:'Fullsize Elite Car',name:'Fullsize Elite Car',flag:'⭐',core:false},
   {n:'Luxury Car',name:'Luxury Car',flag:'👑',core:false},
   {n:'Electric/Hybrid',name:'Electric/Hybrid',flag:'⚡',core:false},
   {n:'Convertibles',name:'Convertibles',flag:'🌀',core:false},
@@ -9107,7 +9111,7 @@ var FLEET_CODES = [
   // ── LUXURY CAR ──────────────────────────────────────────────────────
   {code:'LCAR', group:'Luxury Car',         core:false, desc:'Luxury Car — Cadillac CT5, Lincoln Continental or similar.'},
   {code:'PXAR', group:'No Supply',          core:false, desc:'Premium Car SPECIAL — a discount-rate Premium Car "sale" (Matt). Manager-assigned, no walk-up inventory (like XXAR/SXAR). The Acura Integra LEFT this code for PCAR on 2026-08-25; PXAR stays for other premium specials.'},
-  {code:'GXAR', group:'Luxury Car',         core:false, desc:'Luxury Car — alternate luxury code.'},
+  {code:'GXAR', group:'Fullsize Elite Car', core:false, desc:'Fullsize Elite Car (per SIPP master) — BMW 3-Series, Mercedes C-Class, Audi A4, Acura TLX. Between Standard Elite and Premium Elite.'},
   {code:'LDAR', group:'Luxury Car',         core:false, desc:'Luxury Car — Debit rate.'},
   // ── PREMIUM ELITE CAR ───────────────────────────────────────────────
   {code:'RXPR', group:'Premium Elite Car',  core:false, desc:'Premium Elite Car — Top sedan class. BMW 5-series, Mercedes E-class or similar.'},
@@ -9121,7 +9125,7 @@ var FLEET_CODES = [
   {code:'COAR', group:'Convertibles',       core:false, desc:'Convertible — open-top vehicle.'},
   // ── SPORTS CAR ──────────────────────────────────────────────────────
   {code:'SSAR', group:'Sports Car',         core:false, desc:'Sports Car — Ford Mustang GT, Dodge Challenger or similar. High demand, tight supply.'},
-  {code:'STAR', group:'Sports Car',         core:false, desc:'Sports Car — alternate code. Camaro, Charger Scat Pack or similar.'},
+  {code:'STAR', group:'Convertibles',       core:false, desc:'Convertible (per SIPP master) — Mustang Convertible, Camaro Convertible, Mini Cooper Convertible. (Was mis-filed under Sports; SSAR is the sports code.)'},
   // ── COMPACT SUV (CORE) ──────────────────────────────────────────────
   {code:'CFAR', group:'Compact SUV',        core:true,  desc:'Compact SUV — Nissan Rogue, Toyota RAV4, Honda CR-V or similar. Most common SUV class.'},
   {code:'CFDR', group:'Compact SUV',        core:true,  desc:'Compact SUV — CDW variant.'},
@@ -9147,11 +9151,11 @@ var FLEET_CODES = [
   {code:'FFDR', group:'Fullsize SUV',       core:false, desc:'Full-Size SUV — CDW variant.'},
   {code:'FRAR', group:'Fullsize SUV',       core:false, desc:'Full-Size SUV — alternate code.'},
   // ── LUXURY SUV ──────────────────────────────────────────────────────
-  {code:'RFAR', group:'Luxury SUV',         core:false, desc:'Luxury SUV — Cadillac Escalade, Lincoln Navigator or similar. Chronically tight at CMH.'},
+  {code:'RFAR', group:'Standard Elite SUV', core:false, desc:'Standard Elite SUV (per SIPP master) — Lincoln MKC, Infiniti QX30/QX50, Acura RDX, BMW X1. (Was mis-mapped to Luxury SUV.)'},
   {code:'RFDR', group:'Luxury SUV',         core:false, desc:'Luxury SUV — CDW variant.'},
   // ── LUXURY ELITE SUV ────────────────────────────────────────────────
   {code:'WFAR', group:'Luxury Elite SUV',   core:false, desc:'Luxury Elite SUV — Top SUV tier. Range Rover, BMW X7 or similar.'},
-  {code:'UFAR', group:'Luxury Elite SUV',   core:false, desc:'Luxury Elite SUV — alternate code.'},
+  {code:'UFAR', group:'Premium Elite SUV',  core:false, desc:'Premium Elite SUV (per SIPP master) — Cadillac SRX, Lincoln MKX, BMW X3, Infiniti QX70, VW Touareg, Volvo XC60/70. (Was mis-mapped to Luxury Elite SUV.)'},
   // ── PREMIUM LARGE SUV ───────────────────────────────────────────────
   {code:'OFAR', group:'Premium Large SUV',  core:false, desc:'Premium Large SUV — 3-row premium. Genesis GV80, Volvo XC90 or similar.'},
   {code:'OFDR', group:'Premium Large SUV',  core:false, desc:'Premium Large SUV — CDW variant.'},
@@ -9189,7 +9193,7 @@ var FLEET_CODES = [
   {code:'PGDR', group:'Crossovers',         core:false, desc:'Premium Crossover CDW variant. Counts toward Crossovers group at CMH.'},
   {code:'FJAR', group:'Wrangler / Bronco',      core:false, desc:'LEGACY (replaced by FJBR eff 2026-08-25). Wrangler 4-door rate code. Kept for open tickets through the switch.'},
   {code:'LFAR', group:'Luxury SUV',         core:false, desc:'Luxury SUV — alternate code. Cadillac Escalade, Lincoln Navigator or similar.'},
-  {code:'UXAR', group:'Luxury Elite SUV',   core:false, desc:'Luxury Elite SUV — top tier. Range Rover, BMW X7 or similar.'},
+  {code:'UXAR', group:'Premium Elite Car',  core:false, desc:'Premium Elite Car/sedan (per SIPP master) — Audi A6, BMW 5-Series, Mercedes E-Class, Kia K900, Lincoln Continental. (Was mis-mapped to Luxury Elite SUV — it is a car, not an SUV.)'},
   {code:'WCAR', group:'Luxury Car',         core:false, desc:'Luxury Car — alternate code. Cadillac CT5, Lincoln Continental or similar.'},
   
   {code:'PPAR', group:'Large Pickup',       core:false, desc:'Large Pickup — F-150 SuperCrew, Ram 1500 or similar. Crew cab full-size.'},
