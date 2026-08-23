@@ -19295,6 +19295,61 @@ function sfSetDeclared(pid){
   if(typeof saveState==='function') saveState();
   openStationFairness();
 }
+// v60.112: AUTOSUGGEST — for the managers working today, propose a station using
+// least-total-time-first fairness (the research rule): the prized post (Emerald
+// Booth) goes to whoever's logged the LEAST Emerald time; Returns goes to whoever's
+// done it LEAST (so those who've been stuck get a break and the load equalizes);
+// remaining fill Floater (variety for whoever's done the most Counter) then Counter.
+var _sfSuggestData = null;
+var SF_APPLY_LABEL = {'Emerald Booth':'Emerald Booth Manager','Returns':'Returns Manager','Counter':'Counter Manager','Floater':'Floater'};
+function _sfHrs(pid, bucket){ return (((STATE.mgrStationLog||{})[pid])||{})[bucket] || 0; }
+function _sfTotal(pid){ var t=((STATE.mgrStationLog||{})[pid])||{}; return Object.keys(t).reduce(function(s,k){return s+(t[k]||0);},0); }
+function sfSuggestStations(){
+  // Who's working today? Reuse the tested weekly engine and take today's row;
+  // stations are for floor managers only (BRM/ABRM/MT) — Area Mgrs are off-site.
+  var wk = (typeof asBuildWeek==='function') ? asBuildWeek(0) : {days:[]};
+  var dow = new Date().getDay();
+  var day = wk.days[dow] || {people:[]};
+  var pool = day.people.filter(function(p){ return ['BRM','ABRM','MT'].indexOf(p.role)>=0; })
+    .map(function(p){ return {nick:p.nick, pid:(p.name||'').replace(/\s/g,'_'), start:p.start, end:p.end}; });
+  var out = [];
+  if(pool.length){
+    // Emerald Booth → least Emerald (tie: least total tracked)
+    pool.sort(function(a,b){ return (_sfHrs(a.pid,'Emerald Booth')-_sfHrs(b.pid,'Emerald Booth')) || (_sfTotal(a.pid)-_sfTotal(b.pid)); });
+    var e = pool.shift(); out.push(Object.assign(e,{station:'Emerald Booth', why:'least Emerald time'}));
+  }
+  if(pool.length){
+    pool.sort(function(a,b){ return (_sfHrs(a.pid,'Returns')-_sfHrs(b.pid,'Returns')) || (_sfTotal(a.pid)-_sfTotal(b.pid)); });
+    var r = pool.shift(); out.push(Object.assign(r,{station:'Returns', why:'least Returns so far — fair to rotate in'}));
+  }
+  if(pool.length>=2){
+    pool.sort(function(a,b){ return _sfHrs(b.pid,'Counter')-_sfHrs(a.pid,'Counter'); });
+    var f = pool.shift(); out.push(Object.assign(f,{station:'Floater', why:'most Counter lately — some variety'}));
+  }
+  pool.forEach(function(x){ out.push(Object.assign(x,{station:'Counter', why:''})); });
+  // stable display order by station priority
+  var pri = {'Emerald Booth':0,'Returns':1,'Floater':2,'Counter':3};
+  out.sort(function(a,b){ return (pri[a.station]-pri[b.station]) || (a.start-b.start); });
+  _sfSuggestData = out;
+  openStationFairness();
+}
+function sfApplySuggest(){
+  if(!_sfSuggestData || !_sfSuggestData.length){ return; }
+  if(!confirm('Apply these station suggestions to today’s timeline?\n\nEach manager gets a full-shift block at the suggested station — you can still split/adjust it on the timeline afterward.')) return;
+  if(!STATE.mgmtBlocks) STATE.mgmtBlocks = {};
+  var n=0;
+  _sfSuggestData.forEach(function(s){
+    if(s.start==null || s.end==null) return;
+    var label = SF_APPLY_LABEL[s.station] || s.station;
+    STATE.mgmtBlocks[s.pid] = [{from:s.start, to:s.end, station:label}];
+    n++;
+  });
+  if(typeof saveState==='function') saveState();
+  if(typeof loadScheduleForToday==='function') loadScheduleForToday(false);
+  if(typeof toast==='function') toast('✓ Applied '+n+' station suggestions to today');
+  _sfSuggestData = null;
+  openStationFairness();
+}
 function sfInjectStyle(){
   if(_sfStyled) return; _sfStyled=true;
   var css = '' +
@@ -19323,6 +19378,13 @@ function sfInjectStyle(){
   '.sf-flag.ok{background:rgba(35,201,131,.14);color:var(--accent,#23C983)}' +
   '.sf-tot{font-size:10.5px;color:var(--txt3,rgba(235,235,245,.5));margin-left:auto}' +
   '.sf-note{font-size:11.5px;color:var(--txt3,rgba(235,235,245,.5));line-height:1.5}' +
+  '.sf-sg{background:rgba(35,201,131,.08);border:1px solid rgba(35,201,131,.35);border-radius:12px;padding:12px 13px;margin-bottom:14px}' +
+  '.sf-sg h4{margin:0 0 4px;font-size:13px;font-weight:800;color:var(--accent,#23C983);display:flex;align-items:center;gap:7px}' +
+  '.sf-sgr{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.05);font-size:12.5px}' +
+  '.sf-sgr:first-of-type{border-top:none}' +
+  '.sf-stn{font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;min-width:90px;text-align:center}' +
+  '.sf-sgn{font-weight:700;color:var(--txt,#fff)}' +
+  '.sf-sgw{font-size:10.5px;color:var(--txt3,rgba(235,235,245,.55));margin-left:auto;text-align:right}' +
   '@media(min-width:900px){.sf-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.sf-row{margin-bottom:0}}';
   var s=document.createElement('style'); s.id='sf-style'; s.textContent=css; document.head.appendChild(s);
 }
@@ -19377,14 +19439,37 @@ function openStationFairness(){
     return '<span class="sf-lg"><span class="sf-sw" style="background:'+b.c+'"></span>'+b.k+(b.tag?(' ('+b.tag+')'):'')+'</span>';
   }).join('');
   var loggedToday = (STATE.mgrStationLoggedDates||{})[_sfTodayKey()];
+  var sgHtml = '';
+  if(_sfSuggestData){
+    if(!_sfSuggestData.length){
+      sgHtml = '<div class="sf-sg"><h4>✨ Today’s station suggestion</h4><p class="sf-note" style="margin:0">No floor managers are scheduled today — nothing to assign.</p></div>';
+    } else {
+      var todayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+      sgHtml = '<div class="sf-sg"><h4>✨ '+todayName+'’s station suggestion</h4>' +
+        _sfSuggestData.map(function(s){
+          var c = _sfColor(s.station);
+          return '<div class="sf-sgr">' +
+            '<span class="sf-stn" style="background:'+c+'22;color:'+c+'">'+s.station+'</span>' +
+            '<span class="sf-sgn">'+s.nick+'</span>' +
+            '<span class="sf-sgw">'+(s.why||'')+'</span></div>';
+        }).join('') +
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+          '<button class="sf-btn" onclick="sfApplySuggest()">Apply to today’s timeline →</button>' +
+          '<button class="sf-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_sfSuggestData=null;openStationFairness()">Dismiss</button>' +
+        '</div>' +
+        '<p class="sf-note" style="margin:9px 0 0">Prized post (Emerald Booth) → whoever’s had the least; Returns → least-done, so no one stays stuck. Applying writes a full-shift block each — split/adjust on the timeline as the day goes.</p></div>';
+    }
+  }
   var html =
   '<div class="sf-hd"><div><div class="eb">Fairness · beta</div><h2>Station Fairness</h2></div>' +
     '<button class="sf-x" onclick="closeStationFairness()" aria-label="Close">✕</button></div>' +
   '<div class="sf-body">' +
     '<div class="sf-tools">' +
+      '<button class="sf-btn" onclick="sfSuggestStations()" style="background:var(--eb,#AF9CFF);color:#1a0f33">✨ Suggest today’s stations</button>' +
       '<button class="sf-btn" onclick="sfLogToday()"'+(loggedToday?' style="opacity:.5"':'')+'>'+(loggedToday?'✓ Today logged':'＋ Log today’s stations')+'</button>' +
-      '<span class="sf-note">Reads the station blocks set on today’s timeline and adds them to the tally. Do it once at end of day.</span>' +
     '</div>' +
+    '<span class="sf-note" style="display:block;margin:-6px 0 12px">✨ Suggest = a fair station for each manager working today, from the balances below. ＋ Log = tally the stations set on today’s timeline (once at end of day).</span>' +
+    sgHtml +
     '<div class="sf-legend">'+legend+'</div>' +
     (anyData ? '' : '<p class="sf-note" style="margin:-4px 0 12px">Tracking starts now — the more days you log, the sharper the fairness picture. Declare each manager’s <b>usual station</b> to describe the intended rotation in the meantime. Flags for <b style="color:var(--na,#FF453A)">stuck in Returns</b> and <b style="color:#AF9CFF">never Emerald Booth</b> appear once there’s tracked time.</p>') +
     '<div class="sf-grid">'+rowsHtml+'</div>' +
@@ -19394,7 +19479,7 @@ function openStationFairness(){
   if(!o){ o=document.createElement('div'); o.id='sf-overlay'; document.body.appendChild(o); }
   o.innerHTML=html; o.style.display='flex'; document.body.style.overflow='hidden';
 }
-function closeStationFairness(){ var o=document.getElementById('sf-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+function closeStationFairness(){ _sfSuggestData=null; var o=document.getElementById('sf-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SETUP HUB (v60.79) — self-service "finish": one discoverable place showing the
