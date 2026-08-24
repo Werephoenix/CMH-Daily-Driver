@@ -19203,7 +19203,7 @@ function _asParseWin(code){
 
 // Which weekdays does a manager work? Area mgrs = M/W/Th/F + every-other Sun.
 // Tue/Wed EOW = BRMs. "varies" = available any day (proposer decides).
-function _asMgrWorksDay(p, dow, seed){
+function _asMgrWorksDay(p, dow, seed, idxMap){
   var pd = (p.patternDays||'').toLowerCase();
   if(pd.indexOf('m/w/th/f')>=0){
     if([1,3,4,5].indexOf(dow)>=0) return true;
@@ -19211,7 +19211,14 @@ function _asMgrWorksDay(p, dow, seed){
     return false;
   }
   if(pd.indexOf('tue/wed')>=0) return dow===2 || dow===3;
-  return true; // varies — treat as available
+  // v60.121: "varies" managers are full-time with 2 CONSECUTIVE days off — no one
+  // is scheduled all 7 days. Off-pair is staggered by the manager's stable index
+  // (×3 spreads consecutive indices across the week) + the seed, so coverage stays
+  // even and Regenerate reshuffles who's off when.
+  var idx = (idxMap && idxMap[p.id]!=null) ? idxMap[p.id] : 0;
+  var off1 = ((idx*3) + (seed*2)) % 7;
+  var off2 = (off1 + 1) % 7;
+  return dow!==off1 && dow!==off2;
 }
 
 // Build the whole week. Returns {days:[{dow,label,people:[{nick,role,start,end,win,proposed}], cov:[...]}]}
@@ -19219,6 +19226,11 @@ function asBuildWeek(seed){
   var roster = (typeof getEffectiveRoster==='function') ? getEffectiveRoster() : [];
   var days = [];
   var mgrPrev = {};   // pid -> {dow, end} of the manager's most recent worked day
+  // v60.121: stable index per "varies" manager → staggered days off (see _asMgrWorksDay)
+  var _variesIdx = {};
+  roster.filter(function(p){ return ['BRM','ABRM','MT'].indexOf(p.role)>=0 && p.patternWindows && /varies/i.test(p.patternDays||''); })
+    .sort(function(a,b){ return String(a.id).localeCompare(String(b.id)); })
+    .forEach(function(p,i){ _variesIdx[p.id]=i; });
   var weekStart = _asWeekStart();
   for(var dow=0; dow<7; dow++){
     var people = [];
@@ -19255,7 +19267,7 @@ function asBuildWeek(seed){
     // 2) Area Managers (fixed 8A-6P on their days).
     roster.forEach(function(p){
       if(p.role!=='ARM') return;
-      if(!_asMgrWorksDay(p, dow, seed)) return;
+      if(!_asMgrWorksDay(p, dow, seed, _variesIdx)) return;
       if(_isOff(p.name)) return; // off / PTO this date
       var w = _asParseWin(p.patternWindows && p.patternWindows[0] || '8A-6P') || [8,18];
       people.push({nick:p.nick||p.name, name:p.name, role:'ARM', start:w[0], end:w[1], win:p.patternWindows?p.patternWindows[0]:'8A-6P', proposed:false, sunEO:(dow===0)});
@@ -19266,7 +19278,7 @@ function asBuildWeek(seed){
     //    turnaround, and lean forward (a late finish never gets an early start
     //    the next day). Still one window each, still cover an opener + a closer.
     var pool = roster.filter(function(p){
-      return ['BRM','ABRM','MT'].indexOf(p.role)>=0 && p.patternWindows && _asMgrWorksDay(p,dow,seed) && !_isOff(p.name);
+      return ['BRM','ABRM','MT'].indexOf(p.role)>=0 && p.patternWindows && _asMgrWorksDay(p,dow,seed,_variesIdx) && !_isOff(p.name);
     });
     if(pool.length){
       var order = pool.map(function(_,i){ return pool[(i+dow+seed) % pool.length]; }); // rotate for fairness
@@ -19280,7 +19292,9 @@ function asBuildWeek(seed){
       var seat = function(p, win){
         var w = _asParseWin(win) || [8,18];
         people.push({nick:p.nick||p.name, name:p.name, role:p.role, start:w[0], end:w[1], win:win, proposed:true});
-        assigned[p.id] = true; mgrPrev[p.id] = {dow:_dow, end:w[1]};
+        assigned[p.id] = true;
+        var prevRun = (mgrPrev[p.id] && mgrPrev[p.id].dow===_dow-1) ? (mgrPrev[p.id].closeRun||0) : 0;
+        mgrPrev[p.id] = {dow:_dow, end:w[1], closeRun: (win==='4P-C' ? prevRun+1 : 0)};
       };
       // OPENER (prefer 530A-330P, else 6A-4P) — must clear ≥11h rest.
       var opener = null;
@@ -19297,15 +19311,36 @@ function asBuildWeek(seed){
         order.forEach(function(p){ if(assigned[p.id]) return; var r=restIfStart(p,5.5); if(r>bestR){bestR=r;best=p;} });
         if(best) seat(best, '530A-330P');
       }
-      // CLOSER (4P-C) — closing is rest-safe today, and seating them here excludes
-      // them from tomorrow's opener (this is what actually breaks close→open).
-      for(var ci=0; ci<order.length; ci++){
+      // CLOSER (4P-C). v60.121: a CONSISTENT closer for up to 3 days (each close→
+      // close is 16.5h rest — healthy), then rotate to a fresh manager. This avoids
+      // both close→open flips AND 4+ nights stacked on one person, and keeps the
+      // schedule steady rather than churning the late shift daily. The rotated-off
+      // closer is handled by the mids step (never re-closed).
+      var closerDone = false;
+      // 1) continue yesterday's closer while under the 3-day cap
+      for(var ci=0; ci<order.length && !closerDone; ci++){
         var pc = order[ci]; if(assigned[pc.id]) continue;
         if(pc.patternWindows.indexOf('4P-C')<0) continue;
-        seat(pc, '4P-C'); break;
+        var cp = mgrPrev[pc.id];
+        if(cp && cp.dow===_dow-1 && cp.end>=22 && (cp.closeRun||0)<3){ seat(pc,'4P-C'); closerDone=true; }
+      }
+      // 2) else a FRESH closer who did not close yesterday
+      for(var cj=0; cj<order.length && !closerDone; cj++){
+        var pc2 = order[cj]; if(assigned[pc2.id]) continue;
+        if(pc2.patternWindows.indexOf('4P-C')<0) continue;
+        var cp2 = mgrPrev[pc2.id];
+        if(!(cp2 && cp2.dow===_dow-1 && cp2.end>=22)){ seat(pc2,'4P-C'); closerDone=true; }
+      }
+      // 3) fallback: anyone able to close
+      for(var ck=0; ck<order.length && !closerDone; ck++){
+        var pc3 = order[ck]; if(assigned[pc3.id]) continue;
+        if(pc3.patternWindows.indexOf('4P-C')>=0){ seat(pc3,'4P-C'); closerDone=true; }
       }
       // MIDS — everyone else gets a mid window that clears ≥11h rest; if none does,
-      // give their LATEST-start pattern window to maximize rest (never an early one).
+      // give their LATEST-start NON-CLOSE window (max rest without re-stacking a
+      // close). v60.121: the old fallback picked the latest window overall = 4P-C,
+      // which silently re-closed anyone who closed yesterday and stacked closes on
+      // one manager. Never auto-assign a close in the mids step.
       var mids = ['8A-6P','10A-8P','6A-4P'];
       var mi = 0;
       order.forEach(function(p){
@@ -19317,7 +19352,9 @@ function asBuildWeek(seed){
           if(restIfStart(p, _asParseWin(w)[0]) >= AS_MIN_REST) choice = w;
         }
         if(!choice){
-          choice = p.patternWindows.slice().sort(function(a,b){ return _asParseWin(b)[0] - _asParseWin(a)[0]; })[0];
+          var nonClose = p.patternWindows.filter(function(w){ return w!=='4P-C'; });
+          var pickFrom = nonClose.length ? nonClose : p.patternWindows;
+          choice = pickFrom.slice().sort(function(a,b){ return _asParseWin(b)[0] - _asParseWin(a)[0]; })[0];
         }
         seat(p, choice); mi++;
       });
@@ -19388,6 +19425,37 @@ function asRestWarnings(wk){
   return warns;
 }
 
+// v60.121: consecutive-load checks (shift-science brief, Grimoire 2026-08-23):
+// max ~5–6 workdays in a row, and ~3–4 consecutive late/close shifts. Flags a
+// 7-day run with no day off, and 4+ closes (shift ending ≥10pm) in a row.
+var AS_MAX_RUN = 6, AS_MAX_NIGHTS = 4;
+function asLoadWarnings(wk){
+  // Scoped to MANAGERS — these are the shifts the scheduler assigns and can fix.
+  // (CXR/Exit/Returns run fixed bids, so a long/late bid run is theirs to change,
+  // not the scheduler's; flagging it here would be noise.)
+  var byName = {};
+  wk.days.forEach(function(d){
+    d.people.forEach(function(p){
+      if(!p.name || ['ARM','BRM','ABRM','MT'].indexOf(p.role)<0) return;
+      if(!byName[p.name]) byName[p.name] = {};
+      byName[p.name][d.dow] = {start:p.start, end:p.end, nick:p.nick, role:p.role};
+    });
+  });
+  var longRun = [], nights = [];
+  Object.keys(byName).forEach(function(name){
+    var days = byName[name];
+    var run=0, maxRun=0, nick=name, role='';
+    for(var dow=0; dow<7; dow++){ if(days[dow]){ run++; nick=days[dow].nick||name; role=days[dow].role; if(run>maxRun) maxRun=run; } else run=0; }
+    if(maxRun > AS_MAX_RUN) longRun.push({nick:nick, role:role, days:maxRun});
+    var lrun=0, lmax=0;
+    for(var d2=0; d2<7; d2++){ if(days[d2] && days[d2].end>=22){ lrun++; if(lrun>lmax) lmax=lrun; } else lrun=0; }
+    if(lmax >= AS_MAX_NIGHTS) nights.push({nick:nick, role:role, n:lmax});
+  });
+  longRun.sort(function(a,b){return b.days-a.days;});
+  nights.sort(function(a,b){return b.n-a.n;});
+  return {longRun:longRun, nights:nights};
+}
+
 function asInjectStyle(){
   if(_asStyled) return; _asStyled=true;
   var css = '' +
@@ -19434,15 +19502,30 @@ function openAutoScheduler(){
   asInjectStyle();
   var wk = asBuildWeek(_asSeed);
   var warns = asRestWarnings(wk);
+  var load = asLoadWarnings(wk);
   var warnHtml;
+  var sections = '';
   if(warns.length){
-    warnHtml = '<div class="as-warn"><h4>⚠ '+warns.length+' short-rest turnaround'+(warns.length>1?'s':'')+' (under '+AS_MIN_REST+'h rest)</h4>' +
+    sections += '<h4>⚠ '+warns.length+' short-rest turnaround'+(warns.length>1?'s':'')+' (under '+AS_MIN_REST+'h rest)</h4>' +
       warns.map(function(w){
         return '<div class="wl">'+w.nick+' — '+AS_DOW[w.dowA]+' <b>'+w.aWin+'</b> → '+AS_DOW[w.dowB]+' <b>'+w.bWin+'</b> · <span class="wr">only '+(Math.round(w.rest*10)/10)+'h rest</span></div>';
       }).join('') +
-      '<p class="as-note" style="margin-top:8px">Aim for ≥'+AS_MIN_REST+'h between shifts (≥'+AS_TARGET_REST+'h ideal). Close→open flips like these are the ones to smooth out — try ↻ Regenerate, or hand-adjust these managers.</p></div>';
+      '<p class="as-note" style="margin:6px 0 2px">Aim for ≥'+AS_MIN_REST+'h between shifts (≥'+AS_TARGET_REST+'h ideal). Close→open flips are the ones to smooth out.</p>';
+  }
+  if(load.longRun.length){
+    sections += '<h4'+(warns.length?' style="margin-top:10px"':'')+'>⚠ '+load.longRun.length+' working 7 days straight (no day off)</h4>' +
+      load.longRun.map(function(x){ return '<div class="wl">'+x.nick+' — <span class="wr">'+x.days+' days in a row</span></div>'; }).join('') +
+      '<p class="as-note" style="margin:6px 0 2px">Aim for ≤'+AS_MAX_RUN+' workdays before a day off. (CXR bids set their own days — this mostly flags managers.)</p>';
+  }
+  if(load.nights.length){
+    sections += '<h4'+((warns.length||load.longRun.length)?' style="margin-top:10px"':'')+'>⚠ '+load.nights.length+' with '+AS_MAX_NIGHTS+'+ closes in a row</h4>' +
+      load.nights.map(function(x){ return '<div class="wl">'+x.nick+' — <span class="wr">'+x.n+' late shifts in a row</span></div>'; }).join('') +
+      '<p class="as-note" style="margin:6px 0 2px">Keep consecutive late/close shifts to ≤3 (hard cap 4) — try ↻ Regenerate to spread them.</p>';
+  }
+  if(sections){
+    warnHtml = '<div class="as-warn">'+sections+'</div>';
   } else {
-    warnHtml = '<div class="as-warn clear"><h4>✓ No short-rest turnarounds</h4><p class="as-note" style="margin:0">Everyone gets at least '+AS_MIN_REST+'h between shifts this week.</p></div>';
+    warnHtml = '<div class="as-warn clear"><h4>✓ Healthy rotation</h4><p class="as-note" style="margin:0">No short-rest turnarounds, no 7-day stretches, no stacked closes this week.</p></div>';
   }
   var daysHtml = wk.days.map(function(d){
     var covHtml = d.cov.map(function(c){
@@ -19605,6 +19688,17 @@ var _sfSuggestData = null;
 var SF_APPLY_LABEL = {'Emerald Booth':'Emerald Booth Manager','Returns':'Returns Manager','Counter':'Counter Manager','Floater':'Floater'};
 function _sfHrs(pid, bucket){ return (((STATE.mgrStationLog||{})[pid])||{})[bucket] || 0; }
 function _sfTotal(pid){ var t=((STATE.mgrStationLog||{})[pid])||{}; return Object.keys(t).reduce(function(s,k){return s+(t[k]||0);},0); }
+// v60.121: is a role allowed at a station, per the adopted Branch Interview answer?
+// Only Counter/Returns have eligibility questions; Emerald Booth/Floater are open.
+// Empty/unset list = everyone eligible (no behavior change until answered).
+function _sfEligible(role, station){
+  var cfg = STATE.branchConfig || {};
+  var key = station==='Counter' ? 'eligCounter' : station==='Returns' ? 'eligReturns' : station==='Exit' ? 'eligExit' : null;
+  if(!key) return true;
+  var list = cfg[key];
+  if(!Array.isArray(list) || !list.length) return true;
+  return list.indexOf(role) >= 0;
+}
 function sfSuggestStations(){
   // Who's working today? Reuse the tested weekly engine, anchored to THIS week,
   // and take the row whose DATE is today — so this inherits the scheduler's PTO/
@@ -19616,7 +19710,7 @@ function sfSuggestStations(){
   var todayKey = _asDateKeyOf(new Date());
   var day = (wk.days||[]).filter(function(d){return d.date===todayKey;})[0] || wk.days[new Date().getDay()] || {people:[]};
   var pool = day.people.filter(function(p){ return ['BRM','ABRM','MT'].indexOf(p.role)>=0; })
-    .map(function(p){ return {nick:p.nick, pid:(p.name||'').replace(/\s/g,'_'), start:p.start, end:p.end}; });
+    .map(function(p){ return {nick:p.nick, pid:(p.name||'').replace(/\s/g,'_'), role:p.role, start:p.start, end:p.end}; });
   var out = [];
   if(pool.length){
     // Emerald Booth → least Emerald (tie: least total tracked)
@@ -19625,13 +19719,22 @@ function sfSuggestStations(){
   }
   if(pool.length){
     pool.sort(function(a,b){ return (_sfHrs(a.pid,'Returns')-_sfHrs(b.pid,'Returns')) || (_sfTotal(a.pid)-_sfTotal(b.pid)); });
-    var r = pool.shift(); out.push(Object.assign(r,{station:'Returns', why:'least Returns so far — fair to rotate in'}));
+    // v60.121: respect the Branch Interview "who can work Returns" answer — prefer
+    // an eligible manager; only fall back to keep Returns covered if none is.
+    var ri = pool.findIndex(function(p){ return _sfEligible(p.role,'Returns'); });
+    var elig = ri>=0; if(ri<0) ri=0;
+    var r = pool.splice(ri,1)[0];
+    out.push(Object.assign(r,{station:'Returns', why: elig ? 'least Returns so far — fair to rotate in' : 'least Returns (no Returns-eligible mgr set)'}));
   }
   if(pool.length>=2){
     pool.sort(function(a,b){ return _sfHrs(b.pid,'Counter')-_sfHrs(a.pid,'Counter'); });
     var f = pool.shift(); out.push(Object.assign(f,{station:'Floater', why:'most Counter lately — some variety'}));
   }
-  pool.forEach(function(x){ out.push(Object.assign(x,{station:'Counter', why:''})); });
+  // remaining → Counter, unless the branch says their role can't work Counter → Floater
+  pool.forEach(function(x){
+    var canCounter = _sfEligible(x.role,'Counter');
+    out.push(Object.assign(x,{station: canCounter?'Counter':'Floater', why: canCounter?'':'not Counter-eligible → floater'}));
+  });
   // stable display order by station priority
   var pri = {'Emerald Booth':0,'Returns':1,'Floater':2,'Counter':3};
   out.sort(function(a,b){ return (pri[a.station]-pri[b.station]) || (a.start-b.start); });
