@@ -3706,6 +3706,7 @@ function loadState() {
       s.mgrStationLoggedDates = (s.mgrStationLoggedDates && typeof s.mgrStationLoggedDates === 'object') ? s.mgrStationLoggedDates : {}; // v60.111: {date:true} double-log guard
       s.mgrStationDeclared    = (s.mgrStationDeclared && typeof s.mgrStationDeclared === 'object') ? s.mgrStationDeclared : {};  // v60.111: {pid:station} declared usual station
       s.branchResponses       = (s.branchResponses && typeof s.branchResponses === 'object') ? s.branchResponses : {};  // v60.117: {mgrName:{answers,notes,ts}} per-manager interview viewpoints
+      s.pto                   = (s.pto && typeof s.pto === 'object') ? s.pto : {};  // v60.120: {YYYY-MM-DD:{pid:true}} time-off (read by scheduler + calendar + station suggest)
       return s;
     }
   } catch(e) {}
@@ -3716,7 +3717,7 @@ function loadState() {
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
     closeFields:{}, coverageThresholds:null, floorTargets:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
-    mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{},
+    mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{}, pto:{},
   };
 }
 
@@ -18649,6 +18650,24 @@ function openAutoSchedulerForWeekOf(key){
   closeMasterCalendar();
   openAutoScheduler();
 }
+// v60.120: PTO / time-off entry, writing the STATE.pto store everything reads.
+function mcPtoStore(){ if(!STATE.pto) STATE.pto={}; return STATE.pto; }
+function mcPtoPidsOn(key){ var d=mcPtoStore()[key]; return d? Object.keys(d).filter(function(p){return d[p];}) : []; }
+function mcTogglePtoForm(key){ var f=document.getElementById('mc-pto-form'); if(f) f.style.display = (f.style.display==='none'?'block':'none'); }
+function mcAddPto(key){
+  var who=document.getElementById('mc-pto-who'), daysEl=document.getElementById('mc-pto-days');
+  if(!who || !who.value){ if(typeof toast==='function') toast('Pick a person'); return; }
+  var pid=who.value; var n=Math.max(1, Math.min(60, parseInt(daysEl&&daysEl.value,10)||1));
+  var store=mcPtoStore(); var start=new Date(key+'T12:00:00');
+  for(var i=0;i<n;i++){ var d=new Date(start); d.setDate(start.getDate()+i); var k=_mcKey(d); if(!store[k]) store[k]={}; store[k][pid]=true; }
+  if(typeof saveState==='function') saveState();
+  if(typeof toast==='function') toast('🌴 '+pid.replace(/_/g,' ')+' off '+(n>1?(n+' days'):'this day'));
+  mcDay(key);
+}
+function mcRemovePto(key,pid){
+  var store=mcPtoStore(); if(store[key]){ delete store[key][pid]; if(!Object.keys(store[key]).length) delete store[key]; }
+  if(typeof saveState==='function') saveState(); mcDay(key);
+}
 function _mcHr(h){ if(h==null) return '?'; var hh=((h%24)+24)%24; var ap=hh<12?'a':'p'; var h12=Math.floor(hh)%12; if(h12===0)h12=12; var m=Math.round((hh-Math.floor(hh))*60); return h12+(m?':'+String(m).padStart(2,'0'):'')+ap; }
 function mcFmtShift(c){ if(Array.isArray(c)) return c.length>=2 ? _mcHr(c[0])+'–'+_mcHr(c[1]) : String(c); return String(c); }
 // v60.72 (Round 1): demand model with event ripple (Design §7) — heavy event:
@@ -18776,9 +18795,22 @@ function mcDay(key){
   else h+='<div class="mc-none">No schedule on file for this day</div>';
   // v60.115: real time-off layer + planning access, all in this one place.
   var offList = mcTimeOffOn(key);
+  var ptoPids = mcPtoPidsOn(key);
   h+='</div><div class="mc-sec"><div class="mc-sec-h">🌴 Time off'+(offList.length?' · '+offList.length:'')+'</div>';
-  if(offList.length) offList.forEach(function(x){ h+='<div class="mc-item"><span class="mc-name">'+biEsc(x.name)+'</span><span class="mc-lvl" style="color:'+(x.kind==='PTO'?'#23C983':'#8E8E93')+'">'+x.kind+'</span></div>'; });
+  if(offList.length) offList.forEach(function(x){
+    var pid=x.name.replace(/\s/g,'_'); var canRemove=ptoPids.indexOf(pid)>=0;
+    h+='<div class="mc-item"><span class="mc-name">'+biEsc(x.name)+'</span><span class="mc-lvl" style="color:'+(x.kind==='PTO'?'#23C983':'#8E8E93')+'">'+x.kind+'</span>'
+      +(canRemove?'<button class="mc-rm" title="Remove time off" onclick="mcRemovePto(\''+key+'\',\''+pid+'\')">✕</button>':'')+'</div>';
+  });
   else h+='<div class="mc-none">Nobody off this day</div>';
+  // ＋ mark time off (writes STATE.pto; the scheduler + station suggestions respect it)
+  var _roster = (typeof getEffectiveRoster==='function')? getEffectiveRoster():[];
+  var _opts = _roster.slice().sort(function(a,b){return (a.name<b.name?-1:1);}).map(function(p){ var pid=p.name.replace(/\s/g,'_'); return '<option value="'+biEsc(pid)+'">'+biEsc(p.name)+' ('+biEsc(p.role)+')</option>'; }).join('');
+  h+='<button class="mc-addbtn" style="background:#1C1C1E;border:1px solid rgba(255,255,255,.14);color:#fff;margin-top:6px" onclick="mcTogglePtoForm(\''+key+'\')">＋ Mark time off</button>'
+    +'<div id="mc-pto-form" style="display:none;margin-top:8px">'
+    +'<select id="mc-pto-who" class="bi-in" style="max-width:none;width:100%;margin-bottom:6px"><option value="">Who is off?…</option>'+_opts+'</select>'
+    +'<div style="display:flex;gap:8px;align-items:center"><input id="mc-pto-days" class="bi-in" type="number" value="1" min="1" max="60" style="max-width:70px"><span class="mc-none" style="margin:0">day(s) from this date</span>'
+    +'<button class="mc-addbtn" style="margin-left:auto" onclick="mcAddPto(\''+key+'\')">Add</button></div></div>';
   h+='</div><div class="mc-sec"><div class="mc-sec-h">🗓 Plan</div>'+
      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
        '<button class="mc-addbtn" style="background:#23C983;color:#00301c" onclick="openAutoSchedulerForWeekOf(\''+key+'\')">🤖 Plan this week</button>'+
