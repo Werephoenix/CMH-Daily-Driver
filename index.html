@@ -3687,6 +3687,7 @@ function loadState() {
       s.mgrStationLog         = (s.mgrStationLog && typeof s.mgrStationLog === 'object') ? s.mgrStationLog : {};                 // v60.111: {pid:{station:hours}} station-fairness tally
       s.mgrStationLoggedDates = (s.mgrStationLoggedDates && typeof s.mgrStationLoggedDates === 'object') ? s.mgrStationLoggedDates : {}; // v60.111: {date:true} double-log guard
       s.mgrStationDeclared    = (s.mgrStationDeclared && typeof s.mgrStationDeclared === 'object') ? s.mgrStationDeclared : {};  // v60.111: {pid:station} declared usual station
+      s.branchResponses       = (s.branchResponses && typeof s.branchResponses === 'object') ? s.branchResponses : {};  // v60.117: {mgrName:{answers,notes,ts}} per-manager interview viewpoints
       return s;
     }
   } catch(e) {}
@@ -3697,7 +3698,7 @@ function loadState() {
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
     closeFields:{}, coverageThresholds:null, floorTargets:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
-    mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{},
+    mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{},
   };
 }
 
@@ -18087,52 +18088,60 @@ if (document.readyState === 'loading') {
 // live engines is a later phase — this phase captures + persists + exports.
 // Companion to the printable "CMH Branch Questionnaire".
 // ═══════════════════════════════════════════════════════════════════════════
+// v60.117: refined for the info we now hold + MULTI-MANAGER consistency.
+//   scope:'fact' = one branch truth (hours, coverage minimums, volume) — shared
+//     across all respondents and PRE-FILLED from the live engines (biDefault);
+//     managers confirm or adjust rather than answering blind.
+//   scope:'view' = a judgment/opinion that varies by manager — asked of EACH
+//     respondent separately; the consistency view surfaces agreement vs. split
+//     and adopts one standard. Keys used by the live wirings (sigCancel/Weather/
+//     Flights/Events, defaultSort, netBad) are unchanged.
 var BRANCH_INTERVIEW = [
-  { title:'Branch basics', tunes:'hours & peak', qs:[
-    {k:'hoursOpen',  type:'short', q:'What time do you open?',  ph:'6:00 AM'},
-    {k:'hoursClose', type:'short', q:'What time do you close?', ph:'12:00 AM'},
-    {k:'peakFrom',   type:'short', q:'Busiest window — from',   ph:'11:00 AM'},
-    {k:'peakTo',     type:'short', q:'…to',                     ph:'3:00 PM'},
+  { title:'Hours & peak', tunes:'coverage windows', qs:[
+    {k:'hoursOpen',  type:'short', q:'Open time',  ph:'6:00 AM', scope:'fact'},
+    {k:'hoursClose', type:'short', q:'Close time', ph:'12:30 AM', scope:'fact'},
+    {k:'peakFrom',   type:'short', q:'Busiest window — from', ph:'11:00 AM', scope:'fact'},
+    {k:'peakTo',     type:'short', q:'…to',                   ph:'3:00 PM', scope:'fact'},
+    {k:'lunchLen',   type:'number', q:'Lunch length (minutes)', scope:'fact'},
   ]},
-  { title:'Coverage minimums', tunes:'Now alerts + one-tap fix', qs:[
-    {k:'minPeakCounter', type:'number', q:'Min at Counter during PEAK'},
-    {k:'minPeakExit',    type:'number', q:'Min at Exit booth during PEAK'},
-    {k:'minPeakReturns', type:'number', q:'Min at Returns during PEAK'},
-    {k:'minOffCounter',  type:'number', q:'Min at Counter at SLOW times'},
-    {k:'minOffExit',     type:'number', q:'Min at Exit booth at SLOW times'},
-    {k:'minOffReturns',  type:'number', q:'Min at Returns at SLOW times'},
-    {k:'protectFirst',   type:'single', q:'When short, protect which station first?', opts:['Counter','Exit','Returns']},
-    {k:'lunchLen',       type:'number', q:'Lunch length (minutes)'},
+  { title:'Coverage minimums', tunes:'Now alerts + scheduler', qs:[
+    {k:'minPeakCounter', type:'number', q:'Min at Counter — PEAK', scope:'fact'},
+    {k:'minPeakExit',    type:'number', q:'Min at Exit — PEAK', scope:'fact'},
+    {k:'minPeakReturns', type:'number', q:'Min at Returns — PEAK', scope:'fact'},
+    {k:'minOffCounter',  type:'number', q:'Min at Counter — SLOW', scope:'fact'},
+    {k:'minOffExit',     type:'number', q:'Min at Exit — SLOW', scope:'fact'},
+    {k:'minOffReturns',  type:'number', q:'Min at Returns — SLOW', scope:'fact'},
   ]},
-  { title:'Scheduling rules', tunes:'auto-scheduler blueprint', qs:[
-    {k:'eligCounter', type:'multi',  q:'Who can work Counter? (tap all)',    opts:['CXR','MT','ABRM','BRM']},
-    {k:'eligExit',    type:'multi',  q:'Who can work Exit booth? (tap all)', opts:['CXR','MT','ABRM','BRM']},
-    {k:'eligReturns', type:'multi',  q:'Who can work Returns? (tap all)',    opts:['CXR','MT','ABRM','BRM']},
-    {k:'rotation',    type:'single', q:'How do people move between stations?', opts:['Stay assigned','Rotate on a timer','Move by need']},
-    {k:'fairExit',    type:'single', q:'Spread exit-booth time evenly across the team?', opts:['Yes','No']},
-    {k:'templates',   type:'multi',  q:'Shift templates you use (tap all)', opts:['5:30a-2p','5:30a-3:30p','6a-4p','8a-6p','9a-7p','10a-8p','12p-10p','4p-close']},
-    {k:'daysOn',      type:'number', q:'Typical days on per person per week'},
-    {k:'seniority',   type:'single', q:'Does seniority affect shift choice?', opts:['No','Yes']},
-    {k:'mgrOpenClose',type:'single', q:'Always need an opening + closing manager scheduled?', opts:['Yes','No']},
-    {k:'hardRules',   type:'text',   q:'Any hard rules the schedule must never break?'},
-    {k:'timeOff',     type:'text',   q:'How are time-off / vacation requests handled?'},
+  { title:'Judgment calls', tunes:'scheduler + one-tap fix', view:true, qs:[
+    {k:'protectFirst', type:'single', q:'When short, protect which station first?', opts:['Counter','Exit','Returns'], scope:'view'},
+    {k:'rotation',     type:'single', q:'How do people move between stations?', opts:['Stay assigned','Rotate on a timer','Move by need'], scope:'view'},
+    {k:'fairExit',     type:'single', q:'Spread exit-booth time evenly across the team?', opts:['Yes','No'], scope:'view'},
+    {k:'seniority',    type:'single', q:'Does seniority affect shift choice?', opts:['No','Yes'], scope:'view'},
+    {k:'mgrOpenClose', type:'single', q:'Always schedule an opening + closing manager?', opts:['Yes','No'], scope:'view'},
   ]},
-  { title:'Availability board', tunes:'board layout', opt:true, qs:[
-    {k:'policyFreq',     type:'single', q:'How often do walk-up / 24hr policies change per shift?', opts:['Several times','About once','Rarely']},
-    {k:'statProminence', type:'single', q:'The four totals — glanced constantly, or reference-only?', opts:['Constantly','Sometimes','Reference-only']},
-    {k:'defaultSort',    type:'single', q:'Default board order', opts:['Problems first','Core then non-core','A–Z']},
+  { title:'Who can work where', tunes:'station suggestions', view:true, qs:[
+    {k:'eligCounter', type:'multi', q:'Who can work Counter? (tap all)',    opts:['CXR','MT','ABRM','BRM'], scope:'view'},
+    {k:'eligExit',    type:'multi', q:'Who can work Exit booth? (tap all)', opts:['CXR','MT','ABRM','BRM'], scope:'view'},
+    {k:'eligReturns', type:'multi', q:'Who can work Returns? (tap all)',    opts:['CXR','MT','ABRM','BRM'], scope:'view'},
   ]},
-  { title:'Priorities & volume', tunes:'Now hierarchy + thresholds', opt:true, qs:[
-    {k:'sigCancel',  type:'number', q:'Rank importance 1–4 (1=top): Cancellations'},
-    {k:'sigWeather', type:'number', q:'Weather'},
-    {k:'sigFlights', type:'number', q:'Flight banks'},
-    {k:'sigEvents',  type:'number', q:'City events'},
-    {k:'resLow',     type:'number', q:'Typical daily reservations — low'},
-    {k:'resHigh',    type:'number', q:'Typical daily reservations — high'},
-    {k:'netBad',     type:'number', q:'"Net" below what number is a problem?'},
+  { title:'Board & signals', tunes:'board + Now', view:true, opt:true, qs:[
+    {k:'defaultSort',    type:'single', q:'Default board order', opts:['Problems first','Core then non-core','A–Z'], scope:'view'},
+    {k:'statProminence', type:'single', q:'The four totals — glanced constantly, or reference?', opts:['Constantly','Sometimes','Reference-only'], scope:'view'},
+    {k:'policyFreq',     type:'single', q:'How often do walk-up / 24hr policies change per shift?', opts:['Several times','About once','Rarely'], scope:'view'},
+    {k:'sigCancel',  type:'number', q:'Rank 1–4 (1=top): Cancellations', scope:'view'},
+    {k:'sigWeather', type:'number', q:'Weather', scope:'view'},
+    {k:'sigFlights', type:'number', q:'Flight banks', scope:'view'},
+    {k:'sigEvents',  type:'number', q:'City events', scope:'view'},
   ]},
-  { title:'Anything else', qs:[
-    {k:'notes', type:'text', q:'Anything else we should know?'},
+  { title:'Volume thresholds', tunes:'Net coloring', opt:true, qs:[
+    {k:'resLow',  type:'number', q:'Typical daily reservations — low', scope:'fact'},
+    {k:'resHigh', type:'number', q:'Typical daily reservations — high', scope:'fact'},
+    {k:'netBad',  type:'number', q:'"Net" below what number is a problem?', scope:'view'},
+  ]},
+  { title:'Rules & notes', tunes:'notes', view:true, qs:[
+    {k:'hardRules', type:'text', q:'Any hard rules the schedule must never break?', scope:'view'},
+    {k:'timeOff',   type:'text', q:'How are time-off / vacation requests handled?', scope:'view'},
+    {k:'notes',     type:'text', q:'Anything else we should know?', scope:'view'},
   ]},
 ];
 var _biStyled = false;
@@ -18168,31 +18177,134 @@ function biInjectStyle(){
   +'.bi-foot{flex:none;display:flex;gap:10px;padding:12px 16px;border-top:1px solid rgba(255,255,255,.08);background:rgba(0,0,0,.6)}'
   +'.bi-btn{flex:1;background:#0A84FF;color:#fff;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}'
   +'.bi-btn.gh{background:#1C1C1E;border:1px solid rgba(255,255,255,.14);color:#fff;flex:0 0 auto;padding:13px 16px}'
+  +'.bi-respbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 18px 4px;flex:none}'
+  +'.bi-resplbl{font-size:11px;font-weight:700;color:#8E8E93;text-transform:uppercase;letter-spacing:.05em;margin-right:2px}'
+  +'.bi-resp{background:#1C1C1E;color:#EBEBF5;border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:600;cursor:pointer}'
+  +'.bi-resp.on{background:rgba(175,156,255,.18);border-color:#AF9CFF;color:#C9BCFF}'
+  +'.bi-resp.add{color:#8E8E93;font-weight:800}'
+  +'.bi-sec.view{border-color:rgba(175,156,255,.25)}'
+  +'.bi-scope{font-size:9px;font-weight:800;padding:1px 6px;border-radius:9px;text-transform:uppercase;letter-spacing:.04em}'
+  +'.bi-scope.fact{color:#4DA3FF;border:1px solid rgba(10,132,255,.5)}'
+  +'.bi-scope.view{color:#C9BCFF;border:1px solid rgba(175,156,255,.5)}'
+  +'.bi-cur{font-size:10px;font-weight:700;color:#FFCC00;background:rgba(255,204,0,.12);border-radius:6px;padding:1px 6px;margin-left:6px}'
+  +'.bi-cs-none{font-size:12.5px;color:#8E8E93;line-height:1.5;padding:2px}'
+  +'.bi-cs-sum{font-size:11px;font-weight:700;color:#AEAEB2;margin-bottom:8px}'
+  +'.bi-cs-row{padding:8px 0;border-top:1px solid rgba(255,255,255,.06)}'
+  +'.bi-cs-row:first-of-type{border-top:none}'
+  +'.bi-cs-q{font-size:12.5px;font-weight:600;color:#fff;margin-bottom:3px}'
+  +'.bi-cs-row.ok .bi-cs-v{font-size:12px;color:#30D158}'
+  +'.bi-cs-who{font-size:11.5px;color:#AEAEB2;line-height:1.5;margin-bottom:5px}'
+  +'.bi-cs-picks{font-size:11px;color:#8E8E93;display:flex;gap:6px;flex-wrap:wrap;align-items:center}'
+  +'.bi-cs-pick{background:#2C2C2E;color:#fff;border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:4px 10px;font-size:11.5px;font-weight:600;cursor:pointer}'
+  +'.bi-cs-pick.on{background:rgba(35,201,131,.18);border-color:#23C983;color:#23C983}'
   +'@media (prefers-reduced-motion: reduce){.bi-track>i,.bi-choice{transition:none}}';
   var s=document.createElement('style'); s.textContent=css; document.head.appendChild(s);
 }
-function biCfg(){ if(!STATE.branchConfig) STATE.branchConfig={}; return STATE.branchConfig; }
+function biCfg(){ if(!STATE.branchConfig) STATE.branchConfig={}; return STATE.branchConfig; }  // agreed branch STANDARD (fact answers + adopted views)
 function biAllQs(){ return BRANCH_INTERVIEW.reduce(function(a,s){return a.concat(s.qs);},[]); }
+function biQByKey(k){ return biAllQs().filter(function(q){return q.k===k;})[0]; }
+
+// ── Respondents (multi-manager viewpoints) ─────────────────────────────────
+function biResps(){ if(!STATE.branchResponses) STATE.branchResponses={}; return STATE.branchResponses; }
+function biMgrNames(){ try{ return (typeof getEffectiveRoster==='function'?getEffectiveRoster():[]).filter(function(p){return ['ARM','BRM','ABRM','MT'].indexOf(p.role)>=0;}).map(function(p){return p.nick||p.name;}); }catch(e){ return []; } }
+function biCurResp(){
+  var r=biResps();
+  if(!STATE.biRespondent){ var names=biMgrNames(); STATE.biRespondent = names[0] || 'Manager 1'; }
+  if(!r[STATE.biRespondent]) r[STATE.biRespondent]={answers:{},notes:{},ts:null};
+  return r[STATE.biRespondent];
+}
+function biSetResp(name){ if(name==='+'){ return biAddResp(); } STATE.biRespondent=name; if(!biResps()[name]) biResps()[name]={answers:{},notes:{},ts:null}; if(typeof saveState==='function') saveState(); biRender(); }
+function biAddResp(){ var n=prompt('Manager filling this out — name?'); if(n==null) return; n=n.trim(); if(!n) return; biSetResp(n); }
+
+// ── Pre-fill defaults from the live engines (fact questions) ────────────────
+function _biFhr(h){ if(h==null) return ''; var hh=((h%24)+24)%24; var ap=hh<12?'AM':'PM'; var h12=Math.floor(hh)%12||12; var m=Math.round((hh-Math.floor(hh))*60); return h12+':'+String(m).padStart(2,'0')+' '+ap; }
+function biDefault(q){
+  try{
+    var T=(STATE.floorTargets)||(typeof FLOOR_TARGETS!=='undefined'?FLOOR_TARGETS:null);
+    var peak = T && T.weekday ? (T.weekday.mid||T.weekday.amid) : null;
+    var slow = T && T.weekday ? (T.weekday.open||T.weekday.night) : null;
+    switch(q.k){
+      case 'hoursOpen':  return '6:00 AM';
+      case 'hoursClose': var ext=STATE.closingExtension; return _biFhr(ext&&ext.until?ext.until:24.5);
+      case 'peakFrom':   return '11:00 AM';
+      case 'peakTo':     return '3:00 PM';
+      case 'lunchLen':   return 30;
+      case 'minPeakCounter': return peak?peak.c:'';
+      case 'minPeakExit':    return peak?peak.e:'';
+      case 'minPeakReturns': return peak?peak.r:'';
+      case 'minOffCounter':  return slow?slow.c:'';
+      case 'minOffExit':     return slow?slow.e:'';
+      case 'minOffReturns':  return slow?slow.r:'';
+    }
+  }catch(e){}
+  return '';
+}
+
+// ── Value get/set routed by scope (fact = shared standard, view = per-manager)
+function biStore(q){ return q.scope==='view' ? biCurResp().answers : biCfg(); }
+function biRaw(q){ return biStore(q)[q.k]; }                        // no default fallback
+function biVal(q){ var v=biRaw(q); if((v==null||v==='') && q.scope!=='view'){ var d=biDefault(q); return d===''?undefined:d; } return v; }
 function biProgress(){
-  var c=biCfg(); var qs=biAllQs();
-  var done=qs.filter(function(q){var v=c[q.k]; return v!=null && v!=='' && !(Array.isArray(v)&&!v.length);}).length;
+  var qs=biAllQs();
+  var done=qs.filter(function(q){var v=biRaw(q); return v!=null && v!=='' && !(Array.isArray(v)&&!v.length);}).length;
   return {done:done,total:qs.length};
 }
 function biUpdateProg(){
   var p=biProgress();
   var bar=document.getElementById('bi-progbar'); if(bar) bar.style.width=(p.total?p.done/p.total*100:0)+'%';
   var el=document.getElementById('bi-prog'); if(el) el.textContent=p.done+' of '+p.total+' answered'+(p.done===p.total?'  ·  ✓ complete':'');
+  var cel=document.getElementById('bi-consistency'); if(cel) cel.innerHTML=biConsistencyHtml();
 }
-function biSet(k,val){ biCfg()[k]=val; if(typeof saveState==='function') saveState(); biUpdateProg(); }
-function biNotes(){ if(!STATE.branchNotes) STATE.branchNotes={}; return STATE.branchNotes; }
+function biSet(k,val){
+  var q=biQByKey(k)||{k:k,scope:'fact'};
+  biStore(q)[k]=val;
+  if(q.scope==='view'){ biCurResp().ts=Date.now(); biAdoptIfClear(k); }
+  if(typeof saveState==='function') saveState(); biUpdateProg();
+}
+// Adopt a view answer into the branch STANDARD when everyone who answered agrees
+// (or only one has). On a split, leave the standard and flag it in the panel.
+function biCollect(k){
+  var r=biResps(); var vals=[]; var byResp={};
+  Object.keys(r).forEach(function(nm){ var a=(r[nm].answers||{})[k]; if(a!=null && a!=='' && !(Array.isArray(a)&&!a.length)){ vals.push(JSON.stringify(a)); byResp[nm]=a; } });
+  var distinct=vals.filter(function(v,i){return vals.indexOf(v)===i;});
+  return {byResp:byResp, count:vals.length, distinct:distinct, agree:distinct.length<=1};
+}
+function biAdoptIfClear(k){ var c=biCollect(k); if(c.agree && c.count>=1){ try{ biCfg()[k]=JSON.parse(c.distinct[0]); }catch(e){} } }
+function biAdopt(k,valJson){ try{ biCfg()[k]=JSON.parse(valJson); }catch(e){ biCfg()[k]=valJson; } if(typeof saveState==='function') saveState(); biUpdateProg(); if(typeof toast==='function') toast('Set as branch standard ✓'); }
+
+function biNotes(){ return biCurResp().notes || (biCurResp().notes={}); }
 function biSetNote(k,val,el){ biNotes()[k]=val; if(typeof saveState==='function') saveState(); if(el){ if(val.trim()) el.classList.add('has'); else el.classList.remove('has'); } }
 function biPick(k,opt,btn){ biSet(k,opt); var p=btn.parentNode; Array.prototype.forEach.call(p.children,function(c){c.classList.remove('on');}); btn.classList.add('on'); }
 function biToggleMulti(k,opt,btn){
-  var cur=biCfg()[k]; if(!Array.isArray(cur)) cur=[];
+  var q=biQByKey(k)||{k:k,scope:'fact'}; var cur=biStore(q)[k]; if(!Array.isArray(cur)) cur=[];
   var i=cur.indexOf(opt); if(i>=0){cur.splice(i,1);btn.classList.remove('on');} else {cur.push(opt);btn.classList.add('on');}
   biSet(k,cur.slice());
 }
 function biEsc(s){ return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+// ── Consistency panel: for every VIEW question with 2+ answers, show whether the
+// managers agree (✓) or split (⚠, with each answer + an adopt-as-standard pick).
+function _biFmt(v){ return Array.isArray(v)? v.join(', ') : String(v); }
+function biConsistencyHtml(){
+  var viewQs=biAllQs().filter(function(q){return q.scope==='view';});
+  var rows=''; var splits=0, consensus=0;
+  viewQs.forEach(function(q){
+    var c=biCollect(q.k); if(c.count<2) return;   // need ≥2 viewpoints to compare
+    var std=biCfg()[q.k];
+    if(c.agree){
+      consensus++;
+      rows+='<div class="bi-cs-row ok"><div class="bi-cs-q">'+biEsc(q.q)+'</div><div class="bi-cs-v">✓ '+biEsc(_biFmt(c.byResp[Object.keys(c.byResp)[0]]))+'</div></div>';
+    } else {
+      splits++;
+      var who=Object.keys(c.byResp).map(function(nm){ return biEsc(nm)+': <b>'+biEsc(_biFmt(c.byResp[nm]))+'</b>'; }).join(' · ');
+      var picks=c.distinct.map(function(js){ var v; try{v=JSON.parse(js);}catch(e){v=js;} var on=JSON.stringify(std)===js; return '<button class="bi-cs-pick'+(on?' on':'')+'" onclick="biAdopt(\''+q.k+'\',this.dataset.v)" data-v="'+biEsc(js)+'">'+biEsc(_biFmt(v))+(on?' ✓':'')+'</button>'; }).join('');
+      rows+='<div class="bi-cs-row split"><div class="bi-cs-q">⚠ '+biEsc(q.q)+'</div><div class="bi-cs-who">'+who+'</div><div class="bi-cs-picks">Adopt: '+picks+'</div></div>';
+    }
+  });
+  var nResp=Object.keys(biResps()).filter(function(nm){ return Object.keys(biResps()[nm].answers||{}).length; }).length;
+  if(nResp<2) return '<div class="bi-cs-none">Add a second manager (top of screen) to compare viewpoints. Where they differ, you’ll pick one branch standard here.</div>';
+  if(!rows) return '<div class="bi-cs-none">✓ '+nResp+' managers answered — no conflicts so far.</div>';
+  return '<div class="bi-cs-sum">'+consensus+' agree · '+splits+' to reconcile</div>'+rows;
+}
 function biField(q,val){
   if(q.type==='single'){
     return '<div class="bi-opts">'+q.opts.map(function(o){return '<button type="button" class="bi-choice'+(val===o?' on':'')+'" onclick="biPick(\''+q.k+'\',\''+o.replace(/'/g,"\\'")+'\',this)">'+biEsc(o)+'</button>';}).join('')+'</div>';
@@ -18210,17 +18322,37 @@ function biField(q,val){
   return '<input class="bi-in" style="max-width:200px" type="text" placeholder="'+biEsc(q.ph||'')+'" value="'+(val!=null?biEsc(val):'')+'" oninput="biSet(\''+q.k+'\',this.value)">';
 }
 function biRender(){
-  var o=document.getElementById('bi-overlay'); if(!o) return; var c=biCfg();
-  var h='<div class="bi-head"><div><div class="bi-kick">Branch Setup</div><div class="bi-title">Branch Interview</div></div>'
+  var o=document.getElementById('bi-overlay'); if(!o) return;
+  biCurResp(); var curName=STATE.biRespondent;
+  // respondent chips = roster managers ∪ any custom respondents
+  var allNames=biMgrNames().slice();
+  Object.keys(biResps()).forEach(function(n){ if(allNames.indexOf(n)<0) allNames.push(n); });
+  if(curName && allNames.indexOf(curName)<0) allNames.unshift(curName);
+  var chips=allNames.map(function(n){
+    var dot=(biResps()[n] && Object.keys(biResps()[n].answers||{}).length)?' ●':'';
+    return '<button class="bi-resp'+(n===curName?' on':'')+'" onclick="biSetResp(\''+String(n).replace(/'/g,"\\'")+'\')">'+biEsc(n)+dot+'</button>';
+  }).join('')+'<button class="bi-resp add" onclick="biAddResp()">＋</button>';
+  var h='<div class="bi-head"><div><div class="bi-kick">Branch Setup · multi-manager</div><div class="bi-title">Branch Interview</div></div>'
     +'<button class="bi-x" onclick="closeBranchInterview()">✕</button></div>'
+    +'<div class="bi-respbar"><span class="bi-resplbl">Answering as</span>'+chips+'</div>'
     +'<div class="bi-progwrap"><div class="bi-track"><i id="bi-progbar"></i></div><div class="bi-prog" id="bi-prog"></div></div>'
-    +'<div class="bi-body"><p class="bi-intro">Answer what you can, and add a <b>note</b> beside anything that needs clarifying. Saves as you go. Your answers + notes come back for review — we may follow up with a few more questions in the next round.</p>';
+    +'<div class="bi-body"><p class="bi-intro"><b style="color:#4DA3FF">Branch facts</b> are pre-filled from the app — confirm or fix. <b style="color:#AF9CFF">Your view</b> questions each manager answers separately; where you differ, reconcile to one standard at the bottom. Saves as you go.</p>';
   BRANCH_INTERVIEW.forEach(function(sec){
-    h+='<div class="bi-sec"><div class="bi-sec-hd">'+biEsc(sec.title)+(sec.opt?' <span class="bi-optional">optional</span>':'')+(sec.tunes?'<span class="bi-tunes">→ '+biEsc(sec.tunes)+'</span>':'')+'</div>';
-    sec.qs.forEach(function(q){ var nt=biNotes()[q.k]||''; h+='<div class="bi-q"><div class="bi-q-lbl">'+biEsc(q.q)+'</div>'+biField(q,c[q.k])
-      +'<input class="bi-note'+(nt.trim()?' has':'')+'" placeholder="✎ Note / clarify (optional)…" value="'+biEsc(nt)+'" oninput="biSetNote(\''+q.k+'\',this.value,this)"></div>'; });
+    var isView=!!sec.view;
+    h+='<div class="bi-sec'+(isView?' view':'')+'"><div class="bi-sec-hd">'+biEsc(sec.title)
+      +(isView?' <span class="bi-scope view">your view</span>':' <span class="bi-scope fact">branch fact</span>')
+      +(sec.opt?' <span class="bi-optional">optional</span>':'')
+      +(sec.tunes?'<span class="bi-tunes">→ '+biEsc(sec.tunes)+'</span>':'')+'</div>';
+    sec.qs.forEach(function(q){
+      var nt=biNotes()[q.k]||'';
+      var val=biVal(q);
+      var showCur = q.scope!=='view' && (biRaw(q)==null||biRaw(q)==='') && biDefault(q)!=='';
+      h+='<div class="bi-q"><div class="bi-q-lbl">'+biEsc(q.q)+(showCur?' <span class="bi-cur">now: '+biEsc(_biFmt(biDefault(q)))+'</span>':'')+'</div>'+biField(q,val)
+        +'<input class="bi-note'+(nt.trim()?' has':'')+'" placeholder="✎ Note / clarify (optional)…" value="'+biEsc(nt)+'" oninput="biSetNote(\''+q.k+'\',this.value,this)"></div>';
+    });
     h+='</div>';
   });
+  h+='<div class="bi-sec"><div class="bi-sec-hd">🤝 Consistency <span class="bi-tunes">→ one branch standard</span></div><div id="bi-consistency">'+biConsistencyHtml()+'</div></div>';
   h+='</div><div class="bi-foot"><button class="bi-btn gh" onclick="biExportWith()">⤓ Export</button><button class="bi-btn" onclick="biApply()">Save &amp; close</button></div>';
   o.innerHTML=h; biUpdateProg();
 }
@@ -18242,9 +18374,9 @@ function biExport(){
     if(typeof toast==='function') toast('Exported branch answers');
   }catch(e){ if(typeof toast==='function') toast('Export failed'); }
 }
-function biExportWith(){ /* answers + notes together for review/follow-up */
+function biExportWith(){ /* branch standard + every manager's viewpoint, for review/follow-up */
   try{
-    var out={ answers: biCfg(), notes: biNotes(), exportedFor:'review' };
+    var out={ standard: biCfg(), responses: biResps(), exportedFor:'review', exportedBy: STATE.biRespondent||null };
     var data=JSON.stringify(out,null,2); var blob=new Blob([data],{type:'application/json'});
     var url=URL.createObjectURL(blob); var a=document.createElement('a'); a.href=url; a.download='cmh-branch-interview.json';
     document.body.appendChild(a); a.click(); setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); },120);
