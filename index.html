@@ -2099,16 +2099,9 @@ button { cursor: pointer; }
   <button class="board-pill" onclick="toggleBoardControls()"><span id="board-policy-line" class="board-policy2">🚦 Walk-ups</span><span class="board-pill-chev" id="board-pill-chev">Set ⌄</span></button>
   <div id="board-controls" style="display:none">
 
-  <!-- Ops header — v52: stripped down to just the print button.
-       The "Completely Satisfied / Hot Alerts / Opening / Closing"
-       summary that lived here was redundant with the same info on the
-       dashboard; Matt: "unnecessary, just the print is needed." The
-       fields and update calls (set('bh-cs', ...), set('bh-hot', ...))
-       are kept harmless: setEl no-ops if the element isn't present, so
-       removing the spans here is safe without touching update logic. -->
-  <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
-    <button class="btn btn-gh btn-sm" onclick="showTab('board');setTimeout(()=>window.print(),100)">🖨 Print Board</button>
-  </div>
+  <!-- v60.118: the Print Board button moved OUT of this collapsed drawer to the
+       always-visible Fleet-groups header (🖨), where Matt expects it. The reskin
+       (v60.81) had buried it inside #board-controls behind the Walk-ups pill. -->
 
   <!-- v60.66 (Design §3.5): walk-up + 24hr as iOS segmented controls; 4-state + color preserved -->
   <div class="card" style="padding:12px 14px;margin-bottom:10px">
@@ -2163,6 +2156,7 @@ button { cursor: pointer; }
     <span class="board-fleet-lbl">Fleet groups</span>
     <span id="board-groups-count" class="board-fleet-count"></span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <button class="bv-btn bv-solo" id="board-print-btn" title="Print board" onclick="setTimeout(function(){window.print();},80)">🖨</button>
       <button class="bv-btn bv-solo" id="board-search-btn" title="Search" onclick="toggleBoardSearch()">🔍</button>
       <div class="board-view-toggle">
         <button id="bv-list" class="bv-btn" title="List view" onclick="setBoardView('list')">☰</button>
