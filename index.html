@@ -4570,7 +4570,19 @@ function buildBoardGrid() {
   grid.className = (_view==='list') ? 'board-list' : 'board-wrap';
   // v60.75: board search filter (name or code)
   const _bs = (window._boardSearch||'');
-  const _shown = _bs ? groupsToShow.filter(g=> g.name.toLowerCase().indexOf(_bs)>=0 || (typeof groupRepCode==='function' && (groupRepCode(g.name)||'').toLowerCase().indexOf(_bs)>=0)) : groupsToShow;
+  let _shown = _bs ? groupsToShow.filter(g=> g.name.toLowerCase().indexOf(_bs)>=0 || (typeof groupRepCode==='function' && (groupRepCode(g.name)||'').toLowerCase().indexOf(_bs)>=0)) : groupsToShow;
+  // v60.116: Branch Interview B4 (defaultSort) — order the board's fleet groups.
+  // Unset → natural GROUP_META order (unchanged). Sorts are stable, so ties keep
+  // their natural order.
+  const _sortMode = (STATE.branchConfig||{}).defaultSort;
+  if(_sortMode==='A–Z' || _sortMode==='A-Z'){
+    _shown = _shown.slice().sort((a,b)=> String(a.name).localeCompare(String(b.name)));
+  } else if(_sortMode==='Core then non-core'){
+    _shown = _shown.slice().sort((a,b)=> (_isCore(b)?1:0)-(_isCore(a)?1:0));
+  } else if(_sortMode==='Problems first'){
+    const _sev = {na:0,'no-data':1,up:2,wu:3};   // lower = more urgent → nearer the top
+    _shown = _shown.slice().sort((a,b)=> ((_sev[_grpSt(a)]==null?9:_sev[_grpSt(a)]) - (_sev[_grpSt(b)]==null?9:_sev[_grpSt(b)])));
+  }
   var _gc=document.getElementById('board-groups-count'); if(_gc) _gc.textContent=_shown.length+(_shown.length===1?' group':' groups');
   if(_bs && !_shown.length){ html += '<div style="grid-column:1/-1;color:var(--txt3);font-size:13px;padding:16px;text-align:center">No car group matches “'+_bs+'”.</div>'; }
   _shown.forEach(g => {
@@ -8314,7 +8326,13 @@ function refreshDash() {
   const netEl2=document.getElementById('db-totalnet');
   if(netEl2){
     netEl2.textContent = showNet!==null ? (showNet>0?'+':'')+showNet : '—';
-    netEl2.style.color = showNet===null ? 'var(--txt)' : showNet>0 ? 'var(--green)' : 'var(--red)';
+    // v60.116: Branch Interview D3 (netBad) — "Net below what number is a problem?"
+    // When set, Net turns red only when it's below that threshold (not just ≤0),
+    // making the number judgeable per the branch. Unset → original >0 green / else red.
+    const _nb = parseInt((STATE.branchConfig||{}).netBad, 10);
+    netEl2.style.color = showNet===null ? 'var(--txt)'
+      : (!isNaN(_nb) ? (showNet < _nb ? 'var(--red)' : 'var(--green)')
+                     : (showNet>0 ? 'var(--green)' : 'var(--red)'));
   }
   // Brand split — Ala / Ent / Nat (matches the brand strip header label
   // ALA · ENT · NAT shown beneath the numbers for visual consistency).
@@ -8656,7 +8674,16 @@ function opsSignalsHtml() {
   const soon = (typeof _seededUpcoming==='function') ? _seededUpcoming(7).filter(function(u){return u.inDays>=4;}) : [];
   if (soon.length) { const s=soon[0]; eventRow += `<div class="ops-sig"><span style="font-size:16px">🗓</span><span style="color:var(--txt3)"><b>${s.name}</b> in ${s.inDays} days — pickups build ~3 days prior</span></div>`; }
   eventRow += `<button class="more-row" onclick="showEventSheet()"><span class="more-ic">🏟</span><span class="more-lbl">City events (OSU games, concerts…)</span><span class="more-ch">›</span></button>`;
-  return `<div class="now-sec-hd">Today’s signals</div><div class="more-group">${alert}${eventRow}${flightRow}${stepper}</div>`;
+  // v60.116: order the signals by the Branch Interview ranking (C1: rank 1 = most
+  // important). Unranked → the original order (cancellations · events · flights).
+  // The cancellation stepper (an editor, not a signal) always stays at the bottom.
+  const _cfg = STATE.branchConfig || {};
+  const _sigGroups = [
+    { rank: parseInt(_cfg.sigCancel,10)  || 99, ord: 0, html: alert },
+    { rank: parseInt(_cfg.sigEvents,10)  || 99, ord: 1, html: eventRow },
+    { rank: parseInt(_cfg.sigFlights,10) || 99, ord: 2, html: flightRow },
+  ].sort(function(a,b){ return (a.rank - b.rank) || (a.ord - b.ord); });
+  return `<div class="now-sec-hd">Today’s signals</div><div class="more-group">${_sigGroups.map(function(g){return g.html;}).join('')}${stepper}</div>`;
 }
 
 // ── v60.61: FLIGHT BANKS → per-hour demand (manual entry; no API needed) ────
