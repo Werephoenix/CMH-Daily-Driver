@@ -108,6 +108,24 @@ html {
   background-attachment: fixed;
 }
 
+/* v60.119: HIGH-CONTRAST MODE (body.hc) — for old / low-quality work monitors where
+   the iOS dark palette washes together. Brightens secondary text, strengthens every
+   border and hairline, lightens card surfaces so they separate from the page, and
+   flattens the shell glow to uniform black. Toggle in More → Appearance. */
+body.hc{
+  --text2:#EDEDF2; --txt2:#EDEDF2;
+  --text3:#CBCBD2; --txt3:#CBCBD2;
+  --border:#70707A; --border2:#92929A; --bdr:#70707A; --bdr2:#92929A;
+  --bg2:#242429; --bg3:#3A3A40; --off:#B8B8BE;
+  background:#000 !important;                       /* cover the html radial glow */
+}
+body.hc .card{ border-color:rgba(255,255,255,.30) !important; }
+/* faint inline hairline separators used across the list/overlay modules */
+body.hc .more-row{ border-bottom-color:rgba(255,255,255,.16) !important; }
+body.hc .as-row, body.hc .sf-sgr, body.hc .as-warn .wl, body.hc .bi-cs-row,
+body.hc .mc-item, body.hc .bk-row{ border-top-color:rgba(255,255,255,.18) !important; }
+body.hc .bi-note{ border-bottom-color:rgba(255,255,255,.30) !important; }
+
 /* body: see canonical rules above */
 
 /* Screens — only .scr.on is visible */
@@ -1827,6 +1845,11 @@ button { cursor: pointer; }
         <span class="more-ic tile" style="background:rgba(175,156,255,.16)">🌙</span>
         <span class="more-lbl">Calm Mode<span class="more-sub">Removes glow &amp; motion. Static &amp; quiet.</span></span>
         <span class="nav-calm-sw more-calm-sw" id="more-calm-toggle" aria-hidden="true"><span class="nav-calm-knob"></span></span>
+      </button>
+      <button class="more-row" onclick="toggleContrast()">
+        <span class="more-ic tile" style="background:rgba(255,255,255,.16)">◑</span>
+        <span class="more-lbl">High Contrast<span class="more-sub">Bolder text &amp; borders for older / washed-out monitors.</span></span>
+        <span class="nav-calm-sw more-calm-sw" id="more-hc-toggle" aria-hidden="true"><span class="nav-calm-knob"></span></span>
       </button>
       <button class="more-row" onclick="toggleDensity()">
         <span class="more-ic tile" style="background:rgba(142,142,147,.16)">⊟</span>
@@ -3677,6 +3700,7 @@ function loadState() {
       s.clReasons     = (s.clReasons && typeof s.clReasons === 'object') ? s.clReasons : {};  // v60.8: {cl-mode: {itemText: reason}} for incomplete-item email validation
       s.uiDensity     = (s.uiDensity === 'compact') ? 'compact' : 'comfortable';  // v60.13: card spacing preference
       s.uiTheme       = (s.uiTheme === 'calm') ? 'calm' : 'bold';  // v60.32: dashboard look (bold default, calm opt-out)
+      s.uiContrast    = (s.uiContrast === 'high') ? 'high' : 'normal';  // v60.119: high-contrast mode for old monitors
       s.nameAliases   = (s.nameAliases && typeof s.nameAliases === 'object') ? s.nameAliases : {};  // v60.23: confirmed name→roster mappings for schedule import
       s.mgrStationLog         = (s.mgrStationLog && typeof s.mgrStationLog === 'object') ? s.mgrStationLog : {};                 // v60.111: {pid:{station:hours}} station-fairness tally
       s.mgrStationLoggedDates = (s.mgrStationLoggedDates && typeof s.mgrStationLoggedDates === 'object') ? s.mgrStationLoggedDates : {}; // v60.111: {date:true} double-log guard
@@ -3747,6 +3771,21 @@ function toggleTheme() {
   if (typeof toast === 'function') toast(STATE.uiTheme === 'bold' ? '🎨 Bold theme' : '🌙 Calm Mode');
 }
 
+// v60.119: High-Contrast mode for old/low-quality monitors (body.hc). Independent
+// of Calm/Bold — it only strengthens text, borders, and surface separation.
+function applyContrast() {
+  var hc = (typeof STATE !== 'undefined' && STATE && STATE.uiContrast === 'high');
+  if (document.body) document.body.classList.toggle('hc', hc);
+  var sw = document.getElementById('more-hc-toggle');
+  if (sw) sw.classList.toggle('on', hc);
+}
+function toggleContrast() {
+  STATE.uiContrast = (STATE.uiContrast === 'high') ? 'normal' : 'high';
+  if (typeof saveState === 'function') saveState();
+  applyContrast();
+  if (typeof toast === 'function') toast(STATE.uiContrast === 'high' ? '◑ High contrast on' : 'High contrast off');
+}
+
 // v60.7: one-time migration of legacy DNR/DNQ fraud lists into synced STATE.
 // They used to live in their own device-local localStorage keys
 // ('cmh-dnr' / 'cmh-dnq') which NEVER synced — a fraud / Do-Not-Rent alert
@@ -3813,6 +3852,7 @@ window.onload = function() {
   restoreFields();
   if (typeof applyDensity === 'function') applyDensity();  // v60.13: apply saved density pref
   if (typeof applyTheme === 'function') applyTheme();  // v60.32: apply saved bold/calm theme
+  if (typeof applyContrast === 'function') applyContrast();  // v60.119: apply saved high-contrast pref
   // v54: rebuild live rosters from stored admin overrides BEFORE any UI
   // builders run. Without this, admin add/edit/remove changes from prior
   // sessions wouldn't take effect until a save action triggered the rebuild.
