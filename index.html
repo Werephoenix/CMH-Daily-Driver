@@ -8979,23 +8979,33 @@ function renderNow() {
   const exitHave = zones.exit.length, exitNeed = rules.exitMin||0;
   const ctrHave = zones.counter.length, ctrNeed = rules.counterMin||0;
 
-  // Most-urgent decision
-  let attn;
-  if (!closed && exitHave < exitNeed) {
-    const cand = _nowExitCandidate(exp, h);
-    const cn = cand ? (cand[1].person.nick || cand[1].person.name.split(' ')[0]) : null;
-    attn = { cls:'urgent', kicker:'⚠ Exit short — right now',
-      title:`Exit is ${exitHave}/${exitNeed}`,
-      sub: cand ? `${cn} is freest at Counter and lowest on exit time this week.` : 'No free Counter CXR to pull — consider an MT/ABRM.',
-      btn: cand ? {label:`Send ${cn} to Exit →`, on:`nowFix('${cand[0]}')`, cls:'wide-green'} : null };
-  } else if (!closed && ctrHave < ctrNeed) {
-    attn = { cls:'warn', kicker:'⚠ Counter short — right now',
-      title:`Counter is ${ctrHave}/${ctrNeed}`,
-      sub:'Exit is covered. Pull an MT/ABRM to Counter or accept reduced coverage.',
-      btn:{label:'Open Schedule →', on:"showTab('schedule')"} };
-  } else {
+  // Most-urgent decision — v60.123: checked in the branch's PROTECT-FIRST order
+  // (Branch Interview "when short, protect which station first?"). Default
+  // exit→counter→returns; Returns is now included (the alert used to ignore it).
+  const retHave = zones.returns.length, retNeed = rules.returnsMin||0;
+  const _pf = (STATE.branchConfig||{}).protectFirst;
+  const _order = _pf==='Counter' ? ['counter','exit','returns']
+               : _pf==='Returns' ? ['returns','exit','counter']
+               : ['exit','counter','returns'];
+  const _cards = {
+    exit: () => { if (exitHave >= exitNeed) return null;
+      const cand = _nowExitCandidate(exp, h);
+      const cn = cand ? (cand[1].person.nick || cand[1].person.name.split(' ')[0]) : null;
+      return { cls:'urgent', kicker:'⚠ Exit short — right now', title:`Exit is ${exitHave}/${exitNeed}`,
+        sub: cand ? `${cn} is freest at Counter and lowest on exit time this week.` : 'No free Counter CXR to pull — consider an MT/ABRM.',
+        btn: cand ? {label:`Send ${cn} to Exit →`, on:`nowFix('${cand[0]}')`, cls:'wide-green'} : null }; },
+    counter: () => { if (ctrHave >= ctrNeed) return null;
+      return { cls:'warn', kicker:'⚠ Counter short — right now', title:`Counter is ${ctrHave}/${ctrNeed}`,
+        sub:'Pull an MT/ABRM to Counter or accept reduced coverage.', btn:{label:'Open Schedule →', on:"showTab('schedule')"} }; },
+    returns: () => { if (!(retNeed>0 && retHave < retNeed)) return null;
+      return { cls:'warn', kicker:'⚠ Returns short — right now', title:`Returns is ${retHave}/${retNeed}`,
+        sub:'Staff a Returns agent, or move an MT to Returns.', btn:{label:'Open Schedule →', on:"showTab('schedule')"} }; },
+  };
+  let attn = null;
+  if (!closed) { for (let i=0; i<_order.length && !attn; i++) attn = _cards[_order[i]](); }
+  if (!attn) {
     attn = { cls:'ok', kicker:'✓ You’re covered',
-      title: closed ? 'Branch is closed this hour' : `Exit ${exitHave}/${exitNeed} · Counter ${ctrHave}/${ctrNeed}`,
+      title: closed ? 'Branch is closed this hour' : `Exit ${exitHave}/${exitNeed} · Counter ${ctrHave}/${ctrNeed}${retNeed?` · Ret ${retHave}/${retNeed}`:''}`,
       sub:'Nothing needs attention this hour.',
       btn:{label:'Open Schedule →', on:"showTab('schedule')"} };
   }
