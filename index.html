@@ -7300,7 +7300,11 @@ function autoLoadFromExpected(expectedToday, dow) {
       const overridePref = (pats[pid]&&pats[pid].suggestedPref)||'none';
       const wantsExit    = pref==='exit' || rosterPref==='exit' || overridePref==='exit';
       const wantsCounter = !wantsExit && (pref==='counter' || overridePref==='counter');
-      let cost = _fh(pid);
+      // v60.122: Branch Interview "spread exit-booth time evenly?" — when a manager
+      // answered No, drop the weekly-exit-hours fairness term so exit is assigned by
+      // preference + start-time only (no day-to-day rotation to equalize hours).
+      const _fairExitOn = (((STATE.branchConfig||{}).fairExit)||'Yes') !== 'No';
+      let cost = _fairExitOn ? _fh(pid) : 0;
       if (wantsExit)    cost -= PREF;
       if (wantsCounter) cost += PREF;
       cost += (e.person.shiftStart||99) * 0.01; // anti-clumping tiebreak by start time
@@ -8359,6 +8363,16 @@ function refreshDash() {
   const showRet = calcRet > 0 ? calcRet : (tBrands.totRet   || f.totalRet || '—');
   const showNet = hasRem ? (calcRetRem - calcResRem) : null;
   s('db-totalres', showRes); s('db-totalret', showRet);
+  // v60.122: Branch Interview D1/D2 (resLow/resHigh) — when the branch's typical
+  // daily-reservation range is set, Total Res reads green inside the range and
+  // amber outside it (unusually slow or busy — worth a look). Unset → default amber.
+  const resEl2=document.getElementById('db-totalres');
+  if(resEl2){
+    const _rlo=parseInt((STATE.branchConfig||{}).resLow,10), _rhi=parseInt((STATE.branchConfig||{}).resHigh,10);
+    const _rv=(typeof showRes==='number')?showRes:parseInt(showRes,10);
+    if(!isNaN(_rlo)&&!isNaN(_rhi)&&!isNaN(_rv)) resEl2.style.color = (_rv>=_rlo && _rv<=_rhi) ? 'var(--green3)' : 'var(--amber)';
+    else resEl2.style.color = 'var(--amber)';
+  }
   const netEl2=document.getElementById('db-totalnet');
   if(netEl2){
     netEl2.textContent = showNet!==null ? (showNet>0?'+':'')+showNet : '—';
