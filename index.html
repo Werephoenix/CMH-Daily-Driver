@@ -15405,6 +15405,22 @@ function redoCoverage() {
   try{Object.assign(STATE,JSON.parse(snap));}catch(e){toast('Redo failed');return;}
   buildCoverageTimeline();buildSwitchboard();toast('Redone ↪');
 }
+// v60.135 (Design #3): current-hour Exit/Counter have + need, for What-if previews.
+function _whatifCoverageNow(){
+  try{
+    var exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
+    var now=new Date(), h=Math.floor(now.getHours()+now.getMinutes()/60), dow=now.getDay();
+    var ex=0, ct=0, agents=0;
+    Object.keys(exp).forEach(function(pid2){
+      var e=exp[pid2]; var p2=e.person;
+      if(p2.role==='EXIT'){ var ov=(STATE.shiftMod||{})[pid2]||{}; var ss=ov.start!=null?ov.start:p2.shiftStart; var se=ov.end!=null?ov.end:p2.shiftEnd; if(ss!=null&&h>=ss&&h<se&&(STATE.todayOverrides||{})[pid2]!=='callout') agents++; }
+      var z=(typeof _nowZone==='function')?_nowZone(pid2,p2,h):'off';
+      if(z==='exit') ex++; else if(z==='counter'||z==='mgmt') ct++;
+    });
+    var r=(typeof COVERAGE_BY_HOUR==='function')?COVERAGE_BY_HOUR(h,dow,agents):{exitMin:1,counterMin:2};
+    return {ex:ex, ct:ct, exN:r.exitMin||0, ctN:r.counterMin||0, h:h};
+  }catch(e){ return {ex:0,ct:0,exN:0,ctN:0,h:new Date().getHours()}; }
+}
 function showWhatif(pid, personName) {
   const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
   const entry=exp[pid];if(!entry)return;
@@ -15444,11 +15460,25 @@ function showWhatif(pid, personName) {
   body+=`<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Assign to...</div><div style="display:flex;gap:5px;flex-wrap:wrap">`;
   (SPECIAL_ASSIGNMENTS||[]).forEach(sa=>{body+=`<button onclick="addSpecialBlock('${pid}','${sa.key}');closeModal()" style="padding:5px 9px;border-radius:4px;border:1px solid ${sa.color}44;background:${sa.color}18;color:${sa.color};font-size:10px;font-weight:700;cursor:pointer">${sa.icon} ${sa.label}</button>`;});
   body+=`</div></div>`;
-  // Move station
-  body+=`<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Move Station</div><div style="display:flex;gap:6px">
-    <button onclick="setStation('${pid}','Counter');closeModal();buildCoverageTimeline();buildSwitchboard()" style="flex:1;padding:7px;border-radius:4px;border:1px solid var(--acc)44;background:rgba(37,99,235,.1);color:var(--acc);font-size:11px;font-weight:700;cursor:pointer">🟦 Counter</button>
-    <button onclick="setStation('${pid}','Exit Booth');closeModal();buildCoverageTimeline();buildSwitchboard()" style="flex:1;padding:7px;border-radius:4px;border:1px solid var(--green)44;background:rgba(52,211,153,.1);color:var(--green);font-size:11px;font-weight:700;cursor:pointer">🟩 Exit</button>
-  </div></div>`;
+  // Move station — v60.135 (Design #3): live coverage before/after per target.
+  const _cov = (typeof _whatifCoverageNow==='function') ? _whatifCoverageNow() : {ex:0,ct:0,exN:0,ctN:0,h:new Date().getHours()};
+  let _curZ = getZoneForWhatif(pid, p, _cov.h);
+  if(_curZ!=='exit' && _curZ!=='counter') _curZ = ((STATE.staffStation||{})[pid]==='Exit Booth') ? 'exit' : 'counter';
+  const _movePrev = (toZone)=>{
+    if(_curZ===toZone) return '<span style="color:var(--txt3)">already there — no change</span>';
+    let nEx=_cov.ex, nCt=_cov.ct;
+    if(toZone==='exit'){ nEx++; nCt--; } else { nCt++; nEx--; }
+    const okE=nEx>=_cov.exN, okC=nCt>=_cov.ctN;
+    return `Exit ${_cov.ex}/${_cov.exN}→<b>${nEx}</b> ${okE?'✓':'⚠'} · Counter ${_cov.ct}/${_cov.ctN}→<b>${nCt}</b> ${okC?'✓':'⚠'}`;
+  };
+  body+=`<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Move Station — coverage now (${fmtH(_cov.h)})</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <button onclick="setStation('${pid}','Exit Booth');closeModal();buildCoverageTimeline();buildSwitchboard()" style="flex-shrink:0;min-width:92px;padding:7px;border-radius:4px;border:1px solid var(--green)44;background:rgba(52,211,153,.1);color:var(--green);font-size:11px;font-weight:700;cursor:pointer">🟩 → Exit</button>
+      <div style="font-size:10.5px;color:var(--txt2)">${_movePrev('exit')}</div></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onclick="setStation('${pid}','Counter');closeModal();buildCoverageTimeline();buildSwitchboard()" style="flex-shrink:0;min-width:92px;padding:7px;border-radius:4px;border:1px solid var(--acc)44;background:rgba(37,99,235,.1);color:var(--acc);font-size:11px;font-weight:700;cursor:pointer">🟦 → Counter</button>
+      <div style="font-size:10.5px;color:var(--txt2)">${_movePrev('counter')}</div></div>
+  </div>`;
   // Early out
   if(se){
     body+=`<div><div style="font-size:10px;font-weight:700;color:var(--txt3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">Simulate Early Out</div>`;
