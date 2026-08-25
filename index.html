@@ -18693,22 +18693,28 @@ function mcTogglePtoForm(key){ var f=document.getElementById('mc-pto-form'); if(
 // time off AND is short at the peak block (per the real schedule vs floor need),
 // lead the day detail with a red guard. Conservative: needs a real schedule + a
 // genuine peak shortfall — never fires on empty future days.
-function mcPtoGuard(key){
+// Peak-block coverage for a date: concurrent staff at ~2pm vs the floor need.
+// Returns null when there's no real schedule to judge (don't guess on empty days).
+function mcCoverageShort(key){
   try{
-    var off = mcTimeOffOn(key); if(!off.length) return null;
     var sched = mcScheduleObj(key);
     var arrs = Object.keys(sched).map(function(p){return sched[p];}).filter(function(v){return Array.isArray(v);});
-    if(!arrs.length) return null;                 // no real schedule to judge → don't guess
-    var peakH = 14;                               // ~2pm peak
+    if(!arrs.length) return null;
+    var peakH = 14;
     var onAtPeak = arrs.filter(function(v){ return peakH>=v[0] && peakH<v[1]; }).length;
     var T = (STATE.floorTargets)||(typeof FLOOR_TARGETS!=='undefined'?FLOOR_TARGETS:null);
     var dow = new Date(key+'T12:00:00').getDay();
     var wk = (dow===0||dow===6) ? (T&&T.weekend) : (T&&T.weekday);
     var block = wk && (wk.mid||wk.amid);
     var need = block ? ((block.c||0)+(block.e||0)+(block.r||0)) : 6;
-    if(onAtPeak >= need) return null;             // covered at peak → no conflict
-    return { have:onAtPeak, need:need, names:off.map(function(x){return x.name;}) };
+    return { have:onAtPeak, need:need, short: onAtPeak < need };
   }catch(e){ return null; }
+}
+function mcPtoGuard(key){
+  var off = mcTimeOffOn(key); if(!off.length) return null;
+  var cov = mcCoverageShort(key);
+  if(!cov || !cov.short) return null;             // covered at peak / no schedule → no conflict
+  return { have:cov.have, need:cov.need, names:off.map(function(x){return x.name;}) };
 }
 function mcAddPto(key){
   var who=document.getElementById('mc-pto-who'), daysEl=document.getElementById('mc-pto-days');
@@ -18804,7 +18810,12 @@ function mcRender(){
   for(var d=1;d<=daysIn;d++){
     var key=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
     var evs=mcEventsOn(key), cels=mcCelebsOn(key), staff=mcStaffCount(key), dem=mcDemandLevel(key), off=mcTimeOffOn(key);
-    var demCls = key===todayKey ? ' mc-today' : (dem==='heavy'?' mc-heavy':dem==='elevated'?' mc-elev':'');
+    // v60.125 (Design concept): red tint = demand outruns coverage. A day is red
+    // when it's short at peak (real schedule vs floor need) OR a heavy event day;
+    // amber for merely elevated demand.
+    var _cov = mcCoverageShort(key);
+    var _short = _cov && _cov.short;
+    var demCls = key===todayKey ? ' mc-today' : ((dem==='heavy'||_short)?' mc-heavy':dem==='elevated'?' mc-elev':'');
     h+='<button class="mc-cell'+demCls+'" onclick="mcDay(\''+key+'\')"><div class="mc-dnum">'+d+'</div><div class="mc-marks">';
     evs.slice(0,3).forEach(function(e){ h+='<span class="mc-dot" style="background:'+(e.level==='heavy'?'#FF453A':'#FFCC00')+'"></span>'; });
     if(cels.length) h+='<span class="mc-cake">🎂</span>';
@@ -18812,7 +18823,7 @@ function mcRender(){
     h+='</div>'+(staff>0?'<div class="mc-staff">'+staff+'</div>':'')+'</button>';
   }
   h+='</div></div>';
-  h+='<div class="mc-legend"><span><span class="mc-sw heavy"></span>Heavy demand</span><span><span class="mc-sw elev"></span>Busy</span><span>🎂 Celebration</span><span><b style="color:#64D2FF">N</b> staff scheduled</span></div>';
+  h+='<div class="mc-legend"><span><span class="mc-sw heavy"></span>Short / heavy demand</span><span><span class="mc-sw elev"></span>Busy</span><span>🌴 PTO</span><span>🎂 Celebration</span><span><b style="color:#64D2FF">N</b> staff scheduled</span></div>';
   o.innerHTML=h;
 }
 function mcNav(delta){ _mcCur=new Date(_mcCur.getFullYear(), _mcCur.getMonth()+delta, 1); mcRender(); }
