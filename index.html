@@ -19646,12 +19646,22 @@ function _asRoleColor(r){
 // the Schedule tab's "Week" pattern. asRerender() refreshes whichever is showing,
 // so the This/Next-week, Regenerate, and Apply buttons work identically in both.
 var _asRenderMode = 'overlay';
+// v60.128: two independent planners on the one Week surface — CXR rotation+lunch
+// vs Managers open/close. Each shows only its own staff, flags its own gaps, and
+// Applies only its own roles, so publishing one never touches the other.
+var _asPlanner = 'cxr';   // 'cxr' | 'mgr'
+var AS_CXR_ROLES = ['CXR','EXIT','RETURNS'];
+var AS_MGR_ROLES = ['ARM','BRM','ABRM','MT'];
+function _asPlannerRoles(){ return _asPlanner==='mgr' ? AS_MGR_ROLES : AS_CXR_ROLES; }
 function asRerender(){ if(_asRenderMode==='inline'){ renderScheduleWeek(); } else { openAutoScheduler(); } }
 // Shared body: tools row + health-warning card + 7-day draft grid.
 function asWeekBodyHtml(){
   var wk = asBuildWeek(_asSeed);
-  var warns = asRestWarnings(wk);
-  var load = asLoadWarnings(wk);
+  var pr = _asPlannerRoles();
+  var isMgr = _asPlanner==='mgr';
+  // rest warnings scoped to this planner's roles; load caps only for Managers.
+  var warns = asRestWarnings(wk).filter(function(w){ return pr.indexOf(w.role)>=0; });
+  var load = isMgr ? asLoadWarnings(wk) : {longRun:[],nights:[]};
   var warnHtml;
   var sections = '';
   if(warns.length){
@@ -19664,7 +19674,7 @@ function asWeekBodyHtml(){
   if(load.longRun.length){
     sections += '<h4'+(warns.length?' style="margin-top:10px"':'')+'>⚠ '+load.longRun.length+' working 7 days straight (no day off)</h4>' +
       load.longRun.map(function(x){ return '<div class="wl">'+x.nick+' — <span class="wr">'+x.days+' days in a row</span></div>'; }).join('') +
-      '<p class="as-note" style="margin:6px 0 2px">Aim for ≤'+AS_MAX_RUN+' workdays before a day off. (CXR bids set their own days — this mostly flags managers.)</p>';
+      '<p class="as-note" style="margin:6px 0 2px">Aim for ≤'+AS_MAX_RUN+' workdays before a day off.</p>';
   }
   if(load.nights.length){
     sections += '<h4'+((warns.length||load.longRun.length)?' style="margin-top:10px"':'')+'>⚠ '+load.nights.length+' with '+AS_MAX_NIGHTS+'+ closes in a row</h4>' +
@@ -19674,37 +19684,52 @@ function asWeekBodyHtml(){
   if(sections){
     warnHtml = '<div class="as-warn">'+sections+'</div>';
   } else {
-    warnHtml = '<div class="as-warn clear"><h4>✓ Healthy rotation</h4><p class="as-note" style="margin:0">No short-rest turnarounds, no 7-day stretches, no stacked closes this week.</p></div>';
+    warnHtml = '<div class="as-warn clear"><h4>✓ '+(isMgr?'Healthy manager rotation':'Clean CXR week')+'</h4><p class="as-note" style="margin:0">'+(isMgr?'No short-rest turnarounds, no 7-day stretches, no stacked closes.':'No short-rest turnarounds in the CXR/Exit/Returns bids this week.')+'</p></div>';
   }
   var daysHtml = wk.days.map(function(d){
-    var covHtml = d.cov.map(function(c){
-      if(c.closed) return '<span class="as-chip closed">'+c.lbl+' · closed</span>';
-      var cls = c.gap ? 'gap' : 'ok';
-      var detail = 'Floor '+c.floorHave+'/'+c.floorNeed+' · exit-capable '+c.exitCap+'/'+c.exitMin + (c.returnsMin?(' · returns '+c.retHave+'/'+c.returnsMin):'');
-      var why = c.floorGap ? (c.floorHave+'/'+c.floorNeed) : c.exitGap ? 'exit' : c.retGap ? 'ret' : '';
-      return '<span class="as-chip '+cls+'" title="'+detail+'">'+c.lbl+' '+(c.gap?('⚠'+(why?' '+why:'')):'✓')+'</span>';
-    }).join('');
-    var rowsHtml = d.people.map(function(p){
+    var ppl = d.people.filter(function(p){ return pr.indexOf(p.role)>=0; });   // this planner's staff only
+    var covHtml;
+    if(isMgr){
+      // Manager planner: opener + closer coverage, with a "no closer" gap flag.
+      var hasOpener = ppl.some(function(p){ return p.start<=6; });
+      var hasCloser = ppl.some(function(p){ return p.end>=22; });
+      covHtml = '<span class="as-chip '+(hasOpener?'ok':'gap')+'">'+(hasOpener?'Opener ✓':'Opener ⚠')+'</span>' +
+                '<span class="as-chip '+(hasCloser?'ok':'gap')+'">'+(hasCloser?'Closer ✓':'no closer ⚠')+'</span>';
+    } else {
+      covHtml = d.cov.map(function(c){
+        if(c.closed) return '<span class="as-chip closed">'+c.lbl+' · closed</span>';
+        var cls = c.gap ? 'gap' : 'ok';
+        var detail = 'Floor '+c.floorHave+'/'+c.floorNeed+' · exit-capable '+c.exitCap+'/'+c.exitMin + (c.returnsMin?(' · returns '+c.retHave+'/'+c.returnsMin):'');
+        var why = c.floorGap ? (c.floorHave+'/'+c.floorNeed) : c.exitGap ? 'exit' : c.retGap ? 'ret' : '';
+        return '<span class="as-chip '+cls+'" title="'+detail+'">'+c.lbl+' '+(c.gap?('⚠'+(why?' '+why:'')):'✓')+'</span>';
+      }).join('');
+    }
+    var rowsHtml = ppl.map(function(p){
       return '<div class="as-row">' +
         '<span class="as-rl" style="background:'+_asRoleColor(p.role)+'22;color:'+_asRoleColor(p.role)+'">'+p.role+'</span>' +
         '<span class="as-nm">'+p.nick+(p.proposed?'<span class="as-prop">◇ proposed</span>':'')+'</span>' +
         '<span class="as-tm">'+_asHr(p.start)+'–'+_asHr(p.end)+'</span>' +
       '</div>';
     }).join('') || '<div class="as-note">No one scheduled.</div>';
-    return '<div class="as-day"><h3>'+d.label+' <span style="font-weight:600;color:var(--txt3,rgba(235,235,245,.55))">'+d.dateLabel+'</span> <span class="as-note">· '+d.people.length+' staff'+(d.offCount?' · '+d.offCount+' off':'')+'</span></h3>' +
+    return '<div class="as-day"><h3>'+d.label+' <span style="font-weight:600;color:var(--txt3,rgba(235,235,245,.55))">'+d.dateLabel+'</span> <span class="as-note">· '+ppl.length+(isMgr?' mgrs':' staff')+'</span></h3>' +
       '<div class="as-cov">'+covHtml+'</div>' + rowsHtml + '</div>';
   }).join('');
+  var _pill = function(on){ return on?'background:var(--eb,#AF9CFF);color:#1a0f33':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)'; };
   return ''+
+    '<div class="as-tools" style="margin-bottom:6px">' +
+      '<button class="as-btn" style="'+_pill(_asPlanner==='cxr')+'" onclick="_asPlanner=\'cxr\';asRerender();">👥 CXRs + Lunch</button>' +
+      '<button class="as-btn" style="'+_pill(_asPlanner==='mgr')+'" onclick="_asPlanner=\'mgr\';asRerender();">🎩 Managers</button>' +
+    '</div>' +
     '<div class="as-tools">' +
       '<button class="as-btn" style="'+(_asWeekOffset===0?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=0;asRerender();">This week</button>' +
       '<button class="as-btn" style="'+(_asWeekOffset===1?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=1;asRerender();">Next week</button>' +
-      '<button class="as-btn pri" onclick="asApplyWeek()">✓ Apply →</button>' +
+      '<button class="as-btn pri" onclick="asApplyWeek()">✓ Apply '+(isMgr?'managers':'CXRs')+' →</button>' +
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeed++; asRerender();">↻ Regenerate</button>' +
-      '<span class="as-note">Planning <b>'+_asWeekRangeLabel()+'</b>. CXR / Exit / Returns placed from bids; <b style="color:var(--up,#FFCC00)">◇ proposed</b> = a manager slot the scheduler filled. Anyone marked <b>OFF / VACA / PTO</b> for a date is left out automatically. <b>Apply</b> writes this week into the schedule (and the Master Calendar reads the same data). Undo any day in Setup → Edit Schedule.</span>' +
+      '<span class="as-note">Planning the <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> draft for <b>'+_asWeekRangeLabel()+'</b>. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇ proposed</b> = a slot the scheduler filled.':'Placed from bids.')+' Anyone <b>OFF / VACA / PTO</b> that date is left out. <b>Apply</b> writes ONLY this planner’s people — the other planner’s schedule is untouched. Undo any day in Setup → Edit Schedule.</span>' +
     '</div>' +
     warnHtml +
     '<div class="as-grid">' + daysHtml + '</div>' +
-    '<p class="as-note" style="margin-top:14px">Coverage chips read against the branch floor targets (E = exit, C = counter, R = returns) for each block. ⚠ = below minimum for that block. This is a starting draft — the real week still runs through the schedule editor.</p>';
+    '<p class="as-note" style="margin-top:14px">'+(isMgr?'Opener/Closer chips flag days missing a manager to open or close.':'Coverage chips read against the branch floor targets (E = exit, C = counter, R = returns) per block.')+' This is a draft — the real week still runs through the schedule editor.</p>';
 }
 function openAutoScheduler(){
   asInjectStyle();
@@ -19739,14 +19764,14 @@ function _asDateKey(d){
 }
 function asApplyWeek(){
   var wk = asBuildWeek(_asSeed);
+  var pr = _asPlannerRoles();                        // v60.128: apply ONLY this planner's roles
+  var plannerLbl = _asPlanner==='mgr' ? 'Manager' : 'CXR/Exit/Returns';
   var today = new Date(); today.setHours(0,0,0,0);
   var sunday = _asWeekStart();                       // honors the This/Next-week toggle
   var endSat = new Date(sunday); endSat.setDate(sunday.getDate()+6);
-  var totalAssign = wk.days.reduce(function(n,d){return n + d.people.length;},0);
+  var totalAssign = wk.days.reduce(function(n,d){return n + d.people.filter(function(p){return pr.indexOf(p.role)>=0;}).length;},0);
   var range = _asDateKey(sunday) + ' → ' + _asDateKey(endSat);
-  if(!confirm('Apply this draft to the week '+range+'?\n\n'+totalAssign+' shift assignments will be written into the schedule '+
-    '(managers included). Existing people keep their base shift unless the draft changes it — no one is force-marked OFF. '+
-    'You can undo any day in Setup → Edit Schedule ("Reset this day").')){ return; }
+  if(!confirm('Apply the '+plannerLbl+' draft to the week '+range+'?\n\n'+totalAssign+' shift assignments will be written. This publishes ONLY the '+plannerLbl+' schedule — the other planner is untouched. Existing people keep their base shift unless this draft changes it; no one is force-marked OFF. Undo any day in Setup → Edit Schedule.')){ return; }
   if(!STATE.scheduleOverrides) STATE.scheduleOverrides = {};
   var touchedToday = false;
   var todayK = _asDateKey(today);
@@ -19757,6 +19782,7 @@ function asApplyWeek(){
     if(!STATE.scheduleOverrides[key]) STATE.scheduleOverrides[key] = {};
     d.people.forEach(function(p){
       if(!p.name || p.start==null || p.end==null) return;
+      if(pr.indexOf(p.role)<0) return;               // only this planner's roles
       var pid = p.name.replace(/\s/g,'_');
       STATE.scheduleOverrides[key][pid] = [p.start, p.end];
     });
