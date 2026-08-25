@@ -19031,8 +19031,74 @@ function rqAdd(){
     date:(dt&&dt.value)||'', note:(nt&&nt.value.trim())||'', status:'open' });
   if(typeof saveState==='function') saveState(); window._rqType='off'; rqRender();
 }
-function rqDecide(id,st){ var r=rqArr().filter(function(x){return x.id===id;})[0]; if(r){ r.status=st; r.decidedAt=new Date().toLocaleDateString(); if(typeof logAction==='function') logAction('Request '+st+': '+r.who+(r.date?' ('+r.date+')':'')); if(typeof saveState==='function') saveState(); rqRender(); } }
-function rqReopen(id){ var r=rqArr().filter(function(x){return x.id===id;})[0]; if(r){ r.status='open'; r.decidedAt=null; if(typeof saveState==='function') saveState(); rqRender(); } }
+// v60.132 (Design #6): approving a request rewrites the schedule immediately.
+//   off   → mark the person off (PTO) for the date (the shared time-off spine)
+//   early → trim their shift end to the requested leave time (scheduleOverrides)
+// swap/other stay log-only. Denying or re-opening an applied request undoes it.
+function _rqResolvePid(who){
+  try{
+    var roster=(typeof getEffectiveRoster==='function')?getEffectiveRoster():[]; var w=(who||'').toLowerCase().trim();
+    var m=roster.filter(function(p){ return (p.name||'').toLowerCase()===w || (p.nick||'').toLowerCase()===w; })[0]
+        || roster.filter(function(p){ return w && ((p.name||'').toLowerCase().indexOf(w)>=0 || (p.nick&&w.indexOf(p.nick.toLowerCase())>=0)); })[0];
+    return m ? m.name.replace(/\s/g,'_') : (who||'').replace(/\s/g,'_');
+  }catch(e){ return (who||'').replace(/\s/g,'_'); }
+}
+function _rqPersonStart(pid,date){
+  try{
+    var sched=(typeof getScheduleForDate==='function')?getScheduleForDate(date):null;
+    if(sched && Array.isArray(sched[pid])) return sched[pid][0];
+    var roster=(typeof getEffectiveRoster==='function')?getEffectiveRoster():[]; var p=roster.filter(function(x){return x.name.replace(/\s/g,'_')===pid;})[0];
+    return p && p.shiftStart!=null ? p.shiftStart : 8;
+  }catch(e){ return 8; }
+}
+function _rqParseTime(s){
+  if(!s) return null; var m=String(s).trim().match(/^(\d{1,2})(?::?(\d{2}))?\s*([ap])?/i); if(!m) return null;
+  var h=parseInt(m[1],10), mn=m[2]?parseInt(m[2],10):0, ap=(m[3]||'').toLowerCase();
+  if(ap==='p'&&h!==12) h+=12; if(ap==='a'&&h===12) h=0;
+  if(h<0||h>24) return null; return h+mn/60;
+}
+function _rqApply(r){
+  if(!r.date) return '';
+  var pid=_rqResolvePid(r.who);
+  if(r.type==='off'){
+    if(!STATE.pto) STATE.pto={}; if(!STATE.pto[r.date]) STATE.pto[r.date]={}; STATE.pto[r.date][pid]=true;
+    r.applied={kind:'off', pid:pid, date:r.date};
+    return ' · '+r.who+' marked off';
+  }
+  if(r.type==='early'){
+    var ans=prompt('Approve early-out for '+r.who+' on '+r.date+' — leave at what time? (e.g. 3:00 PM)');
+    if(ans===null) return '__cancel__';
+    var end=_rqParseTime(ans); if(end===null){ if(typeof toast==='function') toast('Could not read that time'); return '__cancel__'; }
+    var start=_rqPersonStart(pid,r.date);
+    if(!STATE.scheduleOverrides) STATE.scheduleOverrides={}; if(!STATE.scheduleOverrides[r.date]) STATE.scheduleOverrides[r.date]={};
+    STATE.scheduleOverrides[r.date][pid]=[start,end];
+    r.applied={kind:'early', pid:pid, date:r.date};
+    return ' · '+r.who+' out at '+_asHr(end);
+  }
+  return '';
+}
+function _rqUndoApply(r){
+  if(!r || !r.applied) return; var a=r.applied;
+  try{
+    if(a.kind==='off'){ if(STATE.pto && STATE.pto[a.date]){ delete STATE.pto[a.date][a.pid]; if(!Object.keys(STATE.pto[a.date]).length) delete STATE.pto[a.date]; } }
+    if(a.kind==='early'){ if(STATE.scheduleOverrides && STATE.scheduleOverrides[a.date]){ delete STATE.scheduleOverrides[a.date][a.pid]; if(!Object.keys(STATE.scheduleOverrides[a.date]).length) delete STATE.scheduleOverrides[a.date]; } }
+  }catch(e){}
+  r.applied=null;
+}
+function rqDecide(id,st){
+  var r=rqArr().filter(function(x){return x.id===id;})[0]; if(!r) return;
+  if(r.applied) _rqUndoApply(r);                 // re-deciding clears any prior schedule effect
+  var impact='';
+  if(st==='approved'){
+    impact=_rqApply(r);
+    if(impact==='__cancel__') return;            // manager backed out of the early-out time
+  }
+  r.status=st; r.decidedAt=new Date().toLocaleDateString();
+  if(typeof logAction==='function') logAction('Request '+st+': '+r.who+(r.date?' ('+r.date+')':'')+impact);
+  if(typeof saveState==='function') saveState(); rqRender();
+  if(impact && typeof toast==='function') toast('✓ Schedule updated'+impact);
+}
+function rqReopen(id){ var r=rqArr().filter(function(x){return x.id===id;})[0]; if(r){ _rqUndoApply(r); r.status='open'; r.decidedAt=null; if(typeof saveState==='function') saveState(); rqRender(); } }
 function rqDelete(id){ var a=rqArr(); var i=a.findIndex(function(x){return x.id===id;}); if(i>=0) a.splice(i,1); if(typeof saveState==='function') saveState(); rqRender(); }
 var _RQ_TYPE={off:'Time off',early:'Leave early',swap:'Shift swap',other:'Other'};
 function rqImpactHtml(r){
@@ -19090,7 +19156,7 @@ function rqRender(){
     if(r.note) s+='<div class="rq-note">'+biEsc(r.note)+'</div>';
     s+=rqImpactHtml(r);
     if(r.status==='open') s+='<div class="rq-actions"><button class="rq-approve" onclick="rqDecide('+r.id+',\'approved\')">Approve</button><button class="rq-deny" onclick="rqDecide('+r.id+',\'denied\')">Deny</button></div>';
-    else s+='<div class="rq-status '+r.status+'">'+(r.status==='approved'?'✓ Approved':'✕ Denied')+(r.decidedAt?' · '+r.decidedAt:'')+'<button class="rq-reopen" onclick="rqReopen('+r.id+')">re-open</button></div>';
+    else s+='<div class="rq-status '+r.status+'">'+(r.status==='approved'?'✓ Approved':'✕ Denied')+(r.decidedAt?' · '+r.decidedAt:'')+(r.applied?' · <span style="color:var(--green)">schedule updated</span>':'')+'<button class="rq-reopen" onclick="rqReopen('+r.id+')">re-open</button></div>';
     return s+'</div>';
   }
   if(open.length){ h+='<div class="now-sec-hd" style="color:#FFCC00">Open ('+open.length+')</div>'; open.forEach(function(r){ h+=card(r); }); }
