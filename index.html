@@ -19296,6 +19296,22 @@ function closeEmeraldGuide(){ var o=document.getElementById('ec-overlay'); if(o)
 // gaps are flagged. "Regenerate" reshuffles the manager rotation seed.
 // ═══════════════════════════════════════════════════════════════════════════
 var _asSeed = 0, _asStyled = false, _asWeekOffset = 0;
+// v60.129: multi-week horizon (Design #12) — plan up to 8 weeks out, each week with
+// its OWN regenerate seed so navigating (or reshuffling one week) never disturbs another.
+var AS_MAX_WEEKS = 8;
+var _asSeeds = {};
+function _asWeekSeed(){ return _asSeeds[_asWeekOffset] || 0; }
+function _asWeekLabel(){ return (_asWeekOffset===0?'This week':_asWeekOffset===1?'Next week':'+'+_asWeekOffset+' wks')+' · '+_asWeekRangeLabel(); }
+// Has the current week + planner already been published (this planner's people have
+// array overrides on the week's dates)?
+function _asWeekApplied(){
+  try{
+    var sunday=_asWeekStart(); var pr=_asPlannerRoles(); var roster=(typeof getEffectiveRoster==='function')?getEffectiveRoster():[];
+    var pids={}; roster.forEach(function(p){ if(pr.indexOf(p.role)>=0) pids[p.name.replace(/\s/g,'_')]=true; });
+    for(var i=0;i<7;i++){ var dt=new Date(sunday); dt.setDate(sunday.getDate()+i); var key=_asDateKeyOf(dt); var ov=(STATE.scheduleOverrides||{})[key]; if(ov){ for(var pid in ov){ if(pids[pid] && Array.isArray(ov[pid])) return true; } } }
+    return false;
+  }catch(e){ return false; }
+}
 var AS_DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var AS_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 // v60.113/114: the draft plans a SPECIFIC dated week. offset 0 = THIS week
@@ -19656,7 +19672,7 @@ function _asPlannerRoles(){ return _asPlanner==='mgr' ? AS_MGR_ROLES : AS_CXR_RO
 function asRerender(){ if(_asRenderMode==='inline'){ renderScheduleWeek(); } else { openAutoScheduler(); } }
 // Shared body: tools row + health-warning card + 7-day draft grid.
 function asWeekBodyHtml(){
-  var wk = asBuildWeek(_asSeed);
+  var wk = asBuildWeek(_asWeekSeed());
   var pr = _asPlannerRoles();
   var isMgr = _asPlanner==='mgr';
   // rest warnings scoped to this planner's roles; load caps only for Managers.
@@ -19721,11 +19737,13 @@ function asWeekBodyHtml(){
       '<button class="as-btn" style="'+_pill(_asPlanner==='mgr')+'" onclick="_asPlanner=\'mgr\';asRerender();">🎩 Managers</button>' +
     '</div>' +
     '<div class="as-tools">' +
-      '<button class="as-btn" style="'+(_asWeekOffset===0?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=0;asRerender();">This week</button>' +
-      '<button class="as-btn" style="'+(_asWeekOffset===1?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=1;asRerender();">Next week</button>' +
+      '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff);padding:9px 12px"'+(_asWeekOffset<=0?' disabled':'')+' onclick="_asWeekOffset=Math.max(0,_asWeekOffset-1);asRerender();">‹</button>' +
+      '<button class="as-btn" style="background:var(--counter,#0A84FF);color:#fff;min-width:150px" title="Jump to this week" onclick="_asWeekOffset=0;asRerender();">'+_asWeekLabel()+'</button>' +
+      '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff);padding:9px 12px"'+(_asWeekOffset>=AS_MAX_WEEKS-1?' disabled':'')+' onclick="_asWeekOffset=Math.min(AS_MAX_WEEKS-1,_asWeekOffset+1);asRerender();">›</button>' +
+      (_asWeekApplied()?'<span class="as-chip ok">✓ applied</span>':'<span class="as-chip">◇ draft</span>') +
       '<button class="as-btn pri" onclick="asApplyWeek()">✓ Apply '+(isMgr?'managers':'CXRs')+' →</button>' +
-      '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeed++; asRerender();">↻ Regenerate</button>' +
-      '<span class="as-note">Planning the <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> draft for <b>'+_asWeekRangeLabel()+'</b>. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇ proposed</b> = a slot the scheduler filled.':'Placed from bids.')+' Anyone <b>OFF / VACA / PTO</b> that date is left out. <b>Apply</b> writes ONLY this planner’s people — the other planner’s schedule is untouched. Undo any day in Setup → Edit Schedule.</span>' +
+      '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeeds[_asWeekOffset]=(_asSeeds[_asWeekOffset]||0)+1; asRerender();">↻ Regenerate</button>' +
+      '<span class="as-note">Planning the <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> draft for <b>'+_asWeekRangeLabel()+'</b> — plan up to '+AS_MAX_WEEKS+' weeks out with ‹ ›. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇ proposed</b> = a slot the scheduler filled.':'Placed from bids.')+' Anyone <b>OFF / VACA / PTO</b> that date is left out. <b>Apply</b> writes ONLY this planner’s people. Each week has its own draft — Regenerate reshuffles just this one. Undo any day in Setup → Edit Schedule.</span>' +
     '</div>' +
     warnHtml +
     '<div class="as-grid">' + daysHtml + '</div>' +
@@ -19763,7 +19781,7 @@ function _asDateKey(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
 function asApplyWeek(){
-  var wk = asBuildWeek(_asSeed);
+  var wk = asBuildWeek(_asWeekSeed());
   var pr = _asPlannerRoles();                        // v60.128: apply ONLY this planner's roles
   var plannerLbl = _asPlanner==='mgr' ? 'Manager' : 'CXR/Exit/Returns';
   var today = new Date(); today.setHours(0,0,0,0);
