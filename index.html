@@ -19741,7 +19741,7 @@ function asWeekBodyHtml(){
       '<button class="as-btn" style="background:var(--counter,#0A84FF);color:#fff;min-width:150px" title="Jump to this week" onclick="_asWeekOffset=0;asRerender();">'+_asWeekLabel()+'</button>' +
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff);padding:9px 12px"'+(_asWeekOffset>=AS_MAX_WEEKS-1?' disabled':'')+' onclick="_asWeekOffset=Math.min(AS_MAX_WEEKS-1,_asWeekOffset+1);asRerender();">›</button>' +
       (_asWeekApplied()?'<span class="as-chip ok">✓ applied</span>':'<span class="as-chip">◇ draft</span>') +
-      '<button class="as-btn pri" onclick="asApplyWeek()">✓ Apply '+(isMgr?'managers':'CXRs')+' →</button>' +
+      '<button class="as-btn pri" onclick="asApplyWeek()">'+((isMgr && _asPublishTier!=='brm')?'🔒 Publish · BRM PIN':('✓ Apply '+(isMgr?'managers':'CXRs')+' →'))+'</button>' +
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeeds[_asWeekOffset]=(_asSeeds[_asWeekOffset]||0)+1; asRerender();">↻ Regenerate</button>' +
       '<span class="as-note">Planning the <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> draft for <b>'+_asWeekRangeLabel()+'</b> — plan up to '+AS_MAX_WEEKS+' weeks out with ‹ ›. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇ proposed</b> = a slot the scheduler filled.':'Placed from bids.')+' Anyone <b>OFF / VACA / PTO</b> that date is left out. <b>Apply</b> writes ONLY this planner’s people. Each week has its own draft — Regenerate reshuffles just this one. Undo any day in Setup → Edit Schedule.</span>' +
     '</div>' +
@@ -19780,10 +19780,20 @@ function closeAutoScheduler(){ _asWeekOffset=0; var o=document.getElementById('a
 function _asDateKey(d){
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+var _asPublishTier = null;   // v60.130: 'brm' once a BRM PIN has been entered this session
 function asApplyWeek(){
   var wk = asBuildWeek(_asWeekSeed());
   var pr = _asPlannerRoles();                        // v60.128: apply ONLY this planner's roles
   var plannerLbl = _asPlanner==='mgr' ? 'Manager' : 'CXR/Exit/Returns';
+  // v60.130 (Design #11): publishing the MANAGER schedule is BRM-gated. MTs can draft;
+  // a BRM PIN (the admin PIN, or any PIN starting with 2 per the branch rule) publishes.
+  if(_asPlanner==='mgr' && _asPublishTier!=='brm'){
+    var _pin = prompt('Publishing the Manager schedule needs a BRM PIN.\n(MTs can draft the week; BRMs publish it.)');
+    if(_pin===null) return;
+    if(_pin===((typeof getAdminPin==='function')?getAdminPin():'2826') || (_pin && _pin.charAt(0)==='2')){ _asPublishTier='brm'; }
+    else if(typeof getModPin==='function' && _pin===getModPin()){ alert('That’s an MT PIN — MTs can draft but not publish. A BRM PIN is required.'); return; }
+    else { alert('Incorrect PIN.'); return; }
+  }
   var today = new Date(); today.setHours(0,0,0,0);
   var sunday = _asWeekStart();                       // honors the This/Next-week toggle
   var endSat = new Date(sunday); endSat.setDate(sunday.getDate()+6);
