@@ -14091,6 +14091,29 @@ function renderScheduleView() {
   else { buildCoverageTimeline(); }
 }
 
+// v60.131 (Design #5): Exit-fairness suggest — the rotation-eligible CXR with the
+// LEAST exit time this week (exemptions/exit agents excluded), so the next exit
+// rotation keeps the team even. Opens that person's adjuster (Rotation tab). Shows
+// only once some exit time has accrued this week (else there's nothing to balance).
+function _fairnessSuggestHtml(exp){
+  try{
+    var cxrs = Object.keys(exp||{}).filter(function(pid){
+      var p=(exp[pid]||{}).person; if(!p) return false;
+      return p.role==='CXR' && !p.fairnessExempt && (STATE.todayOverrides||{})[pid]!=='callout';
+    }).map(function(pid){ return {pid:pid, person:exp[pid].person, h:(typeof getExitHoursWeek==='function'?getExitHoursWeek(pid):0)}; });
+    if(cxrs.length<2) return '';
+    cxrs.sort(function(a,b){ return a.h-b.h; });
+    if(cxrs[cxrs.length-1].h<=0) return '';                 // no exit time logged yet this week
+    var least = cxrs[0];
+    var avg = (typeof getTeamExitAvgWeek==='function')?getTeamExitAvgWeek():0;
+    var nick = least.person.nick || least.person.name.split(' ')[0];
+    return '<div class="now-attn" style="margin-bottom:14px;border-color:rgba(255,204,0,.35);background:rgba(255,204,0,.08)">'
+      +'<div class="now-kicker" style="color:var(--amber)">⚖ Exit-fairness suggest</div>'
+      +'<div class="now-h" style="font-size:19px">'+nick+' is lowest on exit this week</div>'
+      +'<div class="now-p">'+(Math.round(least.h*10)/10)+'h at exit vs team avg '+(Math.round(avg*10)/10)+'h — send the next exit rotation their way to keep it even.</div>'
+      +'<button class="now-btn" onclick="showShiftModModal(\''+least.pid+'\',\''+String(least.person.name||nick).replace(/'/g,"\\'")+'\')">Set '+nick+'’s rotation →</button></div>';
+  }catch(e){ return ''; }
+}
 // ── Coverage-first: current-hour card + per-hour have/need list ──────────────
 function renderCoverageFirst() {
   const el = document.getElementById('coverage-timeline');
@@ -14125,6 +14148,7 @@ function renderCoverageFirst() {
   let html = `<div class="now-attn ${attnCls}" style="margin-bottom:14px"><div class="now-kicker">${kicker}</div>
     <div class="now-h">Exit ${c.ex}/${c.exN} · Counter ${c.ct}/${c.ctN}</div>
     <div class="now-p">${fmtH(nowFloor)}–${fmtH(nowFloor+1)} · ${c.closed?'branch closed this hour':'amber = met exactly, red = below minimum'}</div>${fixBtn}</div>`;
+  html += (typeof _fairnessSuggestHtml==='function') ? _fairnessSuggestHtml(exp) : '';   // v60.131 (Design #5)
   // Per-hour list (from now to close)
   html += `<div class="now-sec-hd">Coverage by hour</div><div class="more-group">`;
   for (let h=nowFloor; h<H_END; h++) {
