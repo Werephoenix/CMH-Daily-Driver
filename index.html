@@ -2258,6 +2258,7 @@ button { cursor: pointer; }
     <button class="seg on" id="spat-timeline" onclick="setSchedPattern('timeline')">Timeline</button>
     <button class="seg"    id="spat-roster"   onclick="setSchedPattern('roster')">Roster</button>
     <button class="seg"    id="spat-coverage" onclick="setSchedPattern('coverage')">Coverage</button>
+    <button class="seg"    id="spat-week"     onclick="setSchedPattern('week')">📅 Week</button>
   </div>
 
   <!-- Grouping selector (v60.37: single unified schedule view — the mode only
@@ -2298,7 +2299,7 @@ button { cursor: pointer; }
     gap:6px;margin-bottom:10px"></div>
 
   <!-- Auto Schedule button — always visible (the rotation engine is the core value of this tab) -->
-  <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+  <div id="sched-auto-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
     <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Distribute Exit & Counter rotations based on coverage rules">
       📅 Auto-Distribute
     </button>
@@ -2321,7 +2322,7 @@ button { cursor: pointer; }
   <div id="coverage-chart" style="margin-bottom:8px"></div>
 
   <!-- Person timeline -->
-  <div class="card" style="padding:10px 12px">
+  <div id="sched-today-card" class="card" style="padding:10px 12px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <div style="font-size:9px;font-weight:800;text-transform:uppercase;
         letter-spacing:.08em;color:var(--txt3)">Today's Coverage</div>
@@ -2339,6 +2340,8 @@ button { cursor: pointer; }
       </div>
     </div>
   </div>
+  <!-- v60.127: Week draft pattern — the Auto-Scheduler rendered inline here (sibling of the day-view card) -->
+  <div id="sched-week-view" style="display:none"></div>
 
   <!-- Person detail panel (slides up on bar tap) -->
   <div id="person-panel" style="display:none;position:fixed;bottom:0;left:0;right:0;
@@ -14044,13 +14047,13 @@ function setSchedGroup(mode) {
 function setSchedPattern(p) {
   STATE.schedPattern = p;
   if (typeof saveState === 'function') saveState();
-  ['timeline','roster','coverage'].forEach(m=>{
+  ['timeline','roster','coverage','week'].forEach(m=>{
     const b = document.getElementById('spat-'+m);
     if (b) b.className = 'seg' + (m===p ? ' on' : '');
   });
   // Group-by placement only matters for timeline/roster.
   const gb = document.getElementById('sched-groupby-row');
-  if (gb) gb.style.display = (p==='coverage') ? 'none' : 'flex';
+  if (gb) gb.style.display = (p==='coverage'||p==='week') ? 'none' : 'flex';
   renderScheduleView();
 }
 
@@ -14065,11 +14068,24 @@ function renderScheduleView() {
       : 'Fills exit gaps using available CXRs · respects manager overrides';
   }
   const gb = document.getElementById('sched-groupby-row');
-  if (gb) gb.style.display = (p==='coverage') ? 'none' : 'flex';
-  ['timeline','roster','coverage'].forEach(m=>{
+  if (gb) gb.style.display = (p==='coverage'||p==='week') ? 'none' : 'flex';
+  ['timeline','roster','coverage','week'].forEach(m=>{
     const b = document.getElementById('spat-'+m);
     if (b) b.className = 'seg' + (m===p ? ' on' : '');
   });
+  // v60.127: the "Week" pattern replaces the whole day-view (switchboard, coverage,
+  // auto-distribute, mode bar) with the inline week draft — a distinct planning mode.
+  const wkEl = document.getElementById('sched-week-view');
+  // id → its normal display value (so hide/restore keeps flex/grid layouts intact)
+  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block'};
+  if (p === 'week') {
+    Object.keys(_dayRestore).forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
+    if (wkEl) wkEl.style.display = 'block';
+    if (typeof renderScheduleWeek === 'function') renderScheduleWeek();
+    return;
+  }
+  if (wkEl) wkEl.style.display = 'none';
+  Object.keys(_dayRestore).forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display=_dayRestore[id]; });
   if (p === 'coverage') { renderCoverageFirst(); }
   else if (p === 'roster') { renderRoster(); }
   else { buildCoverageTimeline(); }
@@ -19592,6 +19608,7 @@ function asInjectStyle(){
   '.as-hd h2{font-size:22px;font-weight:800;margin:2px 0 0;line-height:1.15;color:var(--txt,#fff)}' +
   '.as-x{margin-left:auto;width:34px;height:34px;flex-shrink:0;border-radius:50%;border:none;background:var(--bg3,#2C2C2E);color:var(--txt,#fff);font-size:17px;cursor:pointer}' +
   '.as-body{flex:1;overflow-y:auto;padding:14px 16px 40px;-webkit-overflow-scrolling:touch}' +
+  '.as-body.as-inline{flex:none;overflow:visible;padding:0}' +   /* v60.127: inline in Schedule tab */
   '.as-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center}' +
   '.as-btn{border:none;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;background:var(--bg3,#2C2C2E);color:var(--txt,#fff)}' +
   '.as-btn.pri{background:var(--accent,#23C983);color:#00301c}' +
@@ -19625,8 +19642,13 @@ function _asRoleColor(r){
   return m[r]||'#8E8E93';
 }
 
-function openAutoScheduler(){
-  asInjectStyle();
+// v60.127: the week draft renders in TWO places — the Auto-Scheduler overlay and
+// the Schedule tab's "Week" pattern. asRerender() refreshes whichever is showing,
+// so the This/Next-week, Regenerate, and Apply buttons work identically in both.
+var _asRenderMode = 'overlay';
+function asRerender(){ if(_asRenderMode==='inline'){ renderScheduleWeek(); } else { openAutoScheduler(); } }
+// Shared body: tools row + health-warning card + 7-day draft grid.
+function asWeekBodyHtml(){
   var wk = asBuildWeek(_asSeed);
   var warns = asRestWarnings(wk);
   var load = asLoadWarnings(wk);
@@ -19672,26 +19694,38 @@ function openAutoScheduler(){
     return '<div class="as-day"><h3>'+d.label+' <span style="font-weight:600;color:var(--txt3,rgba(235,235,245,.55))">'+d.dateLabel+'</span> <span class="as-note">· '+d.people.length+' staff'+(d.offCount?' · '+d.offCount+' off':'')+'</span></h3>' +
       '<div class="as-cov">'+covHtml+'</div>' + rowsHtml + '</div>';
   }).join('');
+  return ''+
+    '<div class="as-tools">' +
+      '<button class="as-btn" style="'+(_asWeekOffset===0?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=0;asRerender();">This week</button>' +
+      '<button class="as-btn" style="'+(_asWeekOffset===1?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=1;asRerender();">Next week</button>' +
+      '<button class="as-btn pri" onclick="asApplyWeek()">✓ Apply →</button>' +
+      '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeed++; asRerender();">↻ Regenerate</button>' +
+      '<span class="as-note">Planning <b>'+_asWeekRangeLabel()+'</b>. CXR / Exit / Returns placed from bids; <b style="color:var(--up,#FFCC00)">◇ proposed</b> = a manager slot the scheduler filled. Anyone marked <b>OFF / VACA / PTO</b> for a date is left out automatically. <b>Apply</b> writes this week into the schedule (and the Master Calendar reads the same data). Undo any day in Setup → Edit Schedule.</span>' +
+    '</div>' +
+    warnHtml +
+    '<div class="as-grid">' + daysHtml + '</div>' +
+    '<p class="as-note" style="margin-top:14px">Coverage chips read against the branch floor targets (E = exit, C = counter, R = returns) for each block. ⚠ = below minimum for that block. This is a starting draft — the real week still runs through the schedule editor.</p>';
+}
+function openAutoScheduler(){
+  asInjectStyle();
+  _asRenderMode = 'overlay';
   var html =
   '<div class="as-hd">' +
     '<div><div class="as-eyebrow">Planner · beta · '+_asWeekRangeLabel()+'</div><h2>Weekly Auto-Scheduler</h2></div>' +
     '<button class="as-x" onclick="closeAutoScheduler()" aria-label="Close">✕</button>' +
   '</div>' +
-  '<div class="as-body">' +
-    '<div class="as-tools">' +
-      '<button class="as-btn" style="'+(_asWeekOffset===0?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=0;openAutoScheduler();">This week</button>' +
-      '<button class="as-btn" style="'+(_asWeekOffset===1?'background:var(--counter,#0A84FF);color:#fff':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)')+'" onclick="_asWeekOffset=1;openAutoScheduler();">Next week</button>' +
-      '<button class="as-btn pri" onclick="asApplyWeek()">✓ Apply →</button>' +
-      '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeed++; openAutoScheduler();">↻ Regenerate</button>' +
-      '<span class="as-note">Planning <b>'+_asWeekRangeLabel()+'</b>. CXR / Exit / Returns placed from bids; <b style="color:var(--up,#FFCC00)">◇ proposed</b> = a manager slot the scheduler filled. Anyone marked <b>OFF / VACA / PTO</b> for a date is left out automatically. <b>Apply</b> writes this week into the schedule (and the Master Calendar reads the same data). Undo any day in Setup → Edit Schedule.</span>' +
-    '</div>' +
-    warnHtml +
-    '<div class="as-grid">' + daysHtml + '</div>' +
-    '<p class="as-note" style="margin-top:14px">Coverage chips read against the branch floor targets (E = exit, C = counter, R = returns) for each block. ⚠ = below minimum for that block. This is a starting draft — the real week still runs through the schedule editor.</p>' +
-  '</div>';
+  '<div class="as-body">' + asWeekBodyHtml() + '</div>';
   var o=document.getElementById('as-overlay');
   if(!o){ o=document.createElement('div'); o.id='as-overlay'; document.body.appendChild(o); }
   o.innerHTML=html; o.style.display='flex'; document.body.style.overflow='hidden';
+}
+// v60.127: the same week draft, rendered inline as the Schedule tab's "Week" pattern.
+function renderScheduleWeek(){
+  asInjectStyle();
+  _asRenderMode = 'inline';
+  var el = document.getElementById('sched-week-view');
+  if(!el) return;
+  el.innerHTML = '<div class="as-body as-inline">' + asWeekBodyHtml() + '</div>';
 }
 function closeAutoScheduler(){ _asWeekOffset=0; var o=document.getElementById('as-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
@@ -19731,7 +19765,7 @@ function asApplyWeek(){
   if(typeof saveState==='function') saveState();
   if(touchedToday && typeof loadScheduleForToday==='function') loadScheduleForToday(false);
   if(typeof toast==='function') toast('✓ Draft applied to '+range);
-  closeAutoScheduler();
+  if(_asRenderMode==='inline'){ renderScheduleWeek(); } else { closeAutoScheduler(); }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
