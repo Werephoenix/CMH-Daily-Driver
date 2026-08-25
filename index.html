@@ -18726,6 +18726,7 @@ function mcRailHtml(key){
     if(off.length) h+='<div class="mc-rail-row">🌴 '+off.length+' off · '+biEsc(off.map(function(x){return x.name;}).join(', '))+'</div>';
     h+='<div class="mc-rail-card" style="border-style:dashed;border-color:rgba(255,255,255,.18);margin-top:12px"><div style="font-weight:700">🌴 Time off (PTO)</div><div class="mc-none" style="margin-top:2px">Mark someone off or plan the week from the full day view — it becomes a hard constraint for the auto-scheduler.</div></div>';
     h+='<button class="mc-addbtn" style="width:100%;background:#23C983;color:#00301c;margin-top:4px" onclick="mcDay(\''+key+'\')">Open full day →</button>';
+    h+='<button class="mc-addbtn" style="width:100%;background:#0A84FF;color:#fff;margin-top:6px" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day →</button>';
     return h;
   }catch(e){ return ''; }
 }
@@ -18766,6 +18767,19 @@ function openAutoSchedulerForWeekOf(key){
   _asWeekOffset = Math.max(0, _asOffsetForKey(key));
   closeMasterCalendar();
   openAutoScheduler();
+}
+// v60.134 (Design #2): month → day → Schedule drill. Routes the tapped calendar day
+// into the app's DATE-AWARE schedule editor (Admin → Edit Schedule, which already
+// takes any date) — full per-day editing without refactoring the live "today" renderer.
+function openDayInScheduleEditor(key){
+  if(typeof closeMasterCalendar==='function') closeMasterCalendar();
+  var run = function(){
+    if(typeof openAdminSection==='function') openAdminSection('edit');
+    var dEl=document.getElementById('sched-edit-date'); if(dEl){ dEl.value=key; }
+    if(typeof buildScheduleEditor==='function') buildScheduleEditor();
+    if(typeof toast==='function'){ try{ var d=new Date(key+'T12:00:00'); toast('Editing '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '+_MC_MON[d.getMonth()].slice(0,3)+' '+d.getDate()); }catch(e){} }
+  };
+  if(typeof setupEdit==='function') setupEdit(run); else run();
 }
 // v60.120: PTO / time-off entry, writing the STATE.pto store everything reads.
 function mcPtoStore(){ if(!STATE.pto) STATE.pto={}; return STATE.pto; }
@@ -18980,10 +18994,11 @@ function mcDay(key){
     +'<button class="mc-addbtn" style="margin-left:auto" onclick="mcAddPto(\''+key+'\')">Add</button></div></div>';
   h+='</div><div class="mc-sec"><div class="mc-sec-h">🗓 Plan</div>'+
      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+       '<button class="mc-addbtn" style="background:#0A84FF;color:#fff" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day →</button>'+
        '<button class="mc-addbtn" style="background:#23C983;color:#00301c" onclick="openAutoSchedulerForWeekOf(\''+key+'\')">🤖 Plan this week</button>'+
        '<button class="mc-addbtn" style="background:#AF9CFF;color:#1a0f33" onclick="closeMasterCalendar();openStationFairness()">🔀 Station fairness</button>'+
      '</div>'+
-     '<div class="mc-none" style="margin-top:6px">Draft the week this day belongs to, or check station fairness. Applied drafts show up right here on the calendar.</div>';
+     '<div class="mc-none" style="margin-top:6px">Edit just this day, draft the week it belongs to, or check station fairness. Applied drafts show up right here on the calendar.</div>';
   h+='</div></div>'; o.innerHTML=h;
 }
 function openMasterCalendar(){
