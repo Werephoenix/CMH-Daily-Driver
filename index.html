@@ -18970,6 +18970,12 @@ function mcDay(key){
   var d=new Date(key+'T12:00:00');
   var wd=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
   var h='<div class="mc-head"><button class="mc-back" onclick="mcRender()">‹ Month</button><div class="mc-title2">'+wd+' '+_MC_MON[d.getMonth()].slice(0,3)+' '+d.getDate()+'</div><button class="mc-x" onclick="closeMasterCalendar()">✕</button></div><div class="mc-daybody">';
+  // v60.137 (usability): primary day actions FIRST, so a BM who taps a day to act
+  // doesn't scroll past events/celebrations/roster to find the buttons.
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px">'
+    +'<button class="mc-addbtn" style="background:#0A84FF;color:#fff;flex:1;min-width:120px" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day</button>'
+    +'<button class="mc-addbtn" style="background:#23C983;color:#00301c;flex:1;min-width:120px" onclick="goToWeekPlanner('+_asOffsetForKey(key)+')">🤖 Plan the week</button>'
+    +'</div>';
   // v60.124: PTO conflict guard leads the day when time-off collides with a short day.
   var _grd = mcPtoGuard(key);
   if(_grd){
@@ -19022,14 +19028,8 @@ function mcDay(key){
     +'<select id="mc-pto-who" class="bi-in" style="max-width:none;width:100%;margin-bottom:6px"><option value="">Who is off?…</option>'+_opts+'</select>'
     +'<div style="display:flex;gap:8px;align-items:center"><input id="mc-pto-days" class="bi-in" type="number" value="1" min="1" max="60" style="max-width:70px"><span class="mc-none" style="margin:0">day(s) from this date</span>'
     +'<button class="mc-addbtn" style="margin-left:auto" onclick="mcAddPto(\''+key+'\')">Add</button></div></div>';
-  h+='</div><div class="mc-sec"><div class="mc-sec-h">🗓 Plan</div>'+
-     '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
-       '<button class="mc-addbtn" style="background:#0A84FF;color:#fff" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day →</button>'+
-       '<button class="mc-addbtn" style="background:#23C983;color:#00301c" onclick="goToWeekPlanner('+_asOffsetForKey(key)+')">🤖 Auto-plan the week →</button>'+
-       '<button class="mc-addbtn" style="background:#AF9CFF;color:#1a0f33" onclick="closeMasterCalendar();openStationFairness()">🔀 Station fairness →</button>'+
-     '</div>'+
-     '<div class="mc-none" style="margin-top:6px">Edit just this day, draft the week it belongs to, or check station fairness. Applied drafts show up right here on the calendar.</div>';
-  h+='</div></div>'; o.innerHTML=h;
+  h+='</div>';   // close the Time-off section (actions now live at the top of the day)
+  h+='</div>'; o.innerHTML=h;
 }
 function openMasterCalendar(){
   mcInjectStyle();
