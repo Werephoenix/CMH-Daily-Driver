@@ -19891,6 +19891,8 @@ function asWeekBodyHtml(){
       '<span class="as-note">Planning <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> · <b>'+_asWeekRangeLabel()+'</b>. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇</b> = a slot the scheduler filled.':'Placed from their bids.')+' <b>Apply</b> writes only this group — the other stays as-is. Use ‹ › for other weeks.</span>' +
     '</div>' +
     warnHtml +
+    (isMgr ? '<div class="as-note" style="margin:2px 0 8px">Each day: <b style="color:var(--accent,#23C983)">Opener ✓</b> / <b style="color:var(--na,#FF453A)">no closer ⚠</b> flags a day missing someone to open or close.</div>'
+           : '<div class="as-note" style="margin:2px 0 8px">Day chips = coverage per time block: <b style="color:var(--accent,#23C983)">✓</b> ok, <b style="color:var(--na,#FF453A)">⚠</b> short. Most ⚠ are <b>returns</b> (few returns agents — usually fine); watch for <b>exit</b> / <b>floor</b> gaps.</div>') +
     '<div class="as-grid">' + daysHtml + '</div>' +
     '<p class="as-note" style="margin-top:14px">'+(isMgr?'Opener/Closer chips flag days missing a manager to open or close.':'Coverage chips read against the branch floor targets (E = exit, C = counter, R = returns) per block.')+' This is a draft — the real week still runs through the schedule editor.</p>';
 }
