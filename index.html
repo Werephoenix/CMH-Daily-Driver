@@ -1810,6 +1810,7 @@ button { cursor: pointer; }
   <button class="nbtn on" id="tab-opening"  onclick="showTab('opening')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><path d="M13 2 L4 13.5 h6 l-1.5 8.5 L18 10 h-6 l1-8z"/></svg></span><span class="nbtn-lbl">Now</span></button>
   <button class="nbtn"    id="tab-schedule" onclick="showTab('schedule')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="nbtn-lbl">Schedule</span></button>
   <button class="nbtn"    id="tab-board"    onclick="showTab('board')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><path d="M5 11l1.4-4.2A2 2 0 018.3 5.4h7.4a2 2 0 011.9 1.4L19 11M5 11h14v4.6a1 1 0 01-1 1h-1.4a1 1 0 01-1-1V15H8.4v.6a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><circle cx="8.2" cy="13.6" r="1"/><circle cx="15.8" cy="13.6" r="1"/></svg></span><span class="nbtn-lbl">Board</span></button>
+  <button class="nbtn"    id="tab-calendar" onclick="showTab('calendar')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><circle cx="8" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg></span><span class="nbtn-lbl">Calendar</span></button>
   <button class="nbtn"    id="tab-checklist" onclick="showTab('checklist')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M8 12.2l2.8 2.8L16.5 9"/></svg></span><span class="nbtn-lbl">Rituals</span></button>
   <button class="nbtn"    id="tab-more"     onclick="showTab('more')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg></span><span class="nbtn-lbl">More</span></button>
   <div id="nav-calm"><span class="nav-calm-lbl">Calm Mode</span><button id="nav-calm-toggle" class="nav-calm-sw" onclick="toggleTheme()" aria-label="Toggle Calm Mode"><span class="nav-calm-knob"></span></button></div>
@@ -4012,6 +4013,16 @@ function showTab(id) {
   // Map old tab names to new (emails→closing, codes→reference, hourly→reference, loyalty→reference)
   const tabMap = { emails:'checklist', codes:'reference', hourly:'reference', loyalty:'reference', dashboard:'opening' };
   if (tabMap[id]) id = tabMap[id];
+
+  // v60.124: Calendar is a top-level tab but renders as a full-screen overlay
+  // (the Master Calendar). Open it ON TOP of the current screen and light its nav
+  // button; the underlying screen stays so closing the overlay returns to it.
+  if (id === 'calendar') {
+    document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('on'));
+    const cb = document.getElementById('tab-calendar'); if (cb) cb.classList.add('on');
+    if (typeof openMasterCalendar === 'function') openMasterCalendar();
+    return;
+  }
 
   document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
   document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('on'));
@@ -18678,6 +18689,27 @@ function openAutoSchedulerForWeekOf(key){
 function mcPtoStore(){ if(!STATE.pto) STATE.pto={}; return STATE.pto; }
 function mcPtoPidsOn(key){ var d=mcPtoStore()[key]; return d? Object.keys(d).filter(function(p){return d[p];}) : []; }
 function mcTogglePtoForm(key){ var f=document.getElementById('mc-pto-form'); if(f) f.style.display = (f.style.display==='none'?'block':'none'); }
+// v60.124 (Design deepening #7): PTO conflict guard. On a day that already has
+// time off AND is short at the peak block (per the real schedule vs floor need),
+// lead the day detail with a red guard. Conservative: needs a real schedule + a
+// genuine peak shortfall — never fires on empty future days.
+function mcPtoGuard(key){
+  try{
+    var off = mcTimeOffOn(key); if(!off.length) return null;
+    var sched = mcScheduleObj(key);
+    var arrs = Object.keys(sched).map(function(p){return sched[p];}).filter(function(v){return Array.isArray(v);});
+    if(!arrs.length) return null;                 // no real schedule to judge → don't guess
+    var peakH = 14;                               // ~2pm peak
+    var onAtPeak = arrs.filter(function(v){ return peakH>=v[0] && peakH<v[1]; }).length;
+    var T = (STATE.floorTargets)||(typeof FLOOR_TARGETS!=='undefined'?FLOOR_TARGETS:null);
+    var dow = new Date(key+'T12:00:00').getDay();
+    var wk = (dow===0||dow===6) ? (T&&T.weekend) : (T&&T.weekday);
+    var block = wk && (wk.mid||wk.amid);
+    var need = block ? ((block.c||0)+(block.e||0)+(block.r||0)) : 6;
+    if(onAtPeak >= need) return null;             // covered at peak → no conflict
+    return { have:onAtPeak, need:need, names:off.map(function(x){return x.name;}) };
+  }catch(e){ return null; }
+}
 function mcAddPto(key){
   var who=document.getElementById('mc-pto-who'), daysEl=document.getElementById('mc-pto-days');
   if(!who || !who.value){ if(typeof toast==='function') toast('Pick a person'); return; }
@@ -18790,6 +18822,13 @@ function mcDay(key){
   var d=new Date(key+'T12:00:00');
   var wd=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
   var h='<div class="mc-head"><button class="mc-back" onclick="mcRender()">‹ Month</button><div class="mc-title2">'+wd+' '+_MC_MON[d.getMonth()].slice(0,3)+' '+d.getDate()+'</div><button class="mc-x" onclick="closeMasterCalendar()">✕</button></div><div class="mc-daybody">';
+  // v60.124: PTO conflict guard leads the day when time-off collides with a short day.
+  var _grd = mcPtoGuard(key);
+  if(_grd){
+    h+='<div class="mc-sec" style="border-color:#FF453A;background:rgba(255,69,58,.1)">'
+      +'<div class="mc-sec-h" style="color:#FF453A">⚠ PTO conflict — day is already short</div>'
+      +'<div class="mc-item" style="font-size:13px;color:#EBEBF5">Peak coverage is <b>'+_grd.have+'/'+_grd.need+'</b> with '+biEsc(_grd.names.join(', '))+' off. Hold new PTO for this day, or add a shift.</div></div>';
+  }
   // v60.72: readiness card — demand (events + ripple) vs staff scheduled
   var dem=mcDemandLevel(key), staff=mcStaffCount(key);
   if(dem!=='none'){
@@ -18850,7 +18889,17 @@ function openMasterCalendar(){
   if(!o){ o=document.createElement('div'); o.id='mc-overlay'; o.className='mc-overlay'; document.body.appendChild(o); }
   o.style.display='flex'; mcRender(); document.body.style.overflow='hidden';
 }
-function closeMasterCalendar(){ var o=document.getElementById('mc-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+function closeMasterCalendar(){
+  var o=document.getElementById('mc-overlay'); if(o) o.style.display='none'; document.body.style.overflow='';
+  // v60.124: re-light the nav button for whatever screen is underneath (Calendar
+  // opened as an overlay on top of it, so its tab-* highlight was cleared).
+  try{
+    document.querySelectorAll('.nbtn').forEach(function(b){ b.classList.remove('on'); });
+    var cur=document.querySelector('.scr.on'); var id=cur?cur.id.replace(/^screen-/,''):'opening';
+    var btn=document.getElementById('tab-'+id) || (['paste','reference','inventory','history','admin'].indexOf(id)>=0?document.getElementById('tab-more'):document.getElementById('tab-opening'));
+    if(btn) btn.classList.add('on');
+  }catch(e){}
+}
 function mcOpenTo(key){ openMasterCalendar(); try{ var d=new Date(key+'T12:00:00'); _mcCur=new Date(d.getFullYear(),d.getMonth(),1); }catch(e){} mcDay(key); }
 // v60.72 (Round 1 ③): week-ahead quick look for the Now screen — first elevated/heavy
 // demand day in the next 7, taps into the calendar. (Coverage-shortfall compare comes
