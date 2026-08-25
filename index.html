@@ -1830,7 +1830,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="showTab('history')"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openMasterCalendar()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">📅</span><span class="more-lbl">Master Calendar</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openScheduleLog()"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openAutoScheduler()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">🤖</span><span class="more-lbl">Auto-Scheduler<span class="more-sub">Draft a week from bids + coverage · beta</span></span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="goToWeekPlanner()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">🤖</span><span class="more-lbl">Week Planner<span class="more-sub">Auto-draft &amp; publish the week — opens Schedule → Week</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openStationFairness()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">🔀</span><span class="more-lbl">Station Fairness<span class="more-sub">Who's stuck in Returns / never Emerald · beta</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openBranchAsks()"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openRequests()"><span class="more-ic tile" style="background:rgba(255,159,10,.16)">📥</span><span class="more-lbl">Requests</span><span class="more-ch">›</span></button>
@@ -19025,8 +19025,8 @@ function mcDay(key){
   h+='</div><div class="mc-sec"><div class="mc-sec-h">🗓 Plan</div>'+
      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
        '<button class="mc-addbtn" style="background:#0A84FF;color:#fff" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day →</button>'+
-       '<button class="mc-addbtn" style="background:#23C983;color:#00301c" onclick="openAutoSchedulerForWeekOf(\''+key+'\')">🤖 Plan this week</button>'+
-       '<button class="mc-addbtn" style="background:#AF9CFF;color:#1a0f33" onclick="closeMasterCalendar();openStationFairness()">🔀 Station fairness</button>'+
+       '<button class="mc-addbtn" style="background:#23C983;color:#00301c" onclick="goToWeekPlanner('+_asOffsetForKey(key)+')">🤖 Auto-plan the week →</button>'+
+       '<button class="mc-addbtn" style="background:#AF9CFF;color:#1a0f33" onclick="closeMasterCalendar();openStationFairness()">🔀 Station fairness →</button>'+
      '</div>'+
      '<div class="mc-none" style="margin-top:6px">Edit just this day, draft the week it belongs to, or check station fairness. Applied drafts show up right here on the calendar.</div>';
   h+='</div></div>'; o.innerHTML=h;
@@ -19888,7 +19888,7 @@ function asWeekBodyHtml(){
       (_asWeekApplied()?'<span class="as-chip ok">✓ applied</span>':'<span class="as-chip">◇ draft</span>') +
       '<button class="as-btn pri" onclick="asApplyWeek()">'+((isMgr && _asPublishTier!=='brm')?'🔒 Publish · BRM PIN':('✓ Apply '+(isMgr?'managers':'CXRs')+' →'))+'</button>' +
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeeds[_asWeekOffset]=(_asSeeds[_asWeekOffset]||0)+1; asRerender();">↻ Regenerate</button>' +
-      '<span class="as-note">Planning the <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> draft for <b>'+_asWeekRangeLabel()+'</b> — plan up to '+AS_MAX_WEEKS+' weeks out with ‹ ›. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇ proposed</b> = a slot the scheduler filled.':'Placed from bids.')+' Anyone <b>OFF / VACA / PTO</b> that date is left out. <b>Apply</b> writes ONLY this planner’s people. Each week has its own draft — Regenerate reshuffles just this one. Undo any day in Setup → Edit Schedule.</span>' +
+      '<span class="as-note">Planning <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> · <b>'+_asWeekRangeLabel()+'</b>. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇</b> = a slot the scheduler filled.':'Placed from their bids.')+' <b>Apply</b> writes only this group — the other stays as-is. Use ‹ › for other weeks.</span>' +
     '</div>' +
     warnHtml +
     '<div class="as-grid">' + daysHtml + '</div>' +
@@ -19907,13 +19907,30 @@ function openAutoScheduler(){
   if(!o){ o=document.createElement('div'); o.id='as-overlay'; document.body.appendChild(o); }
   o.innerHTML=html; o.style.display='flex'; document.body.style.overflow='hidden';
 }
+// v60.136 (usability sweep): ONE canonical home for week planning — the Schedule
+// tab's Week pattern. Every entry point (More, Calendar) routes here instead of
+// opening a look-alike overlay, so a first-timer never wonders which is "the real one".
+function goToWeekPlanner(offset, planner){
+  try{ if(typeof closeMasterCalendar==='function') closeMasterCalendar(); }catch(e){}
+  var o=document.getElementById('as-overlay'); if(o) o.style.display='none';   // hide overlay w/o resetting offset
+  document.body.style.overflow='';
+  if(offset!=null) _asWeekOffset=Math.max(0, offset);
+  if(planner) _asPlanner=planner;
+  if(typeof showTab==='function') showTab('schedule');
+  if(typeof setSchedPattern==='function') setSchedPattern('week');
+}
 // v60.127: the same week draft, rendered inline as the Schedule tab's "Week" pattern.
 function renderScheduleWeek(){
   asInjectStyle();
   _asRenderMode = 'inline';
   var el = document.getElementById('sched-week-view');
   if(!el) return;
-  el.innerHTML = '<div class="as-body as-inline">' + asWeekBodyHtml() + '</div>';
+  var lead = '<div style="margin:2px 0 12px">'
+    + '<div style="font-size:21px;font-weight:800;color:var(--txt,#fff);letter-spacing:-.3px">Week Planner</div>'
+    + '<div style="font-size:12.5px;color:var(--txt3,rgba(235,235,245,.55));margin-top:3px;line-height:1.5">'
+    + '<b style="color:var(--txt2,#fff)">①</b> Pick a group below · <b style="color:var(--txt2,#fff)">②</b> scan for <b style="color:var(--na,#FF453A)">⚠</b> flags · <b style="color:var(--txt2,#fff)">③</b> tap <b style="color:var(--accent,#23C983)">Apply</b>. '
+    + 'Nothing changes until you Apply, and any day is undoable in Setup → Edit Schedule.</div></div>';
+  el.innerHTML = '<div class="as-body as-inline">' + lead + asWeekBodyHtml() + '</div>';
 }
 function closeAutoScheduler(){ _asWeekOffset=0; var o=document.getElementById('as-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
 
