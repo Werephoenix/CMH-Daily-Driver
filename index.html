@@ -15055,6 +15055,16 @@ function buildCoverageTimeline() {
         ${wHrs>0.4?lbl:''}
       </div>`;
     });
+    // v60.133 (Design #4): rotation-flip ticks — a white mark on the bar wherever the
+    // working station changes (exit↔counter↔returns), so a manager sees the rotation
+    // boundaries at a glance.
+    const _work = segments.filter(s=>['exit','counter','returns','mgmt','emerald'].indexOf(s.zone)>=0).sort((a,b)=>a.x-b.x);
+    for(let _fi=1;_fi<_work.length;_fi++){
+      if(_work[_fi].zone!==_work[_fi-1].zone){
+        const _fp=_work[_fi].x/totalW2*100;
+        htm+=`<div style="position:absolute;left:${_fp}%;top:0;bottom:0;width:2px;background:#fff;opacity:.9;pointer-events:none" title="flips to ${_work[_fi].zone} at ${hLbl(_work[_fi].x/W+H_S)}"></div>`;
+      }
+    }
     if(nowPctRow>=0&&nowPctRow<=100){
       htm+=`<div style="position:absolute;left:${nowPctRow}%;top:0;bottom:0;width:2px;background:var(--red);opacity:.85;pointer-events:none"></div>`;
     }
