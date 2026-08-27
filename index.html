@@ -4957,12 +4957,12 @@ function buildDaySummary() {
 
 // ── TOAST ────────────────────────────────────────────────────────────────────
 let toastTimer;
-function toast(msg) {
+function toast(msg, ms) {
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms || 2500); // v60.144: optional duration (publish announcements linger)
 }
 
 
@@ -12518,6 +12518,13 @@ async function pushToJsonbin() {
   }
 }
 
+// v60.144: immediate push (skips the 2.5s debounce) — used by Publish so an
+// approved schedule reaches the cloud the second the manager confirms it.
+function pushToJsonbinNow() {
+  if (window._syncTimer) clearTimeout(window._syncTimer);
+  return pushToJsonbin();
+}
+
 // ── v60.6: sync merge split into pure, offline-testable pieces ──────────────
 // (see test_sync.js — proves the race guard and merge behavior without ever
 //  touching the network or the production JSONBin.)
@@ -12586,8 +12593,15 @@ function applyRemoteRecord(record, apply) {
   if (apply && syncPushPending()) { setSyncStatus('syncing', 'Local edit pending…'); return 'deferred'; }
   _lastRemoteAt = remoteAt;
   if (!apply) return 'noted';
+  // v60.144: detect an incoming management publish BEFORE merging (compare stamps)
+  const _prevPub = (STATE.publishMeta && STATE.publishMeta.at) || '';
   mergeRemoteIntoState(STATE, remote);
   rebuildAfterSync();
+  const _newPub = STATE.publishMeta;
+  if (_newPub && _newPub.at && _newPub.at !== _prevPub) {
+    const pt = new Date(_newPub.at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    if (typeof toast === 'function') toast('📢 '+(_newPub.what||'Schedule')+' published by '+(_newPub.by||'management')+' · '+pt, 6000);
+  }
   const t = remoteAt ? new Date(remoteAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}) : '';
   setSyncStatus('synced', 'Updated '+(t||''));
   return 'applied';
@@ -12612,11 +12626,42 @@ async function pullFromJsonbin(apply) {
   }
 }
 
+// v60.144: SMART FOCUS-AWARE POLLING. Instead of a flat 30s interval (which burns
+// requests even when nobody's looking and is still slow when they are), we:
+//   • poll FAST (~8s) while the tab is visible AND recently interacted-with,
+//   • poll SLOW (~45s) while visible but idle for >2min,
+//   • PAUSE entirely when the tab is hidden/backgrounded (saves requests),
+//   • pull IMMEDIATELY the moment the tab becomes visible or the window refocuses
+//     (instant catch-up) and right after a Publish.
+// Net: near-instant when it matters, FEWER total requests than the old 30s loop —
+// stays inside the free tier.
+var _pollFast   = 8000;
+var _pollSlow   = 45000;
+var _idleAfterMs = 120000;
+var _lastActivity = Date.now();
+function _syncScheduleNext() {
+  clearTimeout(_pollTimer);
+  if (document.visibilityState !== 'visible') return;            // paused while hidden
+  const idle = (Date.now() - _lastActivity) > _idleAfterMs;
+  _pollTimer = setTimeout(function(){
+    Promise.resolve(pullFromJsonbin(true)).then(_syncScheduleNext, _syncScheduleNext);
+  }, idle ? _pollSlow : _pollFast);
+}
+function _syncPullNow() {
+  _lastActivity = Date.now();
+  Promise.resolve(pullFromJsonbin(true)).then(_syncScheduleNext, _syncScheduleNext);
+}
 function initSync() {
   setSyncStatus('syncing', 'Connecting...');
-  pullFromJsonbin(true);
-  // Poll every 30 seconds for changes from other devices
-  setInterval(() => pullFromJsonbin(true), 30000);
+  _syncPullNow();
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') _syncPullNow();
+    else clearTimeout(_pollTimer);
+  });
+  window.addEventListener('focus', _syncPullNow);
+  ['click','keydown','touchstart','pointerdown'].forEach(function(ev){
+    document.addEventListener(ev, function(){ _lastActivity = Date.now(); }, {passive:true});
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -20237,9 +20282,18 @@ function asApplyWeek(){
     });
     if(key === todayK) touchedToday = true;
   });
+  // v60.144: PUBLISH TO ALL — Apply is the management approval (PIN-gated above),
+  // so publishing pushes to every device IMMEDIATELY (no 2.5s debounce wait) and
+  // stamps who/when/what so other devices can announce it.
+  STATE.publishMeta = {
+    at: new Date().toISOString(),
+    by: (STATE.fields && STATE.fields.openMgr) || 'a manager',
+    what: (_asPlanner==='mgr'?'Manager':'CXR')+' schedule · '+range,
+  };
   if(typeof saveState==='function') saveState();
+  if(typeof pushToJsonbinNow==='function') pushToJsonbinNow();
   if(touchedToday && typeof loadScheduleForToday==='function') loadScheduleForToday(false);
-  if(typeof toast==='function') toast('✓ Draft applied to '+range);
+  if(typeof toast==='function') toast('📢 Published to all devices — '+range);
   if(_asRenderMode==='inline'){ renderScheduleWeek(); } else { closeAutoScheduler(); }
 }
 
