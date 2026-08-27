@@ -326,6 +326,17 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 
 /* iOS segmented control (v60.44) */
 .seg-ctl { display: flex; background: var(--bg3); border-radius: 9px; padding: 2px; margin-bottom: 10px; gap: 2px; }
+/* v60.145 (Design 1a): numbered spine — "who's on → where are the gaps → fix it".
+   The numbers are printed on the screen so a first-timer reads the flow, and every
+   control hangs off the step it serves. */
+.sp-step { display:flex; align-items:center; gap:7px; margin:16px 0 7px;
+  font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--txt2); }
+.sp-step:first-of-type { margin-top:4px; }
+.sp-step .sp-n { display:inline-flex; align-items:center; justify-content:center;
+  width:19px; height:19px; border-radius:50%; background:var(--bg3);
+  border:1px solid var(--bdr2); color:var(--txt); font-size:11px; font-weight:800;
+  letter-spacing:0; flex-shrink:0; }
 .seg { flex: 1; border: none; background: transparent; color: var(--txt2); font-family: var(--ff-ui); font-size: 13px; font-weight: 600; padding: 7px 4px; border-radius: 7px; cursor: pointer; transition: background .15s, color .15s; }
 .seg.on { background: var(--bg2); color: var(--txt); box-shadow: 0 1px 3px rgba(0,0,0,.4); }
 /* v60.66 (Board re-layout): colored active segments keep walk-up state meaning */
@@ -2234,6 +2245,19 @@ button { cursor: pointer; }
 <div class="scr" id="screen-schedule">
   <h1 class="scr-title">Schedule</h1>
 
+  <!-- v60.145 (Design 1a): TWO DESTINATIONS. Today (the live board) vs Week (the
+       planner) are a real two-mode split, so they read as destinations — not as a
+       4th option hidden inside the View selector. -->
+  <div class="seg-ctl" id="sched-dest" style="margin-bottom:12px">
+    <button class="seg on" id="sdest-today" onclick="setSchedDest('today')">☀️ Today</button>
+    <button class="seg"    id="sdest-week"  onclick="setSchedDest('week')">📅 Week</button>
+  </div>
+
+  <!-- ① WHO'S ON -->
+  <div class="sp-step" id="sp-step-1">
+    <span class="sp-n">①</span> Who's on
+  </div>
+
   <!-- v60.139: primary quick-actions — reachable BEFORE any planning.
        Call-off first (the #1 "something just changed" action), then the
        have-vs-need staffing glance. Both open self-contained overlays. -->
@@ -2282,7 +2306,8 @@ button { cursor: pointer; }
     <button class="seg on" id="spat-timeline" onclick="setSchedPattern('timeline')">Timeline</button>
     <button class="seg"    id="spat-roster"   onclick="setSchedPattern('roster')">Roster</button>
     <button class="seg"    id="spat-coverage" onclick="setSchedPattern('coverage')">Coverage</button>
-    <button class="seg"    id="spat-week"     onclick="setSchedPattern('week')">📅 Week</button>
+    <!-- v60.145: "📅 Week" removed — it's a top-level destination now (#sched-dest),
+         not a 4th render mode hiding inside the View selector. -->
   </div>
 
   <!-- Grouping selector (v60.37: single unified schedule view — the mode only
@@ -2318,6 +2343,11 @@ button { cursor: pointer; }
     </button>
   </div>
 
+  <!-- ② WHERE ARE THE GAPS -->
+  <div class="sp-step" id="sp-step-2">
+    <span class="sp-n">②</span> Where are the gaps
+  </div>
+
   <!-- Zone map — right now -->
   <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
     gap:6px;margin-bottom:10px"></div>
@@ -2327,6 +2357,11 @@ button { cursor: pointer; }
   <!-- Auto Schedule button — always visible (the rotation engine is the core value of this tab).
        v60.140: renamed to "Fill today's gaps" (today-scoped) so it no longer reads like the
        whole-week "📅 Week" planner; removed the duplicate Print button (top Print… has it). -->
+  <!-- ③ FIX IT -->
+  <div class="sp-step" id="sp-step-3">
+    <span class="sp-n">③</span> Fix it
+  </div>
+
   <div id="sched-auto-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
     <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Auto-distribute Exit & Counter rotations for TODAY based on coverage rules">
       ⚡ Fill today's gaps
@@ -7942,7 +7977,8 @@ function openExitAccommodation(pid, name){
       'Marks this person <b>off exit rotation</b> for a day or a longer stretch. While active they are '+
       '<b>never scheduled at exit</b> and it <b>won’t count against their exit-fairness</b>. '+
       '<b>No reason is stored</b> — dates only. On the board it shows only as a neutral “no exit”.</div>'+
-    (active?'<div style="font-size:11.5px;font-weight:700;color:var(--amber);background:rgba(217,119,6,.1);border:1px solid var(--amber3);border-radius:7px;padding:8px 10px;margin-bottom:12px">Currently active — '+exitAccommodationLabel(pid)+'</div>':'')+
+    // v60.145 (Design 1h): grey, never amber — the styling must not read as an alert.
+    (active?'<div style="font-size:11.5px;font-weight:600;color:var(--txt2);background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;padding:8px 10px;margin-bottom:12px">◌ Currently active — '+exitAccommodationLabel(pid)+'</div>':'')+
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px">'+
       '<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin-bottom:4px">Start</div>'+
         '<input type="date" id="ea-start" value="'+start+'" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;color:var(--txt);font-size:13px"></div>'+
@@ -14251,7 +14287,18 @@ function setSchedGroup(mode) {
 }
 
 // v60.44: three render patterns of the SAME schedule data.
+// v60.145 (Design 1a): Today | Week = two destinations. Week hands off to the
+// existing week pattern (whose hide/restore wiring is untouched); Today returns to
+// whichever day-view render the manager last used.
+function setSchedDest(d) {
+  if (d === 'week') { setSchedPattern('week'); return; }
+  const back = (STATE.schedPattern && STATE.schedPattern !== 'week') ? STATE.schedPattern
+             : (STATE._schedDayPattern || 'timeline');
+  setSchedPattern(back);
+}
+
 function setSchedPattern(p) {
+  if (p !== 'week') STATE._schedDayPattern = p;   // remember the day-view choice
   STATE.schedPattern = p;
   if (typeof saveState === 'function') saveState();
   ['timeline','roster','coverage','week'].forEach(m=>{
@@ -14283,8 +14330,13 @@ function renderScheduleView() {
   // v60.127: the "Week" pattern replaces the whole day-view (switchboard, coverage,
   // auto-distribute, mode bar) with the inline week draft — a distinct planning mode.
   const wkEl = document.getElementById('sched-week-view');
+  // v60.145: keep the Today|Week destination pill in sync with the active pattern.
+  const _dt = document.getElementById('sdest-today'), _dw = document.getElementById('sdest-week');
+  if (_dt) _dt.className = 'seg' + (p==='week' ? '' : ' on');
+  if (_dw) _dw.className = 'seg' + (p==='week' ? ' on' : '');
   // id → its normal display value (so hide/restore keeps flex/grid layouts intact)
-  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block'};
+  // v60.145: the ② / ③ spine labels are day-view furniture — hidden in Week mode.
+  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block','sp-step-2':'flex','sp-step-3':'flex'};
   if (p === 'week') {
     Object.keys(_dayRestore).forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
     if (wkEl) wkEl.style.display = 'block';
@@ -14869,14 +14921,60 @@ function buildCoverageTimeline() {
     }).length;
     const _short=_need-_on;
     const _blabel=(typeof FLOOR_BLOCK_LABELS!=='undefined'&&FLOOR_BLOCK_LABELS[_bk])||_bk;
-    const _parts=MGR_AREAS.filter(a=>(_mb[a.k]||0)>0).map(a=>`<span style="color:${a.color}">${a.label} ${_mb[a.k]}</span>`).join(' · ');
-    mcEl.innerHTML=`<div onclick="if(typeof openStaffingNeeds==='function')openStaffingNeeds()" style="cursor:pointer;background:var(--bg3);border:1px solid ${_short>0?'rgba(255,69,58,.5)':'rgba(52,211,153,.3)'};border-radius:6px;padding:8px 10px">`+
+    // v60.145 (Design 1g): THREE STATES, strict escalation — an alert system earns
+    // trust by what it REFUSES to color. Red only for broken PRIMARIES (Emerald/
+    // Returns at 0); amber for a gap with a known next-fill; Counter never colored.
+    const _areaOf = st => { if(!st) return null; const s=String(st);
+      if(/emerald/i.test(s)) return 'emerald'; if(/return/i.test(s)) return 'returns';
+      if(/exit/i.test(s))    return 'exit';    if(/float|shuttl/i.test(s)) return 'floater';
+      if(/counter/i.test(s)) return 'counter'; return null; };
+    // per-area HAVE from mgmtBlocks (time-aware) when present, else staffStation
+    const _have={}; let _haveData=false;
+    people.forEach(pr=>{
+      const pid=pr[0], e=pr[1]; if(!e||!e.person) return;
+      if(['ARM','BRM','ABRM','MT'].indexOf(e.person.role)<0) return;
+      if((STATE.todayOverrides||{})[pid]==='callout') return;
+      const blocks=(STATE.mgmtBlocks||{})[pid]||[];
+      let area=null;
+      if(blocks.length){ _haveData=true;
+        const b=blocks.find(b=>b&&nowH>=b.from&&nowH<b.to); if(b) area=_areaOf(b.station);
+      } else { area=_areaOf((STATE.staffStation||{})[pid]); }
+      if(area) _have[area]=(_have[area]||0)+1;
+    });
+    const _primaryBroken = ['emerald','returns'].some(k=>(_mb[k]||0)>0 && !(_have[k]||0));
+    const _nextFill = (typeof EXIT_FILL_ORDER!=='undefined')?(EXIT_FILL_ORDER[2]||'MT'):'MT';
+    let _tone, _label, _detail;
+    if(!_haveData){
+      // STATE 2 — DEGRADED: areas unassigned, so we only know headcount. Refuse to
+      // claim a primary is broken (we can't see where people are) — red ONLY when
+      // nobody is on at all, which is unambiguous. Otherwise grey + "Assign areas".
+      _tone = (_on===0 && _need>0) ? 'red' : 'grey';
+      _label = `${_on} on · block needs ${_need}`;
+      _detail = MGR_AREAS.filter(a=>(_mb[a.k]||0)>0).map(a=>`<span style="color:${a.color}">${a.label} ${_mb[a.k]}</span>`).join(' · ')
+        + ` <span style="color:var(--txt3)">· Assign areas ›</span>`;
+    } else {
+      // STATE 1 — FULL DATA: per-area chips in model order.
+      _tone = _primaryBroken ? 'red' : (MGR_AREAS.some(a=>a.k!=='counter'&&(_mb[a.k]||0)>(_have[a.k]||0)) ? 'amber' : 'ok');
+      _label = `${_on}/${_need} on station`;
+      _detail = MGR_AREAS.filter(a=>(_mb[a.k]||0)>0||(_have[a.k]||0)>0).map(a=>{
+        const hv=_have[a.k]||0, nd=_mb[a.k]||0, gap=nd-hv;
+        const isPrimary=(a.k==='emerald'||a.k==='returns');
+        const col = a.k==='counter' ? 'var(--txt3)'                    // Counter never colored
+          : gap>0 ? (isPrimary&&hv===0 ? 'var(--red)' : 'var(--amber)')
+          : a.color;
+        return `<span style="color:${col}">${a.label} ${hv}/${nd}${(gap>0&&a.k==='exit')?` · next: ${_nextFill}`:''}</span>`;
+      }).join(' · ');
+    }
+    const _bd = _tone==='red'?'rgba(255,69,58,.5)':_tone==='amber'?'rgba(217,119,6,.45)':_tone==='ok'?'rgba(52,211,153,.3)':'var(--bdr)';
+    const _fg = _tone==='red'?'var(--red)':_tone==='amber'?'var(--amber)':_tone==='ok'?'var(--green)':'var(--txt3)';
+    const _tag = _tone==='red'?'⚠ primary uncovered':_tone==='amber'?'gap':_tone==='ok'?'✓ covered':'';
+    mcEl.innerHTML=`<div onclick="if(typeof openStaffingNeeds==='function')openStaffingNeeds()" style="cursor:pointer;background:var(--bg3);border:1px solid ${_bd};border-radius:6px;padding:8px 10px">`+
       `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">`+
-        `<span style="font-size:9px;font-weight:800;text-transform:uppercase;color:${_short>0?'var(--red)':'var(--green)'}">👔 Managers ${_on}/${_need}</span>`+
-        `<span style="font-size:9px;color:var(--txt3)">this block · ${_blabel}</span>`+
-        (_short>0?`<span style="margin-left:auto;font-size:10px;font-weight:800;color:var(--red)">⚠ short ${_short}</span>`:`<span style="margin-left:auto;font-size:10px;font-weight:800;color:var(--green)">✓ covered</span>`)+
+        `<span style="font-size:9px;font-weight:800;text-transform:uppercase;color:${_fg}">👔 Managers ${_label}</span>`+
+        `<span style="font-size:9px;color:var(--txt3)">${_blabel}</span>`+
+        (_tag?`<span style="margin-left:auto;font-size:10px;font-weight:800;color:${_fg}">${_tag}</span>`:'')+
       `</div>`+
-      `<div style="font-size:10px;color:var(--txt2);line-height:1.5">${_parts||'<span style="color:var(--txt3)">no manager minimums set — Setup → 📊 Coverage targets → 👔 Managers</span>'}</div>`+
+      `<div style="font-size:10px;color:var(--txt2);line-height:1.5">${_detail||'<span style="color:var(--txt3)">no manager minimums set — Setup → 📊 Coverage targets → 👔 Managers</span>'}</div>`+
     `</div>`;
   }
 
@@ -15110,7 +15208,7 @@ function buildCoverageTimeline() {
       text-align:right;padding-right:5px;
       text-decoration:${isOff?'line-through':'none'};
       white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-      line-height:1.2">${nick}${mgmtBadge}</div>`;
+      line-height:1.2">${nick}${mgmtBadge}${(typeof exitAccommodated==='function'&&exitAccommodated(pid))?'<span style="color:var(--txt3);opacity:.7;font-weight:400"> ◌</span>':''}</div>`;
 
     // Render bars using pixel-accurate fractional time positions
     // Collect all time segments from rotation + special blocks
@@ -16588,15 +16686,19 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
     </button>
   </div>`;
 
-  // Exit accommodation (CXR only) — v60.142. Neutral, no reason stored.
+  // Exit accommodation (CXR only) — v60.142; v60.145 adopts Design 1h:
+  // ONE language on every surface — GREY only, DATES only, never red/amber, no
+  // icon that reads medical, no tooltip. "The absence of styling is the design."
   if(person.role==='CXR'){
     const _acc = (typeof exitAccommodated==='function') && exitAccommodated(pid);
+    const _dates = _acc ? exitAccommodationLabel(pid).replace('no exit · ','') : '';
     h+=`<button onclick="closePersonPanel();openExitAccommodation('${pid}','${(person.nick||person.name.split(' ')[0]||'').replace(/'/g,'')}')"
-      style="width:100%;margin-bottom:8px;padding:7px;border-radius:6px;border:1px solid;font-size:11px;font-weight:700;cursor:pointer;
-        background:${_acc?'rgba(217,119,6,.12)':'var(--bg3)'};
-        border-color:${_acc?'var(--amber)':'var(--bdr2)'};
-        color:${_acc?'var(--amber)':'var(--txt3)'}">
-      🛡 ${_acc?('No exit · '+exitAccommodationLabel(pid).replace('no exit · ','')):'Exit accommodation…'}
+      style="width:100%;margin-bottom:8px;padding:7px 10px;border-radius:6px;border:1px solid var(--bdr2);
+        background:var(--bg3);color:var(--txt3);font-size:11px;font-weight:600;cursor:pointer;
+        display:flex;align-items:center;gap:7px;text-align:left">
+      <span style="opacity:.75">◌</span>
+      <span style="flex:1">${_acc?('Exit: unavailable · '+_dates):'Exit availability…'}</span>
+      <span style="opacity:.6">Edit</span>
     </button>`;
   }
 
