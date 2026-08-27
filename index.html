@@ -3825,7 +3825,7 @@ function loadState() {
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
-    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
+    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
     mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{}, pto:{},
   };
 }
@@ -15157,7 +15157,7 @@ function buildCoverageTimeline() {
   orderedGroups.forEach(grp=>{
   grp._shown=false;
   grp.items.forEach(([pid,entry])=>{
-    const p=entry.person,nick=p.nick||p.name.split(' ')[0];
+    const p=entry.person,nick=(typeof dispName==='function'?dispName(p):(p.nick||p.name.split(' ')[0]));
     const isMgmt=['ARM','BRM','ABRM','MT'].includes(p.role);
     const isOff=(STATE.todayOverrides||{})[pid]==='callout';
     // Called-off people are hidden from the timeline entirely (the
@@ -16097,7 +16097,7 @@ function gfRankCandidates(gap, exp){
     var ri=order.indexOf(e.person.role);
     if(ri<0) return;                                      // role not eligible for this area
     var fair=0; try{ fair=(typeof getExitHoursWeek==='function')?getExitHoursWeek(pid):0; }catch(err){}
-    out.push({pid:pid, nick:(e.person.nick||String(e.person.name||'').split(' ')[0]||pid),
+    out.push({pid:pid, nick:(typeof dispName==='function'?dispName(e.person):(e.person.nick||String(e.person.name||'').split(' ')[0]||pid)),
       role:e.person.role, tier:cls.tier, why:cls.why, from:cls.area,
       _r:ri, _t:tierRank[cls.tier], _f:fair});
   });
@@ -21073,7 +21073,7 @@ function _coCollect(){
   var off=[], groups={Managers:[],CXR:[],Exit:[],Returns:[]};
   Object.keys(exp).forEach(function(pid){
     var e=exp[pid]; if(!e||!e.person) return;
-    var p=e.person; var nick=p.nick||(p.name||'').split(' ')[0]||pid;
+    var p=e.person; var nick=(typeof dispName==='function'?dispName(p):(p.nick||(p.name||'').split(' ')[0]||pid));
     var sm=(STATE.shiftMod||{})[pid];
     var shift=sm?sm.display:(e.shift||p.shiftCode||'');
     var row={pid:pid,nick:nick,role:p.role||'',shift:shift};
@@ -21179,6 +21179,136 @@ function coFillAll(){
   coRender();
 }
 // ═══════════════════════════════════════════════════════════════════════════
+// v60.148 · UNAMBIGUOUS DISPLAY NAMES
+// Two real collisions at 38N6: **Matt** the CXR (Matthew Johnson — Matt himself)
+// vs **Matt** the BRM (Matt Johnson), and **Tony** on Counter vs **Toney** on
+// Returns — one letter apart and easy to misread on a phone at speed. Picking the
+// wrong one means calling off / moving the wrong person.
+// Fix: ONE helper that guarantees a distinguishable name.
+//   1. A manual override always wins — set what the floor actually calls them.
+//   2. Otherwise detect collisions AND near-misses (levenshtein ≤1 on the
+//      normalized name, so Tony/Toney counts) across the ACTIVE roster.
+//   3. Disambiguate with whatever actually differs: role first (Matt (CXR) vs
+//      Matt (BRM), Tony (CXR) vs Toney (Ret)), else last initial, else a number.
+// Cached against a cheap signature so 70+ render sites stay cheap.
+// ═══════════════════════════════════════════════════════════════════════════
+var DN_ROLE_TAG = {ARM:'AM', BRM:'BRM', ABRM:'ABRM', MT:'MT', CXR:'CXR', EXIT:'Exit', RETURNS:'Ret'};
+function dnPid(p){ return String((p&&p.name)||p||'').replace(/\s/g,'_'); }
+function _dnNorm(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]/g,''); }
+function _dnPeople(){
+  try{
+    return [].concat(ROSTER_CXR||[], ROSTER_MGMT||[], ROSTER_EXIT||[], ROSTER_RETURNS||[])
+      .filter(function(p){ return p && p.name && p.active!==false; });
+  }catch(e){ return []; }
+}
+// The name we'd LIKE to show, before disambiguation.
+function _dnBase(p){
+  var ov=(STATE.displayNames||{})[dnPid(p)];
+  if(ov && String(ov).trim()) return {text:String(ov).trim(), forced:true};
+  var n = p.nick || String(p.name).split(' ')[0];
+  n = String(n).replace(/\s*\([^)]*\)\s*/g,' ').trim();   // drop "(Returns)", "(BRM)" etc.
+  return {text:n || String(p.name), forced:false};
+}
+var _dnCache=null, _dnSig='';
+function _dnSignature(){
+  var ppl=_dnPeople();
+  return ppl.length+'|'+ppl.map(function(p){return p.id||p.name;}).join(',')
+    +'|'+JSON.stringify(STATE.displayNames||{});
+}
+function _dnBuild(){
+  var ppl=_dnPeople();
+  var rows=ppl.map(function(p){ return {p:p, b:_dnBase(p), pid:dnPid(p)}; });
+  var map={};
+  rows.forEach(function(x){
+    if(x.b.forced){ map[x.pid]=x.b.text; return; }
+    var xn=_dnNorm(x.b.text);
+    // confusable = same normalized name, OR within one edit (Tony/Toney)
+    var peers=rows.filter(function(y){
+      if(y===x) return false;
+      var yn=_dnNorm(y.b.text);
+      if(!xn||!yn) return false;
+      if(xn===yn) return true;                       // exact clash always counts
+      // Near-miss only for names long enough that one edit is a genuine misread.
+      // (Without this, 2-letter nicks like "TT"/"Ty" — 50% different — get tagged.)
+      if(Math.min(xn.length,yn.length)<4) return false;
+      return Math.abs(xn.length-yn.length)<=1 && typeof levenshtein==='function' && levenshtein(xn,yn)<=1;
+    });
+    if(!peers.length){ map[x.pid]=x.b.text; return; }
+    // try role — does it make x unique among the confusable set?
+    var xTag=DN_ROLE_TAG[x.p.role]||x.p.role||'';
+    // When we're about to add a role tag, drop any hand-rolled initial already in
+    // the nick ("Matt B" + BRM would read "Matt B (BRM)") — the tag replaces it.
+    var stem=x.b.text.replace(/\s+[A-Z]\.?$/,'').trim() || x.b.text;
+    var roleWorks = xTag && peers.every(function(y){ return (DN_ROLE_TAG[y.p.role]||y.p.role)!==xTag; });
+    if(roleWorks){ map[x.pid]=stem+' ('+xTag+')'; return; }
+    // else last initial
+    var xi=(String(x.p.name).trim().split(/\s+/).slice(-1)[0]||'').charAt(0).toUpperCase();
+    var initWorks = xi && peers.every(function(y){
+      return (String(y.p.name).trim().split(/\s+/).slice(-1)[0]||'').charAt(0).toUpperCase()!==xi;
+    });
+    if(initWorks){ map[x.pid]=x.b.text+' '+xi+'.'; return; }
+    map[x.pid]=x.b.text+(xTag?' ('+xTag+')':'');   // last resort: still tag it
+  });
+  return map;
+}
+// THE call site helper. Accepts a person object, a pid, or a name.
+function dispName(x){
+  var sig=_dnSignature();
+  if(!_dnCache || _dnSig!==sig){ _dnCache=_dnBuild(); _dnSig=sig; }
+  if(!x) return '';
+  if(typeof x==='object'){
+    var byPid=_dnCache[dnPid(x)];
+    if(byPid) return byPid;
+    return (x.nick||String(x.name||'').split(' ')[0]||'');
+  }
+  var pid=String(x).replace(/\s/g,'_');
+  if(_dnCache[pid]) return _dnCache[pid];
+  return String(x).split(/[\s_]/)[0];
+}
+// Editor: what does the floor actually call this person? (overrides win)
+function openDisplayNames(){
+  var ppl=_dnPeople().slice().sort(function(a,b){
+    return String(a.role||'').localeCompare(String(b.role||'')) || String(a.name).localeCompare(String(b.name));
+  });
+  var body='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
+    +'Names shown on the board. The app auto-tags anyone who’d be confusable — '
+    +'<b>Matt (CXR)</b> vs <b>Matt (BRM)</b>, <b>Tony (CXR)</b> vs <b>Toney (Ret)</b>. '
+    +'Type a name here to override it with whatever the floor actually says.</div>'
+    +'<div style="max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch">';
+  ppl.forEach(function(p){
+    var pid=dnPid(p), ov=(STATE.displayNames||{})[pid]||'';
+    body+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr)">'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:12.5px;font-weight:700;color:var(--txt)">'+dispName(p)+'</div>'
+        +'<div style="font-size:10px;color:var(--txt3)">'+String(p.name)+' · '+(p.role||'')+'</div>'
+      +'</div>'
+      +'<input value="'+String(ov).replace(/"/g,'&quot;')+'" placeholder="override…" '
+      +'oninput="dnSetOverride(\''+pid.replace(/'/g,"\\'")+'\',this.value)" '
+      +'style="width:120px;padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;color:var(--txt);font-size:12px">'
+      +'</div>';
+  });
+  body+='</div><div style="display:flex;gap:8px;margin-top:14px">'
+    +'<button onclick="dnSaveOverrides()" style="flex:1;padding:11px;border-radius:6px;border:none;background:var(--accent);color:#04160e;font-size:13px;font-weight:800;cursor:pointer">✓ Save names</button>'
+    +'<button class="btn btn-gh" onclick="closeModal()">Cancel</button></div>';
+  openModal('🏷 Display names', body);
+}
+function dnSetOverride(pid, val){
+  if(!STATE.displayNames) STATE.displayNames={};
+  if(String(val||'').trim()) STATE.displayNames[pid]=String(val).trim();
+  else delete STATE.displayNames[pid];
+  _dnCache=null;   // force rebuild
+}
+function dnSaveOverrides(){
+  if(typeof saveState==='function') saveState();
+  _dnCache=null;
+  ['buildCoverageTimeline','buildSwitchboard','buildBoardGrid','renderNow'].forEach(function(fn){
+    if(typeof window[fn]==='function'){ try{ window[fn](); }catch(e){} }
+  });
+  if(typeof toast==='function') toast('Display names saved 🏷');
+  closeModal();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // v60.147 · PROPOSED MANAGER AREAS — "train up a good schedule for them"
 // Matt is blocked waiting on the AM's rules. Rather than wait, build the best
 // draft we can from what we DO know — the roster's own shift patterns, the
@@ -21275,7 +21405,7 @@ function proposeManagerAreas(opts){
     });
     rows.push({block:bk, from:from, to:to, avail:avail.length,
       assigned:assigned.map(function(a){
-        var e=exp[a.pid]; return {nick:(e.person.nick||String(e.person.name||'').split(' ')[0]), role:e.person.role, area:a.area};
+        var e=exp[a.pid]; return {nick:(typeof dispName==='function'?dispName(e.person):(e.person.nick||String(e.person.name||'').split(' ')[0])), role:e.person.role, area:a.area};
       }), short:short});
   });
   // merge adjacent same-station blocks so the timeline isn't chopped up
@@ -21590,6 +21720,14 @@ function closeStaffingNeeds(){ var o=document.getElementById('sn-overlay'); if(o
 // thresholds, PINs, schedule) and are engine-wired — this UNIFIES them.
 // ═══════════════════════════════════════════════════════════════════════════
 function suStaffCount(){ try{ return [].concat(ROSTER_CXR||[],ROSTER_MGMT||[],ROSTER_EXIT||[],ROSTER_RETURNS||[]).filter(function(p){return p&&p.active!==false;}).length; }catch(e){ return 0; } }
+function suDisplayNames(){
+  try{
+    var ov=Object.keys(STATE.displayNames||{}).length;
+    var auto=0, m=(typeof dispName==='function')?(dispName(''),null):null;
+    if(_dnCache) Object.keys(_dnCache).forEach(function(k){ if(/\(|\w\.$/.test(_dnCache[k])) auto++; });
+    return ov? (ov+' set by you'+(auto?' · '+auto+' auto-tagged':'')) : (auto? auto+' auto-tagged (Matt/Tony etc.)' : 'all names unique');
+  }catch(e){ return 'names on the board'; }
+}
 function suCoverageSummary(){
   // v60.98: read the weekday midday block from the floor-staffing targets
   try{ var T=(STATE.floorTargets)||FLOOR_TARGETS; var m=(T.weekday&&T.weekday.mid)||FLOOR_TARGETS.weekday.mid;
@@ -21625,6 +21763,7 @@ function suRender(){
     +card('🕐','Hours of operation', suHoursSummary(), adm('sched'))
     +'<div class="su-sech">People &amp; schedule</div>'
     +card('👥','Staff &amp; roles', suStaffCount()+' people', adm('staff'))
+    +card('🏷','Display names', suDisplayNames(), ovl("openDisplayNames()"))
     +card('📅','Schedule', 'paste or edit by day', adm('sched'))
     +card('🗒','Branch setup answers', suBranchAnswers(), ovl("openBranchInterview()"))
     +'<div class="su-sech">Fleet &amp; rules</div>'
