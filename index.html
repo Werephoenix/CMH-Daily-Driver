@@ -14924,10 +14924,9 @@ function buildCoverageTimeline() {
     // v60.145 (Design 1g): THREE STATES, strict escalation — an alert system earns
     // trust by what it REFUSES to color. Red only for broken PRIMARIES (Emerald/
     // Returns at 0); amber for a gap with a known next-fill; Counter never colored.
-    const _areaOf = st => { if(!st) return null; const s=String(st);
-      if(/emerald/i.test(s)) return 'emerald'; if(/return/i.test(s)) return 'returns';
-      if(/exit/i.test(s))    return 'exit';    if(/float|shuttl/i.test(s)) return 'floater';
-      if(/counter/i.test(s)) return 'counter'; return null; };
+    // v60.147: one shared mapper (gfAreaOf) — was a near-duplicate that missed
+    // "Opening Manager"/"Closing Manager", so those minimums could never be met.
+    const _areaOf = st => (typeof gfAreaOf==='function') ? gfAreaOf(st) : null;
     // per-area HAVE from mgmtBlocks (time-aware) when present, else staffStation
     const _have={}; let _haveData=false;
     people.forEach(pr=>{
@@ -15946,6 +15945,8 @@ function gfAreaOf(station){
   if(/float|shuttl/i.test(s))       return 'floater';
   if(/counter/i.test(s))            return 'counter';
   if(/off ?site/i.test(s))          return 'offsite';
+  if(/clos/i.test(s))               return 'closing';   // "Closing Manager"
+  if(/open/i.test(s))               return 'opening';   // "Opening Manager"
   return null;
 }
 // Is this person on shift at hour h (honors shiftMod + overnight)?
@@ -15966,12 +15967,17 @@ function gfAreaAt(pid, e, h){
     var b=blocks.find(function(b){ return b && h>=b.from && h<b.to; });
     if(b) return gfAreaOf(b.station);
   }
+  // v60.147 fix: an explicit NON-rotational posting (Floater/Emerald/Returns) wins
+  // over the counter↔exit rotation guess — otherwise a CXR parked as Floater still
+  // reads as "counter" and is wrongly treated as load-bearing.
+  var ss=gfAreaOf((STATE.staffStation||{})[pid]);
+  if(ss==='floater'||ss==='emerald'||ss==='returns'||ss==='offsite') return ss;
   if(typeof _nowZone==='function' && e && e.person && e.person.role==='CXR'){
     var z=_nowZone(pid, e.person, h);              // rotation-aware for CXRs
     if(z==='exit') return 'exit';
     if(z==='counter') return 'counter';
   }
-  return gfAreaOf((STATE.staffStation||{})[pid]);
+  return ss;
 }
 // Headcount per area at hour h, across everyone on shift.
 function gfCountsAt(exp, h){
@@ -21014,6 +21020,29 @@ function qaInjectStyle(){
   '.co-act.back{background:rgba(35,201,131,.16);color:var(--accent,#23C983)}'+
   '.co-impact{background:var(--bg2,#1C1C1E);border:1px solid var(--bdr,#38383A);border-radius:11px;padding:11px 13px;margin-bottom:14px;font-size:13px;font-weight:700;color:var(--txt,#fff)}'+
   '.co-impact small{display:block;font-weight:600;font-size:11px;color:var(--txt3,rgba(235,235,245,.55));margin-top:3px}'+
+  // v60.147 — "what this opens up"
+  '.co-opened{background:rgba(255,69,58,.07);border:1px solid rgba(255,69,58,.4);border-radius:11px;padding:11px 12px;margin-bottom:14px}'+
+  '.co-opened-hd{font-size:12px;font-weight:800;color:var(--na,#FF453A);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}'+
+  '.co-gap{background:var(--bg2,#1C1C1E);border:1px solid var(--bdr,#38383A);border-radius:9px;padding:9px 10px;margin-bottom:7px}'+
+  '.co-gap-hd{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--txt,#fff);margin-bottom:5px}'+
+  '.co-gap-hd span{font-size:11px;color:var(--txt3,rgba(235,235,245,.55))}'+
+  '.co-gap-n{margin-left:auto;font-size:11px;font-weight:800;color:var(--na,#FF453A)}'+
+  '.co-gap-sg{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt2,rgba(235,235,245,.8))}'+
+  '.co-gap-sg i{font-style:normal;color:var(--txt3,rgba(235,235,245,.5));font-size:11px}'+
+  '.co-gap-sg button{margin-left:auto;flex-shrink:0;border:none;border-radius:7px;padding:7px 12px;font-size:12px;font-weight:800;cursor:pointer;background:var(--accent,#23C983);color:#00301c}'+
+  '.co-gap-sg.none{display:block;font-size:11.5px;color:var(--txt3,rgba(235,235,245,.6));line-height:1.5}'+
+  '.co-fillall{width:100%;margin-top:4px;border:1px solid var(--bdr2,#48484A);border-radius:9px;padding:10px;font-size:12.5px;font-weight:800;cursor:pointer;background:var(--bg3,#2C2C2E);color:var(--txt,#fff)}'+
+  // override + backfill
+  '.co-ov-start{margin-top:7px;width:100%;border:1px solid var(--bdr2,#48484A);border-radius:8px;padding:8px;font-size:11.5px;font-weight:700;cursor:pointer;background:transparent;color:var(--txt3,rgba(235,235,245,.6))}'+
+  '.co-ov{margin-top:8px;border-top:1px solid var(--bdr,#38383A);padding-top:8px}'+
+  '.co-ov-hd{font-size:11.5px;color:var(--txt2,rgba(235,235,245,.8));margin-bottom:7px;line-height:1.45}'+
+  '.co-ov-hd i{font-style:normal;color:var(--txt3,rgba(235,235,245,.5))}'+
+  '.co-ov-cand{display:flex;align-items:center;gap:7px;width:100%;text-align:left;margin-bottom:5px;border:1px solid var(--bdr,#38383A);border-radius:8px;padding:8px 10px;font-size:12px;cursor:pointer;background:var(--bg3,#2C2C2E);color:var(--txt,#fff)}'+
+  '.co-ov-cand span{font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;background:rgba(175,156,255,.16);color:#AF9CFF}'+
+  '.co-ov-cand i{margin-left:auto;font-style:normal;font-size:10.5px;color:var(--txt3,rgba(235,235,245,.5));text-align:right}'+
+  '.co-ov-leave{width:100%;margin-top:3px;border:1px solid rgba(255,69,58,.5);border-radius:8px;padding:9px;font-size:12px;font-weight:800;cursor:pointer;background:rgba(255,69,58,.08);color:var(--na,#FF453A)}'+
+  '.co-ov-cancel{width:100%;margin-top:5px;border:none;border-radius:8px;padding:7px;font-size:11.5px;font-weight:700;cursor:pointer;background:transparent;color:var(--txt3,rgba(235,235,245,.5))}'+
+  '.co-ov-empty{font-size:11.5px;color:var(--txt3,rgba(235,235,245,.5));margin-bottom:6px}'+
   '.qa-done{width:100%;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;background:var(--accent,#23C983);color:#00301c;margin-top:18px}'+
   // staffing-needs bits
   '.sn-card{background:var(--bg2,#1C1C1E);border:1px solid var(--bdr,#38383A);border-radius:12px;padding:13px 14px;margin-bottom:14px}'+
@@ -21061,16 +21090,335 @@ function _coRoleColor(role){
   if(role==='RETURNS') return ['rgba(6,182,212,.16)','#22d3ee'];
   return ['rgba(37,99,235,.16)','#5b9bff'];
 }
+// ── v60.147 (Design 1b): "what this opens up" ──────────────────────────────
+// Marking someone off is only half the job — the manager needs to see WHICH
+// blocks just fell below minimum, and who can cover. Both come from the v60.146
+// guarded engine, so this stays a thin renderer.
+var CO_BLOCK_RANGE = {open:[6,9], amid:[9,12], mid:[12,16], pm:[16,20], night:[20,24]};
+function _coNowH(){ var n=new Date(); return n.getHours()+n.getMinutes()/60; }
+// Collapse per-hour gaps into per-block gaps (worst hour per area+block).
+function _coBlockGaps(gaps){
+  var m={};
+  (gaps||[]).forEach(function(g){
+    var bk=(typeof floorBlockKey==='function')?floorBlockKey(g.hour%24):'mid';
+    var k=g.area+'|'+bk;
+    if(!m[k] || g.short>m[k].short) m[k]={area:g.area, block:bk, short:g.short, hour:g.hour, primary:g.primary};
+  });
+  return Object.keys(m).map(function(k){ return m[k]; });
+}
+// Snapshot at HOUR level. (Collapsing to blocks before diffing hides a change:
+// one hour worsening inside a block whose max shortfall lives in another hour.)
+function _coGapSnapshot(){
+  try{
+    var exp=buildExpectedToday();
+    var gaps=gfDetectGaps(exp, Math.floor(_coNowH()));
+    var map={}; gaps.forEach(function(g){ map[g.area+'@'+g.hour]=g.short; });
+    return {map:map, gaps:gaps};
+  }catch(e){ return {map:{}, gaps:[]}; }
+}
 function coToggle(pid){
   if(!STATE.todayOverrides) STATE.todayOverrides={};
   if(!STATE.staffDuty) STATE.staffDuty={};
   var was=STATE.todayOverrides[pid]==='callout';
+  var before=_coGapSnapshot();                       // measure BEFORE the change
   if(was){ delete STATE.todayOverrides[pid]; STATE.staffDuty[pid]=true; }
   else { STATE.todayOverrides[pid]='callout'; STATE.staffDuty[pid]=false; }
   saveState();
+  var after=_coGapSnapshot();                        // …and after
+  if(was){
+    window._coImpact=null;                           // putting someone back = no new holes
+  } else {
+    // hours that got WORSE because of this call-off, then grouped into blocks
+    var worse=after.gaps.filter(function(g){ return g.short > (before.map[g.area+'@'+g.hour]||0); });
+    window._coImpact={pid:pid, opened:_coBlockGaps(worse)};
+  }
   try{ buildCoverageUI&&buildCoverageUI(); }catch(e){}
   try{ buildMorningBriefing&&buildMorningBriefing(); }catch(e){}
   coRender();
+}
+// Re-measure the still-open gaps after a fill (a fix can also reveal a new hole).
+function _coRefreshOpened(opened, snap){
+  return (opened||[]).map(function(b){
+    var worst=0, hr=b.hour, rng=CO_BLOCK_RANGE[b.block]||[b.hour,b.hour+1];
+    for(var h=rng[0]; h<rng[1]; h++){
+      var s=snap.map[b.area+'@'+h]||0;
+      if(s>worst){ worst=s; hr=h; }
+    }
+    return worst>0 ? Object.assign({},b,{short:worst,hour:hr}) : null;
+  }).filter(Boolean);
+}
+// One-tap fill: put the suggested person on the gap's station for that block.
+function coApplyFill(area, hour, pid){
+  try{
+    var exp=buildExpectedToday(), e=exp[pid]; if(!e||!e.person) return;
+    var isMgr=['ARM','BRM','ABRM','MT'].indexOf(e.person.role)>=0;
+    var station = area==='exit'?'Exit Booth' : area==='returns'?'Returns'
+                : area==='emerald'?'Emerald Booth' : 'Counter';
+    var bk=(typeof floorBlockKey==='function')?floorBlockKey(hour%24):'mid';
+    var rng=CO_BLOCK_RANGE[bk]||[hour,hour+2];
+    if(isMgr && typeof addMgmtBlock==='function'){
+      addMgmtBlock(pid, rng[0], rng[1], station);     // managers get a time block
+    } else {
+      if(area==='exit' && typeof setAltPosition==='function') setAltPosition(pid,'full-exit');
+      if(typeof setStation==='function') setStation(pid, station);
+    }
+    if(typeof saveState==='function') saveState();
+    var nick=e.person.nick||String(e.person.name||'').split(' ')[0];
+    if(typeof toast==='function') toast('✓ '+nick+' → '+station);
+    // re-measure: filling one hole can reveal another
+    var snap=_coGapSnapshot();
+    if(window._coImpact) window._coImpact.opened=_coRefreshOpened(window._coImpact.opened, snap);
+    try{ buildCoverageTimeline&&buildCoverageTimeline(); }catch(e2){}
+    coRender();
+  }catch(err){ if(typeof toast==='function') toast('Could not apply that fill'); }
+}
+function coFillAll(){
+  try{ if(typeof autoSchedule==='function') autoSchedule(); }catch(e){}
+  var snap=_coGapSnapshot();
+  if(window._coImpact) window._coImpact.opened=_coRefreshOpened(window._coImpact.opened, snap);
+  coRender();
+}
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.147 · PROPOSED MANAGER AREAS — "train up a good schedule for them"
+// Matt is blocked waiting on the AM's rules. Rather than wait, build the best
+// draft we can from what we DO know — the roster's own shift patterns, the
+// branch's manager minimums (MGR_TARGETS), each person's defaultStation, and
+// Matt's operating model — then let management CORRECT it. Reacting to a draft
+// is far easier for a busy AM than authoring rules from scratch.
+// Writes STATE.mgmtBlocks (the same structure managers edit by hand), which is
+// also what flips the coverage flag from "degraded" into real per-area data.
+// ═══════════════════════════════════════════════════════════════════════════
+var PMA_BLOCKS = [['open',6,9],['amid',9,12],['mid',12,16],['pm',16,20],['night',20,24]];
+// Fill priority follows the model: primaries first, Counter genuinely last.
+var PMA_PRIORITY = ['emerald','returns','exit','floater','counter'];
+var PMA_STATION = {emerald:'Emerald Booth', returns:'Returns', exit:'Exit Booth',
+                   floater:'Floater', counter:'Counter Manager',
+                   opening:'Opening Manager', closing:'Closing Manager'};
+// Seniority for "who takes the least-desirable slot": MTs/ABRMs step in before BRM/AM.
+var PMA_RANK = {MT:0, ABRM:1, BRM:2, ARM:3};
+
+function proposeManagerAreas(opts){
+  opts = opts || {};
+  var exp = (typeof buildExpectedToday==='function')?buildExpectedToday():{};
+  var dow = new Date().getDay();
+  var dtype = (dow===0||dow===6)?'weekend':'weekday';
+  var targets = (typeof mgrTargetsFor==='function')?mgrTargetsFor(dtype):null;
+  var plan = {};      // pid → [{from,to,station,area}]
+  var rows = [];      // human-readable proposal
+  var lastArea = {};  // pid → area last block (continuity)
+
+  PMA_BLOCKS.forEach(function(b){
+    var bk=b[0], from=b[1], to=b[2];
+    var need = (targets && targets[bk]) || {};
+    // managers actually on shift for the bulk of this block
+    var mid = from + (to-from)/2;
+    var avail = Object.keys(exp).filter(function(pid){
+      var e=exp[pid]; if(!e||!e.person) return false;
+      if(['ARM','BRM','ABRM','MT'].indexOf(e.person.role)<0) return false;
+      if((e.person.defaultStation||'')==='Off Site') return false;   // ARMs off site
+      return gfOnShiftAt(pid, e, mid);
+    });
+    var used={}, assigned=[];
+    // Opener/closer are SHIFT-TIME roles, not areas: the earliest-starting manager
+    // opens, the latest-ending one closes. Resolve those first in their own block,
+    // otherwise the coverage flag can never satisfy "Opening 1 / Closing 1".
+    var order = PMA_PRIORITY.slice();
+    if(bk==='open')                  order.unshift('opening');
+    if(bk==='pm' || bk==='night')    order.unshift('closing');   // the closer arrives at 4p
+    order.forEach(function(area){
+      var n = need[area]||0;
+      for(var i=0;i<n;i++){
+        // rank candidates: their usual station → continuity → least senior first
+        var pool = avail.filter(function(pid){ return !used[pid]; });
+        if(!pool.length) break;
+        if(area==='opening'||area==='closing'){
+          pool.sort(function(a,bb){
+            var sa=(STATE.shiftMod||{})[a]||{}, sb=(STATE.shiftMod||{})[bb]||{};
+            var pa=exp[a].person, pb=exp[bb].person;
+            if(area==='opening'){
+              var s1=(sa.start!=null?sa.start:pa.shiftStart), s2=(sb.start!=null?sb.start:pb.shiftStart);
+              return (s1==null?99:s1)-(s2==null?99:s2);            // earliest in
+            }
+            var e1=(sa.end!=null?sa.end:pa.shiftEnd), e2=(sb.end!=null?sb.end:pb.shiftEnd);
+            return (e2==null?0:e2)-(e1==null?0:e1);                // latest out
+          });
+        } else
+        pool.sort(function(a,bb){
+          var ea=exp[a].person, eb=exp[bb].person;
+          var homeA = gfAreaOf(ea.defaultStation)===area ? 0 : 1;
+          var homeB = gfAreaOf(eb.defaultStation)===area ? 0 : 1;
+          if(homeA!==homeB) return homeA-homeB;                 // their usual post
+          var contA = lastArea[a]===area ? 0 : 1;
+          var contB = lastArea[bb]===area ? 0 : 1;
+          if(contA!==contB) return contA-contB;                 // don't churn people
+          var rA=(PMA_RANK[ea.role]!=null)?PMA_RANK[ea.role]:9;
+          var rB=(PMA_RANK[eb.role]!=null)?PMA_RANK[eb.role]:9;
+          return rA-rB;                                          // MT/ABRM step in first
+        });
+        var pick=pool[0]; used[pick]=true;
+        (plan[pick]=plan[pick]||[]).push({from:from,to:to,station:PMA_STATION[area],area:area});
+        lastArea[pick]=area;
+        assigned.push({pid:pick, area:area});
+      }
+    });
+    // anyone left over floats (that's the useful default, not Counter)
+    avail.forEach(function(pid){
+      if(used[pid]) return;
+      (plan[pid]=plan[pid]||[]).push({from:from,to:to,station:'Floater',area:'floater'});
+      lastArea[pid]='floater'; assigned.push({pid:pid, area:'floater'});
+    });
+    // record shortfalls honestly
+    var short=[];
+    order.forEach(function(area){
+      var got=assigned.filter(function(a){return a.area===area;}).length;
+      var n=need[area]||0; if(got<n) short.push(area+' −'+(n-got));
+    });
+    rows.push({block:bk, from:from, to:to, avail:avail.length,
+      assigned:assigned.map(function(a){
+        var e=exp[a.pid]; return {nick:(e.person.nick||String(e.person.name||'').split(' ')[0]), role:e.person.role, area:a.area};
+      }), short:short});
+  });
+  // merge adjacent same-station blocks so the timeline isn't chopped up
+  Object.keys(plan).forEach(function(pid){
+    var arr=plan[pid].sort(function(a,b){return a.from-b.from;}), merged=[];
+    arr.forEach(function(b){
+      var last=merged[merged.length-1];
+      if(last && last.station===b.station && last.to===b.from) last.to=b.to;
+      else merged.push(Object.assign({},b));
+    });
+    plan[pid]=merged;
+  });
+  return {plan:plan, rows:rows, dtype:dtype};
+}
+// Review-then-apply UI for the draft (never silently rewrite the day).
+function openProposedAreas(){
+  var p=proposeManagerAreas();
+  window._pmaDraft=p;
+  var AREA_LBL={emerald:'🌟 Emerald', returns:'↩ Returns', exit:'🟩 Exit',
+    floater:'🚗 Floater', counter:'🟦 Counter', opening:'🌅 Opening', closing:'🌙 Closing'};
+  var BL=(typeof FLOOR_BLOCK_LABELS!=='undefined')?FLOOR_BLOCK_LABELS:{};
+  var any=p.rows.some(function(r){ return r.assigned.length; });
+  var body='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
+    +'A starting plan built from who’s on today and your manager minimums — <b>Emerald first, then Returns</b>, '
+    +'MTs/ABRMs step into Exit, everyone else floats (never defaulted to Counter). '
+    +'<b>Nothing is locked</b> — apply it, then drag or edit any block to correct it.</div>';
+  if(!any){
+    body+='<div style="font-size:13px;color:var(--txt2);line-height:1.6">No managers are on the schedule today, so there’s nothing to plan yet. Load or paste today’s manager schedule first.</div>'
+      +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-gh" onclick="closeModal()">Close</button></div>';
+    openModal('🤖 Draft manager areas', body); return;
+  }
+  p.rows.forEach(function(r){
+    body+='<div style="border-top:1px solid var(--bdr);padding:9px 0">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'
+      +'<b style="font-size:12px;color:var(--txt)">'+(BL[r.block]||r.block)+'</b>'
+      +(r.short.length
+         ? '<span style="margin-left:auto;font-size:10.5px;font-weight:800;color:var(--red)">⚠ '+r.short.join(' · ')+'</span>'
+         : '<span style="margin-left:auto;font-size:10.5px;font-weight:800;color:var(--accent,#23C983)">✓ covered</span>')
+      +'</div>';
+    body+= r.assigned.length
+      ? '<div style="display:flex;flex-wrap:wrap;gap:5px">'+r.assigned.map(function(a){
+          return '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt2)">'
+            +a.nick+' <span style="color:var(--txt3)">'+(AREA_LBL[a.area]||a.area)+'</span></span>';
+        }).join('')+'</div>'
+      : '<div style="font-size:11px;color:var(--txt3)">nobody on shift</div>';
+    body+='</div>';
+  });
+  body+='<div style="display:flex;gap:8px;margin-top:14px">'
+    +'<button onclick="applyProposedManagerAreas(window._pmaDraft);closeModal();" style="flex:1;padding:11px;border-radius:6px;border:none;background:var(--accent);color:#04160e;font-size:13px;font-weight:800;cursor:pointer">✓ Apply this draft</button>'
+    +'<button class="btn btn-gh" onclick="closeModal()">Cancel</button></div>';
+  openModal('🤖 Draft manager areas', body);
+}
+
+// Apply the proposal into the real structure managers already edit.
+function applyProposedManagerAreas(proposal){
+  proposal = proposal || proposeManagerAreas();
+  if(!STATE.mgmtBlocks) STATE.mgmtBlocks={};
+  Object.keys(proposal.plan).forEach(function(pid){
+    STATE.mgmtBlocks[pid]=proposal.plan[pid].map(function(b){
+      return {from:b.from, to:b.to, station:b.station};
+    });
+  });
+  if(typeof saveState==='function') saveState();
+  try{ buildCoverageTimeline&&buildCoverageTimeline(); }catch(e){}
+  if(typeof toast==='function') toast('✓ Draft manager areas applied — edit any block to correct it', 5000);
+  return proposal;
+}
+
+// ── Override + backfill (Design 2a) ────────────────────────────────────────
+// When every candidate is 🔒 protected, the honest answer is "you must break
+// something." So: never auto-suggest it, but let a manager choose deliberately —
+// and FORCE the second half of the decision (who backfills the station they
+// left, or an explicit "leave it open"). Both moves apply together.
+var _coOv = null;   // {area, hour, pid?}
+function coOverrideStart(area,hour){ _coOv={area:area, hour:hour, pid:null}; coRender(); }
+function coOverrideCancel(){ _coOv=null; coRender(); }
+function coOverridePick(pid){ if(_coOv) _coOv.pid=pid; coRender(); }
+function coOverrideConfirm(backfillPid){
+  if(!_coOv||!_coOv.pid) return;
+  var area=_coOv.area, hour=_coOv.hour, pid=_coOv.pid;
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
+  var fromArea=gfClassify(pid,exp,hour,new Date().getDay()).area;
+  _coOv=null;
+  coApplyFill(area, hour, pid);                       // the deliberate pull
+  if(backfillPid) coApplyFill(fromArea, hour, backfillPid);   // …and the backfill
+  else if(typeof toast==='function') toast('⚠ '+fromArea+' left open — flagged', 4000);
+  coRender();
+}
+function _coOvName(pid, exp){
+  var e=(exp||{})[pid]; if(!e||!e.person) return pid;
+  return e.person.nick || String(e.person.name||'').split(' ')[0] || pid;
+}
+function _coOverrideHtml(g, exp){
+  var active=_coOv && _coOv.area===g.area && _coOv.block!==false && _coOv.hour===g.hour;
+  if(!active) return '<button class="co-ov-start" onclick="coOverrideStart(\''+g.area+'\','+g.hour+')">Pull someone anyway →</button>';
+  var ranked=[]; try{ ranked=gfRankCandidates(g,exp); }catch(e){}
+  if(!_coOv.pid){
+    var prot=ranked.filter(function(c){ return c.tier==='protected'; });
+    if(!prot.length) return '<div class="co-ov"><div class="co-ov-hd">Nobody on shift can cover this at all.</div>'
+      +'<button class="co-ov-cancel" onclick="coOverrideCancel()">Close</button></div>';
+    return '<div class="co-ov"><div class="co-ov-hd">Who do you want to pull? <i>Each is holding something.</i></div>'
+      +prot.map(function(c){
+        return '<button class="co-ov-cand" onclick="coOverridePick(\''+c.pid+'\')">'
+          +'<b>'+c.nick+'</b> <span>'+c.role+'</span><i>'+c.why+'</i></button>';
+      }).join('')
+      +'<button class="co-ov-cancel" onclick="coOverrideCancel()">Cancel</button></div>';
+  }
+  // step 2 — backfill the station they're leaving
+  var nick=_coOvName(_coOv.pid, exp);
+  var fromArea=gfClassify(_coOv.pid,exp,g.hour,new Date().getDay()).area;
+  var back=[]; try{ back=gfRankCandidates({area:fromArea,hour:g.hour,short:1},exp)
+    .filter(function(c){ return c.pid!==_coOv.pid && c.tier!=='protected'; }); }catch(e){}
+  return '<div class="co-ov"><div class="co-ov-hd">Moving <b>'+nick+'</b> off <b>'+fromArea+'</b>. Who backfills it?</div>'
+    +(back.length?back.map(function(c){
+        return '<button class="co-ov-cand" onclick="coOverrideConfirm(\''+c.pid+'\')">'
+          +'<b>'+c.nick+'</b> <span>'+c.role+'</span><i>'+c.why+'</i></button>';
+      }).join(''):'<div class="co-ov-empty">No one free to backfill.</div>')
+    +'<button class="co-ov-leave" onclick="coOverrideConfirm(\'\')">Leave '+fromArea+' open ⚠</button>'
+    +'<button class="co-ov-cancel" onclick="coOverrideCancel()">Cancel</button></div>';
+}
+
+// The "what this opens up" card — only blocks that FELL BELOW min from this call-off.
+function _coImpactHtml(){
+  var imp=window._coImpact; if(!imp||!imp.opened||!imp.opened.length) return '';
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
+  var AREA_LBL={exit:'🟩 Exit', counter:'🟦 Counter', returns:'↩ Returns', emerald:'🌟 Emerald'};
+  var BL=(typeof FLOOR_BLOCK_LABELS!=='undefined')?FLOOR_BLOCK_LABELS:{};
+  var rows=imp.opened.map(function(g){
+    var s=null; try{ s=gfSuggest({area:g.area,hour:g.hour,short:g.short},exp); }catch(e){}
+    var line='<div class="co-gap">'
+      +'<div class="co-gap-hd"><b>'+(AREA_LBL[g.area]||g.area)+'</b> <span>'+(BL[g.block]||g.block)+'</span>'
+      +'<span class="co-gap-n">short '+g.short+'</span></div>';
+    if(s){
+      line+='<div class="co-gap-sg"><span>Suggested: <b>'+s.nick+'</b> <i>('+s.role+' · '+s.from+')</i></span>'
+        +'<button onclick="coApplyFill(\''+g.area+'\','+g.hour+',\''+s.pid+'\')">Move →</button></div>';
+    } else {
+      line+='<div class="co-gap-sg none">Everyone who could cover is already holding a station that would break if they left.</div>'
+        +_coOverrideHtml(g, exp);
+    }
+    return line+'</div>';
+  }).join('');
+  return '<div class="co-opened"><div class="co-opened-hd">⚠ What this opens up</div>'+rows
+    +'<button class="co-fillall" onclick="coFillAll()">⚡ Fill what it safely can</button></div>';
 }
 function coRender(){
   var d=_coCollect();
@@ -21079,7 +21427,8 @@ function coRender(){
   // impact line
   var workingCt=0; Object.keys(d.groups).forEach(function(g){workingCt+=d.groups[g].length;});
   h+='<div class="co-impact">'+workingCt+' working · '+d.off.length+' off'+
-     '<small>After marking someone off, close this and scan the coverage timeline for new ⚠ gaps, then adjust that block.</small></div>';
+     '<small>Marking someone off shows you exactly which blocks it breaks, and who can cover.</small></div>';
+  h+=_coImpactHtml();   // v60.147: "what this opens up" + guarded suggestions
   if(d.off.length){
     h+='<div class="qa-sec">❌ Marked off today ('+d.off.length+')</div>';
     d.off.forEach(function(r){
@@ -21212,7 +21561,9 @@ function snRender(){
   });
   var mPeak=mrows.reduce(function(a,b){return b.tot>a.tot?b:a;},mrows[0]);
   h+='</table>'+
-     '<div class="sn-note">Peak is <b>'+mPeak.block+'</b> — '+mPeak.tot+' managers on station. Numbers were <b>guesstimated from the manager rotation</b>; set your real minimums in <b>Setup → 📊 Coverage targets → 👔 Managers</b>.</div></div>';
+     '<div class="sn-note">Peak is <b>'+mPeak.block+'</b> — '+mPeak.tot+' managers on station. Numbers were <b>guesstimated from the manager rotation</b>; set your real minimums in <b>Setup → 📊 Coverage targets → 👔 Managers</b>.</div>'+
+     '<button class="qa-done" style="margin-top:12px" onclick="openProposedAreas()">🤖 Draft today’s manager areas</button>'+
+     '<div class="sn-note" style="margin-top:6px">Builds a starting plan from who’s on and these minimums — then you (or the AM) correct it.</div></div>';
   var b=document.getElementById('sn-body'); if(b) b.innerHTML=h;
 }
 function openStaffingNeeds(){
