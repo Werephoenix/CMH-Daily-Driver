@@ -2321,6 +2321,8 @@ button { cursor: pointer; }
   <!-- Zone map — right now -->
   <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
     gap:6px;margin-bottom:10px"></div>
+  <!-- v60.142: manager-minimum coverage flag (this block: on-now vs mgr minimums) -->
+  <div id="mgr-coverage" style="margin-bottom:10px"></div>
 
   <!-- Auto Schedule button — always visible (the rotation engine is the core value of this tab).
        v60.140: renamed to "Fill today's gaps" (today-scoped) so it no longer reads like the
@@ -3371,28 +3373,36 @@ function floorBlockKey(h){ if(h<9) return 'open'; if(h<12) return 'amid'; if(h<1
 // peak midday (mid/pm), light night; Emerald always covered, Returns midday-on, Floater
 // only at peak, 1 opener at open, 1 closer on 4P-C (pm+night). These are STARTING POINTS —
 // Matt adjusts the real minimums in the questionnaire.
+// v60.142 MANAGER FUNCTION MODEL (Matt, 2026-08-27 — supersedes v60.141 counter-heavy
+// defaults): Managers NEVER default to Counter (last-case only, usually an MT/ABRM).
+// PRIMARY = Emerald FIRST (always covered), then Returns (≥1 usually); they fill Exit &
+// Returns first, or help at Emerald. Help priority Returns > Exit > Counter. Full
+// per-manager function detail is PENDING a list from the AM (STATE.mgrFunctionsNote).
 var MGR_AREAS = [
-  {k:'emerald', label:'Emerald', color:'#AF9CFF'},
-  {k:'counter', label:'Counter', color:'#0A84FF'},
-  {k:'returns', label:'Returns', color:'#64D2FF'},
+  {k:'emerald', label:'Emerald', color:'#AF9CFF'},  // primary — always covered
+  {k:'returns', label:'Returns', color:'#64D2FF'},  // primary — >=1 usually
+  {k:'exit',    label:'Exit',    color:'#23C983'},  // mgrs fill exit holes (MT/ABRM first)
   {k:'floater', label:'Floater', color:'#FFCC00'},
+  {k:'counter', label:'Counter', color:'#0A84FF'},  // LAST-CASE only (usually MT/ABRM)
   {k:'opening', label:'Opening', color:'#FF9F0A'},
   {k:'closing', label:'Closing', color:'#FF453A'},
 ];
+// Order an exit gap gets filled from — role codes, best-first. ARM = AM/Area Mgr.
+var EXIT_FILL_ORDER = ['EXIT','CXR','MT','ABRM','BRM','ARM'];
 var MGR_TARGETS = {
   weekday: {
-    open: {emerald:1, counter:1, returns:0, floater:0, opening:1, closing:0}, // 3 — opener + Emerald + Counter
-    amid: {emerald:1, counter:1, returns:1, floater:0, opening:0, closing:0}, // 3
-    mid:  {emerald:1, counter:2, returns:1, floater:1, opening:0, closing:0}, // 5 — daily peak
-    pm:   {emerald:1, counter:1, returns:1, floater:1, opening:0, closing:1}, // 5 — peak + closer arrives
-    night:{emerald:1, counter:1, returns:0, floater:0, opening:0, closing:1}, // 3 — closer + Emerald + Counter
+    open: {emerald:1, returns:1, exit:0, floater:0, counter:0, opening:1, closing:0}, // 3 — opener+Emerald+Returns
+    amid: {emerald:1, returns:1, exit:1, floater:0, counter:0, opening:0, closing:0}, // 3
+    mid:  {emerald:1, returns:1, exit:1, floater:1, counter:0, opening:0, closing:0}, // 4 — daily peak
+    pm:   {emerald:1, returns:1, exit:1, floater:0, counter:0, opening:0, closing:1}, // 4 — peak + closer
+    night:{emerald:1, returns:1, exit:0, floater:0, counter:0, opening:0, closing:1}, // 3 — closer+Emerald+Returns
   },
   weekend: {
-    open: {emerald:1, counter:1, returns:0, floater:0, opening:1, closing:0}, // 3
-    amid: {emerald:1, counter:1, returns:1, floater:0, opening:0, closing:0}, // 3
-    mid:  {emerald:1, counter:1, returns:1, floater:1, opening:0, closing:0}, // 4 — lighter peak
-    pm:   {emerald:1, counter:1, returns:1, floater:0, opening:0, closing:1}, // 4
-    night:{emerald:1, counter:1, returns:0, floater:0, opening:0, closing:1}, // 3
+    open: {emerald:1, returns:1, exit:0, floater:0, counter:0, opening:1, closing:0}, // 3
+    amid: {emerald:1, returns:1, exit:0, floater:0, counter:0, opening:0, closing:0}, // 2
+    mid:  {emerald:1, returns:1, exit:1, floater:0, counter:0, opening:0, closing:0}, // 3 — lighter peak
+    pm:   {emerald:1, returns:1, exit:0, floater:0, counter:0, opening:0, closing:1}, // 3
+    night:{emerald:1, returns:1, exit:0, floater:0, counter:0, opening:0, closing:1}, // 3
   }
 };
 function mgrTargetsFor(dtype){ return (STATE.mgrTargets && STATE.mgrTargets[dtype]) || MGR_TARGETS[dtype]; }
@@ -3780,7 +3790,7 @@ function loadState() {
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
-    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
+    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
     mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{}, pto:{},
   };
 }
@@ -5933,6 +5943,8 @@ function buildSmartRotation() {
 
   workingCXRs.forEach((cxr, i) => {
     if (cxr.startStation) return; // already set by manager
+    // v60.142: exit-accommodated CXRs never start (or rotate to) exit.
+    if (typeof exitAccommodated==='function' && exitAccommodated(cxr.pid)) { cxr.startStation='counter'; return; }
     // If exit is critically short, first N CXRs start at exit
     if (i < exitGap) {
       cxr.startStation = 'exit';
@@ -7087,6 +7099,16 @@ function buildSwitchboard() {
           ★
         </button>
       </div>
+
+      <!-- Row 6: Exit accommodation (v60.142) — no reason stored, dates only -->
+      <button onclick="openExitAccommodation('${pid}','${(nick||'').replace(/'/g,'')}')"
+        style="width:100%;margin-top:6px;padding:6px 8px;border-radius:4px;border:1px solid;
+          font-size:10px;font-weight:700;cursor:pointer;text-align:center;
+          background:${exitAccommodated(pid)?'rgba(217,119,6,.12)':'var(--bg2)'};
+          border-color:${exitAccommodated(pid)?'var(--amber3)':'var(--bdr2)'};
+          color:${exitAccommodated(pid)?'var(--amber)':'var(--txt3)'}">
+        🛡 ${exitAccommodated(pid)?exitAccommodationLabel(pid):'Exit accommodation'}
+      </button>
       ` : `
       <!-- EXIT AGENT: no rotation controls -->
       <div style="font-size:11px;font-weight:700;color:var(--red);
@@ -7387,9 +7409,14 @@ function autoLoadFromExpected(expectedToday, dow) {
     .sort((a,b)=>a.cost-b.cost);
   // Assign the exitMax lowest-cost CXRs to Exit; everyone else to Counter.
   // (Respect any station already forced above — EXIT/RETURNS/mgmt roles.)
-  cxrs.forEach((c, idx) => {
+  // v60.142: anyone with an active exit accommodation is skipped (→ Counter) and
+  // never consumes an exit slot, so the next eligible CXR fills it instead.
+  let _exitAssigned = 0;
+  cxrs.forEach((c) => {
     if (STATE.staffStation[c.pid]) return;
-    STATE.staffStation[c.pid] = (idx < exitMax) ? 'Exit Booth' : 'Counter';
+    if (typeof exitAccommodated==='function' && exitAccommodated(c.pid)) { STATE.staffStation[c.pid] = 'Counter'; return; }
+    if (_exitAssigned < exitMax) { STATE.staffStation[c.pid] = 'Exit Booth'; _exitAssigned++; }
+    else STATE.staffStation[c.pid] = 'Counter';
   });
   window._lastAutoAssign = { peakExitMin, exitAgentCount, cxrExitNeeded, exitMax }; // for the "why" readout
   if(typeof buildSmartRotation==='function'){try{const rot=buildSmartRotation();window._lastRotations={};if(rot&&rot.rotations)rot.rotations.forEach(r=>{window._lastRotations[r.pid]=r;});}catch(err){}}
@@ -7870,11 +7897,86 @@ function cycleDuty(key) {
 function updateSchedHelper() { buildSwitchboard(); }
 
 function setStation(key, val) {
+  // v60.142: guard — warn (but allow) if a manager manually puts someone with an
+  // active exit accommodation onto Exit Booth. Their accommodation still stands.
+  if(val==='Exit Booth' && typeof exitAccommodated==='function' && exitAccommodated(key)){
+    if(!confirm('This person has an active EXIT ACCOMMODATION (no exit rotation). Put them at Exit anyway?')) return;
+  }
   STATE.staffStation[key] = val;
   saveState();
   if(typeof buildCoverageTimeline==="function")buildCoverageTimeline();
   buildStaffGrid();
   buildCoverageUI();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  v60.142 · EXIT ROTATION ACCOMMODATION (privacy-respecting)
+//  Matt: some CXRs can't do exit for a day or a longer period (e.g. medical —
+//  a hip injury since February). The system must (1) never schedule them at
+//  exit, (2) not count exit-fairness against them, and (3) NOT store or show
+//  any medical reason — dates only. Neutral "no exit" note is all that shows.
+//    STATE.exitAccommodation[pid] = { start:'YYYY-MM-DD', end:'YYYY-MM-DD'|null }
+//      end null/'' = ongoing (until the manager clears it).
+// ═══════════════════════════════════════════════════════════════════════
+function exitAccommodated(pid, dateKey){
+  var a = (STATE.exitAccommodation||{})[pid];
+  if(!a || !a.start) return false;
+  var dk = dateKey || (typeof todayKey==='function' ? todayKey() : '');
+  if(!dk) return true;
+  if(dk < a.start) return false;          // not started yet
+  if(a.end && dk > a.end) return false;   // window ended
+  return true;
+}
+function exitAccommodationLabel(pid){
+  var a=(STATE.exitAccommodation||{})[pid]; if(!a||!a.start) return '';
+  return a.end ? ('no exit · thru '+a.end) : 'no exit · ongoing';
+}
+function openExitAccommodation(pid, name){
+  var a=(STATE.exitAccommodation||{})[pid]||{};
+  var today = (typeof todayKey==='function')?todayKey():'';
+  var start = a.start || today;
+  var end   = a.end || '';
+  var active = (typeof exitAccommodated==='function') && exitAccommodated(pid);
+  openModal('🛡 Exit accommodation — '+(name||''), ''+
+    '<div style="font-size:12.5px;color:var(--txt2);line-height:1.55;margin-bottom:14px">'+
+      'Marks this person <b>off exit rotation</b> for a day or a longer stretch. While active they are '+
+      '<b>never scheduled at exit</b> and it <b>won’t count against their exit-fairness</b>. '+
+      '<b>No reason is stored</b> — dates only. On the board it shows only as a neutral “no exit”.</div>'+
+    (active?'<div style="font-size:11.5px;font-weight:700;color:var(--amber);background:rgba(217,119,6,.1);border:1px solid var(--amber3);border-radius:7px;padding:8px 10px;margin-bottom:12px">Currently active — '+exitAccommodationLabel(pid)+'</div>':'')+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px">'+
+      '<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin-bottom:4px">Start</div>'+
+        '<input type="date" id="ea-start" value="'+start+'" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;color:var(--txt);font-size:13px"></div>'+
+      '<div><div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin-bottom:4px">End <span style="font-weight:500;text-transform:none">(blank = ongoing)</span></div>'+
+        '<input type="date" id="ea-end" value="'+end+'" style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;color:var(--txt);font-size:13px"></div>'+
+    '</div>'+
+    '<div style="font-size:11px;color:var(--txt3);margin-bottom:14px">Ongoing is fine for a medical accommodation with no set end — clear it when they’re cleared to return.</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="saveExitAccommodation(\''+pid+'\')" style="flex:1;padding:11px;border-radius:6px;border:none;background:var(--accent);color:#04160e;font-size:13px;font-weight:800;cursor:pointer">✓ Save accommodation</button>'+
+      (a.start?'<button onclick="clearExitAccommodation(\''+pid+'\')" style="padding:11px 14px;border-radius:6px;border:1px solid var(--red);background:rgba(255,69,58,.08);color:var(--red);font-size:13px;font-weight:800;cursor:pointer">Clear</button>':'')+
+      '<button class="btn btn-gh" onclick="closeModal()">Cancel</button>'+
+    '</div>');
+}
+function saveExitAccommodation(pid){
+  var s=(document.getElementById('ea-start')||{}).value||'';
+  var e=(document.getElementById('ea-end')||{}).value||'';
+  if(!s){ toast('Pick a start date'); return; }
+  if(e && e<s){ toast('End can’t be before start'); return; }
+  if(!STATE.exitAccommodation) STATE.exitAccommodation={};
+  STATE.exitAccommodation[pid]={start:s, end:e||null};
+  // if they're currently at exit, move them to counter now
+  if((STATE.staffStation||{})[pid]==='Exit Booth' && exitAccommodated(pid)){ STATE.staffStation[pid]='Counter'; }
+  saveState(); closeModal();
+  toast('Exit accommodation saved 🛡');
+  if(typeof buildSwitchboard==='function') buildSwitchboard();
+  if(typeof buildCoverageUI==='function') buildCoverageUI();
+  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+}
+function clearExitAccommodation(pid){
+  if(STATE.exitAccommodation) delete STATE.exitAccommodation[pid];
+  saveState(); closeModal();
+  toast('Accommodation cleared');
+  if(typeof buildSwitchboard==='function') buildSwitchboard();
+  if(typeof buildCoverageUI==='function') buildCoverageUI();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -14137,7 +14239,7 @@ function renderScheduleView() {
   // auto-distribute, mode bar) with the inline week draft — a distinct planning mode.
   const wkEl = document.getElementById('sched-week-view');
   // id → its normal display value (so hide/restore keeps flex/grid layouts intact)
-  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block'};
+  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block'};
   if (p === 'week') {
     Object.keys(_dayRestore).forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
     if (wkEl) wkEl.style.display = 'block';
@@ -14159,7 +14261,8 @@ function _fairnessSuggestHtml(exp){
   try{
     var cxrs = Object.keys(exp||{}).filter(function(pid){
       var p=(exp[pid]||{}).person; if(!p) return false;
-      return p.role==='CXR' && !p.fairnessExempt && (STATE.todayOverrides||{})[pid]!=='callout';
+      return p.role==='CXR' && !p.fairnessExempt && (STATE.todayOverrides||{})[pid]!=='callout'
+        && !(typeof exitAccommodated==='function' && exitAccommodated(pid)); // v60.142: exempt while accommodated
     }).map(function(pid){ return {pid:pid, person:exp[pid].person, h:(typeof getExitHoursWeek==='function'?getExitHoursWeek(pid):0)}; });
     if(cxrs.length<2) return '';
     cxrs.sort(function(a,b){ return a.h-b.h; });
@@ -14697,6 +14800,39 @@ function buildCoverageTimeline() {
       zCard('Emerald','🌟',zones.emerald,true,1)+
       zCard('Exit','🟩',zones.exit,exitOk,rules.exitMin)+
       zCard('Returns','↩',zones.returns,true,0);
+  }
+
+  // ── v60.142: Manager-minimum coverage flag (this block: floor mgrs on-now vs mins) ──
+  const mcEl=document.getElementById('mgr-coverage');
+  if(mcEl && typeof mgrTargetsFor==='function' && typeof MGR_AREAS!=='undefined'){
+    const _bk=(typeof floorBlockKey==='function')?floorBlockKey(nowH):'mid';
+    const _dt=(dow===0||dow===6)?'weekend':'weekday';
+    const _mb=(mgrTargetsFor(_dt)||{})[_bk]||{};
+    const _need=MGR_AREAS.reduce((s,a)=>s+(_mb[a.k]||0),0);
+    // floor managers on shift now (Off-Site ARMs excluded; call-offs excluded)
+    const _on=people.filter(pr=>{
+      const e=pr[1],pid=pr[0]; if(!e||!e.person) return false;
+      if(['ARM','BRM','ABRM','MT'].indexOf(e.person.role)<0) return false;
+      if((STATE.todayOverrides||{})[pid]==='callout') return false;
+      if((e.person.defaultStation||'')==='Off Site') return false;
+      const sm=(STATE.shiftMod||{})[pid]||{};
+      let ss=sm.start!=null?sm.start:e.person.shiftStart;
+      let se=sm.end!=null?sm.end:e.person.shiftEnd;
+      if(ss==null||se==null) return true;
+      if(se<ss) se+=24;
+      return nowH>=ss && nowH<se;
+    }).length;
+    const _short=_need-_on;
+    const _blabel=(typeof FLOOR_BLOCK_LABELS!=='undefined'&&FLOOR_BLOCK_LABELS[_bk])||_bk;
+    const _parts=MGR_AREAS.filter(a=>(_mb[a.k]||0)>0).map(a=>`<span style="color:${a.color}">${a.label} ${_mb[a.k]}</span>`).join(' · ');
+    mcEl.innerHTML=`<div onclick="if(typeof openStaffingNeeds==='function')openStaffingNeeds()" style="cursor:pointer;background:var(--bg3);border:1px solid ${_short>0?'rgba(255,69,58,.5)':'rgba(52,211,153,.3)'};border-radius:6px;padding:8px 10px">`+
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px">`+
+        `<span style="font-size:9px;font-weight:800;text-transform:uppercase;color:${_short>0?'var(--red)':'var(--green)'}">👔 Managers ${_on}/${_need}</span>`+
+        `<span style="font-size:9px;color:var(--txt3)">this block · ${_blabel}</span>`+
+        (_short>0?`<span style="margin-left:auto;font-size:10px;font-weight:800;color:var(--red)">⚠ short ${_short}</span>`:`<span style="margin-left:auto;font-size:10px;font-weight:800;color:var(--green)">✓ covered</span>`)+
+      `</div>`+
+      `<div style="font-size:10px;color:var(--txt2);line-height:1.5">${_parts||'<span style="color:var(--txt3)">no manager minimums set — Setup → 📊 Coverage targets → 👔 Managers</span>'}</div>`+
+    `</div>`;
   }
 
   // ── Coverage chart ──────────────────────────────────────────────────────────
@@ -16402,6 +16538,18 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
     </button>
   </div>`;
 
+  // Exit accommodation (CXR only) — v60.142. Neutral, no reason stored.
+  if(person.role==='CXR'){
+    const _acc = (typeof exitAccommodated==='function') && exitAccommodated(pid);
+    h+=`<button onclick="closePersonPanel();openExitAccommodation('${pid}','${(person.nick||person.name.split(' ')[0]||'').replace(/'/g,'')}')"
+      style="width:100%;margin-bottom:8px;padding:7px;border-radius:6px;border:1px solid;font-size:11px;font-weight:700;cursor:pointer;
+        background:${_acc?'rgba(217,119,6,.12)':'var(--bg3)'};
+        border-color:${_acc?'var(--amber)':'var(--bdr2)'};
+        color:${_acc?'var(--amber)':'var(--txt3)'}">
+      🛡 ${_acc?('No exit · '+exitAccommodationLabel(pid).replace('no exit · ','')):'Exit accommodation…'}
+    </button>`;
+  }
+
   // Called off toggle
   const isCallout=(STATE.todayOverrides||{})[pid]==='callout';
   h+=`<button onclick="toggleCallout('${pid}');buildCoverageTimeline();closePersonPanel()"
@@ -17906,7 +18054,11 @@ function ftRenderModal(){
           ${blocks.map(([k,l])=>row(k,l)).join('')}
         </div>
       </div>
-      <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">Min managers per station, per block. <b>Starting numbers were guesstimated from the manager rotation</b> (Emerald always covered, Returns midday-on, Floater at peak, 1 opener, 1 closer) — adjust to your branch. Emerald · Counter · Returns · Floater · Opening · Closing.</div>`;
+      <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">Min managers per station, per block. Managers <b>never default to Counter</b> — Emerald first, then Returns; they fill Exit/Returns or help Emerald; Counter is last-case (usually MT/ABRM). <b>Starting numbers were guesstimated from the rotation</b> — adjust to your branch.</div>
+      <div style="margin-top:12px;padding:10px 11px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:5px">📋 Manager functions — from the AM (paste when you have it)</div>
+        <textarea id="mgr-fn-note" oninput="STATE.mgrFunctionsNote=this.value" placeholder="The AM's detailed list of what each manager covers (e.g. who owns Emerald, who's the Returns manager, exit-fill order MT→ABRM→BRM→AM…). Saved with the targets." style="width:100%;min-height:70px;resize:vertical;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;color:var(--txt);font-size:12px;padding:8px 9px;line-height:1.5;font-family:inherit">${(STATE.mgrFunctionsNote||'').replace(/</g,'&lt;')}</textarea>
+      </div>`;
   } else {
     // ── Staff floor minimums (Ctr / Exit / Ret) ──
     const T  = (STATE.floorTargets) || FLOOR_TARGETS;
