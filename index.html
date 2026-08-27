@@ -15920,6 +15920,189 @@ function addSpecialBlock(pid, key, fromTime, toTime) {
     </div>`);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.146 · GUARDED FILL ENGINE (Design spec 2a) — the shared primitive
+// Every fill surface (call-off suggestions, Guided Fix, floor view, the
+// plan-today wizard) asks the SAME question: "there's a hole — who can fill it,
+// and who must NOT be moved?" This answers it ONCE, headless and testable, so
+// those surfaces stay thin renderers instead of four diverging copies.
+//
+// Matt's operating model (2026-08-27) drives it:
+//   • Emerald + Returns are PRIMARY touchpoints — never strip them.
+//   • Counter is last-case for managers (usually MT/ABRM).
+//   • Exit holes fill in order: EXIT → CXR → MT → ABRM → BRM → AM/ARM.
+// Classification: 'free' (no station / flex) → auto-suggestible ·
+//   'flex' (assigned but not load-bearing) → suggestible, shown as a move ·
+//   'protected' (holding a primary, or the last body at a station's minimum)
+//   → NEVER auto-suggested; a manager may override, but must backfill.
+// ═══════════════════════════════════════════════════════════════════════════
+var GF_PRIMARY_AREAS = ['emerald','returns'];
+
+function gfAreaOf(station){
+  if(!station) return null; var s=String(station);
+  if(/emerald/i.test(s))            return 'emerald';
+  if(/return/i.test(s))             return 'returns';
+  if(/exit/i.test(s))               return 'exit';
+  if(/float|shuttl/i.test(s))       return 'floater';
+  if(/counter/i.test(s))            return 'counter';
+  if(/off ?site/i.test(s))          return 'offsite';
+  return null;
+}
+// Is this person on shift at hour h (honors shiftMod + overnight)?
+function gfOnShiftAt(pid, e, h){
+  if(!e || !e.person) return false;
+  if((STATE.todayOverrides||{})[pid]==='callout') return false;
+  var ov=(STATE.shiftMod||{})[pid]||{};
+  var ss=(ov.start!=null)?ov.start:e.person.shiftStart;
+  var se=(ov.end  !=null)?ov.end  :e.person.shiftEnd;
+  if(ss==null||se==null) return true;              // unknown window → assume on
+  if(se<ss) se+=24;
+  return h>=ss && h<se;
+}
+// Where is this person at hour h? mgmtBlocks (time-aware) wins, else staffStation.
+function gfAreaAt(pid, e, h){
+  var blocks=(STATE.mgmtBlocks||{})[pid]||[];
+  if(blocks.length){
+    var b=blocks.find(function(b){ return b && h>=b.from && h<b.to; });
+    if(b) return gfAreaOf(b.station);
+  }
+  if(typeof _nowZone==='function' && e && e.person && e.person.role==='CXR'){
+    var z=_nowZone(pid, e.person, h);              // rotation-aware for CXRs
+    if(z==='exit') return 'exit';
+    if(z==='counter') return 'counter';
+  }
+  return gfAreaOf((STATE.staffStation||{})[pid]);
+}
+// Headcount per area at hour h, across everyone on shift.
+function gfCountsAt(exp, h){
+  var c={};
+  Object.keys(exp||{}).forEach(function(pid){
+    var e=exp[pid]; if(!gfOnShiftAt(pid,e,h)) return;
+    var a=gfAreaAt(pid,e,h); if(!a||a==='offsite') return;
+    c[a]=(c[a]||0)+1;
+  });
+  return c;
+}
+// What each area needs at hour h (staff floor targets + manager minimums).
+function gfNeedsAt(h, dow){
+  var out={};
+  try{
+    var r=(typeof COVERAGE_BY_HOUR==='function')?COVERAGE_BY_HOUR(h,dow,0):null;
+    if(r && !r.closed){ out.exit=r.exitMin||0; out.counter=r.counterMin||0; out.returns=r.returnsMin||0; }
+  }catch(e){}
+  try{
+    var dt=(dow===0||dow===6)?'weekend':'weekday';
+    var bk=(typeof floorBlockKey==='function')?floorBlockKey(h%24):'mid';
+    var m=(typeof mgrTargetsFor==='function')?(mgrTargetsFor(dt)||{})[bk]:null;
+    if(m && m.emerald) out.emerald=Math.max(out.emerald||0, m.emerald);
+  }catch(e){}
+  return out;
+}
+// Classify one person for being MOVED at hour h.
+//   → {tier:'free'|'flex'|'protected', area, why}
+function gfClassify(pid, exp, h, dow){
+  var e=(exp||{})[pid];
+  if(!e || !gfOnShiftAt(pid,e,h)) return {tier:'protected', area:null, why:'not on shift'};
+  var area=gfAreaAt(pid,e,h);
+  if(!area || area==='floater') return {tier:'free', area:area, why:'unassigned / floating'};
+  if(area==='offsite')          return {tier:'protected', area:area, why:'off site'};
+  // Holding a PRIMARY touchpoint (Emerald / Returns) → never auto-move.
+  if(gfPrimaryAreas().indexOf(area)>=0){
+    var cP=gfCountsAt(exp,h), nP=gfNeedsAt(h,dow);
+    var needP=(nP[area]!=null)?nP[area]:1;          // primaries default to 1
+    if((cP[area]||0)<=needP) return {tier:'protected', area:area, why:'holds '+area+' (primary)'};
+    return {tier:'flex', area:area, why:area+' has spare'};
+  }
+  // Otherwise: last body at a station that's already at its minimum → protected.
+  var c=gfCountsAt(exp,h), n=gfNeedsAt(h,dow);
+  var need=n[area]||0;
+  if(need>0 && (c[area]||0)<=need) return {tier:'protected', area:area, why:area+' is at minimum'};
+  return {tier:'flex', area:area, why:'can move from '+area};
+}
+function gfIsProtected(pid, exp, h, dow){ return gfClassify(pid,exp,h,dow).tier==='protected'; }
+
+// Detect coverage holes across the open day. Returns worst-first.
+function gfDetectGaps(exp, fromHour){
+  exp = exp || (typeof buildExpectedToday==='function'?buildExpectedToday():{});
+  var dow=new Date().getDay();
+  var start=(fromHour!=null)?Math.floor(fromHour):6;
+  var gaps=[];
+  for(var h=start; h<=24; h++){
+    var need=gfNeedsAt(h,dow), have=gfCountsAt(exp,h);
+    Object.keys(need).forEach(function(area){
+      var nd=need[area]||0, hv=have[area]||0;
+      if(nd>0 && hv<nd) gaps.push({hour:h, area:area, need:nd, have:hv, short:nd-hv,
+        primary:gfPrimaryAreas().indexOf(area)>=0});
+    });
+  }
+  // rank: primaries first → soonest → biggest shortfall (Design 3c rule 1)
+  gaps.sort(function(a,b){
+    if(a.primary!==b.primary) return a.primary?-1:1;
+    if(a.hour!==b.hour) return a.hour-b.hour;
+    return b.short-a.short;
+  });
+  return gaps;
+}
+
+// Which roles may fill THIS area, best-first. Exit uses Matt's EXIT_FILL_ORDER;
+// Emerald/Returns are manager stations (a CXR can't just be dropped on Emerald),
+// so they walk the manager chain least-senior-first. Overridden by the Branch
+// Interview's eligibility answers once management fills them in
+// (STATE.branchConfig.chainEmerald / chainReturns / chainExit / chainCounter).
+// Branch Interview answers use readable labels; the engine works in role codes.
+var GF_ROLE_LABEL = {'Exit agent':'EXIT','Returns agent':'RETURNS','CXR':'CXR',
+  'MT':'MT','ABRM':'ABRM','BRM':'BRM','AM/ARM':'ARM'};
+var GF_AREA_LABEL = {'Emerald':'emerald','Returns':'returns','Exit':'exit','Counter':'counter'};
+// Which areas must never be stripped. Management's answer wins; else the model default.
+function gfPrimaryAreas(){
+  var a=((STATE.branchConfig)||{}).primaryAreas;
+  if(Array.isArray(a) && a.length) return a.map(function(l){ return GF_AREA_LABEL[l]||String(l).toLowerCase(); });
+  return GF_PRIMARY_AREAS;
+}
+function gfChainFor(area){
+  var cfg=(STATE.branchConfig)||{};
+  var custom=cfg['chain'+area.charAt(0).toUpperCase()+area.slice(1)];
+  if(Array.isArray(custom) && custom.length){
+    return custom.map(function(l){ return GF_ROLE_LABEL[l]||l; });   // tap order = priority
+  }
+  if(area==='exit')    return (typeof EXIT_FILL_ORDER!=='undefined')?EXIT_FILL_ORDER:['EXIT','CXR','MT','ABRM','BRM','ARM'];
+  if(area==='emerald') return ['MT','ABRM','BRM','ARM'];          // manager station
+  if(area==='returns') return ['RETURNS','MT','ABRM','BRM','ARM'];
+  if(area==='counter') return ['CXR','MT','ABRM','BRM','ARM'];    // mgrs last-case
+  return ['CXR','MT','ABRM','BRM','ARM'];
+}
+
+// Rank who should fill a gap: walk the area's role chain, and within a role
+// prefer free › flex › protected, tiebreaking on least exit time already worked
+// (fairness — don't burn the same person twice).
+function gfRankCandidates(gap, exp){
+  exp = exp || (typeof buildExpectedToday==='function'?buildExpectedToday():{});
+  var dow=new Date().getDay(), h=gap.hour;
+  var order=gfChainFor(gap.area);
+  var tierRank={free:0, flex:1, protected:2};
+  var out=[];
+  Object.keys(exp).forEach(function(pid){
+    var e=exp[pid]; if(!e||!e.person) return;
+    if(!gfOnShiftAt(pid,e,h)) return;
+    var cls=gfClassify(pid,exp,h,dow);
+    if(cls.area===gap.area) return;                       // already there
+    // exit accommodations are absolute — never a candidate for exit
+    if(gap.area==='exit' && typeof exitAccommodated==='function' && exitAccommodated(pid)) return;
+    var ri=order.indexOf(e.person.role);
+    if(ri<0) return;                                      // role not eligible for this area
+    var fair=0; try{ fair=(typeof getExitHoursWeek==='function')?getExitHoursWeek(pid):0; }catch(err){}
+    out.push({pid:pid, nick:(e.person.nick||String(e.person.name||'').split(' ')[0]||pid),
+      role:e.person.role, tier:cls.tier, why:cls.why, from:cls.area,
+      _r:ri, _t:tierRank[cls.tier], _f:fair});
+  });
+  out.sort(function(a,b){ return (a._r-b._r) || (a._t-b._t) || (a._f-b._f); });
+  return out;
+}
+// The one call a surface makes: best NON-protected suggestion for a gap (or null).
+function gfSuggest(gap, exp){
+  return gfRankCandidates(gap, exp).filter(function(c){ return c.tier!=='protected'; })[0] || null;
+}
+
 function autoSchedule() {
   // 1. Assign exit rotation first (fill gaps with CXRs fairly)
   const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
@@ -16251,7 +16434,13 @@ function autoDistributeExit(exp) {
         !assigned.has(c.pid) &&
         !managerSet.has(c.pid) &&
         STATE.altSchedule[c.pid] !== 'full-counter' &&
-        gapH >= c.ss && gapH < c.se
+        gapH >= c.ss && gapH < c.se &&
+        // v60.146 GUARD: never auto-pull the last body off a station that's already
+        // at its minimum (or off a primary touchpoint) just to plug exit. Managers
+        // can still do it deliberately via an override + backfill.
+        !(typeof gfIsProtected==='function' && gfIsProtected(c.pid, exp, gapH, dow)) &&
+        // exit accommodations are absolute
+        !(typeof exitAccommodated==='function' && exitAccommodated(c.pid))
       );
 
       if (!candidates.length) break; // no more CXRs available for this gap
@@ -18678,6 +18867,42 @@ var BRANCH_INTERVIEW = [
     {k:'eligExit',    type:'multi', q:'Who can work Exit booth? (tap all)', opts:['CXR','MT','ABRM','BRM'], scope:'view'},
     {k:'eligReturns', type:'multi', q:'Who can work Returns? (tap all)',    opts:['CXR','MT','ABRM','BRM'], scope:'view'},
   ]},
+  // ── v60.146: THE FILL-RULES SECTION — these answers ARE the guarded-fill engine.
+  // Every question here changes what the app suggests when a hole opens. Ordered
+  // most-critical-first; each is one tap. Tap order = priority for the chains.
+  { title:'⚡ Fill rules — what the app suggests when someone’s short',
+    tunes:'the guarded fill engine (gfChainFor / gfClassify)', view:true, qs:[
+    {k:'primaryAreas', type:'multi', scope:'view',
+     q:'1. Which stations must NEVER be left uncovered, even for a minute? (tap all)',
+     opts:['Emerald','Returns','Exit','Counter']},
+    {k:'chainExit', type:'multi', scope:'view',
+     q:'2. EXIT is short. Who gets pulled — TAP IN ORDER, first choice first.',
+     opts:['Exit agent','CXR','MT','ABRM','BRM','AM/ARM']},
+    {k:'chainEmerald', type:'multi', scope:'view',
+     q:'3. EMERALD needs covering. Who can run it — tap in order.',
+     opts:['MT','ABRM','BRM','AM/ARM','CXR']},
+    {k:'chainReturns', type:'multi', scope:'view',
+     q:'4. RETURNS needs covering. Who can run it — tap in order.',
+     opts:['Returns agent','CXR','MT','ABRM','BRM','AM/ARM']},
+    {k:'chainCounter', type:'multi', scope:'view',
+     q:'5. COUNTER is short and no CXR is free. Which managers can take it — tap in order (leave blank if never).',
+     opts:['MT','ABRM','BRM','AM/ARM']},
+    {k:'primaryGrace', type:'single', scope:'view',
+     q:'6. If a manager steps off Emerald/Returns for a break, how long may it sit empty?',
+     opts:['Never — always backfill','Up to 15 min','Up to 30 min','Whatever it takes']},
+    {k:'backfillWho', type:'single', scope:'view',
+     q:'7. When you MUST pull someone off a primary station, who backfills them?',
+     opts:['Next person in the chain','The floater','A specific manager','Leave it open + flag it']},
+    {k:'emeraldOwner', type:'short', scope:'view', ph:'name or “rotates”',
+     q:'8. Who normally runs Emerald?'},
+    {k:'returnsOwner', type:'short', scope:'view', ph:'name or “rotates”',
+     q:'9. Who is normally the Returns manager?'},
+    {k:'rotateLong', type:'single', scope:'view',
+     q:'10. Must a long CXR shift (7.5h+) change stations partway?',
+     opts:['Yes — always','Only if a station is short','No — leave them put']},
+    {k:'exitNoGo', type:'text', scope:'view',
+     q:'11. Anyone who should never be put on Exit? NAMES ONLY — do not write a reason.'},
+  ]},
   { title:'Board & signals', tunes:'board + Now', view:true, opt:true, qs:[
     {k:'defaultSort',    type:'single', q:'Default board order', opts:['Problems first','Core then non-core','A–Z'], scope:'view'},
     {k:'statProminence', type:'single', q:'The four totals — glanced constantly, or reference?', opts:['Constantly','Sometimes','Reference-only'], scope:'view'},
@@ -18808,6 +19033,7 @@ function biUpdateProg(){
   var bar=document.getElementById('bi-progbar'); if(bar) bar.style.width=(p.total?p.done/p.total*100:0)+'%';
   var el=document.getElementById('bi-prog'); if(el) el.textContent=p.done+' of '+p.total+' answered'+(p.done===p.total?'  ·  ✓ complete':'');
   var cel=document.getElementById('bi-consistency'); if(cel) cel.innerHTML=biConsistencyHtml();
+  var eel=document.getElementById('bi-engine-ready'); if(eel) eel.innerHTML=biEngineReadyHtml();
 }
 function biSet(k,val){
   var q=biQByKey(k)||{k:k,scope:'fact'};
@@ -18825,6 +19051,80 @@ function biCollect(k){
 }
 function biAdoptIfClear(k){ var c=biCollect(k); if(c.agree && c.count>=1){ try{ biCfg()[k]=JSON.parse(c.distinct[0]); }catch(e){} } }
 function biAdopt(k,valJson){ try{ biCfg()[k]=JSON.parse(valJson); }catch(e){ biCfg()[k]=valJson; } if(typeof saveState==='function') saveState(); biUpdateProg(); if(typeof toast==='function') toast('Set as branch standard ✓'); }
+
+// ── v60.146: ENGINE READINESS — exactly what's still blocking the fill engine.
+// Matt's biggest frustration is WAITING on management, so this (a) shows precisely
+// what's missing, and (b) generates a short plain-text ask he can paste into a
+// text/email to the AM — no app access or prep needed on their end.
+function biEngineQs(){
+  var sec=BRANCH_INTERVIEW.filter(function(s){ return /Fill rules/.test(s.title); })[0];
+  return sec?sec.qs:[];
+}
+function biMissingForEngine(){
+  var cfg=biCfg();
+  return biEngineQs().filter(function(q){
+    var v=cfg[q.k];
+    return v==null || v==='' || (Array.isArray(v) && !v.length);
+  });
+}
+function biEngineReadyHtml(){
+  var qs=biEngineQs(), miss=biMissingForEngine(), have=qs.length-miss.length;
+  var pct=qs.length?Math.round(have/qs.length*100):0;
+  var h='<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px">'
+    +'<b style="font-size:13px;color:'+(miss.length?'var(--amber)':'var(--accent,#23C983)')+'">'
+    +(miss.length?('⚡ '+have+' of '+qs.length+' answered'):'✓ Engine fully configured')+'</b>'
+    +'<span style="flex:1;height:6px;border-radius:3px;background:var(--bg3);overflow:hidden">'
+    +'<i style="display:block;height:100%;width:'+pct+'%;background:'+(miss.length?'var(--amber)':'var(--accent,#23C983)')+'"></i></span></div>';
+  if(!miss.length){
+    h+='<div class="bi-cs-none">Every fill rule is set — the app can suggest coverage fixes on its own.</div>';
+  } else {
+    h+='<div style="font-size:11.5px;color:var(--txt3);line-height:1.55;margin-bottom:9px">'
+      +'Until these are answered the app stays cautious: it will flag a hole but won’t suggest who fills it.</div>'
+      +'<ul style="margin:0 0 10px;padding-left:18px;font-size:12px;color:var(--txt2);line-height:1.6">'
+      +miss.map(function(q){ return '<li>'+biEsc(String(q.q).replace(/^\d+\.\s*/,''))+'</li>'; }).join('')
+      +'</ul>';
+  }
+  h+='<button class="bi-btn gh" style="width:100%" onclick="biCopyAskForAM()">📋 Copy these questions to send the AM</button>';
+  return h;
+}
+// Build a short, plain-language ask — no jargon, answerable by text message.
+function biAskTextForAM(){
+  var miss=biMissingForEngine();
+  var L=[];
+  L.push('Quick questions for the branch scheduling app — should take about 5 minutes, no prep needed.');
+  L.push('These are the last things it needs before it can suggest who covers a hole instead of just flagging it.');
+  L.push('');
+  if(!miss.length){ L.push('(All answered — nothing outstanding. Thanks!)'); }
+  miss.forEach(function(q,i){
+    // strip app-isms — this is going into a text message, not a screen
+    var txt=String(q.q).replace(/^\d+\.\s*/,'')
+      .replace(/\s*\(tap all\)/i,'')
+      .replace(/\s*—?\s*TAP IN ORDER,\s*first choice first\./i,' — in order, first choice first.')
+      .replace(/\s*—?\s*tap in order/i,' — in order')
+      .replace(/\s*\(leave blank if never\)/i,' (or say "never")');
+    L.push((i+1)+'. '+txt);
+    if(q.opts && q.opts.length) L.push('     Pick from: '+q.opts.join(', '));
+  });
+  L.push('');
+  L.push('Short answers are fine — even just names or a ranked list.');
+  L.push('Thanks!');
+  return L.join('\n');
+}
+function biCopyAskForAM(){
+  var txt=biAskTextForAM();
+  function done(){ if(typeof toast==='function') toast('Copied — paste it into a text or email 📋', 4000); }
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done, fallback); return; }
+  }catch(e){}
+  fallback();
+  function fallback(){
+    try{
+      var ta=document.createElement('textarea'); ta.value=txt;
+      ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta);
+      ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done();
+    }catch(e){ if(typeof toast==='function') toast('Copy failed — use ⤓ Export instead'); }
+  }
+}
 
 function biNotes(){ return biCurResp().notes || (biCurResp().notes={}); }
 function biSetNote(k,val,el){ biNotes()[k]=val; if(typeof saveState==='function') saveState(); if(el){ if(val.trim()) el.classList.add('has'); else el.classList.remove('has'); } }
@@ -18906,6 +19206,7 @@ function biRender(){
     });
     h+='</div>';
   });
+  h+='<div class="bi-sec"><div class="bi-sec-hd">⚡ Engine readiness <span class="bi-tunes">→ what’s still blocking auto-suggestions</span></div><div id="bi-engine-ready">'+biEngineReadyHtml()+'</div></div>';
   h+='<div class="bi-sec"><div class="bi-sec-hd">🤝 Consistency <span class="bi-tunes">→ one branch standard</span></div><div id="bi-consistency">'+biConsistencyHtml()+'</div></div>';
   h+='</div><div class="bi-foot"><button class="bi-btn gh" onclick="biExportWith()">⤓ Export</button><button class="bi-btn" onclick="biApply()">Save &amp; close</button></div>';
   o.innerHTML=h; biUpdateProg();
