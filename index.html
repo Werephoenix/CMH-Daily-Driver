@@ -2250,26 +2250,34 @@ button { cursor: pointer; }
     </button>
   </div>
 
-  <!-- Print buttons -->
-  <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
-    <button onclick="printScheduleGrid()"
-      style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
-        background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
-      🖨 Print Weekly Grid
-    </button>
-    <button onclick="printScheduleMap()"
-      style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
-        background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
-      🖨 Print Today's Schedule
-    </button>
-    <button onclick="printDashboardSummary()"
-      style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
-        background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
-      🖨 Print Fleet Summary
-    </button>
-  </div>
+  <!-- Print buttons — v60.140: tucked into a disclosure so they don't dominate
+       the top of the tab. Printing is an end-of-flow action, not a starting one. -->
+  <details style="margin-bottom:10px">
+    <summary style="list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+      padding:6px 12px;border-radius:6px;border:1px solid var(--bdr2);background:var(--bg3);
+      color:var(--txt3);font-size:11px;font-weight:700;user-select:none">🖨 Print…</summary>
+    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button onclick="printScheduleGrid()"
+        style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
+          background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
+        🖨 Weekly Grid
+      </button>
+      <button onclick="printScheduleMap()"
+        style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
+          background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
+        🖨 Today's Schedule
+      </button>
+      <button onclick="printDashboardSummary()"
+        style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
+          background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
+        🖨 Fleet Summary
+      </button>
+    </div>
+  </details>
 
-  <!-- v60.44: view-pattern segmented control (same data, 3 renders) -->
+  <!-- v60.44: view-pattern segmented control (same data, 3 renders).
+       v60.140: labeled "View:" to pair clearly with the "Group by:" row below. -->
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:4px">View</div>
   <div class="seg-ctl" id="sched-seg">
     <button class="seg on" id="spat-timeline" onclick="setSchedPattern('timeline')">Timeline</button>
     <button class="seg"    id="spat-roster"   onclick="setSchedPattern('roster')">Roster</button>
@@ -2314,16 +2322,15 @@ button { cursor: pointer; }
   <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
     gap:6px;margin-bottom:10px"></div>
 
-  <!-- Auto Schedule button — always visible (the rotation engine is the core value of this tab) -->
+  <!-- Auto Schedule button — always visible (the rotation engine is the core value of this tab).
+       v60.140: renamed to "Fill today's gaps" (today-scoped) so it no longer reads like the
+       whole-week "📅 Week" planner; removed the duplicate Print button (top Print… has it). -->
   <div id="sched-auto-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Distribute Exit & Counter rotations based on coverage rules">
-      📅 Auto-Distribute
-    </button>
-    <button class="btn btn-gh btn-sm" onclick="printScheduleMap()" title="Print full-day schedule for everyone">
-      🖨 Print Schedule Map
+    <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Auto-distribute Exit & Counter rotations for TODAY based on coverage rules">
+      ⚡ Fill today's gaps
     </button>
     <span id="auto-why" style="font-size:9px;color:var(--txt3)">
-      Fills exit gaps using available CXRs · respects manager overrides
+      Fills today's exit gaps using available CXRs · respects manager overrides
     </span>
   </div>
 
