@@ -4074,25 +4074,162 @@ function _sodRow(lbl, val){
 function showEODRecap() {
   window._sodActive = true;              // arms the post-paste "what's next" prompt
   window._sodPrompted = false;
+  sodInjectStyle();
   const hist = (typeof loadHistory === 'function') ? loadHistory() : [];
   const e = (hist && hist.length) ? hist[0] : null;
-  let body;
+  const todayLbl = new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  let body = `<div class="sod-date">${todayLbl}</div>`;
+
+  // ── 1. LAST NIGHT ────────────────────────────────────────────────────────
+  body += `<div class="sod-sec">Last night</div>`;
   if (!e) {
-    body = `<p style="font-size:14px;color:var(--txt2);margin-bottom:16px">No saved end-of-day summary yet — let's get today started.</p>`
-         + `<button class="now-btn" onclick="sodToPaste()">Paste GreenLight data →</button>`;
+    body += `<div class="sod-none">No saved end-of-day summary yet — it'll appear here once a night gets closed out in the app.</div>`;
   } else {
-    body = `<div style="font-size:13px;color:var(--txt3);margin-bottom:12px">${e.dateLabel || e.date}</div>`
-         + `<div class="more-group" style="margin-bottom:16px">`
-         +   _sodRow('Closed by', e.closeMgr)
-         +   _sodRow('Completely Satisfied', e.cs)
-         +   _sodRow('Hot alerts', e.hot)
-         +   _sodRow('OOS units', e.oos)
-         +   _sodRow('Walk-up policy', e.walkUpPolicy)
-         +   (e.closeNotes ? `<div class="cov-row"><div style="font-size:13px;color:var(--txt2)">📝 ${e.closeNotes}</div></div>` : '')
-         + `</div>`
-         + `<button class="now-btn" onclick="sodToPaste()">Start the day → Paste data</button>`;
+    // today's expected volume, written down by last night's closer
+    const hasVol = e.tmrwRes || e.tmrwRet;
+    if (hasVol) {
+      body += `<div class="sod-vol"><div class="sod-vol-lbl">Expected today <i>(from last night's close)</i></div>`
+           +  `<div class="sod-vol-nums">`
+           +  (e.tmrwRes?`<span><b>${e.tmrwRes}</b> res</span>`:'')
+           +  (e.tmrwRet?`<span><b>${e.tmrwRet}</b> ret</span>`:'')
+           +  `</div></div>`;
+    }
+    let rows = '';
+    rows += _sodRow('Closed by', e.closeMgr);
+    rows += _sodRow('Final OOS', e.oos);
+    rows += _sodRow('FBOs', e.fboCount);
+    rows += _sodRow('Completely Satisfied', e.cs);
+    rows += _sodRow('Hot alerts', e.hot);
+    rows += _sodRow('Stayed late', e.lateStaff);
+    // did closing actually finish?
+    if (e.clClosing && typeof e.clClosing === 'object' && e.clClosing.total) {
+      const d=e.clClosing.done, t=e.clClosing.total, left=t-d;
+      rows += `<div class="cov-row"><div style="flex:1;font-size:13px;color:var(--txt2)">Closing checklist</div>`
+           +  `<div style="font-weight:700;color:${left>0?'var(--amber)':'var(--green)'}">${d}/${t}${left>0?` ⚠ ${left} left`:' ✓'}</div></div>`;
+    }
+    body += rows ? `<div class="more-group">${rows}</div>` : `<div class="sod-none">Nothing was logged at close last night.</div>`;
+    if (e.closeNotes) body += `<div class="sod-note"><b>📝 Notes for you</b><div>${String(e.closeNotes).replace(/</g,'&lt;')}</div></div>`;
+    if (e.fboDetail)  body += `<div class="sod-note"><b>FBO detail</b><div>${String(e.fboDetail).replace(/</g,'&lt;')}</div></div>`;
   }
-  if (typeof openModal === 'function') openModal('☀️ Good morning — yesterday\'s recap', body);
+
+  // ── 2. SET THE DAY — one-tap decisions ───────────────────────────────────
+  body += `<div class="sod-sec">Set the day</div>`;
+  const wu  = STATE.walkUpPolicy || 'open';
+  const b24 = (STATE.fields && STATE.fields.book24hr) || 'open';
+  const seg = (opts, cur, fn) => `<div class="sod-seg">` + opts.map(o =>
+      `<button class="${cur===o[0]?'on':''}" onclick="${fn}('${o[0]}');showEODRecap()">${o[1]}</button>`).join('') + `</div>`;
+  body += `<div class="sod-q">🚦 Walk-ups</div>`
+       +  seg([['open','All open'],['core','Core'],['noncore','Non-core'],['closed','Closed']], wu, 'setWU');
+  body += `<div class="sod-q">📅 24-hour booking</div>`
+       +  seg([['open','Open'],['restricted','Restricted'],['emerald-only','Emerald'],['closed','Closed']], b24, 'set24hr');
+
+  // closing extension carried over from last night — only when it's actually set
+  if (STATE.closingExtension && STATE.closingExtension.until) {
+    body += `<div class="sod-q">🌙 Closing extension still on <i>(from last night)</i></div>`
+         +  `<div class="sod-seg"><button onclick="sodClearExt()">Clear it</button>`
+         +  `<button class="on" onclick="showEODRecap()">Keep it</button></div>`;
+  }
+
+  // who's in early — grouped by the branch's real arrival waves
+  body += `<div class="sod-q">👥 Who's in early</div>` + sodEarlyHtml();
+
+  body += `<button class="now-btn" style="margin-top:16px" onclick="sodToPaste()">Start the day → Paste data</button>`;
+  if (typeof openModal === 'function') openModal('☀️ Good morning', body);
+}
+
+// v60.149: the branch's REAL staggered open (Matt, 2026-08-27):
+//   Returns comes in early · Mgrs + CXRs 5:30 · Exit 6–7 · MTs/other ABRMs 6–7.
+// Grouping the morning card this way matches how people actually walk in.
+var SOD_WAVES = [
+  {k:'returns', lbl:'Returns — in early',        roles:['RETURNS']},
+  {k:'core',    lbl:'Managers + CXRs — 5:30a',   roles:['BRM','ABRM','ARM','CXR']},
+  {k:'later',   lbl:'Exit + MTs — 6–7a',         roles:['EXIT','MT']},
+];
+function sodEarlyHtml(){
+  var exp={}; try{ exp=(typeof buildExpectedToday==='function')?buildExpectedToday():{}; }catch(err){}
+  var pids=Object.keys(exp);
+  if(!pids.length) return '<div class="sod-none">No schedule loaded for today yet — paste it and this fills in.</div>';
+  // "early" = anyone starting before 8a
+  var early=pids.filter(function(pid){
+    var e=exp[pid]; if(!e||!e.person) return false;
+    var ov=(STATE.shiftMod||{})[pid]||{};
+    var ss=(ov.start!=null)?ov.start:e.person.shiftStart;
+    return ss!=null && ss<8;
+  });
+  if(!early.length) return '<div class="sod-none">Nobody on the schedule starts before 8a today.</div>';
+  var out='', placed={};
+  SOD_WAVES.forEach(function(w){
+    var grp=early.filter(function(pid){
+      if(placed[pid]) return false;
+      return w.roles.indexOf(exp[pid].person.role)>=0;
+    });
+    grp.forEach(function(pid){ placed[pid]=true; });
+    if(!grp.length) return;
+    out+='<div class="sod-wave"><div class="sod-wave-lbl">'+w.lbl+'</div>';
+    grp.sort(function(a,b){
+      var sa=((STATE.shiftMod||{})[a]||{}).start; if(sa==null) sa=exp[a].person.shiftStart;
+      var sb=((STATE.shiftMod||{})[b]||{}).start; if(sb==null) sb=exp[b].person.shiftStart;
+      return (sa||0)-(sb||0);
+    });
+    grp.forEach(function(pid){
+      var e=exp[pid], off=(STATE.todayOverrides||{})[pid]==='callout';
+      var nm=(typeof dispName==='function')?dispName(e.person):(e.person.nick||e.person.name);
+      var stn=(STATE.staffStation||{})[pid]||'';
+      out+='<div class="sod-p'+(off?' off':'')+'">'
+        +'<span class="sod-p-nm">'+nm+'</span>'
+        +(stn?'<span class="sod-p-st">'+stn.replace(/ (Booth|Manager)$/,'')+'</span>':'')
+        +'<button onclick="sodToggleHere(\''+pid+'\')">'+(off?'↩ here':'no-show')+'</button>'
+        +'</div>';
+    });
+    out+='</div>';
+  });
+  return out || '<div class="sod-none">No early arrivals found.</div>';
+}
+function sodToggleHere(pid){
+  if(typeof coToggle==='function'){ coToggle(pid); }
+  else {
+    if(!STATE.todayOverrides) STATE.todayOverrides={};
+    if(STATE.todayOverrides[pid]==='callout') delete STATE.todayOverrides[pid];
+    else STATE.todayOverrides[pid]='callout';
+    if(typeof saveState==='function') saveState();
+  }
+  showEODRecap();   // re-render the morning card in place
+}
+function sodClearExt(){
+  STATE.closingExtension=null;
+  if(typeof saveState==='function') saveState();
+  if(typeof toast==='function') toast('Closing extension cleared');
+  showEODRecap();
+}
+var _sodStyled=false;
+function sodInjectStyle(){
+  if(_sodStyled) return; _sodStyled=true;
+  var css=''
+  +'.sod-date{font-size:13px;color:var(--txt3);margin-bottom:14px}'
+  +'.sod-sec{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--txt3);margin:16px 0 8px}'
+  +'.sod-sec:first-of-type{margin-top:0}'
+  +'.sod-none{font-size:12.5px;color:var(--txt3);line-height:1.55;padding:4px 0}'
+  +'.sod-vol{background:rgba(35,201,131,.09);border:1px solid rgba(35,201,131,.35);border-radius:10px;padding:10px 12px;margin-bottom:10px}'
+  +'.sod-vol-lbl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent,#23C983)}'
+  +'.sod-vol-lbl i{font-style:normal;text-transform:none;letter-spacing:0;color:var(--txt3);font-weight:600}'
+  +'.sod-vol-nums{display:flex;gap:18px;margin-top:4px}'
+  +'.sod-vol-nums span{font-size:12px;color:var(--txt2)}'
+  +'.sod-vol-nums b{font-size:20px;color:var(--txt);font-weight:800;margin-right:3px}'
+  +'.sod-note{background:var(--bg3);border:1px solid var(--bdr2);border-radius:9px;padding:9px 11px;margin-top:8px;font-size:12.5px;color:var(--txt2);line-height:1.5}'
+  +'.sod-note b{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:3px}'
+  +'.sod-q{font-size:12.5px;font-weight:700;color:var(--txt2);margin:12px 0 5px}'
+  +'.sod-q i{font-style:normal;font-weight:600;color:var(--txt3);font-size:11px}'
+  +'.sod-seg{display:flex;gap:5px;flex-wrap:wrap}'
+  +'.sod-seg button{flex:1;min-width:66px;padding:9px 6px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);font-size:12px;font-weight:700;cursor:pointer}'
+  +'.sod-seg button.on{background:var(--accent,#23C983);border-color:transparent;color:#04160e}'
+  +'.sod-wave{margin-bottom:9px}'
+  +'.sod-wave-lbl{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--txt3);margin-bottom:4px}'
+  +'.sod-p{display:flex;align-items:center;gap:8px;padding:7px 10px;background:var(--bg3);border:1px solid var(--bdr);border-radius:8px;margin-bottom:4px}'
+  +'.sod-p.off{opacity:.55;background:rgba(255,69,58,.08);border-color:rgba(255,69,58,.35)}'
+  +'.sod-p-nm{font-size:13px;font-weight:700;color:var(--txt);flex:1;min-width:0}'
+  +'.sod-p-st{font-size:10px;color:var(--txt3)}'
+  +'.sod-p button{flex-shrink:0;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);border-radius:6px;padding:4px 9px;font-size:10.5px;font-weight:700;cursor:pointer}';
+  var st=document.createElement('style'); st.id='sod-style'; st.textContent=css; document.head.appendChild(st);
 }
 function sodToPaste() {
   if (typeof closeModal === 'function') closeModal();
@@ -5509,6 +5646,14 @@ function saveDayToHistory() {
     closeNotes: STATE.fields.closeNotes || null,
     lateStaff: STATE.fields.lateStaff || null,
     xxar: STATE.fields.xxar || null,
+    // v60.149: carry the closer's captured numbers into history so they survive
+    // to the morning. "Tomorrow's Res/Ret" written at close IS today's expected
+    // volume — the single most useful number for an opener, and it was being
+    // thrown away every night.
+    tmrwRes: STATE.fields.closeTmrwRes || null,
+    tmrwRet: STATE.fields.closeTmrwRet || null,
+    fboCount: STATE.fields.fboCount || null,
+    fboDetail: STATE.fields.fboDetail || null,
     clOpening: countCLDone('opening'),
     clMid:     countCLDone('mid'),
     clClosing: countCLDone('closing'),
