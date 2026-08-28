@@ -18526,6 +18526,9 @@ function openThresholdQuiz() {
 function setFtDaytype(dt){ window._ftDaytype = (dt==='weekend'?'weekend':'weekday'); ftRenderModal(); }
 function setFtMode(m){ window._ftMode = (m==='mgr'?'mgr':'staff'); ftRenderModal(); }
 function ftRenderModal(){
+  // v60.151: the .ft-* styles live in the shared qa stylesheet, which is injected
+  // lazily by the call-off / staffing overlays — this modal can open first.
+  if (typeof qaInjectStyle === 'function') qaInjectStyle();
   const dt = window._ftDaytype || 'weekday';
   const mode = window._ftMode || 'staff';
   const blocks=[['open','Open–9a'],['amid','9a–12p'],['mid','12p–4p'],['pm','4p–8p'],['night','8p–Close']];
@@ -18541,22 +18544,32 @@ function ftRenderModal(){
       </div>`;
   let body;
   if(mode==='mgr'){
-    // ── Manager station minimums (6 areas × 5 blocks) ──
+    // ── Manager station minimums — v60.151 (Design 1f): BLOCK-FIRST.
+    // The old 7-area × 5-block grid needed horizontal scrolling on a phone, which
+    // is exactly where these get set (standing with the AM). Now: pick one block,
+    // set its areas with big +/− steppers, optionally copy across all blocks.
     const T = mgrTargetsFor(dt);
-    const sel=(bk,area,val,color)=>`<select onchange="updateMgrTarget('${dt}','${bk}','${area}',+this.value)" style="padding:5px 3px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:${color};font-size:13px;font-weight:700;text-align:center">${[0,1,2,3,4].map(n=>`<option value="${n}"${(val||0)===n?' selected':''}>${n}</option>`).join('')}</select>`;
-    const cols = '96px ' + MGR_AREAS.map(()=> '46px').join(' ');
-    const head = `<div style="display:grid;grid-template-columns:${cols};gap:6px;padding:4px 0 8px;border-bottom:2px solid var(--bdr);margin-bottom:2px">`+
-      `<div style="font-size:9px;font-weight:800;color:var(--txt3)">BLOCK</div>`+
-      MGR_AREAS.map(a=>`<div style="font-size:8.5px;font-weight:800;color:${a.color};text-align:center">${a.label.slice(0,4).toUpperCase()}</div>`).join('')+`</div>`;
-    const row=(bk,lbl)=>{const b=(T&&T[bk])||MGR_TARGETS[dt][bk];return `<div style="display:grid;grid-template-columns:${cols};gap:6px;align-items:center;padding:7px 0;border-bottom:1px solid var(--bdr)"><div style="font-size:11px;font-weight:600;color:var(--txt)">${lbl}</div>${MGR_AREAS.map(a=>sel(bk,a.k,b[a.k],a.color)).join('')}</div>`;};
+    const curBk = window._ftBlock || 'mid';
+    const b = (T&&T[curBk]) || MGR_TARGETS[dt][curBk] || {};
+    const blockPick = `<div class="ft-blocks">` + blocks.map(([k,l])=>
+        `<button class="${k===curBk?'on':''}" onclick="setFtBlock('${k}')">${l}</button>`).join('') + `</div>`;
+    const stepper = (a)=>{
+      const v=b[a.k]||0;
+      return `<div class="ft-row">
+        <div class="ft-row-lbl"><i style="background:${a.color}"></i>${a.label}</div>
+        <div class="ft-step">
+          <button onclick="bumpMgrTarget('${dt}','${curBk}','${a.k}',-1)" ${v<=0?'disabled':''}>−</button>
+          <b style="color:${v?a.color:'var(--txt3)'}">${v}</b>
+          <button onclick="bumpMgrTarget('${dt}','${curBk}','${a.k}',1)">+</button>
+        </div></div>`;
+    };
+    const tot = MGR_AREAS.reduce((n,a)=>n+(b[a.k]||0),0);
     body = `
       ${modeSeg}${daySeg}
-      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-        <div style="min-width:400px">
-          ${head}
-          ${blocks.map(([k,l])=>row(k,l)).join('')}
-        </div>
-      </div>
+      ${blockPick}
+      <div class="ft-blockhd">${(FLOOR_BLOCK_LABELS[curBk]||curBk)} · <b>${tot}</b> manager${tot===1?'':'s'} on station</div>
+      ${MGR_AREAS.map(stepper).join('')}
+      <button class="ft-copy" onclick="copyMgrBlockToAll('${dt}','${curBk}')">⇊ Use these numbers for every block</button>
       <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">Min managers per station, per block. Managers <b>never default to Counter</b> — Emerald first, then Returns; they fill Exit/Returns or help Emerald; Counter is last-case (usually MT/ABRM). <b>Starting numbers were guesstimated from the rotation</b> — adjust to your branch.</div>
       <div style="margin-top:12px;padding:10px 11px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px">
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:5px">📋 Manager functions — from the AM (paste when you have it)</div>
@@ -18586,6 +18599,24 @@ function ftRenderModal(){
         <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
       </div>
     </div>`);
+}
+function setFtBlock(bk){ window._ftBlock=bk; ftRenderModal(); }
+// v60.151: +/− stepper — clamped 0..4, same store as the old select.
+function bumpMgrTarget(dt, bk, area, delta){
+  var T=mgrTargetsFor(dt); var cur=((T&&T[bk])||MGR_TARGETS[dt][bk]||{})[area]||0;
+  var next=Math.max(0, Math.min(4, cur+delta));
+  updateMgrTarget(dt, bk, area, next);
+  ftRenderModal();
+}
+// The common real-world case: the same manager posture all day. One tap beats 35.
+function copyMgrBlockToAll(dt, bk){
+  var T=mgrTargetsFor(dt); var src=Object.assign({}, (T&&T[bk])||MGR_TARGETS[dt][bk]||{});
+  ['preopen','open','amid','mid','pm','night'].forEach(function(k){
+    if(k===bk) return;
+    MGR_AREAS.forEach(function(a){ updateMgrTarget(dt, k, a.k, src[a.k]||0); });
+  });
+  if(typeof toast==='function') toast('Copied to every block — adjust any one after');
+  ftRenderModal();
 }
 function updateMgrTarget(dt, bk, area, val){
   if(!STATE.mgrTargets) STATE.mgrTargets = JSON.parse(JSON.stringify(MGR_TARGETS));
@@ -21216,6 +21247,34 @@ function qaInjectStyle(){
   '.sn-tbl td:first-child,.sn-tbl th:first-child{text-align:left;font-weight:700;color:var(--txt,#fff)}'+
   '.sn-tbl .tot{font-weight:800;color:var(--txt,#fff)}'+
   '.sn-note{font-size:11.5px;color:var(--txt3,rgba(235,235,245,.55));line-height:1.5;margin-top:8px}'+
+  '.ft-blocks{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}'+
+  '.ft-blocks button{flex:1;min-width:60px;padding:8px 4px;border-radius:8px;border:1px solid var(--bdr2,#48484A);background:var(--bg3,#2C2C2E);color:var(--txt3,rgba(235,235,245,.6));font-size:11px;font-weight:700;cursor:pointer}'+
+  '.ft-blocks button.on{background:var(--accent,#23C983);border-color:transparent;color:#04160e}'+
+  '.ft-blockhd{font-size:12px;color:var(--txt3,rgba(235,235,245,.6));margin:4px 0 10px}'+
+  '.ft-blockhd b{color:var(--txt,#fff);font-size:14px}'+
+  '.ft-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bdr,#38383A)}'+
+  '.ft-row-lbl{flex:1;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:var(--txt,#fff)}'+
+  '.ft-row-lbl i{width:10px;height:10px;border-radius:3px;flex-shrink:0}'+
+  '.ft-step{display:flex;align-items:center;gap:2px}'+
+  '.ft-step button{width:38px;height:38px;border-radius:9px;border:1px solid var(--bdr2,#48484A);background:var(--bg3,#2C2C2E);color:var(--txt,#fff);font-size:19px;font-weight:700;cursor:pointer;line-height:1}'+
+  '.ft-step button:disabled{opacity:.3;cursor:default}'+
+  '.ft-step b{min-width:34px;text-align:center;font-size:17px;font-weight:800}'+
+  '.ft-copy{width:100%;margin-top:12px;padding:10px;border-radius:9px;border:1px dashed var(--bdr2,#48484A);background:transparent;color:var(--txt3,rgba(235,235,245,.6));font-size:12px;font-weight:700;cursor:pointer}'+
+  '.sn-slot-lead{font-size:11px;color:var(--txt3,rgba(235,235,245,.55));line-height:1.6;margin-bottom:9px}'+
+  '.sn-slot{display:inline-block;width:11px;height:14px;border-radius:3px;margin-right:3px;vertical-align:middle}'+
+  '.sn-slot.off{border:1.5px dashed var(--na,#FF453A);opacity:.75}'+
+  '.sn-slot.extra{width:auto;padding:0 4px;font-size:9px;font-style:normal;color:var(--txt3,rgba(235,235,245,.5));border:1px solid var(--bdr,#38383A)}'+
+  '.sn-slot-na{color:var(--txt3,rgba(235,235,245,.35));font-size:11px}'+
+  '.sn-slot-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-top:1px solid var(--bdr,#38383A)}'+
+  '.sn-slot-row:first-of-type{border-top:none}'+
+  '.sn-slot-row.now{background:rgba(35,201,131,.06);border-radius:7px;padding-left:6px;padding-right:6px}'+
+  '.sn-slot-blk{flex:0 0 84px;font-size:11.5px;font-weight:700;color:var(--txt,#fff)}'+
+  '.sn-slot-blk span{display:block;font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--accent,#23C983)}'+
+  '.sn-slot-areas{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:10px}'+
+  '.sn-slot-grp{display:inline-flex;align-items:center;gap:4px;font-size:10px}'+
+  '.sn-slot-grp b{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.03em}'+
+  '.sn-slot-vd{flex:0 0 28px;text-align:right;font-size:12px;font-weight:800}'+
+  '.sn-slot-vd .bad{color:var(--na,#FF453A)}.sn-slot-vd .ok{color:var(--accent,#23C983)}'+
   '.sn-seg{display:flex;gap:6px;margin-bottom:12px}'+
   '.sn-segb{flex:1;border:1px solid var(--bdr,#38383A);background:var(--bg2,#1C1C1E);color:var(--txt3,rgba(235,235,245,.6));border-radius:8px;padding:9px;font-size:12.5px;font-weight:800;cursor:pointer}'+
   '.sn-segb.on{background:var(--accent,#23C983);color:#00301c;border-color:transparent}';
@@ -21790,6 +21849,63 @@ function _snMgrRows(dtype){
 function _snMgrPeakNeed(dtype){
   return _snMgrRows(dtype).reduce(function(a,r){return r.tot>a?r.tot:a;},0);
 }
+
+// v60.151 (Design 1c): supply-vs-demand as literal SLOTS, not number pairs —
+// "the eye counts holes for free". For each block of TODAY it draws one square
+// per required body: filled = covered, dashed = missing. Reads live off the
+// v60.146 engine (gfCountsAt / gfNeedsAt) so it can never drift from the flags.
+var SN_SLOT_BLOCKS = [
+  {k:'preopen', h:5},   {k:'open', h:7},  {k:'amid', h:10},
+  {k:'mid',     h:14},  {k:'pm',   h:18}, {k:'night', h:22}
+];
+var SN_SLOT_AREAS = [
+  {k:'counter', lbl:'Ctr',  col:'var(--acc,#0A84FF)'},
+  {k:'exit',    lbl:'Exit', col:'var(--green,#23C983)'},
+  {k:'returns', lbl:'Ret',  col:'#22d3ee'}
+];
+function _snSlots(have, need, col){
+  if(!need) return '<span class="sn-slot-na">—</span>';
+  var out='';
+  for(var i=0;i<need;i++){
+    out += (i<have) ? '<i class="sn-slot on" style="background:'+col+'"></i>'
+                    : '<i class="sn-slot off"></i>';
+  }
+  if(have>need) out+='<i class="sn-slot extra" title="above minimum">+'+(have-need)+'</i>';
+  return out;
+}
+function snSlotGridHtml(){
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){ return ''; }
+  if(!Object.keys(exp).length) return '';
+  var dow=new Date().getDay();
+  var nowB=(typeof floorBlockKey==='function')?floorBlockKey(new Date().getHours()):null;
+  var BL=(typeof FLOOR_BLOCK_LABELS!=='undefined')?FLOOR_BLOCK_LABELS:{};
+  var rows='';
+  SN_SLOT_BLOCKS.forEach(function(b){
+    var have={}, need={};
+    try{ have=gfCountsAt(exp,b.h); need=gfNeedsAt(b.h,dow); }catch(e){}
+    var isNow = (b.k===nowB);
+    var short = SN_SLOT_AREAS.reduce(function(a,ar){
+      return a + Math.max(0,(need[ar.k]||0)-(have[ar.k]||0)); },0);
+    rows+='<div class="sn-slot-row'+(isNow?' now':'')+'">'
+       +'<div class="sn-slot-blk">'+(BL[b.k]||b.k)+(isNow?'<span>now</span>':'')+'</div>'
+       +'<div class="sn-slot-areas">'
+       + SN_SLOT_AREAS.map(function(ar){
+           var n=need[ar.k]||0; if(!n && !(have[ar.k]||0)) return '';
+           return '<span class="sn-slot-grp"><b style="color:'+ar.col+'">'+ar.lbl+'</b>'
+                + _snSlots(have[ar.k]||0, n, ar.col)+'</span>';
+         }).join('')
+       +'</div>'
+       +'<div class="sn-slot-vd">'+(short>0
+            ? '<span class="bad">−'+short+'</span>'
+            : '<span class="ok">✓</span>')+'</div>'
+       +'</div>';
+  });
+  return '<div class="qa-sec">Today, block by block</div>'
+    +'<div class="sn-card"><div class="sn-slot-lead">One square per body you need. '
+    +'<i class="sn-slot on" style="background:var(--txt3)"></i> filled = covered · '
+    +'<i class="sn-slot off"></i> dashed = missing.</div>'
+    + rows + '</div>';
+}
 function snRender(){
   // ── TODAY: have vs need ──
   var d=_coCollect();
@@ -21811,8 +21927,11 @@ function snRender(){
      '<div class="sn-vs">floor staff available today<br>(CXR + Exit + Returns, minus call-offs)<br>Peak need: <b>'+needFloor+'</b> — Counter '+peak.c+' · Exit '+peak.e+' · Returns '+peak.r+'</div></div>'+
      '<div class="sn-bar"><div style="width:'+pct+'%;background:'+barColor+'"></div></div>'+
      (short>0
-        ? '<span class="sn-verdict short">⚠ Short '+short+' at peak — lean on floaters / adjust breaks</span>'
-        : '<span class="sn-verdict ok">✅ Covered at peak ('+haveFloor+' ≥ '+needFloor+')</span>')+
+        ? '<span class="sn-verdict short">⚠ Short '+short+' bodies at peak — lean on floaters / adjust breaks</span>'
+        // v60.151: this only counts BODIES, not placement. Saying "covered" while the
+        // block view below shows holes reads as a contradiction — so say which it is.
+        : '<span class="sn-verdict ok">✅ Enough bodies at peak ('+haveFloor+' ≥ '+needFloor+')</span>'
+          +'<div class="sn-note" style="margin-top:5px">That\'s headcount, not placement — the block view below shows whether they\'re in the right stations.</div>')+
      (function(){
         var mNeed=_snMgrPeakNeed(dtypeToday); var mShort=mNeed-haveMgr;
         return '<div class="sn-note">👔 Managers on today: <b>'+haveMgr+'</b> · peak need <b>'+mNeed+'</b> — '+
@@ -21820,6 +21939,7 @@ function snRender(){
           '. They cover Emerald/Counter/Returns + open, close &amp; breaks (see table below).</div>';
      })()+
      '</div>';
+  h+=snSlotGridHtml();   // v60.151: today's real supply, block by block
   // ── TYPICAL DAY table ──
   h+='<div class="qa-sec">Typical day — people needed per station</div>';
   h+='<div class="sn-seg">'+
