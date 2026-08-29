@@ -20476,11 +20476,22 @@ function _rqPersonStart(pid,date){
     return p && p.shiftStart!=null ? p.shiftStart : 8;
   }catch(e){ return 8; }
 }
+// v60.156: was anchored with ^, so it only read a note that STARTED with a time.
+// Real notes read "needs to leave at 3pm" — which silently failed, taking the
+// approve-early action (shift trim) down with it, not just the impact line.
+// Now: prefer an unambiguous am/pm time anywhere, then a colon time, and keep
+// the original leading-number behaviour as the last fallback.
 function _rqParseTime(s){
-  if(!s) return null; var m=String(s).trim().match(/^(\d{1,2})(?::?(\d{2}))?\s*([ap])?/i); if(!m) return null;
-  var h=parseInt(m[1],10), mn=m[2]?parseInt(m[2],10):0, ap=(m[3]||'').toLowerCase();
+  if(!s) return null;
+  var str=String(s).trim(), m=null, h, mn, ap;
+  m = str.match(/\b(\d{1,2})(?::(\d{2}))?\s*([ap])\.?m?\b/i);          // "3pm", "3:30 p.m."
+  if(!m) m = str.match(/\b(\d{1,2}):(\d{2})\b/);                        // "15:30"
+  if(!m) m = str.match(/^(\d{1,2})(?::?(\d{2}))?\s*([ap])?/i);           // legacy: leading number
+  if(!m) return null;
+  h=parseInt(m[1],10); mn=m[2]?parseInt(m[2],10):0; ap=(m[3]||'').toLowerCase();
   if(ap==='p'&&h!==12) h+=12; if(ap==='a'&&h===12) h=0;
-  if(h<0||h>24) return null; return h+mn/60;
+  if(h<0||h>24||mn<0||mn>59) return null;
+  return h+mn/60;
 }
 function _rqApply(r){
   if(!r.date) return '';
@@ -20526,18 +20537,112 @@ function rqDecide(id,st){
 function rqReopen(id){ var r=rqArr().filter(function(x){return x.id===id;})[0]; if(r){ _rqUndoApply(r); r.status='open'; r.decidedAt=null; if(typeof saveState==='function') saveState(); rqRender(); } }
 function rqDelete(id){ var a=rqArr(); var i=a.findIndex(function(x){return x.id===id;}); if(i>=0) a.splice(i,1); if(typeof saveState==='function') saveState(); rqRender(); }
 var _RQ_TYPE={off:'Time off',early:'Leave early',swap:'Shift swap',other:'Other'};
+// v60.156 (Design v2): an approval row should state the COST and ITS LENGTH, so
+// the decision is a read rather than a judgement call. Upgrades the old
+// headcount-only line ("14 scheduled → 13") to duration + per-block verdict.
+//
+// Honest about its own reach: exact station placement for a FUTURE date isn't
+// knowable (CXRs rotate, managers get assigned that morning), so this works at
+// the level that IS knowable from the plan — floor bodies per block vs that
+// block's minimum — and says which blocks break rather than implying more.
+function _rqShiftFor(who,dateKey){
+  try{
+    var sched=mcScheduleObj(dateKey)||{};
+    var w=String(who||'').toLowerCase().trim(); if(!w) return null;
+    var pid=Object.keys(sched).filter(function(p){
+      var n=p.replace(/_/g,' ').toLowerCase();
+      return n===w || n.indexOf(w)>=0 || w.indexOf(n.split(' ')[0])===0;
+    })[0];
+    if(!pid) return null;
+    var code=sched[pid];
+    if(!code || /OFF|VACA|PTO/i.test(String(code))) return {pid:pid, code:code, off:true};
+    var t=(typeof parseShiftToTimes==='function')?parseShiftToTimes(code):null;
+    if(!t || t.shiftStart==null) return {pid:pid, code:code};
+    return {pid:pid, code:code, start:t.shiftStart, end:t.shiftEnd};
+  }catch(e){ return null; }
+}
+function _rqDur(h){
+  if(h==null||isNaN(h)) return '';
+  if(h<1) return Math.round(h*60)+' min';
+  var r=Math.round(h*10)/10;
+  return (r===Math.round(r)?Math.round(r):r)+'h';
+}
+// Floor bodies scheduled per block on a date, and what each block needs.
+function _rqBlockLoad(dateKey, dropPid, fromH, toH){
+  var sched=mcScheduleObj(dateKey)||{};
+  var d=new Date(dateKey+'T12:00:00'); var dow=d.getDay();
+  var dtype=(dow===0||dow===6)?'weekend':'weekday';
+  var T=(STATE.floorTargets&&STATE.floorTargets[dtype])||FLOOR_TARGETS[dtype];
+  var blocks=[['preopen',3.5,6],['open',6,9],['amid',9,12],['mid',12,16],['pm',16,20],['night',20,24]];
+  var people=Object.keys(sched).map(function(pid){
+    var c=sched[pid]; if(!c||/OFF|VACA|PTO/i.test(String(c))) return null;
+    var t=(typeof parseShiftToTimes==='function')?parseShiftToTimes(c):null;
+    if(!t||t.shiftStart==null||t.shiftEnd==null) return null;
+    return {pid:pid, s:t.shiftStart, e:t.shiftEnd};
+  }).filter(Boolean);
+  return blocks.map(function(b){
+    var key=b[0], mid=(b[1]+b[2])/2;
+    var tgt=T[key]||FLOOR_TARGETS[dtype][key]||{c:0,e:0,r:0};
+    var need=(tgt.c||0)+(tgt.e||0)+(tgt.r||0);
+    var have=people.filter(function(x){ return mid>=x.s && mid<x.e; }).length;
+    // would this person have been on during this block, within the affected window?
+    var lost=0;
+    var me=people.filter(function(x){return x.pid===dropPid;})[0];
+    if(me && mid>=me.s && mid<me.e){
+      var lo=(fromH!=null)?fromH:me.s, hi=(toH!=null)?toH:me.e;
+      if(mid>=lo && mid<hi) lost=1;
+    }
+    return {key:key, lbl:(FLOOR_BLOCK_LABELS[key]||key), need:need, have:have, after:have-lost, lost:lost};
+  }).filter(function(b){ return b.need>0; });
+}
 function rqImpactHtml(r){
   if(!r.date) return '<div class="rq-impact">No date given — add one to see coverage impact.</div>';
   try{
-    var d=new Date(r.date+'T12:00:00'); var wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
-    var staff=(typeof mcStaffCount==='function')?mcStaffCount(r.date):0;
-    var sched=(typeof mcScheduleObj==='function')?mcScheduleObj(r.date):{};
-    var on=Object.keys(sched).some(function(p){ return !/OFF|VACA/i.test(String(sched[p])) && p.replace(/_/g,' ').toLowerCase().indexOf(String(r.who).toLowerCase())>=0; });
+    var d=new Date(r.date+'T12:00:00');
+    var wd=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    var when=wd+' '+r.date.slice(5).replace('-','/');
     var dem=(typeof mcDemandLevel==='function')?mcDemandLevel(r.date):'none';
     var demTxt = dem==='heavy'?'<span class="dem-heavy">⚠ Heavy demand</span> · ':(dem==='elevated'?'<span class="dem-elev">Busy</span> · ':'');
-    var impact = on ? (staff+' scheduled → <b>'+(staff-1)+'</b> if approved') : (staff>0? staff+' scheduled (this person isn\'t on that day)' : 'no schedule loaded for that day');
-    return '<div class="rq-impact">'+wd+' '+r.date.slice(5).replace('-','/')+' · '+demTxt+impact+'</div>';
-  }catch(e){ return ''; }
+    var sh=_rqShiftFor(r.who, r.date);
+
+    if(!sh) return '<div class="rq-impact">'+when+' · '+demTxt+'not on the schedule that day — nothing to cover.</div>';
+    if(sh.off) return '<div class="rq-impact">'+when+' · '+demTxt+'already off that day ('+String(sh.code)+') — no impact.</div>';
+    if(sh.start==null) return '<div class="rq-impact">'+when+' · '+demTxt+'shift "'+String(sh.code)+'" couldn’t be read — impact unknown.</div>';
+
+    // How much time does this request actually remove?
+    var fromH=sh.start, toH=sh.end, label;
+    if(r.type==='early'){
+      var t=(typeof _rqParseTime==='function')?_rqParseTime(r.note||''):null;
+      if(t!=null){ fromH=t; toH=sh.end; label='Impact '+_rqDur(toH-fromH); }
+      else {
+        // v60.156: don't assert a shortfall we can't know. Without a leave time
+        // the affected window is unknown, so asking beats guessing — the old
+        // path fell through and reported a specific block as short.
+        return '<div class="rq-impact">'+when+' · '+demTxt+
+          '<span class="rq-bad">add a leave time to the note</span> (e.g. "leaving at 3pm") to see the impact.</div>';
+      }
+    } else if(r.type==='off'){
+      label='Impact all shift ('+_rqDur(sh.end-sh.start)+')';
+    } else {
+      return '<div class="rq-impact">'+when+' · '+demTxt+'logged for review — '+
+             (_RQ_TYPE[r.type]||r.type)+' doesn’t change coverage on its own.</div>';
+    }
+
+    var blocks=_rqBlockLoad(r.date, sh.pid, fromH, toH);
+    var hit=blocks.filter(function(b){ return b.lost>0; });
+    var broken=hit.filter(function(b){ return b.after < b.need; });
+    var verdict;
+    if(!hit.length){
+      verdict='<span class="rq-ok">no covered block affected — safe to approve</span>';
+    } else if(!broken.length){
+      var w=hit[0];
+      verdict='<span class="rq-ok">'+w.lbl+' still '+w.after+'/'+w.need+' — safe to approve</span>';
+    } else {
+      verdict='<span class="rq-bad">needs cover '+broken.map(function(b){
+        return b.lbl+' ('+b.after+'/'+b.need+')'; }).join(' · ')+'</span>';
+    }
+    return '<div class="rq-impact">'+when+' · '+demTxt+label+' · '+verdict+'</div>';
+  }catch(e){ return '<div class="rq-impact">Impact couldn’t be computed for this one.</div>'; }
 }
 var _rqStyled=false;
 function rqInjectStyle(){
@@ -20554,6 +20659,7 @@ function rqInjectStyle(){
   +'.rq-types{display:flex;gap:6px;flex-wrap:wrap}'
   +'.rq-typebtn{background:#2C2C2E;color:#8E8E93;border:1px solid rgba(255,255,255,.1);border-radius:9px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}.rq-typebtn.on{background:rgba(35,201,131,.16);border-color:#23C983;color:#23C983}' /* v60.95: Design green active */
   +'.rq-submit{background:#23C983;color:#04160e;border:none;border-radius:10px;padding:11px;font-size:14px;font-weight:800;cursor:pointer}' /* v60.95: Design green primary */
+  +'.rq-ok{color:#30D158;font-weight:700}.rq-bad{color:#FF9F0A;font-weight:700}'
   +'.rq-empty{color:#8E8E93;font-size:14px;text-align:center;padding:28px 16px;background:#1C1C1E;border-radius:14px}'
   +'.rq-card{background:#1C1C1E;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:13px;margin-bottom:10px}.rq-card.open{border-left:3px solid #FFCC00}'
   +'.rq-top{display:flex;align-items:baseline;gap:8px}.rq-who{font-size:15px;font-weight:700;color:#fff;flex:1}.rq-type{font-size:11px;color:#8E8E93;font-weight:600}.rq-del{background:none;border:none;color:#8E8E93;cursor:pointer;font-size:13px}'
