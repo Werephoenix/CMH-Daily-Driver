@@ -3857,7 +3857,7 @@ function loadState() {
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
-    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, soloChecked:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
+    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, soloChecked:{}, corpAvg:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
     mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{}, pto:{},
   };
 }
@@ -9482,6 +9482,174 @@ function soloRenderSchedBanner(){
       +(s.until?(' until '+_soloFmtH(s.until.h)):'')
       +'<span>check in ›</span></div>';
   }).join('');
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.154 · WINS & SCORES (Design v2)
+// CS and HoT are already captured every night and kept 60 days, so this needed
+// no new data source — only a reading of it.
+//
+// HONESTY RULE (Design's, kept verbatim in the UI): the corporate score formula
+// is proprietary. So we chart RAW COUNTS ONLY, the manager types in the corp
+// average when it posts, and the whole panel is labelled an unofficial pace
+// clue. We do not invent a score.
+// ═══════════════════════════════════════════════════════════════════════════
+function _winsDays(n){
+  var hist=[]; try{ hist=(typeof loadHistory==='function')?loadHistory():[]; }catch(e){}
+  return hist.slice(0, n||28).slice().reverse();   // oldest → newest for charting
+}
+function _winsNum(v){ if(v==null||v==='') return null; var m=String(v).match(/-?\d+(\.\d+)?/); return m?parseFloat(m[0]):null; }
+function winsCorpAvg(){ var v=STATE.corpAvg; return (v==null||v==='')?null:_winsNum(v); }
+function setCorpAvg(delta, absolute){
+  var cur=winsCorpAvg();
+  if(absolute!=null){ STATE.corpAvg=absolute; }
+  else { var base=(cur==null?90:cur); STATE.corpAvg=Math.max(0, Math.round((base+delta)*10)/10); }
+  if(typeof saveState==='function') saveState();
+  if(typeof renderWins==='function') renderWins();
+}
+function _winsBars(days, pick, opts){
+  opts=opts||{};
+  var vals=days.map(function(d){ return _winsNum(pick(d)); });
+  var real=vals.filter(function(v){ return v!=null; });
+  if(!real.length) return {html:'<div class="wins-empty">No numbers logged yet — they start appearing once a few days are closed out in the app.</div>', n:0, good:0};
+  var max=Math.max.apply(null, real.concat([opts.min||1]));
+  var line=opts.line;
+  // v60.154: CS values cluster high (88–95), so a zero-based axis renders 28
+  // near-identical bars and the daily movement disappears. Zoom the baseline —
+  // but LABEL it, because an unlabelled truncated axis is a misleading chart.
+  var base=0, zoomed=false;
+  if(opts.zoom){
+    var lo=Math.min.apply(null, real.concat(line!=null?[line]:[]));
+    if((max-lo) < max*0.35){ base=Math.max(0, Math.floor(lo-1)); zoomed=base>0; }
+  }
+  var span=Math.max(1, max-base);
+  var pct=function(v){ return Math.max(3, Math.round((v-base)/span*100)); };
+  var good=0;
+  var bars=days.map(function(d,i){
+    var v=vals[i];
+    if(v==null) return '<i class="wb none" title="'+(d.dateLabel||d.date||'')+' — not logged"></i>';
+    var isGood = opts.goodWhen ? opts.goodWhen(v, line) : true;
+    if(isGood) good++;
+    return '<i class="wb'+(isGood?'':' dim')+'" style="height:'+pct(v)+'%;background:'+opts.color+'" title="'+(d.dateLabel||d.date||'')+' — '+v+'"></i>';
+  }).join('');
+  var lineEl='';
+  if(line!=null && line>base && line<=max){
+    lineEl='<div class="wb-line" style="bottom:'+pct(line)+'%"><span>CORP '+line+'</span></div>';
+  }
+  return {html:'<div class="wb-wrap">'+lineEl+bars+'</div>', n:real.length, good:good,
+          axis: zoomed ? ('Bars start at '+base+', not zero — so the day-to-day movement is visible.') : ''};
+}
+function winsHtml(){
+  var days=_winsDays(28);
+  var corp=winsCorpAvg();
+  var cs=_winsBars(days, function(d){return d.cs;}, {
+    color:'var(--green,#30D158)', line:corp, zoom:true,
+    goodWhen:function(v,l){ return l==null ? true : v>=l; }
+  });
+  var hot=_winsBars(days, function(d){return d.hot;}, {
+    color:'var(--na,#FF453A)', min:3,
+    goodWhen:function(v){ return v<3; }
+  });
+  // week totals from the newest 7
+  var wk=days.slice(-7);
+  var wkCs=wk.reduce(function(a,d){var v=_winsNum(d.cs); return a+(v||0);},0);
+  var wkHot=wk.reduce(function(a,d){var v=_winsNum(d.hot); return a+(v||0);},0);
+  var onPace = (corp!=null && cs.n) ? (cs.good >= Math.ceil(cs.n*0.5)) : null;
+
+  var h='';
+  h+='<div class="wins-lead">Raw counts straight from your nightly close — <b>not</b> the corporate score. '
+    +'That formula isn’t published, so this is an <b>unofficial pace clue</b>, not an official number.</div>';
+
+  if(onPace!==null){
+    h+='<div class="wins-pace '+(onPace?'ok':'warn')+'">'+(onPace
+      ? '✅ On pace — hold this and the team bonus checkpoint clears'
+      : '⚠ Trending under the corp line — worth a push this week')+'</div>';
+  }
+
+  // CS
+  h+='<div class="wins-card"><div class="wins-hd">Completely Satisfied <span>last '+(cs.n||0)+' logged days</span></div>'
+    + cs.html
+    + '<div class="wins-foot">'+(corp!=null
+        ? '<b>'+cs.good+' of '+cs.n+'</b> days at or above the corp line'
+        : 'Enter the corp average below to see how many days cleared it')
+    + (cs.axis?'<div class="wins-axis">'+cs.axis+'</div>':'') + '</div></div>';
+
+  // corp average stepper
+  h+='<div class="wins-card corp"><div class="wins-hd">Corp average <span>you enter this when it posts</span></div>'
+    +'<div class="corp-row">'
+    +'<button onclick="setCorpAvg(-1)">−</button>'
+    +'<b>'+(corp!=null?corp:'—')+'</b>'
+    +'<button onclick="setCorpAvg(1)">+</button>'
+    +'<input type="number" step="0.1" placeholder="type it" value="'+(corp!=null?corp:'')+'" '
+    +'oninput="setCorpAvgInput(this.value)">'
+    +'</div><div class="wins-foot">Set it at the weekly checkpoint, or whenever the real number posts.</div></div>';
+
+  // HoT
+  h+='<div class="wins-card"><div class="wins-hd">HoT alerts <span>under 3 a day is the goal</span></div>'
+    + hot.html
+    + '<div class="wins-foot"><b>'+hot.good+' of '+hot.n+'</b> days under 3 HoTs</div></div>';
+
+  // week totals
+  h+='<div class="wins-card"><div class="wins-hd">This week, raw</div>'
+    +'<div class="wins-tot"><span>CS <b>'+wkCs+'</b></span><span>HoT <b>'+wkHot+'</b></span></div>'
+    +'<div class="wins-foot">Totals of whatever was logged in the last 7 closed days.</div></div>';
+  return h;
+}
+function setCorpAvgInput(v){
+  if(String(v).trim()==='') { delete STATE.corpAvg; }
+  else STATE.corpAvg=_winsNum(v);
+  if(typeof saveState==='function') saveState();
+  var f=document.getElementById('wins-body');
+  if(f) { /* re-render without stealing focus from the input */
+    var b=f.querySelector('.corp-row b'); if(b) b.textContent=(winsCorpAvg()!=null?winsCorpAvg():'—');
+  }
+}
+function renderWins(){ var el=document.getElementById('wins-body'); if(el) el.innerHTML=winsHtml(); }
+function openWins(){
+  if(typeof qaInjectStyle==='function') qaInjectStyle();
+  winsInjectStyle();
+  var o=document.getElementById('wins-overlay');
+  if(!o){
+    o=document.createElement('div'); o.id='wins-overlay';
+    o.innerHTML='<div class="qa-hd"><div><div class="eb">Scoreboard</div><h2>★ Wins &amp; Scores</h2></div>'
+      +'<button class="qa-x" onclick="closeWins()">✕</button></div><div class="qa-body" id="wins-body"></div>';
+    document.body.appendChild(o);
+  }
+  o.style.display='flex'; document.body.style.overflow='hidden';
+  renderWins();
+}
+function closeWins(){ var o=document.getElementById('wins-overlay'); if(o) o.style.display='none'; document.body.style.overflow=''; }
+var _winsStyled=false;
+function winsInjectStyle(){
+  if(_winsStyled) return; _winsStyled=true;
+  var css=''
+  +'#wins-overlay{position:fixed;inset:0;z-index:100063;background:var(--bg,#000);display:flex;flex-direction:column;overflow:hidden}'
+  +'.wins-lead{font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px}'
+  +'.wins-pace{font-size:13px;font-weight:800;padding:10px 12px;border-radius:10px;margin-bottom:12px}'
+  +'.wins-pace.ok{background:rgba(48,209,88,.12);color:var(--green,#30D158);border:1px solid rgba(48,209,88,.4)}'
+  +'.wins-pace.warn{background:rgba(255,159,10,.12);color:var(--amber,#FF9F0A);border:1px solid rgba(255,159,10,.4)}'
+  +'.wins-card{background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;padding:12px 13px;margin-bottom:12px}'
+  +'.wins-hd{display:flex;align-items:baseline;gap:8px;font-size:13px;font-weight:800;color:var(--txt);margin-bottom:10px}'
+  +'.wins-hd span{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--txt3)}'
+  +'.wb-wrap{position:relative;display:flex;align-items:flex-end;gap:2px;height:80px;padding-bottom:2px}'
+  +'.wb{flex:1;min-width:0;border-radius:2px 2px 0 0;opacity:1}'
+  +'.wb.dim{opacity:.32}'
+  +'.wb.none{height:3px;background:var(--bdr2);opacity:.5}'
+  +'.wb-line{position:absolute;left:0;right:0;border-top:1.5px dashed var(--amber2,#FFD60A);pointer-events:none}'
+  +'.wb-line span{position:absolute;right:0;top:-14px;font-size:9px;font-weight:800;color:var(--amber2,#FFD60A)}'
+  +'.wins-foot{font-size:11.5px;color:var(--txt3);margin-top:8px;line-height:1.5}'
+  +'.wins-foot b{color:var(--txt)}'
+  +'.wins-axis{font-size:10.5px;color:var(--txt3);opacity:.85;margin-top:3px}'
+  +'.wins-empty{font-size:12.5px;color:var(--txt3);line-height:1.6;padding:12px 0}'
+  +'.corp-row{display:flex;align-items:center;gap:8px}'
+  +'.corp-row button{width:40px;height:40px;border-radius:10px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:20px;font-weight:700;cursor:pointer;line-height:1}'
+  +'.corp-row b{min-width:56px;text-align:center;font-size:22px;font-weight:800;color:var(--txt)}'
+  +'.corp-row input{flex:1;min-width:0;padding:9px 10px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:8px;color:var(--txt);font-size:14px}'
+  +'.wins-tot{display:flex;gap:20px}'
+  +'.wins-tot span{font-size:12px;color:var(--txt3)}'
+  +'.wins-tot b{font-size:22px;font-weight:800;color:var(--txt);margin-left:5px}';
+  var st=document.createElement('style'); st.id='wins-style'; st.textContent=css; document.head.appendChild(st);
 }
 
 function renderNow() {
@@ -22189,6 +22357,15 @@ function closeStaffingNeeds(){ var o=document.getElementById('sn-overlay'); if(o
 // thresholds, PINs, schedule) and are engine-wired — this UNIFIES them.
 // ═══════════════════════════════════════════════════════════════════════════
 function suStaffCount(){ try{ return [].concat(ROSTER_CXR||[],ROSTER_MGMT||[],ROSTER_EXIT||[],ROSTER_RETURNS||[]).filter(function(p){return p&&p.active!==false;}).length; }catch(e){ return 0; } }
+function suWinsSummary(){
+  try{
+    var d=(typeof _winsDays==='function')?_winsDays(28):[];
+    var n=d.filter(function(x){return _winsNum(x.cs)!=null;}).length;
+    var c=(typeof winsCorpAvg==='function')?winsCorpAvg():null;
+    if(!n) return 'no days logged yet';
+    return n+' days of CS/HoT'+(c!=null?' · corp '+c:' · corp not set');
+  }catch(e){ return 'CS & HoT trend'; }
+}
 function suDisplayNames(){
   try{
     var ov=Object.keys(STATE.displayNames||{}).length;
@@ -22233,6 +22410,7 @@ function suRender(){
     +'<div class="su-sech">People &amp; schedule</div>'
     +card('👥','Staff &amp; roles', suStaffCount()+' people', adm('staff'))
     +card('🏷','Display names', suDisplayNames(), ovl("openDisplayNames()"))
+    +card('★','Wins &amp; Scores', suWinsSummary(), ovl("openWins()"))
     +card('📅','Schedule', 'paste or edit by day', adm('sched'))
     +card('🗒','Branch setup answers', suBranchAnswers(), ovl("openBranchInterview()"))
     +'<div class="su-sech">Fleet &amp; rules</div>'
