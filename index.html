@@ -6810,7 +6810,7 @@ function parseSection(section) {
     const rows = unmatched.map(nm => {
       const sug = suggestRosterMatch(nm, filtered);
       if (sug) {
-        const short = sug.person.nick || sug.person.name.split(' ')[0];
+        const short = (typeof dispName==='function')?dispName(sug.person):(sug.person.nick || sug.person.name.split(' ')[0]);
         return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:5px 0">
           <span><b style="color:var(--txt)">${escH(nm)}</b> — did you mean
           <b style="color:var(--green)">${escH(sug.person.name)}</b>?</span>
@@ -6845,7 +6845,7 @@ function parseSection(section) {
   ph += '</tr>';
 
   Object.entries(sched.people).forEach(([pid, p]) => {
-    ph += `<tr><td class="mg-name">${p.nick||pid.replace(/_/g,' ').split(' ')[0]}</td>`;
+    ph += `<tr><td class="mg-name">${(typeof dispName==='function')?dispName(p):(p.nick||pid.replace(/_/g,' ').split(' ')[0])}</td>`;
     previewDates.forEach(k => {
       const shift = sched.grid[k]?.[pid] || '—';
       const cls = shiftDisplayCls(shift);
@@ -7721,7 +7721,7 @@ function reinstatePerson(pid) {
 
 function showCalloutSuggestion(calledOutPid) {
   const person = [...ROSTER_CXR, ...ROSTER_MGMT].find(p => p.name.replace(/\s/g,'_') === calledOutPid);
-  const personName = person ? (person.nick || person.name.split(' ')[0]) : calledOutPid;
+  const personName = person ? ((typeof dispName==='function')?dispName(person):(person.nick || person.name.split(' ')[0])) : calledOutPid;
 
   // Analyze coverage gap
   const { rotations, workingExit, coverage, rules } = buildSmartRotation();
@@ -8291,7 +8291,7 @@ function addMgmtBlockPrompt(pid) {
   const html = `
     <div style="display:grid;gap:10px">
       <div style="font-size:11px;color:var(--txt3)">
-        Add a station block for <b>${p.nick||p.name}</b>'s shift.
+        Add a station block for <b>${(typeof dispName==='function')?dispName(p):(p.nick||p.name)}</b>'s shift.
         Times in 24-hour format (e.g. 8.5 = 8:30am, 14 = 2pm, 22 = 10pm).
         Overlapping existing blocks will be auto-trimmed.
       </div>
@@ -8883,7 +8883,7 @@ function nowFix(pid) {
   if (typeof buildSwitchboard === 'function') buildSwitchboard();
   if (typeof renderNow === 'function') renderNow();
   const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
-  const nick = exp[pid] ? (exp[pid].person.nick || exp[pid].person.name.split(' ')[0]) : 'Staff';
+  const nick = exp[pid] ? ((typeof dispName==='function')?dispName(exp[pid].person):(exp[pid].person.nick || exp[pid].person.name.split(' ')[0])) : 'Staff';
   if (typeof toast === 'function') toast('Sent ' + nick + ' to Exit');
 }
 // v60.55: one-tap apply for a "Movable" row in the Coverage view. Uses the same
@@ -8897,7 +8897,7 @@ function covFix(pid, mode) {
   if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
   if (typeof buildSwitchboard === 'function') buildSwitchboard();
   const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
-  const nick = exp[pid] ? (exp[pid].person.nick || exp[pid].person.name.split(' ')[0]) : 'Staff';
+  const nick = exp[pid] ? ((typeof dispName==='function')?dispName(exp[pid].person):(exp[pid].person.nick || exp[pid].person.name.split(' ')[0])) : 'Staff';
   if (typeof toast === 'function') toast('Sent ' + nick + ' to ' + (mode==='full-exit'?'Exit':'Counter') + ' (all shift)');
 }
 
@@ -9844,7 +9844,7 @@ function renderNow() {
   Object.entries(exp).forEach(([pid,e]) => {
     const rot=(window._lastRotations||{})[pid];
     if (rot && rot.lunch && rot.lunch.from > nowH && (!nextLunch || rot.lunch.from < nextLunch.at)) {
-      nextLunch = { at: rot.lunch.from, who: e.person.nick||e.person.name.split(' ')[0] };
+      nextLunch = { at: rot.lunch.from, who: (typeof dispName==='function')?dispName(e.person):(e.person.nick||e.person.name.split(' ')[0]) };
     }
   });
   const ritual = h < 11 ? 'Opening' : h < 16 ? 'Mid-shift' : 'Closing';
