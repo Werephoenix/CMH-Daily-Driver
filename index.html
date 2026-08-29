@@ -294,6 +294,25 @@ body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 .now-attn.urgent { background: rgba(255,69,58,.12); border-color: rgba(255,69,58,.4); }
 .now-attn.warn   { background: rgba(255,204,0,.10); border-color: rgba(255,204,0,.4); }
 .now-attn.ok     { background: rgba(48,209,88,.10); border-color: rgba(48,209,88,.35); }
+/* v60.153 solo-coverage check-in */
+.now-attn.solo-warn { background: rgba(255,159,10,.10); border-color: rgba(255,159,10,.42); }
+.now-attn.solo-quiet{ background: var(--bg2); border-color: var(--bdr2); }
+.solo-kick { font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--amber,#FF9F0A);margin-bottom:4px }
+.solo-kick.quiet { color: var(--txt3); }
+.solo-h { font-size:17px;font-weight:700;color:var(--txt);line-height:1.3;margin-bottom:4px }
+.solo-p { font-size:13px;color:var(--txt2);line-height:1.5;margin-bottom:10px }
+.solo-acts { display:flex;gap:8px;flex-wrap:wrap }
+.solo-btn { flex:1;min-width:140px;padding:11px 12px;border-radius:10px;border:none;cursor:pointer;
+  background:var(--accent,#23C983);color:#04160e;font-size:13px;font-weight:800 }
+.solo-btn.ghost { background:var(--bg3);color:var(--txt2);border:1px solid var(--bdr2) }
+.solo-done { display:inline-block;padding:9px 12px;border-radius:9px;background:rgba(48,209,88,.14);
+  color:var(--green,#30D158);font-size:12.5px;font-weight:800 }
+.solo-line { display:flex;align-items:center;gap:8px;cursor:pointer;padding:9px 12px;border-radius:10px;
+  background:rgba(255,159,10,.10);border:1px solid rgba(255,159,10,.40);margin-bottom:6px;
+  font-size:12.5px;color:var(--txt2) }
+.solo-line.quiet { background:var(--bg2);border-color:var(--bdr2) }
+.solo-line b { color:var(--txt);font-weight:700 }
+.solo-line span { margin-left:auto;font-size:11px;color:var(--txt3);white-space:nowrap }
 body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-in-out infinite; }
 .now-kicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 .now-attn.urgent .now-kicker { color: var(--na); }
@@ -2258,6 +2277,9 @@ button { cursor: pointer; }
     <span class="sp-n">①</span> Who's on
   </div>
 
+  <!-- v60.153: solo-coverage summary — pinned when someone is on their own -->
+  <div id="solo-banner" style="display:none;margin-bottom:10px"></div>
+
   <!-- v60.139: primary quick-actions — reachable BEFORE any planning.
        Call-off first (the #1 "something just changed" action), then the
        have-vs-need staffing glance. Both open self-contained overlays. -->
@@ -3835,7 +3857,7 @@ function loadState() {
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
-    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
+    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, soloChecked:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
     mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{}, pto:{},
   };
 }
@@ -4266,7 +4288,9 @@ function sodGo(where) {
 
 function showTab(id) {
   // Map old tab names to new (emails→closing, codes→reference, hourly→reference, loyalty→reference)
-  const tabMap = { emails:'checklist', codes:'reference', hourly:'reference', loyalty:'reference', dashboard:'opening' };
+  // v60.153: 'now' aliased — the Now screen's id is 'opening'. showTab('now')
+  // previously matched nothing and blanked the app (no screen kept .on).
+  const tabMap = { emails:'checklist', codes:'reference', hourly:'reference', loyalty:'reference', dashboard:'opening', now:'opening' };
   if (tabMap[id]) id = tabMap[id];
 
   // v60.124: Calendar is a top-level tab but renders as a full-screen overlay
@@ -4279,9 +4303,12 @@ function showTab(id) {
     return;
   }
 
+  const scr = document.getElementById('screen-'+id);
+  // v60.153: bail BEFORE hiding anything if the id doesn't resolve — otherwise a
+  // typo'd tab name leaves the user staring at an empty app with no way back.
+  if (!scr) { try{ console.warn('showTab: no screen for id', id); }catch(e){} return; }
   document.querySelectorAll('.scr').forEach(s => s.classList.remove('on'));
   document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('on'));
-  const scr = document.getElementById('screen-'+id);
   let btn = document.getElementById('tab-'+id);
   // v60.42: secondary screens live under the More tab — keep it lit for them.
   if (!btn && ['paste','reference','inventory','history','admin'].includes(id)) {
@@ -9307,6 +9334,156 @@ function buildEventSheet() {
   wrap.innerHTML = html;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.153 · SOLO-COVERAGE CHECK-IN (Design v2)
+// "Exit has 1" is data. "Kerv is alone at Returns until 12p — check he's had a
+// break" is a behaviour. Computed live off the v60.146 engine, so it can never
+// disagree with the coverage flags.
+//
+// DESIGN CALL (mine, flagged to Matt + Design as an open question): firing a red
+// alert on a *structurally normal* solo — Returns is always one person at 4a —
+// would train everyone to dismiss it within a week. So the branch's OWN minimum
+// decides the tone:
+//   • need >= 2 but only 1 present  → UNDERSTAFFED. Amber, offers a float.
+//   • need <= 1 (solo IS the plan)  → NORMAL. Quiet check-in nudge, no float,
+//                                      no alarm — just "they're on their own".
+// Both offer "I checked on them", which is the point of the feature.
+// Float candidates come only from zones with >=2 (gfClassify already refuses to
+// create a second hole).
+// ═══════════════════════════════════════════════════════════════════════════
+var SOLO_ZONES = [
+  {k:'exit',    lbl:'Exit'},
+  {k:'returns', lbl:'Returns'},
+  {k:'counter', lbl:'Counter'}
+];
+function _soloFmtH(h){
+  if(h==null) return '';
+  var hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:(hh===0?12:hh);
+  var m=Math.round((h-Math.floor(h))*60);
+  return d+(m?':'+String(m).padStart(2,'0'):'')+ap;
+}
+// When does this person stop being alone? Next arrival into their zone, else
+// their own shift end — whichever comes first.
+function _soloUntil(exp, zone, pid, nowH){
+  var end=null;
+  try{
+    var ov=(STATE.shiftMod||{})[pid]||{}, e=exp[pid];
+    var se=(ov.end!=null)?ov.end:(e&&e.person?e.person.shiftEnd:null);
+    if(se!=null){ var ss=(ov.start!=null)?ov.start:e.person.shiftStart; if(ss!=null&&se<ss) se+=24; end=se; }
+  }catch(err){}
+  for(var h=Math.ceil(nowH); h<=25; h++){
+    var n=0;
+    Object.keys(exp).forEach(function(q){
+      if(q===pid) return;
+      if(!gfOnShiftAt(q,exp[q],h)) return;
+      if(gfAreaAt(q,exp[q],h)===zone) n++;
+    });
+    if(n>0) return {h:h, why:'relief'};
+  }
+  return end!=null ? {h:end, why:'shiftend'} : null;
+}
+// Everyone currently alone in a zone, with tone + a surplus-only float suggestion.
+function soloCoverage(atHour){
+  var out=[];
+  var exp={}; try{ exp=(typeof buildExpectedToday==='function')?buildExpectedToday():{}; }catch(e){ return out; }
+  if(!Object.keys(exp).length) return out;
+  var now=new Date();
+  var h=(atHour!=null)?atHour:(now.getHours()+now.getMinutes()/60);
+  var dow=now.getDay();
+  var need={}; try{ need=gfNeedsAt(Math.floor(h),dow); }catch(e){}
+  var counts={}; try{ counts=gfCountsAt(exp,h); }catch(e){}
+  // closed hours have nobody to worry about
+  try{ var r=COVERAGE_BY_HOUR(Math.floor(h),dow,0); if(r&&r.closed) return out; }catch(e){}
+  SOLO_ZONES.forEach(function(z){
+    if((counts[z.k]||0)!==1) return;
+    var who=Object.keys(exp).filter(function(pid){
+      return gfOnShiftAt(pid,exp[pid],h) && gfAreaAt(pid,exp[pid],h)===z.k;
+    })[0];
+    if(!who) return;
+    var planned=((need[z.k]||0)<=1);
+    // float candidates: only from zones that would still be fine without them
+    var float=null;
+    if(!planned){
+      try{
+        var c=gfRankCandidates({area:z.k, hour:Math.floor(h), short:1}, exp)
+              .filter(function(x){ return x.tier!=='protected'; })[0];
+        if(c) float=c;
+      }catch(e){}
+    }
+    var until=_soloUntil(exp,z.k,who,h);
+    out.push({
+      zone:z.k, zoneLbl:z.lbl, pid:who,
+      nick:(typeof dispName==='function')?dispName(exp[who].person):(exp[who].person.nick||who),
+      planned:planned, need:(need[z.k]||0),
+      until:until, float:float,
+      checked: !!((STATE.soloChecked||{})[_soloKey(z.k,who)])
+    });
+  });
+  return out;
+}
+function _soloKey(zone,pid){
+  var d=(typeof todayKey==='function')?todayKey():'';
+  return d+'|'+zone+'|'+pid;
+}
+function soloMarkChecked(zone,pid){
+  if(!STATE.soloChecked) STATE.soloChecked={};
+  var k=_soloKey(zone,pid);
+  STATE.soloChecked[k]={ at:new Date().toISOString(), by:(STATE.fields&&STATE.fields.openMgr)||'manager' };
+  if(typeof saveState==='function') saveState();
+  if(typeof toast==='function') toast('✓ Check-in logged');
+  if(typeof renderNow==='function') try{ renderNow(); }catch(e){}
+  if(typeof buildCoverageTimeline==='function') try{ buildCoverageTimeline(); }catch(e){}
+  if(typeof soloRenderSchedBanner==='function') soloRenderSchedBanner();
+}
+// Full card — Now screen.
+function soloCardHtml(){
+  var list=[]; try{ list=soloCoverage(); }catch(e){ return ''; }
+  if(!list.length) return '';
+  return list.map(function(s){
+    var untilTxt = s.until ? (' until '+_soloFmtH(s.until.h)) : '';
+    var tone = s.planned ? 'solo-quiet' : 'solo-warn';
+    var head = s.planned
+      ? '<div class="solo-kick quiet">🫱 On their own</div>'
+      : '<div class="solo-kick">⚠ Alone at '+s.zoneLbl+'</div>';
+    var body = '<div class="solo-h">'+s.nick+' is alone at '+s.zoneLbl+untilTxt+'</div>'
+      + '<div class="solo-p">'
+      + (s.planned
+          ? 'That’s how the day is planned — still worth a check that they’ve had a break.'
+          : 'Below your minimum of '+s.need+'. Check in — help, a bathroom break, or a breather.')
+      + '</div>';
+    var actions='<div class="solo-acts">';
+    if(s.checked){
+      actions+='<span class="solo-done">✓ Checked on</span>';
+    } else {
+      actions+='<button class="solo-btn" onclick="soloMarkChecked(\''+s.zone+'\',\''+s.pid+'\')">I checked on them</button>';
+    }
+    if(s.float){
+      actions+='<button class="solo-btn ghost" onclick="soloSendFloat(\''+s.zone+'\','+Math.floor((s.until&&s.until.h)||new Date().getHours())+',\''+s.float.pid+'\')">Send '+s.float.nick+' →</button>';
+    }
+    actions+='</div>';
+    return '<div class="now-attn '+tone+'">'+head+body+actions+'</div>';
+  }).join('');
+}
+function soloSendFloat(zone,hour,pid){
+  if(typeof coApplyFill==='function'){ coApplyFill(zone, (new Date()).getHours(), pid); }
+  if(typeof renderNow==='function') try{ renderNow(); }catch(e){}
+}
+// Compact one-line banner — Schedule tab.
+function soloRenderSchedBanner(){
+  var el=document.getElementById('solo-banner'); if(!el) return;
+  var list=[]; try{ list=soloCoverage(); }catch(e){}
+  var live=list.filter(function(s){ return !s.checked; });
+  if(!live.length){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='block';
+  el.innerHTML = live.map(function(s){
+    return '<div class="solo-line'+(s.planned?' quiet':'')+'" onclick="showTab(\'opening\')">'
+      +'<b>'+(s.planned?'🫱':'⚠')+' '+s.nick+'</b> alone at '+s.zoneLbl
+      +(s.until?(' until '+_soloFmtH(s.until.h)):'')
+      +'<span>check in ›</span></div>';
+  }).join('');
+}
+
 function renderNow() {
   const el = document.getElementById('now-hero');
   if (!el) return;
@@ -9393,6 +9570,7 @@ function renderNow() {
     <div class="now-h">${attn.title}</div><div class="now-p">${attn.sub}</div>`;
   if (attn.btn) html += `<button class="now-btn ${attn.btn.cls||''}" onclick="${attn.btn.on}">${attn.btn.label}</button>`;
   html += `</div>`;
+  html += (typeof soloCardHtml==='function') ? soloCardHtml() : '';   // v60.153
 
   const floorRow = (ic,label,have,need,names,ok) => `<div class="more-row" style="cursor:default">
     <span class="more-ic">${ic}</span>
@@ -14491,7 +14669,7 @@ function renderScheduleView() {
   if (_dw) _dw.className = 'seg' + (p==='week' ? ' on' : '');
   // id → its normal display value (so hide/restore keeps flex/grid layouts intact)
   // v60.145: the ② / ③ spine labels are day-view furniture — hidden in Week mode.
-  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block','sp-step-2':'flex','sp-step-3':'flex'};
+  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','solo-banner':'block','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block','sp-step-2':'flex','sp-step-3':'flex'};
   if (p === 'week') {
     Object.keys(_dayRestore).forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
     if (wkEl) wkEl.style.display = 'block';
@@ -15053,6 +15231,8 @@ function buildCoverageTimeline() {
       zCard('Exit','🟩',zones.exit,exitOk,rules.exitMin)+
       zCard('Returns','↩',zones.returns,true,0);
   }
+
+  if (typeof soloRenderSchedBanner==='function') { try{ soloRenderSchedBanner(); }catch(e){} }  // v60.153
 
   // ── v60.142: Manager-minimum coverage flag (this block: floor mgrs on-now vs mins) ──
   const mcEl=document.getElementById('mgr-coverage');
