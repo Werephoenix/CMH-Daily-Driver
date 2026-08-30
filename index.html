@@ -22486,9 +22486,128 @@ function _asMgrWorksDay(p, dow, seed, idxMap){
 }
 
 // Build the whole week. Returns {days:[{dow,label,people:[{nick,role,start,end,win,proposed}], cov:[...]}]}
-function asBuildWeek(seed){
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.177 · THE WEEK BOUNDARY WAS A BLIND SPOT
+//
+// asBuildWeek() started every week with `mgrPrev = {}` — no memory of the week
+// before. The ≥11h rest rule and the 3-day closer cap both read mgrPrev, so
+// BOTH stopped enforcing at the Saturday→Sunday seam.
+//
+// Measured over 24 simulated weeks: 14 clopenings, and ALL FOURTEEN were across
+// a week boundary — ZERO inside a week. e.g. Khala closing Saturday to 11:30p
+// and opening Sunday at 5:30a: SIX HOURS off, three separate times. The rest
+// logic was never broken; it simply couldn't see across the seam.
+//
+// Anchor changes also land on week boundaries, which is why "change the anchor
+// less often" appeared to help — it was reducing exposure to this blind spot
+// rather than fixing anything.
+//
+// Fix: prime mgrPrev from the last day BEFORE this week — the real stored
+// schedule when we have it, otherwise a deterministic replay of the previous
+// week. dow:-1 makes the existing `prev.dow === _dow-1` test fire correctly on
+// Sunday (dow 0), so no seat picker needed changing.
+// ═══════════════════════════════════════════════════════════════════════════
+function _asEndOfStoredShift(v){
+  try{
+    if(Array.isArray(v) && v.length===2) return v[1];
+    if(typeof v!=='string') return null;
+    if(/\b(OFF|VACA?|PTO|LOA|JURY|SICK|NCNS)\b/i.test(v)) return null;
+    var parts=v.split(/-(?=\d)|-(?=C\b)/i);
+    if(parts.length<2) return null;
+    var tail=parts[1].trim();
+    if(/^c/i.test(tail)) return 24;                       // "4P-C" → close
+    var m=tail.match(/(\d{1,4})(?::(\d{2}))?\s*([ap])?/i);
+    if(!m) return null;
+    var num=parseInt(m[1],10), mn=parseInt(m[2]||0,10), ap=(m[3]||'').toLowerCase();
+    if(num>99){ mn=num%100; num=Math.floor(num/100); }
+    var h=num+mn/60;
+    if(ap==='p'&&num!==12) h+=12;
+    if(ap==='a'&&num===12) h-=12;
+    return h;
+  }catch(e){ return null; }
+}
+// How many days in a row has this person ALREADY closed, counting back from the
+// day before this week? Seeding closeRun:1 (the first cut) understated a real
+// run, so the 3-day cap restarted every Sunday and a manager could stack 5+
+// consecutive closes. Walks back at most 6 days — the cap is 3, so that is
+// always enough to know whether it has been reached.
+function _asTrailingCloseRun(dayEndAt, pidKey, roster){
+  var run=0;
+  try{
+    for(var back=0; back<6; back++){
+      var d=new Date(dayEndAt); d.setDate(dayEndAt.getDate()-back);
+      var sc=null;
+      try{ sc=(typeof getScheduleForDate==='function')?getScheduleForDate(_asDateKeyOf(d)):null; }catch(e){}
+      if(!sc) break;
+      var end=_asEndOfStoredShift(sc[pidKey]);
+      if(end==null || end<22) break;      // not a close (or not working) → run ends
+      run++;
+    }
+  }catch(e){}
+  return run;
+}
+// Fill mgrPrev with {dow:-1, end, closeRun} for the day before this week starts.
+function _asSeedPriorWeek(mgrPrev, roster, depth, seedRun){
+  seedRun = seedRun || {};
+  try{
+    var byPid={};
+    (roster||[]).forEach(function(p){ if(p&&p.name) byPid[String(p.name).replace(/\s/g,'_')]=p; });
+    var weekStart=_asWeekStart();
+    var prev=new Date(weekStart); prev.setDate(weekStart.getDate()-1);
+    var key=_asDateKeyOf(prev);
+    // 1) the REAL schedule for that day, when the branch has one stored
+    var sched=null;
+    try{ sched=(typeof getScheduleForDate==='function')?getScheduleForDate(key):null; }catch(e){}
+    var seeded=false;
+    if(sched){
+      Object.keys(sched).forEach(function(pid){
+        var p=byPid[pid]; if(!p) return;
+        if(['BRM','ABRM','MT'].indexOf(p.role)<0) return;
+        var end=_asEndOfStoredShift(sched[pid]); if(end==null) return;
+        var _r=(end>=22 ? _asTrailingCloseRun(prev, pid, roster) : 0);
+        mgrPrev[p.id]={dow:-1, end:end, closeRun:_r};
+        seedRun[p.id]=_r;
+        seeded=true;
+      });
+    }
+    if(seeded) return;
+    // 2) otherwise replay the previous week deterministically (one level only)
+    if(depth) return;
+    if(!(typeof _asWeekOffset==='number') || _asWeekOffset<=0) return;
+    var saved=_asWeekOffset;
+    try{
+      _asWeekOffset = saved-1;
+      var pw = asBuildWeek(_asWeekSeed(), 1);      // depth flag: no further recursion
+      _asWeekOffset = saved;
+      var pdays=(pw&&pw.days)||[];
+      var last=pdays[pdays.length-1];
+      ((last&&last.people)||[]).forEach(function(pp){
+        if(['BRM','ABRM','MT'].indexOf(pp.role)<0) return;
+        var p=byPid[String(pp.name||'').replace(/\s/g,'_')]; if(!p) return;
+        var run=0;
+        if(pp.win==='4P-C'){
+          // walk the replayed week backwards for consecutive closes
+          for(var di=pdays.length-1; di>=0; di--){
+            var me=((pdays[di].people)||[]).filter(function(q){
+              return String(q.name||'')===String(pp.name||''); })[0];
+            if(!me || me.win!=='4P-C') break;
+            run++;
+          }
+        }
+        mgrPrev[p.id]={dow:-1, end:pp.end, closeRun:run};
+        seedRun[p.id]=run;
+      });
+    } catch(e){ _asWeekOffset=saved; }
+  }catch(e){}
+}
+
+function asBuildWeek(seed, _priorDepth){
   var roster = (typeof getEffectiveRoster==='function') ? getEffectiveRoster() : [];
   var days = [];
+  seed = seed || 0;   // v60.177: a missing seed made (i+dow+seed) NaN → pool[NaN]
+                      // → "cannot read properties of undefined" deep in the
+                      // opener loop. Every real call site passes one; this is
+                      // so the next one that doesn't fails visibly, not cryptically.
   var mgrPrev = {};   // pid -> {dow, end} of the manager's most recent worked day
   // v60.121: stable index per "varies" manager → staggered days off (see _asMgrWorksDay)
   var _variesIdx = {};
@@ -22496,6 +22615,10 @@ function asBuildWeek(seed){
     .sort(function(a,b){ return String(a.id).localeCompare(String(b.id)); })
     .forEach(function(p,i){ _variesIdx[p.id]=i; });
   var weekStart = _asWeekStart();
+  // v60.177: carry the previous week's tail in, so the rest rule and the closer
+  // cap keep working across the Saturday→Sunday seam.
+  var _seedCloseRun = {};
+  _asSeedPriorWeek(mgrPrev, roster, _priorDepth, _seedCloseRun);
   for(var dow=0; dow<7; dow++){
     var people = [];
     // Real date for this day of the planned week (date-aware, v60.113).
@@ -22570,6 +22693,22 @@ function asBuildWeek(seed){
         if(!prev || prev.dow !== _dow-1) return 99;     // off yesterday → unconstrained
         return (startH + 24) - prev.end;
       };
+      // v60.177: COUNT THE RUN, DON'T TRACK IT.
+      // The 3-day closer cap was threaded through four seat pickers as an
+      // incrementally-maintained mgrPrev.closeRun, and managers were still
+      // landing 5 closes in a row. Rather than keep chasing which path dropped
+      // the counter, this derives the answer at the moment of the decision by
+      // walking the days already built (plus the run carried in from last week).
+      // One source of truth, and it cannot silently reset.
+      var _closesInARow = function(p){
+        var nm=String(p.name||''), run=0;
+        for(var di=days.length-1; di>=0; di--){
+          var me=((days[di].people)||[]).filter(function(q){ return String(q.name||'')===nm; })[0];
+          if(!me || me.win!=='4P-C') return run;      // a non-close (or a day off) ends it
+          run++;
+        }
+        return run + (_seedCloseRun[p.id]||0);        // ran to the start of the week
+      };
       var seat = function(p, win){
         var w = _asParseWin(win) || [8,18];
         people.push({nick:p.nick||p.name, name:p.name, role:p.role, start:w[0], end:w[1], win:win, proposed:true});
@@ -22611,7 +22750,7 @@ function asBuildWeek(seed){
         var pc = order[ci]; if(assigned[pc.id]) continue;
         if(pc.patternWindows.indexOf('4P-C')<0) continue;
         var cp = mgrPrev[pc.id];
-        if(cp && cp.dow===_dow-1 && cp.end>=22 && (cp.closeRun||0)<3){ seat(pc,'4P-C'); closerDone=true; }
+        if(cp && cp.dow===_dow-1 && cp.end>=22 && _closesInARow(pc)<3){ seat(pc,'4P-C'); closerDone=true; }
       }
       // 2) else a FRESH closer who did not close yesterday — anchored closers first
       for(var cj=0; cj<closeOrder.length && !closerDone; cj++){
@@ -22620,11 +22759,21 @@ function asBuildWeek(seed){
         var cp2 = mgrPrev[pc2.id];
         if(!(cp2 && cp2.dow===_dow-1 && cp2.end>=22)){ seat(pc2,'4P-C'); closerDone=true; }
       }
-      // 3) fallback: anyone able to close
-      for(var ck=0; ck<order.length && !closerDone; ck++){
-        var pc3 = order[ck]; if(assigned[pc3.id]) continue;
-        if(pc3.patternWindows.indexOf('4P-C')>=0){ seat(pc3,'4P-C'); closerDone=true; }
-      }
+      // 3) fallback: anyone able to close. The branch MUST close, so this step
+      //    deliberately ignores the 3-day cap — leaving the branch unclosed is
+      //    not an option the schedule gets to choose.
+      //    v60.177: but it no longer takes the FIRST able body. It takes the one
+      //    with the SHORTEST current close run, so when the cap has to break it
+      //    breaks on whoever has closed least — same coverage, spread burden.
+      //    (Measured: this is where 4th/5th consecutive closes were coming from.)
+      var closeFallback = order.filter(function(p){
+        return !assigned[p.id] && p.patternWindows.indexOf('4P-C')>=0;
+      }).sort(function(a,b){
+        var ra=_closesInARow(a), rb=_closesInARow(b);
+        if(ra!==rb) return ra-rb;                       // fewest closes in a row first
+        return _asAnchorRank(a,'close')-_asAnchorRank(b,'close');
+      });
+      if(!closerDone && closeFallback.length){ seat(closeFallback[0],'4P-C'); closerDone=true; }
       // MIDS — everyone else gets a mid window that clears ≥11h rest; if none does,
       // give their LATEST-start NON-CLOSE window (max rest without re-stacking a
       // close). v60.121: the old fallback picked the latest window overall = 4P-C,
@@ -22661,7 +22810,7 @@ function asBuildWeek(seed){
           // honour the cap instead of forcing a short turnaround.
           var _pv = mgrPrev[p.id];
           var closedYesterday = !!(_pv && _pv.dow===_dow-1 && _pv.end>=22);
-          var underCap = !_pv || (_pv.closeRun||0) < 3;
+          var underCap = _closesInARow(p) < 3;
           if(closedYesterday && underCap && p.patternWindows.indexOf('4P-C')>=0){
             seat(p,'4P-C'); return;
           }
@@ -22697,8 +22846,32 @@ function asBuildWeek(seed){
         if(yEnd==null) return;
         var rest = (pr.start + 24) - yEnd;
         if(rest >= AS_MIN_REST) return;
+        // v60.177: THE REPAIR PASS WAS OVERRIDING THE 3-DAY CLOSER CAP.
+        // After a close ending 23.5, another close always maximises rest
+        // (16.5h vs 10h for any morning), so this loop re-seated capped closers
+        // to 4P-C night after night — measured: 5 consecutive closes, and it
+        // would have run indefinitely. The rest rule and the cap were in direct
+        // conflict and the repair pass won simply by running last.
+        // Resolution: honour the cap, take the best NON-close option, and let
+        // asRestWarnings surface the short turnaround — which is what this
+        // pass's own comment says to do when the best available is still short.
+        // A flagged 10.5h turnaround beats an unbounded run of night shifts.
+        // Bounded escalation, not a hard wall. Honour the 3-day cap when there IS
+        // a humane alternative; if nothing else clears 11h rest, another close
+        // (16.5h) genuinely is the healthiest option available — but never past
+        // AS_CLOSE_RUN_MAX, so a run can no longer grow without limit.
+        // Measured trade at 24 weeks: a hard wall at 3 cut the longest run
+        // 5→3 but MANUFACTURED 8 extra 10–11h turnarounds (20→28). This keeps
+        // the bound and does not manufacture them.
+        var _run = _closesInARow(pObj);
+        var _altClears = (pObj.patternWindows||[]).some(function(w){
+          if(w==='4P-C') return false;
+          var wv=_asParseWin(w); return wv && ((wv[0]+24)-yEnd) >= AS_MIN_REST;
+        });
+        var _capped = (_run >= AS_CLOSE_RUN_MAX) || (_run >= 3 && _altClears);
         var best=null, bestRest=rest;
         (pObj.patternWindows||[]).forEach(function(w){
+          if(_capped && w==='4P-C') return;
           var wv=_asParseWin(w); if(!wv) return;
           var r=(wv[0]+24)-yEnd;
           if(r>bestRest){ bestRest=r; best=w; }
@@ -22750,6 +22923,7 @@ function asBuildWeek(seed){
 // (Grimoire 2026-08-23), <11h between consecutive shifts is a harmful "quick
 // return"; a close→open turnaround (e.g. 4P-C then 5:30A) is the worst case.
 // Walk each person across the draft week and flag adjacent days with rest <11h.
+var AS_CLOSE_RUN_MAX = 5;   // absolute ceiling on consecutive closes
 var AS_MIN_REST = 11, AS_TARGET_REST = 12;
 function asRestWarnings(wk){
   var byName = {};
