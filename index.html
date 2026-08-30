@@ -7351,7 +7351,7 @@ function parseSection(section) {
   ph += '</tr>';
 
   Object.entries(sched.people).forEach(([pid, p]) => {
-    ph += `<tr><td class="mg-name">${(typeof dispName==='function')?dispName(p):(p.nick||pid.replace(/_/g,' ').split(' ')[0])}</td>`;
+    ph += `<tr><td class="mg-name pid-chip" data-pid="${pid}" role="button" tabindex="0" style="cursor:pointer">${(typeof dispName==='function')?dispName(p):(p.nick||pid.replace(/_/g,' ').split(' ')[0])}</td>`;
     previewDates.forEach(k => {
       const shift = sched.grid[k]?.[pid] || '—';
       const cls = shiftDisplayCls(shift);
@@ -8464,7 +8464,7 @@ function buildMonthGrid() {
 
   sorted.forEach(person => {
     const pid = person.name.replace(/\s/g,'_');
-    html += `<tr><td class="mg-name">${person.nick||person.name.split(' ')[0]}<br>
+    html += `<tr><td class="mg-name pid-chip" data-pid="${pid}" role="button" tabindex="0" style="cursor:pointer">${person.nick||person.name.split(' ')[0]}<br>
       <span style="font-size:9px;color:var(--txt3)">${person.role}</span></td>`;
     dateKeys.forEach(k => {
       const shift = sched.grid[k]?.[pid] || '—';
@@ -23240,7 +23240,7 @@ function openStationFairness(){
     }
     var declLabel = r.decl ? ('Usual: '+r.decl) : 'Set usual station';
     return '<div class="sf-row">' +
-      '<div class="sf-top"><span class="sf-nm">'+(r.p.nick||r.p.name)+'</span>' +
+      '<div class="sf-top"><span class="sf-nm pid-chip" data-pid="'+String(r.p.name).replace(/\s/g,'_').replace(/"/g,'&quot;')+'" role="button" tabindex="0" style="cursor:pointer">'+(r.p.nick||r.p.name)+'</span>' +
         '<span class="sf-role">'+r.p.role+'</span>' +
         '<span class="sf-decl" onclick="sfSetDeclared(\''+r.pid+'\')">'+declLabel+'</span></div>' +
       (r.total>0 ? '<div class="sf-bar">'+segs+'</div>' : '') +
