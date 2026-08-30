@@ -5086,7 +5086,7 @@ var GROUP_REP_CODE = {
   'Wrangler / Bronco': 'FJBR',   // 4dr Wrangler Unlimited + Ford Bronco 4dr (v60.102 replaced FJAR). 2dr = IJAR.
   'Convertibles':      'ITAR',   // master: intermediate convertible. Compact conv = CTAR.
   'Electric/Hybrid':   'ICAE',   // master
-  'Large Pickup':      'QPAR'    // master: HD pickup
+  'Large Pickup':      'PPAR'    // master — CONFIRMED by Matt 2026-08-30 (was QPAR, my guess, wrong)
 };
 // Every code that maps to a group — so nothing is hidden behind the one on the tile.
 function groupAllCodes(name){
@@ -19713,6 +19713,15 @@ function getScheduleForDate(dateStr) {
   return Object.assign({}, base || {}, overrides);
 }
 
+// v60.172: remove every schedule-DERIVED 'off' override, leaving manager
+// decisions ('callout', 'confirmed') intact. See the note in
+// loadScheduleForToday for why this has to happen before the recompute.
+function _clearDerivedOff(){
+  var ov = STATE.todayOverrides || {};
+  Object.keys(ov).forEach(function(pid){ if (ov[pid] === 'off') delete ov[pid]; });
+  return ov;
+}
+
 function loadScheduleForToday(force) {
   const today = new Date();
   const key = today.getFullYear()+'-'+
@@ -19733,12 +19742,31 @@ function loadScheduleForToday(force) {
       window._noSchedNotified = true;
       toast('📅 No saved schedule for today — import this week in Admin → Schedule');
     }
+    // v60.172: no schedule for this date means we CANNOT know who's off, so
+    // carrying yesterday's answer forward is strictly wrong — it silently hides
+    // people who are working. Clear it and let each person's roster daysOn
+    // decide, which is what the fallback below is for.
+    _clearDerivedOff();
+    if (typeof saveState === 'function') saveState();
     return false;
   }
 
   if (!STATE.shiftMod)      STATE.shiftMod      = {};
   if (!STATE.staffDuty)     STATE.staffDuty     = {};
   if (!STATE.todayOverrides) STATE.todayOverrides = {};
+
+  // v60.172 — WIPE SCHEDULE-DERIVED 'off' BEFORE RECOMPUTING IT.
+  // 'off' is *derived* from the schedule; it is not a human decision, so it is
+  // safe (and necessary) to rebuild it from scratch for the requested date.
+  // The old code only cleared a stale 'off' inside the `Array.isArray(shift)`
+  // branch, so a shift stored as a STRING ("8A-6P", the May format) or as a
+  // TEXT MARKER ("BRM RETREAT", "CXR TRAINING", "MQI") hit neither branch and
+  // a previous day's 'off' SURVIVED — marking a working person as off and
+  // dropping them off the floor entirely. Found 2026-08-30 when Matt (CXR,
+  // Sun–Thu 5:30a–2p) wasn't listed on a Sunday he was working.
+  // 'callout' and 'confirmed' are MANAGER decisions and are deliberately left
+  // untouched here — clearing those is resetSchedDay()'s job, not this one.
+  _clearDerivedOff();
 
   Object.entries(sched).forEach(([pid, shift]) => {
     if (shift === 'OFF' || shift === 'VACA') {
