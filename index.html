@@ -5786,6 +5786,15 @@ function saveDayToHistory() {
     // to the morning. "Tomorrow's Res/Ret" written at close IS today's expected
     // volume — the single most useful number for an opener, and it was being
     // thrown away every night.
+    // v60.163: call-offs were never recorded, so nothing could ever learn from
+    // them. Capture per day (who + how many) — no reasons, same privacy rule as
+    // the accommodation feature. Prediction needs history; history starts here.
+    callouts: (function(){
+      try{
+        var ov=STATE.todayOverrides||{};
+        return Object.keys(ov).filter(function(k){ return ov[k]==='callout'; });
+      }catch(e){ return []; }
+    })(),
     tmrwRes: STATE.fields.closeTmrwRes || null,
     tmrwRet: STATE.fields.closeTmrwRet || null,
     fboCount: STATE.fields.fboCount || null,
@@ -6073,7 +6082,13 @@ function parseShiftTime(code) {
     let h = parseInt(m[1]) + (m[2] ? parseInt(m[2])/60 : 0);
     const ap = m[3].toUpperCase();
     if (ap === 'P' && h < 12) h += 12;
-    if (ap === 'A' && h === 12) h = 0;
+    // v60.163: was `h === 12`, an EXACT match — so "1230A" (h = 12.5) skipped the
+    // midnight conversion and came back as 12.5 = half past NOON. Callers then
+    // saw end(12.5) < start(16) and added 24, so a 4p–12:30a closer read as
+    // working until 12:30 PM THE NEXT DAY — a phantom body on the floor for
+    // twelve hours, inflating coverage exactly where it's thinnest.
+    // Same flaw fixed in parseShiftEndHour at v60.150; this is a second parser.
+    if (ap === 'A' && h >= 12 && h < 13) h -= 12;
     return h;
   }
 
@@ -10049,6 +10064,118 @@ function rotationHealthFromStored(section, fromKey, toKey){
   return rotationHealth(byPerson);
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.163 · MONTH-AHEAD FORECAST + FRAGILITY
+// Not fortune-telling — arithmetic on the schedule that's already published.
+//
+// The number that matters is FRAGILITY: how many people a given day can lose
+// before a block drops below minimum. 0 = already short. 1 = one call-off from
+// breaking. That is the honest version of "we're running on a knife edge", and
+// it's the argument to take to an AM: not "we feel short", but "eleven days
+// next month break if one person calls off."
+//
+// What this deliberately does NOT predict: WHO will call off, and walk-up
+// demand by hour. Call-offs were never recorded until v60.163 and hourly demand
+// is never archived, so any such number would be invention. See forecastLimits().
+// ═══════════════════════════════════════════════════════════════════════════
+function forecastLimits(){
+  return {
+    canPredict:[
+      'Which days fall below minimum, per block',
+      'Which blocks leave someone working a zone alone',
+      'How many call-offs each day can absorb before it breaks (fragility)',
+      'Which managers are heading for a rough stretch (rotation health)'
+    ],
+    cannotPredict:[
+      'WHO will call off, or when — call-offs were never recorded before v60.163; the history starts now',
+      'Walk-up demand by hour — hourly paste data is never archived, so there is nothing to learn from'
+    ]
+  };
+}
+function _fcPeopleOn(dateKey){
+  var sched={}; try{ sched=mcScheduleObj(dateKey)||{}; }catch(e){}
+  var out=[];
+  Object.keys(sched).forEach(function(pid){
+    var code=sched[pid];
+    // v60.163: a stored day can hold EITHER a shift-code string ("530A-2P") or a
+    // MAY_SCHEDULE-style [start,end] pair. Handle both — passing an array into
+    // parseShiftToTimes throws (code.match is not a function).
+    var t=null;
+    if(Array.isArray(code)){
+      if(code.length<2 || code[0]==null) return;
+      t={shiftStart:code[0], shiftEnd:code[1]};
+    } else {
+      if(typeof isOffCode==='function' && isOffCode(code)) return;
+      t=(typeof parseShiftToTimes==='function')?parseShiftToTimes(code):null;
+    }
+    if(!t||t.shiftStart==null||t.shiftEnd==null) return;
+    var role=null;
+    try{
+      var all=[].concat(ROSTER_CXR||[],ROSTER_MGMT||[],ROSTER_EXIT||[],ROSTER_RETURNS||[]);
+      var m=all.filter(function(p){ return p && p.name && p.name.replace(/\s/g,'_')===pid; })[0];
+      role=m?m.role:null;
+    }catch(e){}
+    out.push({pid:pid, role:role, s:t.shiftStart, e:t.shiftEnd<t.shiftStart?t.shiftEnd+24:t.shiftEnd});
+  });
+  return out;
+}
+// One day: per-block have/need, fragility, and who'd be alone.
+function forecastDay(dateKey){
+  var ppl=_fcPeopleOn(dateKey);
+  if(!ppl.length) return {date:dateKey, noData:true};
+  var d=new Date(dateKey+'T12:00:00'), dow=d.getDay();
+  var dtype=(dow===0||dow===6)?'weekend':'weekday';
+  var T=(STATE.floorTargets&&STATE.floorTargets[dtype])||FLOOR_TARGETS[dtype];
+  var blocks=[['preopen',3.5,6],['open',6,9],['amid',9,12],['mid',12,16],['pm',16,20],['night',20,24]];
+  var FLOOR=['CXR','EXIT','RETURNS'];
+  var worst=99, rows=[], solo=[];
+  blocks.forEach(function(b){
+    var key=b[0], mid=(b[1]+b[2])/2;
+    var tgt=T[key]||FLOOR_TARGETS[dtype][key]||{c:0,e:0,r:0};
+    var need=(tgt.c||0)+(tgt.e||0)+(tgt.r||0);
+    if(need<=0) return;
+    var on=ppl.filter(function(x){ return mid>=x.s && mid<x.e; });
+    var have=on.filter(function(x){ return FLOOR.indexOf(x.role)>=0 || x.role===null; }).length;
+    var slack=have-need;
+    if(slack<worst) worst=slack;
+    // one-deep zones (returns/exit are the structural risk)
+    ['RETURNS','EXIT'].forEach(function(r){
+      var n=on.filter(function(x){return x.role===r;}).length;
+      if(n===1) solo.push({block:key, role:r, who:on.filter(function(x){return x.role===r;})[0].pid});
+    });
+    rows.push({block:key, label:(FLOOR_BLOCK_LABELS[key]||key), have:have, need:need, slack:slack});
+  });
+  return {date:dateKey, dow:dow, rows:rows, solo:solo,
+          fragility: worst===99?null:worst,
+          short: rows.filter(function(r){return r.slack<0;}).length};
+}
+// The month ahead, worst days first.
+function forecastAhead(days, fromKey){
+  var out=[], start=fromKey||(typeof todayKey==='function'?todayKey():null);
+  if(!start) return out;
+  var d0=new Date(start+'T12:00:00');
+  for(var i=0;i<(days||28);i++){
+    var d=new Date(d0.getTime()+i*86400000);
+    var k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    var f=forecastDay(k);
+    if(!f.noData) out.push(f);
+  }
+  return out;
+}
+function forecastSummary(days){
+  var f=forecastAhead(days||28);
+  var withData=f.length;
+  return {
+    days:withData,
+    alreadyShort:f.filter(function(x){return x.fragility!=null && x.fragility<0;}).length,
+    oneCallOffAway:f.filter(function(x){return x.fragility===0;}).length,
+    twoDeep:f.filter(function(x){return x.fragility===1;}).length,
+    soloDays:f.filter(function(x){return x.solo.length>0;}).length,
+    worst:f.slice().sort(function(a,b){return (a.fragility==null?9:a.fragility)-(b.fragility==null?9:b.fragility);}).slice(0,8)
+  };
+}
+
 function renderNow() {
   const el = document.getElementById('now-hero');
   if (!el) return;
@@ -10214,7 +10341,7 @@ function shiftToHour(str) {
   const ap = m[2];
   if (num > 99) num = Math.floor(num/100) + (num % 100) / 60;
   if (ap === 'P' && num < 12) num += 12;
-  if (ap === 'A' && num === 12) num = 0;
+  if (ap === 'A' && num >= 12 && num < 13) num -= 12;   // v60.163: 1230A → 0.5, not 12.5
   return num;
 }
 
@@ -18870,7 +18997,7 @@ function parseSchedulePaste(text) {
     if(num>99){num=Math.floor(num/100)+(num%100)/60;}
     let h=num+mn/60;
     if(ap==='p'&&h<12)h+=12;
-    if(ap==='a'&&h===12)h=0;
+    if(ap==='a'&&h>=12&&h<13)h-=12;   // v60.163: 12:30a → 0.5, not 12.5
     return Math.round(h*100)/100;
   }
 
