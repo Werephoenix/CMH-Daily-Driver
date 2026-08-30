@@ -7944,7 +7944,11 @@ function buildSwitchboard() {
 }
 
 // ── Tap-to-adjust slide-up panel ─────────────────────────────────────────────
-function tapPerson(pid) { return; // Replaced by inline cards
+// v60.173: tapPerson was dead — an early `return` left over from the move to
+// inline cards, so the switchboard's name buttons (still wired to it) silently
+// did nothing. It is now the single canonical "open this person's card" entry.
+function tapPerson(pid) { return openPersonPanel(pid); }
+function _tapPersonLegacy(pid) {
   if (_adjustPid === pid) { closeAdjustPanel(); return; }
   _adjustPid = pid;
 
@@ -10793,9 +10797,12 @@ function renderNow() {
     }
     const z = _effectiveNowZone(pid, e.person, h); // actual if tapped fresh, else plan
     const nick = e.person.nick || e.person.name.split(' ')[0];
-    if (z==='exit') zones.exit.push(nick);
-    else if (z==='counter'||z==='mgmt') zones.counter.push(nick);
-    else if (z==='returns') zones.returns.push(nick);
+    // v60.173: push a tappable chip, not a bare string. Only .length and
+    // .join(', ') are used downstream, so the chip HTML is safe here.
+    const _c = pidChip(pid, nick);
+    if (z==='exit') zones.exit.push(_c);
+    else if (z==='counter'||z==='mgmt') zones.counter.push(_c);
+    else if (z==='returns') zones.returns.push(_c);
   });
   const offPlan = (typeof _offPlanCount==='function') ? _offPlanCount() : 0;
   const rules = typeof COVERAGE_BY_HOUR==='function' ? COVERAGE_BY_HOUR(h, dow, exitAgents) : {exitMin:1, counterMin:2};
@@ -14006,7 +14013,7 @@ function floorSection() {
   // v60.85: Design floor-map "pill" — name chip + one optional badge.
   // Open/Close mgr fold-in: opener/closer shown as a role tag (Design's CLOSER pattern).
   function personRow(item) {
-    const {nick,info,callout}=item;
+    const {pid,nick,info,callout}=item;   // v60.173: pid for the tap-in
     // One badge max. Lunch is NOT tagged per-pill — lunch folks are grouped in the single
     // "On Lunch" zone card, so a per-pill lunch tag would double-label (isMgmt && /lunch/i.test(mgmtStation)
     // was the old guard for the same double-lunch problem; the grouping supersedes it).
@@ -14014,7 +14021,9 @@ function floorSection() {
     if(callout)                              badge=`<b class="fm-badge" style="color:var(--na)">off</b>`;
     else if(_closeNick && nick===_closeNick) badge=`<b class="fm-badge" style="color:var(--eb)">closer</b>`;
     else if(_openNick  && nick===_openNick)  badge=`<b class="fm-badge" style="color:var(--up)">opener</b>`;
-    return `<span class="fm-pill${callout?' fm-off':''}">${nick}${badge}</span>`;
+    // v60.173: the pill IS the door into the person's card.
+    return `<span class="fm-pill${callout?' fm-off':''} pid-chip" data-pid="${String(pid).replace(/"/g,'&quot;')}"
+      role="button" tabindex="0" style="cursor:pointer">${nick}${badge}</span>`;
   }
 
   const rules=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(Math.floor(nowH),dow):{exitMin:1,counterMin:2};
@@ -16759,17 +16768,18 @@ function buildCoverageTimeline() {
       const se=ov.end!=null?ov.end:e.person.shiftEnd;
       const onShift=ss!=null&&nowFloor>=ss&&nowFloor<se;
       if(onShift&&(STATE.todayOverrides||{})[pid]!=='callout'){
-        zones.returns.push(e.person.nick||e.person.name.split(' ')[0]);
+        zones.returns.push(pidChip(pid, e.person.nick||e.person.name.split(' ')[0]));
       }
       return;
     }
     const z=getZone(pid,e.person,nowFloor),nick=e.person.nick||e.person.name.split(' ')[0];
     if(z==='off')return; // skip off-shift
     if(z==='lunch')return; // lunching people handled separately
-    if(z==='exit')zones.exit.push(nick);
-    else if(z==='emerald')zones.emerald.push(nick);
-    else if(z==='returns')zones.returns.push(nick);
-    else if(z==='counter'||z==='mgmt')zones.counter.push(nick);
+    const _zc=pidChip(pid,nick);   // v60.173: tappable
+    if(z==='exit')zones.exit.push(_zc);
+    else if(z==='emerald')zones.emerald.push(_zc);
+    else if(z==='returns')zones.returns.push(_zc);
+    else if(z==='counter'||z==='mgmt')zones.counter.push(_zc);
   });
   const rules=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(nowFloor,dow,exitAgentCount):{exitMin:1,counterMin:2};
   const exitOk=zones.exit.length>=rules.exitMin,ctrOk=zones.counter.length>=rules.counterMin;
@@ -18471,9 +18481,36 @@ function updateManagerModeUI() {
   }
 }
 
+// v60.173: resolve a pid against EVERY roster, not just today's schedule.
+// _dnPeople() is the existing all-rosters list used by the display-name engine.
+function personByPid(pid){
+  if(!pid) return null;
+  var want = String(pid).replace(/\s/g,'_');
+  var ppl = (typeof _dnPeople==='function') ? _dnPeople() : [];
+  for (var i=0;i<ppl.length;i++){ if (dnPid(ppl[i]) === want) return ppl[i]; }
+  // tolerate the punctuation-stripped pid form used by some older call sites
+  var norm = want.replace(/[^A-Za-z0-9]/g,'_').replace(/__+/g,'_');
+  for (var j=0;j<ppl.length;j++){
+    var q = dnPid(ppl[j]).replace(/[^A-Za-z0-9]/g,'_').replace(/__+/g,'_');
+    if (q === norm) return ppl[j];
+  }
+  return null;
+}
+
 function openPersonPanel(pid) {
   const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
-  const entry = exp[pid]; if(!entry)return;
+  let entry = exp[pid];
+  // v60.173: a name is a door into the card EVERYWHERE it appears — including
+  // for someone who isn't on today's schedule (a roster list, a week view, an
+  // off/PTO list). Previously this returned silently, so those names looked
+  // tappable and did nothing. Fall back to the roster and open the card anyway;
+  // the controls that need a shift degrade rather than disappear.
+  if(!entry){
+    const rp = personByPid(pid);
+    if(!rp) return;
+    entry = { person: rp, shift: rp.shiftCode || '—', source: 'roster-notworking',
+              notWorkingToday: true };
+  }
   const p = entry.person;
   const nick = p.nick||p.name.split(' ')[0];
   const mods = STATE.shiftMod||{}, ov=mods[pid]||{};
@@ -18593,6 +18630,27 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
   let h=`<div style="border-top:1px solid var(--bdr);padding-top:12px;margin-top:4px">
     <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;
       color:var(--txt3);margin-bottom:8px">Manager Controls</div>`;
+
+  // v60.173 — ARE THEY HERE? is the first question about anyone, so it sits at the
+  // top of EVERY card regardless of role (Matt: "Called off should be on all
+  // employees employee card"). Before this it was a single binary "Mark Called
+  // Off" button buried at the BOTTOM, behind the "occasional" disclosure — and it
+  // still used the pre-v60.169 toggle, so a card could not record PTO, vacation or
+  // a genuine no-show. Recording a phoned-in absence as the same thing as a
+  // no-call-no-show is an attendance mark against someone who did the right thing,
+  // which is the exact unfairness v60.169 set out to fix.
+  // Reuses absencePickerHtml() — one picker, one behaviour, everywhere it appears.
+  {
+    const _curAbs = (typeof absenceTypeOf==='function') ? absenceTypeOf(pid) : null;
+    const _am = (_curAbs && typeof absenceMeta==='function') ? absenceMeta(_curAbs) : null;
+    h+=`<div style="margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+        color:${_am?_am.tone:'var(--txt3)'};margin-bottom:5px">
+        ${_am ? (_am.icon+' '+_am.label+' today — tap ↩ Here to undo') : 'Here today? — tap if not'}
+      </div>
+      ${(typeof absencePickerHtml==='function') ? absencePickerHtml(pid) : ''}
+    </div>`;
+  }
 
   // v60.143: ROTATION as the quick top toggle on a CXR card (Matt: should be one of
   // the quickest/easiest buttons). Big 1-tap targets, at the very top.
@@ -18798,19 +18856,68 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
     </button>`;
   }
 
-  // Called off toggle
-  const isCallout=(STATE.todayOverrides||{})[pid]==='callout';
-  h+=`<button onclick="toggleCallout('${pid}');buildCoverageTimeline();closePersonPanel()"
-    style="width:100%;padding:7px;border-radius:6px;border:1px solid;font-size:11px;font-weight:700;cursor:pointer;
-      background:${isCallout?'rgba(248,113,113,.1)':'var(--bg3)'};
-      border-color:${isCallout?'var(--red)':'var(--bdr2)'};
-      color:${isCallout?'var(--red)':'var(--txt3)'}">
-    ${isCallout?'❌ Called Off — Tap to Reinstate':'Mark Called Off'}
-  </button>`;
+  // v60.173: the old binary "Mark Called Off" button lived here, at the bottom
+  // behind the disclosure. It has moved to the TOP of the card as the four-type
+  // absence picker — see the note there. Not duplicated: one control, one place.
 
   h+=`</div>`;
   return h;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.173 · EVERY NAME IS A DOOR INTO THE CARD
+// Matt: "Anywhere an employees name is listed, it should click into the employee
+// card for all the controls and options."
+//
+// Done with ONE delegated listener rather than an onclick on every name. There
+// are 30+ places that render a name, several rebuild their HTML constantly
+// (the floor, the timeline, the coverage chart), and per-site onclick wiring
+// would rot the moment someone adds a 31st. Delegation means: tag the element
+// with data-pid and it works, forever, including through re-renders.
+//
+// Guards, in order — each exists for a reason:
+//   • honour a real control first: if the click landed on a button/link/input
+//     INSIDE a tagged row (the absence picker, a "send to exit" fix button),
+//     that control wins and the card does not open over the top of it.
+//   • ignore text selection, so dragging to read a name isn't a tap.
+//   • ignore an empty data-pid.
+// ═══════════════════════════════════════════════════════════════════════════
+function pidChip(pid, label, extraStyle){
+  var esc = String(pid).replace(/"/g,'&quot;');
+  return '<span class="pid-chip" data-pid="'+esc+'" role="button" tabindex="0"'
+       + ' style="cursor:pointer'+(extraStyle?';'+extraStyle:'')+'">'+label+'</span>';
+}
+function _pidFromEvent(e){
+  var el = e.target;
+  // a genuine control inside the row handles its own click
+  var ctl = el.closest && el.closest('button,a,input,select,textarea,[onclick]');
+  var host = el.closest && el.closest('[data-pid]');
+  if(!host) return null;
+  if(ctl && host.contains(ctl) && ctl !== host) return null;
+  var pid = host.getAttribute('data-pid');
+  return (pid && pid.trim()) ? pid : null;
+}
+function _initNameDelegation(){
+  if(window._nameDelegationOn) return;
+  window._nameDelegationOn = true;
+  document.addEventListener('click', function(e){
+    var pid = _pidFromEvent(e);
+    if(!pid) return;
+    try { if(String(window.getSelection())) return; } catch(err){}
+    e.preventDefault(); e.stopPropagation();
+    if(typeof openPersonPanel==='function') openPersonPanel(pid);
+  }, true);
+  // keyboard parity — a tappable name should also be reachable by Enter/Space
+  document.addEventListener('keydown', function(e){
+    if(e.key!=='Enter' && e.key!==' ') return;
+    var host = e.target && e.target.closest && e.target.closest('[data-pid]');
+    if(!host || !host.classList.contains('pid-chip')) return;
+    e.preventDefault();
+    if(typeof openPersonPanel==='function') openPersonPanel(host.getAttribute('data-pid'));
+  });
+}
+try { _initNameDelegation(); } catch(e){}
+document.addEventListener('DOMContentLoaded', function(){ try{ _initNameDelegation(); }catch(e){} });
 
 function closePersonPanel() {
   const p=document.getElementById('person-panel');
