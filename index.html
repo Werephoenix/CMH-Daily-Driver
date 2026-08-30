@@ -2998,8 +2998,16 @@ Genesis Cochran, 5/14</pre>
 <!-- MODAL OVERLAY -->
 <!-- v60.44: iOS bottom sheet (was a centered dialog). Grab handle + slide-up;
      docks as a right panel on desktop. -->
+<!-- v60.174: z-index was 1000 — BELOW the full-screen sheets (#as-overlay 100060,
+     #sf-overlay 100061, #co-overlay/#sn-overlay 100062, #wins-overlay 100063),
+     all of which paint an OPAQUE background. So any openModal() launched from
+     inside one of those sheets rendered ~99,000 layers underneath it and looked
+     like a dead button — you only saw it after closing the sheet. Found via
+     "Draft today's manager areas" inside "Who I need today". 100080 puts modals
+     above every sheet while staying below the DNR gate (100090), which must
+     remain the top layer because it gates third-party PII. -->
 <div id="modal-overlay" style="display:none;position:fixed;inset:0;
-  background:rgba(0,0,0,.6);z-index:1000;
+  background:rgba(0,0,0,.6);z-index:100080;
   align-items:flex-end;justify-content:center;padding:0">
   <div class="modal-sheet">
     <div class="sheet-grab"></div>
@@ -7725,13 +7733,20 @@ function buildSwitchboard() {
       <!-- Row 1: Name + shift + working toggle -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;color:var(--txt)">${nick}
+          <div class="pid-chip" data-pid="${pid}" role="button" tabindex="0"
+            style="font-size:13px;font-weight:700;color:var(--txt);cursor:pointer">${nick}
             ${pref==='counter'?'<span style="font-size:9px;color:var(--acc)"> 🟦</span>':pref==='exit'?'<span style="font-size:9px;color:var(--green)"> 🟩</span>':''}
           ${(()=>{const sg=typeof getPatternSuggestion==='function'?getPatternSuggestion(pid):null;return sg&&pref==='none'?`<span style="font-size:8px;background:rgba(217,119,6,.1);color:var(--amber);border-radius:3px;padding:1px 4px;margin-left:3px">~${sg.pref==='exit'?'🟩':'🟦'}</span>`:'';})()}
           </div>
           <div onclick="showShiftModModal('${pid}','${(nick||'').replace(/'/g,'')}')" title="Adjust work time — slide or type" style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono);cursor:pointer;border-bottom:1px dotted var(--bdr2);display:inline-block">⏰ ${timeDisp}</div>
         </div>
-        <button onclick="toggleCallout('${pid}');buildSwitchboard()"
+        <!-- v60.174: was toggleCallout() — an UNTYPED callout. One tap still means
+             the common case (they phoned in), but it now records the TYPE
+             explicitly via setAbsence so nothing downstream has to guess, and
+             tapping again clears it. For no-show / PTO / vacation, tap the NAME
+             to open the card and pick. -->
+        <button onclick="event.stopPropagation();sbQuickAbsence('${pid}')"
+          title="Tap = called off. Tap the name for No show / PTO / Vacation."
           style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:4px;
             border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);
             cursor:pointer;white-space:nowrap;flex-shrink:0">
@@ -7875,10 +7890,17 @@ function buildSwitchboard() {
       <!-- Row 1: Name + shift + working toggle -->
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;color:var(--txt)">${nick}</div>
+          <div class="pid-chip" data-pid="${pid}" role="button" tabindex="0"
+            style="font-size:13px;font-weight:700;color:var(--txt);cursor:pointer">${nick}</div>
           <div onclick="showShiftModModal('${pid}','${(nick||'').replace(/'/g,'')}')" title="Adjust work time — slide or type" style="font-size:10px;color:var(--txt3);font-family:var(--ff-mono);cursor:pointer;border-bottom:1px dotted var(--bdr2);display:inline-block">⏰ ${timeDisp}</div>
         </div>
-        <button onclick="toggleCallout('${pid}');buildSwitchboard()"
+        <!-- v60.174: was toggleCallout() — an UNTYPED callout. One tap still means
+             the common case (they phoned in), but it now records the TYPE
+             explicitly via setAbsence so nothing downstream has to guess, and
+             tapping again clears it. For no-show / PTO / vacation, tap the NAME
+             to open the card and pick. -->
+        <button onclick="event.stopPropagation();sbQuickAbsence('${pid}')"
+          title="Tap = called off. Tap the name for No show / PTO / Vacation."
           style="font-size:10px;font-weight:700;padding:5px 10px;border-radius:4px;
             border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);
             cursor:pointer;white-space:nowrap;flex-shrink:0">
@@ -8188,6 +8210,17 @@ function toggleBriefingPerson(pid) {
   else STATE.todayOverrides[pid] = 'confirmed';
   saveState();
   buildMorningBriefing();
+}
+
+// v60.174: the switchboard's one-tap absence. Explicit 'calledoff' rather than
+// an untyped callout — a person who phoned in must never look like a no-show.
+// Anything other than the common case is a tap on the NAME, which opens the
+// card and its four-type picker.
+function sbQuickAbsence(pid){
+  var cur = (typeof absenceTypeOf==='function') ? absenceTypeOf(pid) : null;
+  if(cur){ if(typeof clearAbsence==='function') clearAbsence(pid); }
+  else   { if(typeof setAbsence==='function')  setAbsence(pid,'calledoff'); }
+  if(typeof buildSwitchboard==='function') buildSwitchboard();
 }
 
 function toggleCallout(pid) {
@@ -23709,9 +23742,11 @@ function proposeManagerAreas(opts){
       var got=assigned.filter(function(a){return a.area===area;}).length;
       var n=need[area]||0; if(got<n) short.push(area+' −'+(n-got));
     });
-    rows.push({block:bk, from:from, to:to, avail:avail.length,
+    // v60.174: keep pid + this block's need on the row. Without pid the draft
+    // could only ever be read, never corrected — which is what Matt hit.
+    rows.push({block:bk, from:from, to:to, avail:avail.length, need:need,
       assigned:assigned.map(function(a){
-        var e=exp[a.pid]; return {nick:(typeof dispName==='function'?dispName(e.person):(e.person.nick||String(e.person.name||'').split(' ')[0])), role:e.person.role, area:a.area};
+        var e=exp[a.pid]; return {pid:a.pid, nick:(typeof dispName==='function'?dispName(e.person):(e.person.nick||String(e.person.name||'').split(' ')[0])), role:e.person.role, area:a.area};
       }), short:short});
   });
   // merge adjacent same-station blocks so the timeline isn't chopped up
@@ -23727,8 +23762,61 @@ function proposeManagerAreas(opts){
   return {plan:plan, rows:rows, dtype:dtype};
 }
 // Review-then-apply UI for the draft (never silently rewrite the day).
-function openProposedAreas(){
-  var p=proposeManagerAreas();
+// ── v60.174 · EDITING THE DRAFT ────────────────────────────────────────────
+// The draft is now corrected BEFORE it's applied. Editing mutates rows only;
+// pmaRebuild() regenerates plan{} from the rows at apply time, so an edited and
+// an untouched draft go through exactly the same path — there is no second
+// code path that could drift from the first.
+var PMA_EDIT_AREAS = ['emerald','returns','exit','floater','counter','opening','closing'];
+
+// Recompute a block's shortfalls after an edit, so ⚠/✓ never lies about the
+// plan actually on screen.
+function pmaRecount(row){
+  var need=row.need||{}, short=[];
+  Object.keys(need).forEach(function(area){
+    var n=need[area]||0; if(!n) return;
+    var got=row.assigned.filter(function(a){return a.area===area;}).length;
+    if(got<n) short.push(area+' \u2212'+(n-got));
+  });
+  row.short=short;
+  return row;
+}
+function pmaSetArea(blockKey, pid, area){
+  var d=window._pmaDraft; if(!d||!d.rows) return;
+  var row=d.rows.filter(function(r){return r.block===blockKey;})[0]; if(!row) return;
+  var a=row.assigned.filter(function(x){return String(x.pid)===String(pid);})[0]; if(!a) return;
+  a.area=area;
+  pmaRecount(row);
+  openProposedAreas(d);      // re-render in place, preserving the edits
+}
+// rows → plan{pid:[{from,to,station}]}, merging adjacent same-station blocks
+// (the same merge the generator does, so the timeline isn't chopped up).
+function pmaRebuild(draft){
+  if(!draft||!draft.rows) return draft;
+  var plan={};
+  draft.rows.forEach(function(r){
+    r.assigned.forEach(function(a){
+      (plan[a.pid]=plan[a.pid]||[]).push({from:r.from,to:r.to,
+        station:(PMA_STATION[a.area]||'Floater'), area:a.area});
+    });
+  });
+  Object.keys(plan).forEach(function(pid){
+    var arr=plan[pid].sort(function(x,y){return x.from-y.from;}), merged=[];
+    arr.forEach(function(b){
+      var last=merged[merged.length-1];
+      if(last && last.station===b.station && last.to===b.from) last.to=b.to;
+      else merged.push(Object.assign({},b));
+    });
+    plan[pid]=merged;
+  });
+  draft.plan=plan;
+  return draft;
+}
+
+function openProposedAreas(existing){
+  // v60.174: re-render the CURRENT draft when one is passed in, so an edit
+  // doesn't silently regenerate the plan and throw away what was just changed.
+  var p = existing || proposeManagerAreas();
   window._pmaDraft=p;
   var AREA_LBL={emerald:'🌟 Emerald', returns:'↩ Returns', exit:'🟩 Exit',
     floater:'🚗 Floater', counter:'🟦 Counter', opening:'🌅 Opening', closing:'🌙 Closing'};
@@ -23737,7 +23825,8 @@ function openProposedAreas(){
   var body='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
     +'A starting plan built from who’s on today and your manager minimums — <b>Emerald first, then Returns</b>, '
     +'MTs/ABRMs step into Exit, everyone else floats (never defaulted to Counter). '
-    +'<b>Nothing is locked</b> — apply it, then drag or edit any block to correct it.</div>';
+    +'<b>Change anything before you apply it</b> — tap any station below to reassign that '
+    +'person for that block; the ⚠/✓ updates as you go.</div>';
   if(!any){
     body+='<div style="font-size:13px;color:var(--txt2);line-height:1.6">No managers are on the schedule today, so there’s nothing to plan yet. Load or paste today’s manager schedule first.</div>'
       +'<div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-gh" onclick="closeModal()">Close</button></div>';
@@ -23751,16 +23840,27 @@ function openProposedAreas(){
          ? '<span style="margin-left:auto;font-size:10.5px;font-weight:800;color:var(--red)">⚠ '+r.short.join(' · ')+'</span>'
          : '<span style="margin-left:auto;font-size:10.5px;font-weight:800;color:var(--accent,#23C983)">✓ covered</span>')
       +'</div>';
+    // v60.174: each assignment is EDITABLE here. The draft used to be read-only
+    // with "apply it, then edit any block to correct it" — which meant committing
+    // a plan you could already see was wrong, then unpicking it. A native <select>
+    // is deliberate: it's one tap on a phone and needs no drag targets.
     body+= r.assigned.length
       ? '<div style="display:flex;flex-wrap:wrap;gap:5px">'+r.assigned.map(function(a){
-          return '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt2)">'
-            +a.nick+' <span style="color:var(--txt3)">'+(AREA_LBL[a.area]||a.area)+'</span></span>';
+          var opts=PMA_EDIT_AREAS.map(function(k){
+            return '<option value="'+k+'"'+(k===a.area?' selected':'')+'>'+(AREA_LBL[k]||k)+'</option>';
+          }).join('');
+          return '<span style="font-size:11px;padding:3px 5px 3px 8px;border-radius:6px;background:var(--bg3);'
+            +'border:1px solid var(--bdr2);color:var(--txt2);display:inline-flex;align-items:center;gap:4px">'
+            +'<b style="color:var(--txt)">'+a.nick+'</b>'
+            +'<select onchange="pmaSetArea(\''+r.block+'\',\''+String(a.pid).replace(/'/g,"\\'")+'\',this.value)" '
+            +'style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:5px;color:var(--txt2);'
+            +'font-size:11px;padding:2px 4px;cursor:pointer">'+opts+'</select></span>';
         }).join('')+'</div>'
       : '<div style="font-size:11px;color:var(--txt3)">nobody on shift</div>';
     body+='</div>';
   });
   body+='<div style="display:flex;gap:8px;margin-top:14px">'
-    +'<button onclick="applyProposedManagerAreas(window._pmaDraft);closeModal();" style="flex:1;padding:11px;border-radius:6px;border:none;background:var(--accent);color:#04160e;font-size:13px;font-weight:800;cursor:pointer">✓ Apply this draft</button>'
+    +'<button onclick="applyProposedManagerAreas(pmaRebuild(window._pmaDraft));closeModal();" style="flex:1;padding:11px;border-radius:6px;border:none;background:var(--accent);color:#04160e;font-size:13px;font-weight:800;cursor:pointer">✓ Apply this draft</button>'
     +'<button class="btn btn-gh" onclick="closeModal()">Cancel</button></div>';
   openModal('🤖 Draft manager areas', body);
 }
