@@ -3020,6 +3020,76 @@ Genesis Cochran, 5/14</pre>
 
 const JSONBIN_ID  = '69f8b975aaba8821976dafb7';
 const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/69f8b975aaba8821976dafb7';
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.171 · SUPABASE — the cloud store, replacing the public JSONBin bin above.
+//
+// WHY: that bin had no authentication of ANY kind. Anyone with the URL could
+// read or overwrite the branch's whole state — staff names, schedules,
+// birthdays, and the DNR/DNQ list (named customers with fraud allegations).
+// Verified 2026-08-30 against this project: anonymous read AND anonymous write
+// are both refused (401), while a signed-in device works normally.
+//
+// JSONBIN_URL is kept above deliberately: for one week the old bin stays
+// READABLE as a fallback and as the source for the one-time migration, but
+// nothing writes to it ever again.
+//
+// The anon key below is PUBLIC BY DESIGN — it identifies the project, it does
+// not grant access; the row-level-security policies do that, and they require a
+// signed-in user. The PASSWORD IS NEVER IN THIS FILE. Each device signs in once
+// and the session lives in localStorage (device-local, deliberately NOT in
+// STATE, which syncs). Baking a password in would publish it on GitHub Pages
+// and undo the entire exercise.
+// ═══════════════════════════════════════════════════════════════════════════
+const SB_URL  = 'https://uktrhfagdavwdlnqyuak.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrdHJoZmFnZGF2d2RsbnF5dWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwNTQ4NzIsImV4cCI6MjEwMzYzMDg3Mn0.5grMq8rZSHl93qkDgOn778qUHv5BI4Sdn81LedM8fOs';
+const SB_ROW  = 'cmh-38n6';            // one row = this branch's shared state
+const SB_SESS_KEY = 'cmh-sb-session';  // device-local; never synced
+var _sbRt = null, _sbRtHeartbeat = null, _sbRtOk = false;
+
+function _sbSess(){ try { return JSON.parse(localStorage.getItem(SB_SESS_KEY)||'null'); } catch(e){ return null; } }
+function _sbSaveSess(o){ try { localStorage.setItem(SB_SESS_KEY, JSON.stringify(o)); } catch(e){} }
+function sbSignedIn(){ var s=_sbSess(); return !!(s && s.refresh_token); }
+function sbSignOut(){
+  try { localStorage.removeItem(SB_SESS_KEY); } catch(e){}
+  try { if(_sbRt) _sbRt.close(); } catch(e){}
+  setSyncStatus('offline','Signed out');
+}
+
+// Access tokens expire after ~1h; the refresh_token is long-lived. Returns null
+// when this device isn't signed in, which every caller treats as "stay local".
+async function sbToken(){
+  var s = _sbSess(); if(!s) return null;
+  var now = Math.floor(Date.now()/1000);
+  if (s.access_token && s.expires_at && s.expires_at - 30 > now) return s.access_token;
+  if (!s.refresh_token) return null;
+  try {
+    const r = await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token', {
+      method:'POST', headers:{ apikey:SB_ANON, 'Content-Type':'application/json' },
+      body: JSON.stringify({ refresh_token: s.refresh_token }) });
+    const j = await r.json();
+    if (!j.access_token) return null;
+    j.expires_at = Math.floor(Date.now()/1000) + (j.expires_in||3600);
+    _sbSaveSess(j);
+    return j.access_token;
+  } catch(e){ return null; }
+}
+async function sbSignIn(email, password){
+  try {
+    const r = await fetch(SB_URL+'/auth/v1/token?grant_type=password', {
+      method:'POST', headers:{ apikey:SB_ANON, 'Content-Type':'application/json' },
+      body: JSON.stringify({ email:email, password:password }) });
+    const j = await r.json();
+    if (!j.access_token) return { ok:false, err:(j.error_description||j.msg||j.error||'Sign-in failed') };
+    j.expires_at = Math.floor(Date.now()/1000) + (j.expires_in||3600);
+    _sbSaveSess(j);
+    return { ok:true };
+  } catch(e){ return { ok:false, err:'No connection' }; }
+}
+async function _sbHeaders(extra){
+  const t = await sbToken(); if(!t) return null;
+  return Object.assign({ apikey:SB_ANON, Authorization:'Bearer '+t,
+                         'Content-Type':'application/json' }, extra||{});
+}
 
 // ── CAR CODE → GROUP MAPPING ────────────────────────────────────────────────
 var CODE_MAP = {
@@ -4156,13 +4226,13 @@ function saveState() {
   }
   // Debounce cloud sync 2.5s
   if (window._syncTimer) clearTimeout(window._syncTimer);
-  // v60.6: mark that a local edit is queued to push. pullFromJsonbin checks
+  // v60.6: mark that a local edit is queued to push. cloudPull checks
   // this (via syncPushPending) and DEFERS applying a remote pull while a push
   // is pending — otherwise an interleaved 30s poll would Object.assign over the
   // just-made local edit before it ever reaches the server, and the queued push
   // would then upload the clobbered state, silently losing the edit.
   window._syncPending = true;
-  window._syncTimer = setTimeout(pushToJsonbin, 2500);
+  window._syncTimer = setTimeout(cloudPush, 2500);
 }
 
 function saveField(key, val) {
@@ -14115,40 +14185,44 @@ function setSyncStatus(status, msg) {
     syncing: {color:'var(--amber)', dot:'◉', text:'Syncing...'},
     synced:  {color:'var(--green)', dot:'●', text: msg || 'Live'},
     error:   {color:'var(--red)',   dot:'●', text: msg || 'Sync error'},
-    offline: {color:'var(--txt3)',  dot:'○', text:'Local only'},
+    offline: {color:'var(--txt3)',  dot:'○', text: msg || 'Local only'},
   };
   const c = cfg[status] || cfg.offline;
   el.innerHTML = '<span style="color:'+c.color+'">'+c.dot+' '+c.text+'</span>';
+  // v60.171: the indicator is the way BACK to sign-in. Without this, dismissing
+  // the prompt once would strand a device on local-only with no visible route
+  // to sharing again short of clearing site data.
+  const needsSignIn = (typeof sbSignedIn === 'function') && !sbSignedIn();
+  el.style.cursor = needsSignIn ? 'pointer' : '';
+  el.title = needsSignIn ? 'Tap to sign in and sync with the other devices' : '';
+  el.onclick = needsSignIn ? function(){ sbPrompt(); } : null;
 }
 
-async function pushToJsonbin() {
-  // v60.6: the push is firing now — clear the pending flag. Everything below
-  // runs synchronously up to the `await fetch`, so JSON.stringify(payload)
-  // captures the current STATE into the request body before any remote pull
-  // could mutate it. Clearing here (not on success) means an actively-editing
-  // device resumes accepting remote pulls right after it pushes.
+async function cloudPush() {
+  // v60.6: the push is firing now — clear the pending flag. This line stays
+  // SYNCHRONOUS (before any await) so an actively-editing device resumes
+  // accepting remote pulls the moment it pushes. test_sync.js asserts this.
   window._syncPending = false;
   setSyncStatus('syncing');
+  const H = await _sbHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' });
+  if (!H) { setSyncStatus('offline','Sign in to sync'); return; }
   try {
     const payload = {
-      app: 'cmh-daily-driver',
-      version: '1',
-      savedAt: new Date().toISOString(),
-      by: (STATE.fields&&STATE.fields.openMgr)||'manager',
+      id: SB_ROW,
+      saved_at: new Date().toISOString(),
+      saved_by: (STATE.fields&&STATE.fields.openMgr)||'manager',
       state: STATE,
     };
-    const res = await fetch(JSONBIN_URL, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Bin-Versioning': 'false'
-      },
-      body: JSON.stringify(payload),
-    });
+    // upsert: one row per branch, overwritten in place (no version history to
+    // grow unbounded — same shape as the old bin's X-Bin-Versioning:false).
+    const res = await fetch(SB_URL+'/rest/v1/branch_state', {
+      method:'POST', headers:H, body: JSON.stringify(payload) });
     if (res.ok) {
       const t = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
       setSyncStatus('synced', 'Saved '+t);
-      _lastRemoteAt = payload.savedAt;
+      _lastRemoteAt = payload.saved_at;
+    } else if (res.status === 401 || res.status === 403) {
+      setSyncStatus('offline','Sign in to sync');
     } else {
       setSyncStatus('error', 'Error '+res.status);
     }
@@ -14159,9 +14233,9 @@ async function pushToJsonbin() {
 
 // v60.144: immediate push (skips the 2.5s debounce) — used by Publish so an
 // approved schedule reaches the cloud the second the manager confirms it.
-function pushToJsonbinNow() {
+function cloudPushNow() {
   if (window._syncTimer) clearTimeout(window._syncTimer);
-  return pushToJsonbin();
+  return cloudPush();
 }
 
 // ── v60.6: sync merge split into pure, offline-testable pieces ──────────────
@@ -14246,23 +14320,63 @@ function applyRemoteRecord(record, apply) {
   return 'applied';
 }
 
-async function pullFromJsonbin(apply) {
+async function cloudPull(apply) {
+  const H = await _sbHeaders();
+  if (!H) { setSyncStatus('offline','Sign in to sync'); return; }
   try {
-    const res = await fetch(JSONBIN_URL+'/latest', {
-      headers: { 'X-Bin-Meta': 'false' }
-    });
+    const res = await fetch(SB_URL+'/rest/v1/branch_state?id=eq.'+encodeURIComponent(SB_ROW)
+                            +'&select=state,saved_at,saved_by', { headers:H });
     if (!res.ok) {
-      if (res.status === 404) setSyncStatus('synced', 'Ready');
+      if (res.status === 401 || res.status === 403) setSyncStatus('offline','Sign in to sync');
       else setSyncStatus('offline');
       return;
     }
-    const data = await res.json();
-    // jsonbin v3 with X-Bin-Meta:false returns the record directly
-    const record = data.record || data;
-    applyRemoteRecord(record, apply);
+    const rows = await res.json();
+    if (!rows || !rows.length) { setSyncStatus('synced','Ready'); return; }   // first run, nothing stored yet
+    // Re-shaped to the record contract applyRemoteRecord already expects, so
+    // the race guard and union merge below are reused completely unchanged.
+    applyRemoteRecord({ state: rows[0].state, savedAt: rows[0].saved_at,
+                        by: rows[0].saved_by }, apply);
   } catch(e) {
     setSyncStatus('offline');
   }
+}
+
+// ── Realtime: a change on one device lands on the others in well under a second.
+// This SUPPLEMENTS the focus-aware poll below rather than replacing it — if the
+// socket dies on flaky airport wifi the poll is still the floor.
+function sbRealtime(){
+  if (!sbSignedIn()) return;
+  try { if (_sbRt) _sbRt.close(); } catch(e){}
+  sbToken().then(function(tok){
+    if (!tok) return;
+    try {
+      _sbRt = new WebSocket(SB_URL.replace('https','wss')+'/realtime/v1/websocket?apikey='+SB_ANON+'&vsn=1.0.0');
+    } catch(e){ return; }
+    _sbRt.onopen = function(){
+      _sbRt.send(JSON.stringify({ topic:'realtime:public:branch_state', event:'phx_join',
+        payload:{ config:{ postgres_changes:[{ event:'*', schema:'public', table:'branch_state' }] } },
+        ref:'1' }));
+      _sbRtOk = true;
+      clearInterval(_sbRtHeartbeat);
+      _sbRtHeartbeat = setInterval(function(){
+        try { _sbRt.send(JSON.stringify({topic:'phoenix',event:'heartbeat',payload:{},ref:'hb'})); } catch(e){}
+      }, 25000);
+    };
+    _sbRt.onmessage = function(ev){
+      try {
+        const m = JSON.parse(ev.data);
+        // Ignore our own echo: _syncPending/_lastRemoteAt guards in
+        // applyRemoteRecord already handle it, so just pull.
+        if (m.event === 'postgres_changes') cloudPull(true);
+      } catch(e){}
+    };
+    _sbRt.onclose = function(){
+      _sbRtOk = false; clearInterval(_sbRtHeartbeat);
+      setTimeout(function(){ if (sbSignedIn()) sbRealtime(); }, 5000);
+    };
+    _sbRt.onerror = function(){ _sbRtOk = false; };
+  });
 }
 
 // v60.144: SMART FOCUS-AWARE POLLING. Instead of a flat 30s interval (which burns
@@ -14283,16 +14397,106 @@ function _syncScheduleNext() {
   if (document.visibilityState !== 'visible') return;            // paused while hidden
   const idle = (Date.now() - _lastActivity) > _idleAfterMs;
   _pollTimer = setTimeout(function(){
-    Promise.resolve(pullFromJsonbin(true)).then(_syncScheduleNext, _syncScheduleNext);
+    Promise.resolve(cloudPull(true)).then(_syncScheduleNext, _syncScheduleNext);
   }, idle ? _pollSlow : _pollFast);
 }
 function _syncPullNow() {
   _lastActivity = Date.now();
-  Promise.resolve(pullFromJsonbin(true)).then(_syncScheduleNext, _syncScheduleNext);
+  Promise.resolve(cloudPull(true)).then(_syncScheduleNext, _syncScheduleNext);
 }
-function initSync() {
-  setSyncStatus('syncing', 'Connecting...');
+
+// ── v60.171: sign-in, once per device ──────────────────────────────────────
+// Deliberately a prompt, not a baked-in credential. This app is served from a
+// public GitHub Pages URL; anything in the file is world-readable.
+function sbPrompt(){
+  openModal('🔒 Sign in to sync',
+     '<div style="font-size:13px;color:var(--txt3);line-height:1.55;margin-bottom:14px">'
+    +'This device needs the branch login <b>once</b>. After that it stays signed in '
+    +'and syncs on its own — you won\'t see this again on this device.'
+    +'</div>'
+    +'<input id="sb-em" type="email" placeholder="Branch email" autocomplete="username" '
+    +'style="width:100%;padding:12px;margin-bottom:8px;background:var(--bg3);border:1px solid var(--bdr2);'
+    +'border-radius:8px;color:var(--txt);font-size:15px;box-sizing:border-box">'
+    +'<input id="sb-pw" type="password" placeholder="Password" autocomplete="current-password" '
+    +'onkeydown="if(event.key===\'Enter\')sbDoSignIn()" '
+    +'style="width:100%;padding:12px;background:var(--bg3);border:1px solid var(--bdr2);'
+    +'border-radius:8px;color:var(--txt);font-size:15px;box-sizing:border-box">'
+    +'<div id="sb-err" style="color:var(--na,#ff6b6b);font-size:12.5px;margin-top:10px;min-height:16px"></div>'
+    +'<button onclick="sbDoSignIn()" style="width:100%;margin-top:10px;padding:14px;border-radius:10px;'
+    +'border:none;background:var(--accent);color:#04160e;font-size:15px;font-weight:800;cursor:pointer">'
+    +'Sign in</button>'
+    +'<div style="font-size:11.5px;color:var(--txt3);margin-top:12px;line-height:1.5">'
+    +'You can keep using the app offline without signing in — your work saves on this '
+    +'device either way. Signing in is what shares it with the other devices.</div>');
+  setTimeout(function(){ var e=document.getElementById('sb-em'); if(e) e.focus(); }, 120);
+}
+async function sbDoSignIn(){
+  const em = (document.getElementById('sb-em')||{}).value||'';
+  const pw = (document.getElementById('sb-pw')||{}).value||'';
+  const errEl = document.getElementById('sb-err');
+  if (!em.trim() || !pw) { if(errEl) errEl.textContent='Enter the email and password.'; return; }
+  if (errEl) errEl.textContent = 'Signing in…';
+  const res = await sbSignIn(em.trim(), pw);
+  if (!res.ok) { if(errEl) errEl.textContent = res.err; return; }
+  closeModal();
+  if (typeof toast==='function') toast('🔒 Signed in — syncing');
+  await sbMigrateIfNeeded();
   _syncPullNow();
+  sbRealtime();
+}
+
+// ── one-time migration off the old public bin ──────────────────────────────
+// Runs once per device, guarded by a device-local flag. Reads the old bin,
+// unions it in through the SAME merge used for every pull, pushes the result.
+// The old bin is left completely untouched and READABLE — it stays as a
+// fallback for a week before deletion; we simply never write to it again.
+async function sbMigrateIfNeeded(){
+  try {
+    if (localStorage.getItem('cmh-sb-migrated') === '1') return {ok:true, skipped:true};
+  } catch(e){}
+  try {
+    // If Supabase already holds a row, another device migrated first — the
+    // normal pull path is correct and re-importing the stale bin would be a
+    // step backwards.
+    const H = await _sbHeaders();
+    if (!H) return {ok:false, why:'not signed in'};
+    const chk = await fetch(SB_URL+'/rest/v1/branch_state?id=eq.'+encodeURIComponent(SB_ROW)+'&select=id',
+                            { headers:H });
+    if (chk.ok) {
+      const rows = await chk.json();
+      if (rows && rows.length) { try{ localStorage.setItem('cmh-sb-migrated','1'); }catch(e){} 
+        return {ok:true, skipped:'already migrated'}; }
+    }
+    const r = await fetch(JSONBIN_URL+'/latest', { headers:{'X-Bin-Meta':'false'} });
+    if (!r.ok) { try{ localStorage.setItem('cmh-sb-migrated','1'); }catch(e){}
+      return {ok:false, why:'old store unreachable ('+r.status+')'}; }
+    const d = await r.json();
+    const rec = d.record || d;
+    if (rec && rec.state) mergeRemoteIntoState(STATE, rec.state);
+    if (typeof saveState === 'function') saveState();
+    await cloudPush();
+    try { localStorage.setItem('cmh-sb-migrated','1'); } catch(e){}
+    if (typeof toast === 'function') toast('☁️ Brought your saved data across');
+    return {ok:true, from:(rec&&rec.savedAt)||null};
+  } catch(e){ return {ok:false, why:e.message}; }
+}
+
+function initSync() {
+  // v60.171: Supabase-backed. Not signed in = the app still works fully offline
+  // on this device; it just doesn't share. We ask once, gently, after the UI has
+  // settled — never a wall in front of the morning open.
+  setSyncStatus('syncing', 'Connecting...');
+  if (!sbSignedIn()) {
+    // NOTE: fall through, don't return. The focus/visibility listeners below
+    // must attach even while signed out — otherwise signing in later via the
+    // prompt leaves this device with no catch-up-on-focus until a reload.
+    // _syncPullNow is harmless while signed out: cloudPull exits at the
+    // no-token check without making a single network request.
+    setSyncStatus('offline', 'Sign in to sync');
+    setTimeout(function(){ if (!sbSignedIn()) sbPrompt(); }, 1500);
+  } else {
+    sbMigrateIfNeeded().then(function(){ _syncPullNow(); sbRealtime(); });
+  }
   document.addEventListener('visibilitychange', function(){
     if (document.visibilityState === 'visible') _syncPullNow();
     else clearTimeout(_pollTimer);
@@ -22633,7 +22837,7 @@ function asApplyWeek(){
     what: (_asPlanner==='mgr'?'Manager':'CXR')+' schedule · '+range,
   };
   if(typeof saveState==='function') saveState();
-  if(typeof pushToJsonbinNow==='function') pushToJsonbinNow();
+  if(typeof cloudPushNow==='function') cloudPushNow();
   if(touchedToday && typeof loadScheduleForToday==='function') loadScheduleForToday(false);
   if(typeof toast==='function') toast('📢 Published to all devices — '+range);
   if(_asRenderMode==='inline'){ renderScheduleWeek(); } else { closeAutoScheduler(); }
