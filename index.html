@@ -1646,31 +1646,92 @@ select option{background:var(--bg3)}
 .ff-mono{font-family:var(--ff-mono)}
 
 @media print {
-  #topbar, #nav, .wu-master, .legend, .kpi-row,
-  .nbtn, #bh-classnotes, .tile-override-btn { display:none !important; }
-  body { background:#fff !important; color:#000 !important; }
+  /* ═══════════════════════════════════════════════════════════════════════
+     v60.166 · PRINT — REBUILT. Matt's printouts came out near-white and blurry.
+     Cause: the app is dark-themed and every element carries its own colour
+     TOKEN (var(--txt) etc.). The old rule set `body{color:#000}`, which never
+     cascaded past those explicit colours — so light-grey-on-black became
+     light-grey-on-WHITE, i.e. invisible, and browsers dropped the dark card
+     backgrounds that had been carrying the contrast.
+     Fix at the source: REDEFINE THE TOKENS for print. Every element then
+     recolours itself correctly with no per-component chasing. Colours below are
+     chosen for ink on white — darker and more saturated than the screen values,
+     because a mid-grey that reads fine on a glowing panel disappears on paper.
+     ═══════════════════════════════════════════════════════════════════════ */
+  :root {
+    --bg:#fff; --bg2:#fff; --bg3:#f4f4f5; --border:#9a9a9e; --border2:#7a7a7e;
+    --text:#000; --text2:#1a1a1a; --text3:#3a3a3a;
+    --txt:#000;  --txt2:#1a1a1a; --txt3:#3a3a3a;
+    --bdr:#9a9a9e; --bdr2:#7a7a7e;
+    --accent:#0B7A4B; --accent2:#0B7A4B;
+    --acc:#0B4FA8;  --acc2:#0B4FA8;
+    --wu:#0B7A4B;  --wu-bg:#e6f4ea;  --wu-border:#0B7A4B;
+    --up:#8A6100;  --up-bg:#fdf3d8;  --up-border:#8A6100;
+    --na:#B3261E;  --na-bg:#fce8e6;  --na-border:#B3261E;
+    --green:#0B7A4B; --green2:#e6f4ea; --green3:#0B7A4B;
+    --amber:#8A6100; --amber2:#fdf3d8; --amber3:#8A6100;
+    --red:#B3261E;   --red2:#fce8e6;   --red3:#B3261E;
+    --counter:#0B4FA8; --exit:#0B7A4B; --eb:#5B3FA8; --returns:#0B5E77;
+    --off:#5a5a5e;
+  }
+  /* print the colours we DID choose — browsers strip backgrounds by default */
+  * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important;
+      text-shadow:none !important; box-shadow:none !important; animation:none !important; }
+  html, body { background:#fff !important; color:#000 !important; }
+
+  /* chrome that wastes paper */
+  #topbar, #nav, .wu-master, .legend, .kpi-row, .nbtn, #bh-classnotes,
+  .tile-override-btn, .seg-ctl, .bb-chev, #solo-banner button, .co-fillall,
+  .qa-x, .bi-x, .rq-x, .sf-x, button.now-btn { display:none !important; }
+
   .scr.on { display:block !important; padding:0 !important; max-width:100% !important; }
   .scr:not(.on) { display:none !important; }
-  .board-wrap { grid-template-columns:repeat(5,1fr) !important; gap:4px !important; }
-  .tile { border-radius:4px !important; padding:6px 8px !important; border-width:1px !important; }
-  .tile.wu { background:#e6f4ea !important; border-color:#34a853 !important; }
-  .tile.up { background:#fef9e7 !important; border-color:#f9ab00 !important; }
-  .tile.na { background:#fce8e6 !important; border-color:#ea4335 !important; }
-  .tile.nd { background:#f8f9fa !important; border-color:#dadce0 !important; }
-  .tile-name { color:#000 !important; font-size:10px !important; }
-  .tile-net { font-size:16px !important; }
-  .tile-net.pos { color:#34a853 !important; }
-  .tile-net.neg { color:#ea4335 !important; }
-  .tile-st { font-size:8px !important; }
-  .tile-st.wu { color:#34a853 !important; }
-  .tile-st.up { color:#f9ab00 !important; }
-  .tile-st.na { color:#ea4335 !important; }
-  .tile-res { color:#666 !important; }
-  .mgr-bar { background:#f8f9fa !important; border-color:#dadce0 !important;
-    color:#000 !important; print-color-adjust:exact; }
-  .mgr-item-lbl, .mgr-item-val, #bh-cs-hot, #bh-mgrs { color:#000 !important; }
-}
 
+  /* ── legibility floor: nothing prints lighter than mid-grey or smaller than 9px ── */
+  body, .card, .scr, div, span, td, th, li, p, label, b, strong, small, i {
+    color:#000 !important;
+  }
+  .now-sub, .tile-res, .more-sub, .sub, .bi-cur, .wins-foot, .sn-note, .solo-p,
+  [style*="--txt3"] { color:#3a3a3a !important; }
+  small, .micro, .tile-st, [style*="font-size:8px"], [style*="font-size:9px"],
+  [style*="font-size:9.5px"], [style*="font-size:10px"] { font-size:10px !important; }
+  [style*="font-size:11px"], [style*="font-size:11.5px"] { font-size:11px !important; }
+
+  /* cards must read as boxes without their dark fill */
+  .card, .tile, .more-row, .now-attn, .mgr-bar, .bb, .wins-card, .sn-card,
+  .admt, .co-row, .dg-card, .sf-row, .rq-card {
+    background:#fff !important; border:1px solid #9a9a9e !important;
+    border-radius:4px !important; page-break-inside:avoid; break-inside:avoid;
+  }
+  .board-wrap { grid-template-columns:repeat(5,1fr) !important; gap:5px !important; }
+  .tile { padding:6px 8px !important; }
+  .tile-name { color:#000 !important; font-size:10px !important; font-weight:700 !important; }
+  .tile-net  { font-size:17px !important; font-weight:800 !important; }
+  .tile-res  { color:#3a3a3a !important; }
+
+  /* status still means something on paper: tinted fill + a heavier rule */
+  .tile.wu { background:#e6f4ea !important; border:1.5px solid #0B7A4B !important; }
+  .tile.up { background:#fdf3d8 !important; border:1.5px solid #8A6100 !important; }
+  .tile.na { background:#fce8e6 !important; border:1.5px solid #B3261E !important; }
+  .tile.nd { background:#fff !important;    border:1px solid #b9b9bd !important; }
+  .tile-net.pos, .tile-st.wu { color:#0B7A4B !important; font-weight:800 !important; }
+  .tile-net.neg, .tile-st.na { color:#B3261E !important; font-weight:800 !important; }
+  .tile-st.up { color:#8A6100 !important; font-weight:800 !important; }
+
+  .mgr-bar { background:#f4f4f5 !important; border:1px solid #9a9a9e !important; }
+  .mgr-item-lbl, .mgr-item-val, #bh-cs-hot, #bh-mgrs { color:#000 !important; }
+
+  h1, h2, h3, .scr-title, .now-title, .ch, .now-h {
+    color:#000 !important; font-weight:800 !important;
+  }
+  .scr-title, .now-title { font-size:22px !important; }
+
+  /* headed sections shouldn't split across a page break */
+  .card, table, .now-attn, .wins-card { page-break-inside:avoid; break-inside:avoid; }
+  thead { display:table-header-group; }
+  a[href]:after { content:""; }   /* don't print raw URLs after links */
+  @page { margin:0.4in; }
+}
 
 /* ── iPAD / MOBILE FIXES ─────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -16650,7 +16711,7 @@ function buildCoverageTimeline() {
       }
     }
     if(nowPctRow>=0&&nowPctRow<=100){
-      htm+=`<div style="position:absolute;left:${nowPctRow}%;top:0;bottom:0;width:2px;background:var(--red);opacity:.85;pointer-events:none"></div>`;
+      htm+=`<div style="position:absolute;left:${nowPctRow}%;top:0;bottom:0;width:2px;background:var(--red);opacity:1;pointer-events:none"></div>`;
     }
     htm+=`</div>`;
     // Reset old loop variables so nothing breaks
@@ -16837,7 +16898,7 @@ function printScheduleMap() {
         const left = (s.from - H_S) * HOUR_PX;
         const width = (s.to - s.from) * HOUR_PX - 1;
         if (width < 1) return;
-        const sty = zoneStyle[s.zone] || {bg:'#999', label:''};
+        const sty = zoneStyle[s.zone] || {bg:'#333', label:''};
         const wHrs = s.to - s.from;
         const lbl = wHrs > 0.45 ? sty.label : '';
         const sublbl = wHrs > 1.2 ? `<div class="sublbl">${fmtH(s.from)}–${fmtH(s.to)}</div>` : '';
@@ -16881,7 +16942,7 @@ function printScheduleMap() {
       .header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 10px; padding-bottom:8px; border-bottom:2px solid #111; }
       .title { font-size: 16px; font-weight: 800; }
       .subtitle { font-size: 10px; color: #555; margin-top: 2px; }
-      .legend { display:flex; gap: 12px; font-size: 9px; color: #444; }
+      .legend { display:flex; gap: 12px; font-size:11px; color: #444; }
       .leg-item { display:inline-flex; align-items:center; gap: 4px; }
       .leg-dot { width: 10px; height: 10px; border-radius: 2px; }
 
@@ -16894,12 +16955,12 @@ function printScheduleMap() {
       .prow { display: flex; align-items: center; margin-bottom: 1px; page-break-inside: avoid; }
       .name-col { width: ${NAME_PX}px; flex-shrink: 0; padding-right: 6px; text-align: right; }
       .name { font-size: 11px; font-weight: 700; line-height: 1.1; }
-      .name.callout { text-decoration: line-through; color: #999; }
-      .name .shift-time { font-size: 8px; color: #888; font-weight: 400; margin-top: 1px; }
-      .section-header { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555; padding: 8px 0 3px; border-bottom: 1px solid #ccc; margin-top: 4px; }
+      .name.callout { text-decoration: line-through; color: #333; }
+      .name .shift-time { font-size:10.5px; color: #333; font-weight: 400; margin-top: 1px; }
+      .section-header { font-size:11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #555; padding: 8px 0 3px; border-bottom: 1px solid #ccc; margin-top: 4px; }
 
       .hour-scale { position: relative; height: 16px; margin-left: ${NAME_PX + 4}px; margin-bottom: 4px; width: ${HOURS.length * HOUR_PX}px; }
-      .hour-tick { position: absolute; top: 0; font-size: 8px; color: #555; text-align: left; padding-left: 1px; border-left: 1px solid #ddd; height: 16px; }
+      .hour-tick { position: absolute; top: 0; font-size:10.5px; color: #555; text-align: left; padding-left: 1px; border-left: 1px solid #ddd; height: 16px; }
 
       .bar-col { flex: 0 0 auto; padding: 2px 0; }
       .bar-track {
@@ -16930,7 +16991,7 @@ function printScheduleMap() {
         print-color-adjust: exact;
       }
       .seg .lbl { line-height: 1.1; }
-      .seg .sublbl { font-size: 7px; opacity: 0.95; line-height: 1; margin-top: 1px; font-weight: 600; }
+      .seg .sublbl { font-size: 10px; opacity: 1; line-height: 1.1; margin-top: 1px; font-weight: 700; }
 
       /* Legend dots — same print-color treatment */
       .leg-dot {
@@ -19236,7 +19297,7 @@ function printAllChecklists(blank) {
         display:flex;justify-content:space-between;align-items:center;
         font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em">
         <span>${cfg.icon} ${cfg.label}</span>
-        <span style="font-size:9px;font-weight:600;opacity:.95">${blank?'___':done} / ${total}</span>
+        <span style="font-size:11px;font-weight:600;opacity:.95">${blank?'___':done} / ${total}</span>
       </div>
       <div style="height:5px;background:#e5e5e5">
         <div style="height:100%;width:${total?Math.round(done/total*100):0}%;background:${cfg.col}"></div>
@@ -19255,12 +19316,12 @@ function printAllChecklists(blank) {
       modeHtml += `<div style="break-inside:avoid;background:#fff;
         border:1px solid ${cfg.col}30;border-left:2.5px solid ${cfg.col};
         border-radius:2px;padding:5px 8px;margin-bottom:5px">
-        <div style="font-size:8px;font-weight:800;color:${cfg.col};
+        <div style="font-size:10.5px;font-weight:800;color:${cfg.col};
           text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;
           padding-bottom:2px;border-bottom:1px dotted ${cfg.col}50;
           display:flex;justify-content:space-between;align-items:baseline">
           <span>${sec.s}</span>
-          <span style="font-weight:600;opacity:.8">${blank?'__':secDone} / ${secItems.length}</span>
+          <span style="font-weight:600;opacity:1">${blank?'__':secDone} / ${secItems.length}</span>
         </div>`;
       secItems.forEach(it => {
         const checked = !blank && cl[it.t];
@@ -19269,15 +19330,15 @@ function printAllChecklists(blank) {
         // Build inline field display: "Label: ___value___"
         const fieldHtml = fields.map(fld => {
           const val = blank ? '' : ((STATE.fields||{})[fld.key] || '');
-          return `<span style="margin-left:4px;color:#888;font-size:7px">${fld.label}:</span>
-            <span style="font-family:monospace;color:#000;border-bottom:1px dotted #999;
-              min-width:28px;display:inline-block;padding:0 2px;font-size:8px">${val||'_____'}</span>`;
+          return `<span style="margin-left:4px;color:#333;font-size:10px">${fld.label}:</span>
+            <span style="font-family:monospace;color:#000;border-bottom:1px dotted #333;
+              min-width:28px;display:inline-block;padding:0 2px;font-size:10.5px">${val||'_____'}</span>`;
         }).join(' ');
         // v60.11: bigger checkbox (13px), bold action text, roomier rows —
         // per Matt's "all 5 improvements" answer to morning question 8.
         modeHtml += `<div style="display:flex;align-items:flex-start;gap:4px;padding:2px 0;
-          font-size:9.5px;line-height:1.3">
-          <span style="font-size:13px;color:${checked?'#16a34a':'#aaa'};flex-shrink:0;line-height:1">${checked?'☑':'☐'}</span>
+          font-size:11px;line-height:1.3">
+          <span style="font-size:13px;color:${checked?'#16a34a':'#333'};flex-shrink:0;line-height:1">${checked?'☑':'☐'}</span>
           <div style="flex:1;color:${checked?'#222':'#333'}"><span style="font-weight:700">${it.t}</span>${hasFields?'<br>'+fieldHtml:''}</div>
         </div>`;
       });
@@ -19299,7 +19360,7 @@ function printAllChecklists(blank) {
       ['Walk-Ups', blank?'_______':wlbls[pol], '#ea580c'],
     ].map(([lbl,val,col])=>`<div style="border:1px solid ${col}50;border-left:2.5px solid ${col};
       border-radius:3px;padding:3px 6px;background:#fff">
-      <div style="font-size:7px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:${col};line-height:1">${lbl}</div>
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:${col};line-height:1">${lbl}</div>
       <div style="font-size:11px;font-weight:700;line-height:1.2;margin-top:1px;color:#222">${val}</div>
     </div>`).join('')}
   </div>`;
@@ -19312,7 +19373,7 @@ function printAllChecklists(blank) {
       *{box-sizing:border-box;margin:0;padding:0}
       body{font-family:Arial,sans-serif;color:#222;font-size:11px;line-height:1.3;padding:0}
       h1{font-size:13px;font-weight:800;margin:0}
-      h2{font-size:9px;color:#666;margin:0 0 6px;font-weight:500}
+      h2{font-size:11px;color:#222;margin:0 0 6px;font-weight:500}
       .header{display:flex;justify-content:space-between;align-items:flex-end;
         border-bottom:1.5px solid #333;padding-bottom:3px;margin-bottom:6px}
       /* 2-col flow grid — mode cards balance across both columns */
@@ -19374,12 +19435,12 @@ function printScheduleGrid() {
     const pid=p.name.replace(/\s/g,'_');
     const nick=p.nick||p.name.split(' ')[0];
     tableRows+=`<tr>
-      <td style="font-weight:700;font-size:9px;white-space:nowrap;padding:3px 5px;
-        border:1px solid #e5e7eb">${nick}<br><span style="font-weight:400;color:#6b7280;font-size:7px">${p.role}</span></td>
+      <td style="font-weight:700;font-size:11px;white-space:nowrap;padding:3px 5px;
+        border:1px solid #e5e7eb">${nick}<br><span style="font-weight:400;color:#6b7280;font-size:10px">${p.role}</span></td>
       ${printDates.map(k=>{
         const s=(sched.grid[k]||{})[pid]||'—';
         const isToday=k===today;
-        return `<td style="font-size:8px;font-family:monospace;text-align:center;padding:2px 3px;
+        return `<td style="font-size:10.5px;font-family:monospace;text-align:center;padding:2px 3px;
           border:1px solid #e5e7eb;background:${isToday?'#fef3c7':shiftColor(s)};
           font-weight:${isToday?800:400};white-space:nowrap">${s}</td>`;
       }).join('')}
@@ -19391,7 +19452,7 @@ function printScheduleGrid() {
     const isToday=k===today;
     const dow=d.toLocaleDateString('en-US',{weekday:'short'});
     const dt=d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'});
-    return `<th style="font-size:8px;padding:3px;text-align:center;border:1px solid #e5e7eb;
+    return `<th style="font-size:10.5px;padding:3px;text-align:center;border:1px solid #e5e7eb;
       background:${isToday?'#1a1a2e':'#f9fafb'};color:${isToday?'#fff':'#374151'};
       white-space:nowrap;min-width:42px">${dow}<br>${dt}</th>`;
   }).join('');
@@ -19412,11 +19473,11 @@ function printScheduleGrid() {
         <div style="font-size:14px;font-weight:800">🚗 CMH Schedule</div>
         <div style="font-size:10px;color:#6b7280">${dateLabel}${dateKeys.length>14?' · Showing first 14 days':''}</div>
       </div>
-      <div style="font-size:9px;color:#9ca3af">Printed ${new Date().toLocaleString()}</div>
+      <div style="font-size:11px;color:#9ca3af">Printed ${new Date().toLocaleString()}</div>
     </div>
     <table>
       <thead><tr>
-        <th style="font-size:9px;padding:4px 5px;border:1px solid #e5e7eb;background:#f9fafb;text-align:left;min-width:60px">Name</th>
+        <th style="font-size:11px;padding:4px 5px;border:1px solid #e5e7eb;background:#f9fafb;text-align:left;min-width:60px">Name</th>
         ${dateHeaders}
       </tr></thead>
       <tbody>${tableRows}</tbody>
@@ -19445,8 +19506,8 @@ function printDashboardSummary() {
     const st=typeof getGroupStatus==='function'?getGroupStatus(g.name,d.net):'na';
     boardHtml+=`<div style="border:1px solid ${statColor[st]||'#ccc'};border-radius:5px;padding:6px 8px;
       background:${st==='wu'?'#f0fdf4':st==='up'?'#fffbeb':'#fff5f5'}">
-      <div style="font-size:8px;font-weight:800;color:#374151">${g.name}</div>
-      <div style="font-size:18px;font-weight:900;color:${statColor[st]||'#666'};line-height:1">${(d.net>0?'+':'')+d.net}</div>
+      <div style="font-size:10.5px;font-weight:800;color:#374151">${g.name}</div>
+      <div style="font-size:18px;font-weight:900;color:${statColor[st]||'#222'};line-height:1">${(d.net>0?'+':'')+d.net}</div>
       <div style="font-size:7px;font-weight:700;color:${statColor[st]||'#666'}">${statLabel[st]||'—'}</div>
       <div style="font-size:7px;color:#9ca3af">R${d.res} ↩${d.ret}</div>
     </div>`;
