@@ -2552,23 +2552,47 @@ button { cursor: pointer; }
     <!-- Admin content (hidden until PIN entered) -->
     <div id="admin-content" style="display:none">
 
+      <!-- v60.159 (Design v2): Cockpit ⇄ Settings. Split by HOW OFTEN you touch it,
+           not by topic — everyday calls in one mode, durable setup behind a toggle
+           whose state persists. The sections themselves are untouched; only which
+           group of doors is on screen changes. -->
+      <div id="adm-modebar" style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <div>
+          <div id="adm-mode-lbl" style="font-size:15px;font-weight:800;color:var(--txt);line-height:1.2">🎛 Cockpit</div>
+          <div id="adm-mode-sub" style="font-size:11px;color:var(--txt3)">Today’s calls</div>
+        </div>
+        <button id="adm-mode-btn" onclick="toggleAdminMode()"
+          style="margin-left:auto;padding:8px 14px;border-radius:9px;border:1px solid var(--bdr2);
+            background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">⚙ Settings</button>
+        <button class="btn btn-gh btn-sm" style="color:var(--red)" onclick="lockAdmin()">🔒 Lock</button>
+      </div>
+
+      <!-- Today's controls — cockpit only -->
+      <div id="adm-today" style="margin-bottom:12px"></div>
+
       <!-- Section tabs — grouped -->
       <div style="margin-bottom:12px">
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">⚡ Operations</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-          <button class="btn btn-g btn-sm" id="adm-tab-annc" onclick="showAdminSection('annc')">📣 Announcements</button>
-          <button class="btn btn-gh btn-sm" id="adm-tab-celeb" onclick="showAdminSection('celeb')">🎂 Celebrations</button>
-          <button class="btn btn-gh btn-sm" id="adm-tab-edit" onclick="showAdminSection('edit')">✏️ Edit Schedule</button>
-          <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
+        <div id="adm-grp-ops">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">⚡ Operations</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+            <button class="btn btn-g btn-sm" id="adm-tab-annc" onclick="showAdminSection('annc')">📣 Announcements</button>
+            <button class="btn btn-gh btn-sm" id="adm-tab-celeb" onclick="showAdminSection('celeb')">🎂 Celebrations</button>
+            <button class="btn btn-gh btn-sm" id="adm-tab-edit" onclick="showAdminSection('edit')">✏️ Edit Schedule</button>
+            <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
+            <button class="btn btn-gh btn-sm" onclick="openRequests()">📥 Requests</button>
+          </div>
         </div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">🔧 Setup</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn btn-gh btn-sm" id="adm-tab-staff" onclick="showAdminSection('staff')">👥 Staff</button>
-          <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
-          <button class="btn btn-gh btn-sm" id="adm-tab-photos" onclick="showAdminSection('photos')">📸 Car Photos</button>
-          <button class="btn btn-gh btn-sm" onclick="openThresholdQuiz()">📊 Thresholds</button>
-          <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
-          <button class="btn btn-gh btn-sm" style="margin-left:auto;color:var(--red)" onclick="lockAdmin()">🔒 Lock</button>
+        <div id="adm-grp-setup" style="display:none">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">🔧 Setup — set once, rarely changes</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-gh btn-sm" id="adm-tab-staff" onclick="showAdminSection('staff')">👥 Staff</button>
+            <button class="btn btn-gh btn-sm" onclick="openDisplayNames()">🏷 Display names</button>
+            <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
+            <button class="btn btn-gh btn-sm" id="adm-tab-photos" onclick="showAdminSection('photos')">📸 Car Photos</button>
+            <button class="btn btn-gh btn-sm" onclick="openThresholdQuiz()">📊 Coverage targets</button>
+            <button class="btn btn-gh btn-sm" onclick="openBranchInterview()">🗒 Branch setup</button>
+            <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
+          </div>
         </div>
       </div>
 
@@ -13451,7 +13475,12 @@ function checkAdminPin() {
     if (content) content.style.display = 'block';
     input.value = '';
     if (err) err.textContent = '';
-    showAdminSection('staff');
+    // v60.159: unlock lands in whichever mode you left it in, on that mode's
+    // default section — previously it always dropped you into the Staff editor,
+    // which is durable setup, not what you open Admin for mid-shift.
+    if (typeof admtInjectStyle==='function') admtInjectStyle();
+    showAdminSection(adminMode()==='settings' ? 'staff' : 'annc');
+    if (typeof applyAdminMode==='function') applyAdminMode(false);
   } else {
     if (err) err.textContent = 'Incorrect PIN';
     input.value = '';
@@ -13475,6 +13504,14 @@ function openAdminSection(sec) {
   const content = document.getElementById('admin-content');
   if (lock)    lock.style.display    = 'none';
   if (content) content.style.display = 'block';
+  // v60.159: honour the section being asked for — switch to whichever mode owns
+  // it, so a deep link from the Setup hub can't land on a hidden tab row.
+  try{
+    if (typeof admtInjectStyle==='function') admtInjectStyle();
+    if (typeof ADM_SETUP!=='undefined' && ADM_SETUP.indexOf(sec)>=0) STATE.adminMode='settings';
+    else if (typeof ADM_OPS!=='undefined' && ADM_OPS.indexOf(sec)>=0) STATE.adminMode='cockpit';
+    if (typeof applyAdminMode==='function') applyAdminMode(false);
+  }catch(e){}
   if (typeof closeSetupHub === 'function') closeSetupHub();
   if (typeof showTab === 'function') showTab('admin');
   if (typeof showAdminSection === 'function') showAdminSection(sec);
@@ -13501,7 +13538,78 @@ function changeAdminPin() {
   if(msg){msg.textContent='✓ PIN changed successfully';msg.style.color='var(--green)';}
 }
 
+
+// ── v60.159 · Cockpit ⇄ Settings ───────────────────────────────────────────
+// Split by FREQUENCY, not topic: everyday calls vs durable setup. Mode persists.
+var ADM_OPS   = ['annc','celeb','edit','sched'];
+var ADM_SETUP = ['staff','codes','photos','pin'];
+function adminMode(){ return STATE.adminMode==='settings' ? 'settings' : 'cockpit'; }
+function toggleAdminMode(){ setAdminMode(adminMode()==='cockpit'?'settings':'cockpit'); }
+function setAdminMode(m){
+  STATE.adminMode = (m==='settings')?'settings':'cockpit';
+  if(typeof saveState==='function') saveState();
+  applyAdminMode(true);
+}
+function applyAdminMode(switchSection){
+  var m=adminMode(), isCk=(m==='cockpit');
+  var set=function(id,prop,val){ var e=document.getElementById(id); if(e) e.style[prop]=val; };
+  set('adm-grp-ops','display',   isCk?'block':'none');
+  set('adm-grp-setup','display', isCk?'none':'block');
+  set('adm-today','display',     isCk?'block':'none');
+  var lbl=document.getElementById('adm-mode-lbl'), sub=document.getElementById('adm-mode-sub'),
+      btn=document.getElementById('adm-mode-btn');
+  if(lbl) lbl.textContent = isCk?'🎛 Cockpit':'⚙ Settings';
+  if(sub) sub.textContent = isCk?'Today’s calls':'Set once — rarely changes';
+  if(btn) btn.textContent = isCk?'⚙ Settings':'← Back to Cockpit';
+  if(isCk) renderAdminToday();
+  // if the open section belongs to the other mode, move to this mode's default
+  if(switchSection){
+    var cur=window._admSection||'annc';
+    var wanted = isCk?ADM_OPS:ADM_SETUP;
+    if(wanted.indexOf(cur)<0) showAdminSection(isCk?'annc':'staff');
+  }
+}
+// Today's controls — the handful of things a manager actually flips on a shift.
+function renderAdminToday(){
+  var el=document.getElementById('adm-today'); if(!el) return;
+  var wu=STATE.walkUpPolicy||'open';
+  var up=(typeof bbUpgradePush==='function')?bbUpgradePush():!!(STATE.fields&&STATE.fields.upgradePush);
+  var b24=(STATE.fields&&STATE.fields.book24hr)||'open';
+  var seg=function(opts,cur,fn){
+    return '<div class="admt-seg">'+opts.map(function(o){
+      return '<button class="'+(cur===o[0]?'on':'')+'" onclick="'+fn+'(\''+o[0]+'\');renderAdminToday()">'+o[1]+'</button>';
+    }).join('')+'</div>';
+  };
+  el.innerHTML='<div class="admt">'
+    +'<div class="admt-hd">Today’s controls</div>'
+    +'<div class="admt-lbl">🚦 Walk-ups</div>'
+    + seg([['open','All open'],['core','Core'],['noncore','Non-core'],['closed','Closed']], wu, 'setWU')
+    +'<div class="admt-lbl">📅 24-hour booking</div>'
+    + seg([['open','Open'],['restricted','Restricted'],['emerald-only','Emerald'],['closed','Closed']], b24, 'set24hr')
+    +'<button class="admt-push'+(up?' on':'')+'" onclick="toggleUpgradePush();renderAdminToday()">'
+    +'⇧ Upgrade push '+(up?'ON — showing on every board bar':'off')+'</button>'
+    +'</div>';
+}
+var _admtStyled=false;
+function admtInjectStyle(){
+  if(_admtStyled) return; _admtStyled=true;
+  var css=''
+  +'.admt{background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;padding:12px 13px}'
+  +'.admt-hd{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:9px}'
+  +'.admt-lbl{font-size:12px;font-weight:700;color:var(--txt2);margin:9px 0 5px}'
+  +'.admt-lbl:first-of-type{margin-top:0}'
+  +'.admt-seg{display:flex;gap:5px;flex-wrap:wrap}'
+  +'.admt-seg button{flex:1;min-width:74px;padding:9px 5px;border-radius:8px;border:1px solid var(--bdr2);'
+  +'background:var(--bg3);color:var(--txt3);font-size:11.5px;font-weight:700;cursor:pointer}'
+  +'.admt-seg button.on{background:var(--accent,#23C983);border-color:transparent;color:#04160e}'
+  +'.admt-push{width:100%;margin-top:11px;padding:10px;border-radius:9px;border:1px solid var(--bdr2);'
+  +'background:var(--bg3);color:var(--txt3);font-size:12px;font-weight:700;cursor:pointer}'
+  +'.admt-push.on{background:rgba(48,209,88,.12);border-color:rgba(48,209,88,.45);color:var(--green,#30D158)}';
+  var st=document.createElement('style'); st.id='admt-style'; st.textContent=css; document.head.appendChild(st);
+}
+
 function showAdminSection(sec) {
+  window._admSection = sec;                                  // v60.159
   // v59: added 'annc' (announcements) and 'celeb' (celebrations) tabs.
   ['staff','edit','codes','pin','sched','annc','celeb','photos'].forEach(s => {
     const el  = document.getElementById('adm-'+s);
