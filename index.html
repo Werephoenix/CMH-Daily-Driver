@@ -3917,7 +3917,7 @@ function loadState() {
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
-    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, soloChecked:{}, corpAvg:null, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
+    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, soloChecked:{}, corpAvg:null, mgrAnchorOverride:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
     mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{}, pto:{},
   };
 }
@@ -7033,9 +7033,18 @@ function updateStoredStatus() {
 // Override the original to accept optional filter param
 const _origParseGrid = parseGridSchedule;
 function parseGridSchedule(text, rosterFilter) {
-  const allRoster = rosterFilter
-    ? [...ROSTER_CXR, ...ROSTER_MGMT].filter(rosterFilter)
-    : [...ROSTER_CXR, ...ROSTER_MGMT];
+  // v60.162: the importer only ever looked at CXR + MGMT, so Returns and Exit
+  // agents could NOT be imported at all — pasting the real branch grid silently
+  // dropped Kerv, Julian, Abdi, Toney, Nas, Rob, Fatuma, Shawnee, Dariu and Zina.
+  // They're on the floor from 3:30a to 12:30a; leaving them out of the schedule
+  // is exactly the data gap that made coverage look thinner than it is.
+  const _fullRoster = [
+    ...(typeof ROSTER_CXR     !== 'undefined' ? ROSTER_CXR     : []),
+    ...(typeof ROSTER_MGMT    !== 'undefined' ? ROSTER_MGMT    : []),
+    ...(typeof ROSTER_EXIT    !== 'undefined' ? ROSTER_EXIT    : []),
+    ...(typeof ROSTER_RETURNS !== 'undefined' ? ROSTER_RETURNS : [])
+  ];
+  const allRoster = rosterFilter ? _fullRoster.filter(rosterFilter) : _fullRoster;
 
   // v60.57: the two Matt Johnsons — disambiguate by SHIFT (Matt's rule): the
   // 5:30a–2p person is ALWAYS the CXR (Matthew Johnson / matt-j); any other
@@ -9930,6 +9939,114 @@ function boardBarHtml(){
       +'</div>';
   }
   return h+'</div>';
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.161 · ROTATION HEALTH + ANCHORED MANAGER SHIFTS
+//
+// DERIVED FROM REAL DATA (May 2026, 28 days + September 2026, both analysed
+// 2026-08-29). The finding that drove this:
+//
+//   CXRs:     11 of 12 have exactly ONE start time all month. 4% of shift
+//             transitions move the start by 4h+.
+//   MANAGERS: every single one has 3–7 different start times. 26% of
+//             transitions move 4h+. In September it's 11 of 11 with a 10+ hour
+//             spread — Ami runs 5:30a, 6a, 8a and 4p starts in one month.
+//
+// So the branch gives CXRs circadian stability and makes MANAGERS absorb 100%
+// of the schedule's variability. That is the "cruel and unusual" part — not
+// clopenings (May had only one). It's that a manager never sleeps on a stable
+// clock, and the rotation direction is a coin flip: 23 forward vs 23 backward.
+//
+// THE FIX — anchors. Each manager holds ONE shift family for a block of weeks,
+// and anchors rotate FORWARD only (open → mid → close), which the shift-science
+// research in the Grimoire says is markedly easier to adapt to than backward or
+// random. Coverage is unchanged: the same shifts get worked, by steadier people.
+// ═══════════════════════════════════════════════════════════════════════════
+var MGR_ANCHORS = [
+  {k:'open',  label:'Opener',  starts:[5.5, 6],      lo:5.5, hi:6.5},
+  {k:'mid',   label:'Mid',     starts:[8, 10, 12],   lo:8,   hi:12.5},
+  {k:'close', label:'Closer',  starts:[16],          lo:15.5,hi:17}
+];
+var ANCHOR_WEEKS = 2;   // how long a manager holds a family before rotating on
+function anchorByKey(k){ return MGR_ANCHORS.filter(function(a){return a.k===k;})[0]||MGR_ANCHORS[1]; }
+// Deterministic forward rotation: person i, week w → anchor (i + floor(w/N)) % 3
+function mgrAnchorFor(pid, weekIndex){
+  try{
+    var mgrs=(typeof _sfMgrRoster==='function')?_sfMgrRoster():[];
+    if(!mgrs.length) mgrs=(typeof ROSTER_MGMT!=='undefined'?ROSTER_MGMT:[]).filter(function(p){return p&&p.active!==false;});
+    var ids=mgrs.map(function(p){return (p.name||'').replace(/\s/g,'_');});
+    var i=ids.indexOf(pid); if(i<0) return null;
+    var override=(STATE.mgrAnchorOverride||{})[pid];
+    if(override) return anchorByKey(override);
+    var step=Math.floor((weekIndex||0)/ANCHOR_WEEKS);
+    return MGR_ANCHORS[(i+step)%MGR_ANCHORS.length];   // forward only
+  }catch(e){ return null; }
+}
+function setMgrAnchor(pid,k){
+  if(!STATE.mgrAnchorOverride) STATE.mgrAnchorOverride={};
+  if(!k) delete STATE.mgrAnchorOverride[pid]; else STATE.mgrAnchorOverride[pid]=k;
+  if(typeof saveState==='function') saveState();
+}
+
+// ── The scorer. Give it {pid:[{date,start,end}]} and it grades the rotation. ──
+function rotationHealth(byPerson){
+  var out={people:[], clopenings:0, tight:0, bigSwings:0, transitions:0,
+           backward:0, forward:0, steady:0, score:100};
+  Object.keys(byPerson||{}).forEach(function(pid){
+    var shifts=(byPerson[pid]||[]).filter(function(s){return s&&s.start!=null;})
+      .sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
+    if(shifts.length<2) return;
+    var starts=shifts.map(function(s){return s.start;});
+    var spread=Math.max.apply(null,starts)-Math.min.apply(null,starts);
+    var distinct=[];
+    starts.forEach(function(v){ if(distinct.every(function(d){return Math.abs(d-v)>0.24;})) distinct.push(v); });
+    var clop=0,tight=0,big=0,back=0,fwd=0,steady=0;
+    for(var i=0;i<shifts.length-1;i++){
+      var a=shifts[i], b=shifts[i+1];
+      var gapDays=Math.round((new Date(b.date)-new Date(a.date))/86400000);
+      if(gapDays===1){
+        var end=a.end!=null?a.end:a.start+8;
+        var rest=(b.start+24)-end;
+        if(rest<10) clop++; else if(rest<11) tight++;
+      }
+      var d=b.start-a.start;
+      out.transitions++;
+      if(Math.abs(d)>=4) big++;
+      if(d<-1) back++; else if(d>1) fwd++; else steady++;
+    }
+    out.clopenings+=clop; out.tight+=tight; out.bigSwings+=big;
+    out.backward+=back; out.forward+=fwd; out.steady+=steady;
+    out.people.push({pid:pid, shifts:shifts.length, distinct:distinct.length,
+      spread:Math.round(spread*10)/10, clopenings:clop, tight:tight, bigSwings:big});
+  });
+  // score: clopenings hurt most, then whiplash, then backward rotation
+  var pen = out.clopenings*12 + out.tight*4
+          + (out.transitions? (out.bigSwings/out.transitions)*40 : 0)
+          + (out.transitions? (out.backward/out.transitions)*20 : 0);
+  out.score=Math.max(0, Math.round(100-pen));
+  out.people.sort(function(a,b){ return (b.clopenings*10+b.spread)-(a.clopenings*10+a.spread); });
+  return out;
+}
+// Convenience: score the stored schedule over a date range.
+function rotationHealthFromStored(section, fromKey, toKey){
+  var byPerson={};
+  try{
+    var sec=(typeof getStoredSection==='function')?getStoredSection(section):null;
+    var grid=(sec&&sec.grid)||{};
+    Object.keys(grid).forEach(function(dk){
+      if(fromKey&&dk<fromKey) return; if(toKey&&dk>toKey) return;
+      Object.keys(grid[dk]).forEach(function(pid){
+        var code=grid[dk][pid];
+        if(typeof isOffCode==='function' && isOffCode(code)) return;
+        var t=(typeof parseShiftToTimes==='function')?parseShiftToTimes(code):null;
+        if(!t||t.shiftStart==null) return;
+        (byPerson[pid]=byPerson[pid]||[]).push({date:dk,start:t.shiftStart,end:t.shiftEnd});
+      });
+    });
+  }catch(e){}
+  return rotationHealth(byPerson);
 }
 
 function renderNow() {
@@ -21309,6 +21426,23 @@ function asBuildWeek(seed){
       return ['BRM','ABRM','MT'].indexOf(p.role)>=0 && p.patternWindows && _asMgrWorksDay(p,dow,seed,_variesIdx) && !_isOff(p.name);
     });
     if(pool.length){
+      // v60.161: ANCHOR-FIRST ordering. The May/September analysis showed every
+      // manager bouncing across 3–7 different start times while CXRs sat on one.
+      // Sorting each day's pool by how well the seat matches the person's ANCHOR
+      // means the opener seat goes to whoever is currently an Opener, the closer
+      // seat to a Closer — so a manager keeps one body clock for ANCHOR_WEEKS
+      // instead of flipping day to day. Coverage is identical; the same shifts
+      // still get worked. `_asAnchorRank` is used by the seat pickers below.
+      var _wkIdx = (typeof _asWeekOffset==='number') ? _asWeekOffset : 0;
+      var _anchorOf = {};
+      pool.forEach(function(p){
+        var a=(typeof mgrAnchorFor==='function')?mgrAnchorFor(String(p.name||'').replace(/\s/g,'_'), _wkIdx):null;
+        _anchorOf[p.id] = a ? a.k : null;
+      });
+      var _asAnchorRank = function(p, want){    // 0 = this is their anchor
+        var a=_anchorOf[p.id]; if(!a) return 1;
+        return a===want ? 0 : (a==='mid' ? 1 : 2);
+      };
       var order = pool.map(function(_,i){ return pool[(i+dow+seed) % pool.length]; }); // rotate for fairness
       var assigned = {};
       var _dow = dow;
@@ -21321,10 +21455,15 @@ function asBuildWeek(seed){
         var w = _asParseWin(win) || [8,18];
         people.push({nick:p.nick||p.name, name:p.name, role:p.role, start:w[0], end:w[1], win:win, proposed:true});
         assigned[p.id] = true;
-        var prevRun = (mgrPrev[p.id] && mgrPrev[p.id].dow===_dow-1) ? (mgrPrev[p.id].closeRun||0) : 0;
-        mgrPrev[p.id] = {dow:_dow, end:w[1], closeRun: (win==='4P-C' ? prevRun+1 : 0)};
+        var _prevRec = mgrPrev[p.id];
+        var prevRun = (_prevRec && _prevRec.dow===_dow-1) ? (_prevRec.closeRun||0) : 0;
+        // v60.161: keep yesterday's END so the repair pass can measure the turnaround
+        var _yEnd = (_prevRec && _prevRec.dow===_dow-1) ? _prevRec.end : null;
+        mgrPrev[p.id] = {dow:_dow, end:w[1], _prevEnd:_yEnd, closeRun: (win==='4P-C' ? prevRun+1 : 0)};
       };
       // OPENER (prefer 530A-330P, else 6A-4P) — must clear ≥11h rest.
+      // v60.161: anchored openers get first refusal.
+      order = order.slice().sort(function(a,b){ return _asAnchorRank(a,'open')-_asAnchorRank(b,'open'); });
       var opener = null;
       for(var oi=0; oi<order.length && !opener; oi++){
         var p = order[oi]; if(assigned[p.id]) continue;
@@ -21345,6 +21484,9 @@ function asBuildWeek(seed){
       // schedule steady rather than churning the late shift daily. The rotated-off
       // closer is handled by the mids step (never re-closed).
       var closerDone = false;
+      // v60.161: anchored closers first for the fresh-closer pick below (step 1
+      // still continues yesterday's closer — continuity beats anchor there).
+      var closeOrder = order.slice().sort(function(a,b){ return _asAnchorRank(a,'close')-_asAnchorRank(b,'close'); });
       // 1) continue yesterday's closer while under the 3-day cap
       for(var ci=0; ci<order.length && !closerDone; ci++){
         var pc = order[ci]; if(assigned[pc.id]) continue;
@@ -21352,9 +21494,9 @@ function asBuildWeek(seed){
         var cp = mgrPrev[pc.id];
         if(cp && cp.dow===_dow-1 && cp.end>=22 && (cp.closeRun||0)<3){ seat(pc,'4P-C'); closerDone=true; }
       }
-      // 2) else a FRESH closer who did not close yesterday
-      for(var cj=0; cj<order.length && !closerDone; cj++){
-        var pc2 = order[cj]; if(assigned[pc2.id]) continue;
+      // 2) else a FRESH closer who did not close yesterday — anchored closers first
+      for(var cj=0; cj<closeOrder.length && !closerDone; cj++){
+        var pc2 = closeOrder[cj]; if(assigned[pc2.id]) continue;
         if(pc2.patternWindows.indexOf('4P-C')<0) continue;
         var cp2 = mgrPrev[pc2.id];
         if(!(cp2 && cp2.dow===_dow-1 && cp2.end>=22)){ seat(pc2,'4P-C'); closerDone=true; }
@@ -21369,22 +21511,85 @@ function asBuildWeek(seed){
       // close). v60.121: the old fallback picked the latest window overall = 4P-C,
       // which silently re-closed anyone who closed yesterday and stacked closes on
       // one manager. Never auto-assign a close in the mids step.
-      var mids = ['8A-6P','10A-8P','6A-4P'];
-      var mi = 0;
+      // v60.161: ANCHOR-AWARE mids. The old version cycled a rotating index (mi++)
+      // through ['8A-6P','10A-8P','6A-4P'], which is precisely the churn the May
+      // data exposed — it MOVED people between start times on purpose. Now each
+      // manager is offered the window CLOSEST TO THEIR ANCHOR first, so an Opener
+      // lands on 6A-4P and a Mid on 8A-6P/10A-8P week after week. The ≥11h rest
+      // rule still wins over the anchor; the anchor only breaks ties.
+      var mids = ['6A-4P','8A-6P','10A-8P'];
       order.forEach(function(p){
         if(assigned[p.id]) return;
+        var aK=_anchorOf[p.id];
+        var target = aK==='open' ? 6 : aK==='close' ? 14 : 9;   // preferred start
+        var cands = mids.filter(function(w){ return p.patternWindows.indexOf(w)>=0; })
+          .sort(function(a,b){
+            return Math.abs(_asParseWin(a)[0]-target) - Math.abs(_asParseWin(b)[0]-target);
+          });
         var choice = null;
-        for(var k=0; k<mids.length && !choice; k++){
-          var w = mids[(mi+k) % mids.length];
-          if(p.patternWindows.indexOf(w)<0) continue;
-          if(restIfStart(p, _asParseWin(w)[0]) >= AS_MIN_REST) choice = w;
+        for(var k=0; k<cands.length && !choice; k++){
+          if(restIfStart(p, _asParseWin(cands[k])[0]) >= AS_MIN_REST) choice = cands[k];
         }
         if(!choice){
+          // v60.161: nothing clears the rest minimum, so we're already choosing a
+          // bad option — REST WINS HERE, not the anchor. Picking "closest to the
+          // anchor" in this branch was manufacturing 10–11h turnarounds after a
+          // close. Order: most rest first, anchor only as the tiebreak.
+          // v60.161: if they CLOSED yesterday and nothing clears 11h, another close
+          // is the HEALTHIEST option available — close→close is 16.5h rest, versus
+          // 10–11h for any morning/mid. The v60.121 "never auto-close in mids" rule
+          // existed to stop close-STACKING; the 3-day cap already handles that, so
+          // honour the cap instead of forcing a short turnaround.
+          var _pv = mgrPrev[p.id];
+          var closedYesterday = !!(_pv && _pv.dow===_dow-1 && _pv.end>=22);
+          var underCap = !_pv || (_pv.closeRun||0) < 3;
+          if(closedYesterday && underCap && p.patternWindows.indexOf('4P-C')>=0){
+            seat(p,'4P-C'); return;
+          }
           var nonClose = p.patternWindows.filter(function(w){ return w!=='4P-C'; });
           var pickFrom = nonClose.length ? nonClose : p.patternWindows;
-          choice = pickFrom.slice().sort(function(a,b){ return _asParseWin(b)[0] - _asParseWin(a)[0]; })[0];
+          choice = pickFrom.slice().sort(function(a,b){
+            var ra=restIfStart(p,_asParseWin(a)[0]), rb=restIfStart(p,_asParseWin(b)[0]);
+            if(Math.abs(ra-rb) > 0.25) return rb-ra;                     // more rest wins
+            return Math.abs(_asParseWin(a)[0]-target) - Math.abs(_asParseWin(b)[0]-target);
+          })[0];
         }
-        seat(p, choice); mi++;
+        seat(p, choice);
+      });
+
+      // ── v60.161 REST REPAIR PASS ──────────────────────────────────────────
+      // Belt-and-braces. Four different seat pickers can place a manager, and a
+      // short turnaround slipped through all of them (every case was 4P-C →
+      // next-day 10A-8P = 10.5h, plus one 4P-C → 5:30a = 6h). Rather than chase
+      // which picker, verify the FINISHED day: anything under AS_MIN_REST gets
+      // re-seated to the option that maximises rest. If the best available is
+      // still short, leave it and let asRestWarnings flag it honestly — never
+      // silently ship a 6-hour turnaround.
+      people.forEach(function(pr){
+        if(!pr.proposed || pr.start==null) return;
+        if(['ARM','BRM','ABRM','MT'].indexOf(pr.role)<0) return;
+        var pObj = pool.filter(function(q){ return q.name===pr.name; })[0];
+        if(!pObj) return;
+        var prev = mgrPrev[pObj.id];
+        // seat() has ALREADY written today's record here, so the guard must test
+        // for TODAY (not yesterday) and read the yesterday-end it stashed.
+        if(!prev || prev.dow !== _dow) return;
+        var yEnd = prev._prevEnd;
+        if(yEnd==null) return;
+        var rest = (pr.start + 24) - yEnd;
+        if(rest >= AS_MIN_REST) return;
+        var best=null, bestRest=rest;
+        (pObj.patternWindows||[]).forEach(function(w){
+          var wv=_asParseWin(w); if(!wv) return;
+          var r=(wv[0]+24)-yEnd;
+          if(r>bestRest){ bestRest=r; best=w; }
+        });
+        if(best){
+          var bw=_asParseWin(best);
+          pr.win=best; pr.start=bw[0]; pr.end=bw[1];
+          mgrPrev[pObj.id]={dow:_dow, end:bw[1], _prevEnd:yEnd,
+            closeRun:(best==='4P-C'? (prev.closeRun||0)+1 : 0)};
+        }
       });
     }
     // Coverage check per block vs COVERAGE_BY_HOUR.
