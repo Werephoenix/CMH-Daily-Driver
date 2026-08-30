@@ -2235,6 +2235,10 @@ button { cursor: pointer; }
 
   <!-- v60.81 (Design §3.5): collapsed POLICY PILL — tap to expand walk-up + 24hr + overrides -->
   <button class="board-pill" onclick="toggleBoardControls()"><span id="board-policy-line" class="board-policy2">🚦 Walk-ups</span><span class="board-pill-chev" id="board-pill-chev">Set ⌄</span></button>
+  <!-- v60.167: board sort chips. Default is vehicle size order; picking a chip
+       replaces it for the session. -->
+  <div id="board-sortbar" style="display:none;gap:6px;flex-wrap:wrap;margin:0 0 10px"></div>
+
   <div id="board-controls" style="display:none">
 
   <!-- v60.118: the Print Board button moved OUT of this collapsed drawer to the
@@ -2294,6 +2298,7 @@ button { cursor: pointer; }
     <span class="board-fleet-lbl">Fleet groups</span>
     <span id="board-groups-count" class="board-fleet-count"></span>
     <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <button class="bv-btn bv-solo" id="board-sort-btn" title="Sort the board" onclick="toggleBoardSort()">⇅</button>
       <button class="bv-btn bv-solo" id="board-print-btn" title="Print board" onclick="setTimeout(function(){window.print();},80)">🖨</button>
       <button class="bv-btn bv-solo" id="board-search-btn" title="Search" onclick="toggleBoardSearch()">🔍</button>
       <div class="board-view-toggle">
@@ -3083,6 +3088,37 @@ var CORE_GROUPS = new Set([
 // ── Aliases for backward compatibility ───────────────────────────────────
 var CORE    = CORE_GROUPS;   // CORE_GROUPS is the Set of core car group names
 var THRESH  = THRESHOLDS;    // THRESHOLDS has the [wu_min, up_min] per group
+// v60.167: BOARD DEFAULT ORDER — smallest → largest within each family (Matt).
+// The natural GROUP_META order was mostly size-ordered but had real breaks:
+// Crossovers sat AFTER Standard SUV, and Premium Elite Car / Premium Large SUV /
+// Premium Elite SUV were stranded at the very end, after the pickups. Declaring
+// the ladder makes the default deliberate instead of inherited.
+// "Elite" is treated as a nicer trim WITHIN its size (Standard Elite sits with
+// Standard), which is how the names read. Specialty groups tail their family.
+// ⚠ Judgement calls, easy to change — reorder this list and the board follows.
+var GROUP_SIZE_ORDER = [
+  // ── cars, small → large ──
+  'Econ/Compact Car','Intermediate Car','Standard Car','Standard Elite Car',
+  'Full-Size Car','Fullsize Elite Car','Premium Car','Premium Elite Car','Luxury Car',
+  // car specialty
+  'Electric/Hybrid','Convertibles','Sports Car',
+  // ── SUVs, small → large ──
+  'Crossovers','Compact SUV','Midsize SUV','Standard SUV','Standard Elite SUV',
+  'Fullsize SUV','Premium SUV','Premium Large SUV','Premium Elite SUV',
+  'Luxury SUV','Luxury Elite SUV',
+  // SUV specialty
+  'Wrangler / Bronco',
+  // ── vans, then trucks ──
+  'Minivan 7-Seat','Minivan 8-Seat','Passenger Van',
+  'Standard Pickup','Large Pickup',
+  // ── showcase ──
+  'Exotic'
+];
+function groupSizeRank(name){
+  var i=GROUP_SIZE_ORDER.indexOf(name);
+  return i<0 ? 999 : i;          // anything unlisted sorts to the end, order kept
+}
+
 var GROUPS  = GROUP_META;    // GROUP_META is the ordered array with flag+core info (added .n alias)
 // GROUP_META items have .n = shorthand for group name (set directly in definition)
 var MGMT_STATIONS = [
@@ -4936,10 +4972,64 @@ function boardGroupOn(name){
   return walkUpAutoAllows(name);
 }
 var _grpCodeRev = null;
+// v60.167: the code on a tile used to be "whichever code happened to be declared
+// FIRST in CODE_MAP" — an accident of object order, not a decision. That's why
+// Wrangler/Bronco showed JWAR and Convertibles showed XCAR. A group holds several
+// codes; which one REPRESENTS it is fleet truth, so it's declared explicitly here.
+// Anything not listed still falls back to first-declared (previous behaviour).
+// Sources: the "(master: XXXX)" annotations already in CODE_MAP, and v60.102's
+// note that FJBR replaced FJAR eff. 2026-08-25.
+var GROUP_REP_CODE = {
+  'Wrangler / Bronco': 'FJBR',   // 4dr Wrangler Unlimited + Ford Bronco 4dr (v60.102 replaced FJAR). 2dr = IJAR.
+  'Convertibles':      'ITAR',   // master: intermediate convertible. Compact conv = CTAR.
+  'Electric/Hybrid':   'ICAE',   // master
+  'Large Pickup':      'QPAR'    // master: HD pickup
+};
+// Every code that maps to a group — so nothing is hidden behind the one on the tile.
+function groupAllCodes(name){
+  var out=[]; try{ for(var c in CODE_MAP){ if(CODE_MAP[c]===name) out.push(c); } }catch(e){}
+  return out;
+}
 function groupRepCode(name){
+  if(GROUP_REP_CODE[name]) return GROUP_REP_CODE[name];
   if(!_grpCodeRev){ _grpCodeRev={}; try{ for(const c in CODE_MAP){ const g=CODE_MAP[c]; if(g && !_grpCodeRev[g]) _grpCodeRev[g]=c; } }catch(e){} }
   return _grpCodeRev[name] || '';
 }
+
+// ── v60.167 · board sort chips ─────────────────────────────────────────────
+var BOARD_SORTS = [
+  {k:'',                   label:'Size order',   hint:'smallest → largest (default)'},
+  {k:'Shortest first',     label:'Shortest',     hint:'what am I running out of'},
+  {k:'Most spare first',   label:'Most spare',   hint:'what can I upgrade into'},
+  {k:'Biggest movers',     label:'Biggest movers',hint:'where the day is happening'},
+  {k:'Core, problems first',label:'Core trouble',hint:'core groups, worst first'},
+  {k:'Problems first',     label:'Problems',     hint:'anything short, first'},
+  {k:'A–Z',                label:'A–Z',          hint:'alphabetical'}
+];
+function toggleBoardSort(){
+  var b=document.getElementById('board-sortbar'); if(!b) return;
+  var show=(b.style.display==='none'||!b.style.display);
+  b.style.display = show?'flex':'none';
+  if(show) renderBoardSortChips();
+}
+function setBoardSort(k){
+  window._boardSort = k || null;
+  renderBoardSortChips();
+  if(typeof buildBoardGrid==='function') buildBoardGrid();
+}
+function renderBoardSortChips(){
+  var b=document.getElementById('board-sortbar'); if(!b) return;
+  var cur=window._boardSort || '';
+  b.innerHTML = BOARD_SORTS.map(function(o){
+    var on = (cur===o.k);
+    return '<button title="'+o.hint+'" onclick="setBoardSort(\''+o.k.replace(/'/g,"\\'")+'\')" '
+      +'style="font-size:11px;padding:6px 11px;border-radius:999px;cursor:pointer;font-weight:700;'
+      +'border:1px solid '+(on?'transparent':'var(--bdr2)')+';'
+      +'background:'+(on?'var(--accent)':'var(--bg3)')+';color:'+(on?'#04160e':'var(--txt3)')+'">'
+      +o.label+'</button>';
+  }).join('');
+}
+
 function toggleOvShowAll(){ window._ovShowAll = !window._ovShowAll; buildBoardOverrides(); }
 // v60.75 (Round 3 ⑥): board search + policy status line
 function setBoardSearch(v){ window._boardSearch=(v||'').trim().toLowerCase(); buildBoardGrid(); }
@@ -5026,14 +5116,59 @@ function buildBoardGrid() {
   // v60.116: Branch Interview B4 (defaultSort) — order the board's fleet groups.
   // Unset → natural GROUP_META order (unchanged). Sorts are stable, so ties keep
   // their natural order.
-  const _sortMode = (STATE.branchConfig||{}).defaultSort;
+  // v60.167: SORT. A session pick (window._boardSort, set by the chips) beats the
+  // Branch Interview default. The three original modes are kept; the new ones
+  // answer questions a manager actually asks at the board, rather than just
+  // reordering alphabetically.
+  const _sortMode = window._boardSort || (STATE.branchConfig||{}).defaultSort;
+  // Default view = vehicle size order, smallest → largest per family. Any
+  // explicit sort below replaces it entirely (Matt: "unless purposefully
+  // sorted otherwise").
+  if(!_sortMode && typeof groupSizeRank==='function'){
+    _shown = _shown.map((g,i)=>[g,i])
+      .sort((a,b)=> (groupSizeRank(a[0].name)-groupSizeRank(b[0].name)) || (a[1]-b[1]))
+      .map(x=>x[0]);
+  }
+  const _netOf = g => { const d=data[g.name]; return (d && d.has && typeof d.net==='number') ? d.net : null; };
+  const _sev = {na:0,'no-data':1,up:2,wu:3};   // lower = more urgent → nearer the top
+  const _sevOf = g => { const v=_sev[_grpSt(g)]; return v==null?9:v; };
+  const _stable = (arr,fn) => arr.map((g,i)=>[g,i]).sort((a,b)=> fn(a[0],b[0]) || (a[1]-b[1])).map(x=>x[0]);
+
   if(_sortMode==='A–Z' || _sortMode==='A-Z'){
-    _shown = _shown.slice().sort((a,b)=> String(a.name).localeCompare(String(b.name)));
+    _shown = _stable(_shown, (a,b)=> String(a.name).localeCompare(String(b.name)));
   } else if(_sortMode==='Core then non-core'){
-    _shown = _shown.slice().sort((a,b)=> (_isCore(b)?1:0)-(_isCore(a)?1:0));
+    _shown = _stable(_shown, (a,b)=> (_isCore(b)?1:0)-(_isCore(a)?1:0));
   } else if(_sortMode==='Problems first'){
-    const _sev = {na:0,'no-data':1,up:2,wu:3};   // lower = more urgent → nearer the top
-    _shown = _shown.slice().sort((a,b)=> ((_sev[_grpSt(a)]==null?9:_sev[_grpSt(a)]) - (_sev[_grpSt(b)]==null?9:_sev[_grpSt(b)])));
+    _shown = _stable(_shown, (a,b)=> _sevOf(a)-_sevOf(b));
+  } else if(_sortMode==='Shortest first'){
+    // most negative net at the top — "what am I about to run out of?"
+    _shown = _stable(_shown, (a,b)=>{
+      const x=_netOf(a), y=_netOf(b);
+      if(x==null && y==null) return 0;
+      if(x==null) return 1; if(y==null) return -1;
+      return x-y;
+    });
+  } else if(_sortMode==='Most spare first'){
+    // biggest surplus at the top — "what can I upgrade people into / sell hard?"
+    _shown = _stable(_shown, (a,b)=>{
+      const x=_netOf(a), y=_netOf(b);
+      if(x==null && y==null) return 0;
+      if(x==null) return 1; if(y==null) return -1;
+      return y-x;
+    });
+  } else if(_sortMode==='Core, problems first'){
+    // the one a BM actually wants: core groups first, and WITHIN core the
+    // trouble at the top. Non-core follows, also worst-first.
+    _shown = _stable(_shown, (a,b)=>
+      ((_isCore(b)?1:0)-(_isCore(a)?1:0)) || (_sevOf(a)-_sevOf(b)) );
+  } else if(_sortMode==='Biggest movers'){
+    // largest absolute net either way — where the day is actually happening
+    _shown = _stable(_shown, (a,b)=>{
+      const x=_netOf(a), y=_netOf(b);
+      if(x==null && y==null) return 0;
+      if(x==null) return 1; if(y==null) return -1;
+      return Math.abs(y)-Math.abs(x);
+    });
   }
   var _gc=document.getElementById('board-groups-count'); if(_gc) _gc.textContent=_shown.length+(_shown.length===1?' group':' groups');
   if(_bs && !_shown.length){ html += '<div style="grid-column:1/-1;color:var(--txt3);font-size:13px;padding:16px;text-align:center">No car group matches “'+_bs+'”.</div>'; }
