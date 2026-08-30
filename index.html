@@ -16616,7 +16616,12 @@ function buildCoverageTimeline() {
 
   const H_START=5, H_END=26;
   const HOURS=Array.from({length:H_END-H_START},(_,i)=>H_START+i);
-  const hLbl=h=>{const hh=h%24,d=hh>12?hh-12:hh===0?12:hh,s=hh>=12?'p':'a';return d+s;};
+  // v60.176: was `d+s`, which printed a half-hour boundary as "1.5p" / "6.5p".
+  // Whole hours are unchanged ("1p") — minutes only appear when there are any.
+  const hLbl=h=>{const t=((h%24)+24)%24;let hh=Math.floor(t),mn=Math.round((t-hh)*60);
+    if(mn===60){mn=0;hh=(hh+1)%24;}
+    const d=hh>12?hh-12:hh===0?12:hh,s=hh>=12?'p':'a';
+    return d+(mn?':'+String(mn).padStart(2,'0'):'')+s;};
 
   function getZone(pid,person,h) {
     const specs=(STATE.specialBlocks||{})[pid]||[];
@@ -17204,6 +17209,12 @@ function buildCoverageTimeline() {
             if (st === 'Returns' || st === 'Returns Manager') return 'returns';
             if (st === 'Emerald Booth' || st === 'Emerald Booth Manager') return 'emerald';
             if (st === 'Shuttling') return 'shuttling';
+            // v60.176: these fell through to 'mgmt' — so a CXR's lunch drew as an
+            // UNLABELLED PURPLE MANAGEMENT block. zColor/label already had proper
+            // entries for all three; only this mapper was missing them.
+            if (st === 'Lunch')    return 'lunch';
+            if (st === 'Break')    return 'break';
+            if (st === 'Training') return 'training';
             return 'mgmt'; // Floater, At 99, Outfield, etc. → generic mgmt purple
           };
           // ── Determine the default station for gap-fill ─────────────────
@@ -18698,6 +18709,27 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
           background:${on?col+'22':'var(--bg3)'};border-color:${on?col:'var(--bdr2)'};color:${on?col:'var(--txt2)'}">${lbl}</button>`;
     });
     h+=`</div></div>`;
+  }
+
+  // v60.176: custom times for each leg of the rotation. Sits directly under the
+  // presets because it is the same question — "where are they, when" — just
+  // without the assumption that lunch splits the shift in half.
+  {
+    const _cb = ((STATE.mgmtBlocks||{})[pid]||[]);
+    const _on = _cb.length>0;
+    h+=`<button onclick="openRotationEditor('${pid}')"
+      style="width:100%;margin-bottom:12px;padding:10px;border-radius:8px;
+        border:1.5px solid ${_on?'var(--accent)':'var(--bdr2)'};
+        background:${_on?'rgba(35,201,131,.10)':'var(--bg3)'};
+        color:${_on?'var(--accent)':'var(--txt2)'};font-size:12.5px;font-weight:700;
+        cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px">
+      <span>⏱</span>
+      <span style="flex:1">${_on
+        ? ('Custom times · '+_cb.length+' segment'+(_cb.length===1?'':'s')+' — '+
+           _cb.map(b=>rotFmtClock(b.from)+'–'+rotFmtClock(b.to)).join(', '))
+        : 'Set custom times for each leg…'}</span>
+      <span style="opacity:.6">Edit</span>
+    </button>`;
   }
 
   if(!isExit){
@@ -23811,6 +23843,219 @@ function pmaRebuild(draft){
   });
   draft.plan=plan;
   return draft;
+}
+
+// ── v60.176 · clock parsing for the rotation segment editor ────────────────
+// A dedicated parser, NOT _rqParseTime: that one reads "130p" as 1:00pm
+// because \d{1,2} eats "13" and the trailing "0p" falls off the end. Managers
+// type "130p" constantly, so a silent half-hour error there is unacceptable.
+// Accepts: 1:30p · 130p · 1:30 PM · 13:30 · 1330 · 10a · 2p · 14 · 13.5
+function rotParseClock(s){
+  if(s==null) return null;
+  var str=String(s).trim().toLowerCase().replace(/\s+/g,'');
+  if(!str) return null;
+  // Strip a trailing meridiem, dots and all — but ONLY the meridiem. Blanket
+  // dot-removal turned the legacy decimal form "13.5" into "135" → 1:35am.
+  var ap=null;
+  var mm=str.match(/(a\.?m\.?|p\.?m\.?|a|p)$/);
+  if(mm){ ap=mm[1].charAt(0); str=str.slice(0, str.length-mm[1].length); }
+  if(!str) return null;
+  var h=null, mn=0;
+  if(/^\d{1,2}:\d{2}$/.test(str)){                       // 1:30 / 13:30
+    var q=str.split(':'); h=+q[0]; mn=+q[1];
+  } else if(/^\d{3,4}$/.test(str)){                      // 130 / 1330
+    h=+str.slice(0,str.length-2); mn=+str.slice(-2);
+  } else if(/^\d{1,2}$/.test(str)){                      // 10 / 2 / 14
+    h=+str;
+  } else if(/^\d{1,2}\.\d+$/.test(str)){                 // 13.5 (legacy decimal)
+    var f=parseFloat(str); h=Math.floor(f); mn=Math.round((f-h)*60);
+  } else return null;
+  if(mn>59 || mn<0) return null;
+  if(ap==='p' && h!==12) h+=12;
+  if(ap==='a' && h===12) h=0;
+  if(h<0 || h>24) return null;
+  return Math.round((h+mn/60)*100)/100;
+}
+function rotFmtClock(h){
+  if(h==null||isNaN(h)) return '';
+  var t=((h%24)+24)%24;
+  var hh=Math.floor(t), mn=Math.round((t-hh)*60);
+  if(mn===60){ mn=0; hh=(hh+1)%24; }
+  var ap=hh>=12?'p':'a', d=hh%12; if(d===0) d=12;
+  return d+(mn?':'+String(mn).padStart(2,'0'):'')+ap;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.176 · ROTATION SEGMENT EDITOR — lay out a whole shift, in clock time
+//
+// Matt: "it needs a way to enter stop/end times for each section of rotation,
+// even if the lunch isn't in the mid point since someone could theoretically
+// work counter 10-1, lunch 1-1:30, counter 1:30-2, Exit 2-6:30."
+//
+// The ENGINE already supported this — getZone() has honoured arbitrary blocks
+// for any role since v58. What didn't exist was a way to ENTER it: the only
+// route was "+ Add Block", one modal per segment, typing DECIMAL HOURS
+// ("8.5 = 8:30am"). Matt's four-segment example meant four separate modals and
+// four mental conversions. So the capability was real and unreachable.
+//
+// This is the whole day on one screen, in the clock time people actually speak.
+// Writes STATE.mgmtBlocks[pid] — the same store the timeline, coverage and
+// exit-credit already read, so nothing downstream needed changing.
+// ═══════════════════════════════════════════════════════════════════════════
+var ROT_STATIONS_CXR = ['Counter','Exit Booth','Returns','Lunch','Break','Shuttling','Training'];
+var ROT_STATIONS_MGR = ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling','Lunch','Break','Training'];
+var ROT_ICON = {'Emerald Booth':'🌟','Counter Manager':'🟦','Counter':'🟦','Exit Booth':'🟩',
+  'Returns':'↩','Floater':'🚗','Shuttling':'🚌','Lunch':'🍽️','Break':'☕','Training':'📚'};
+var _rotDraft = null, _rotPid = null;
+
+function openRotationEditor(pid){
+  var exp=(typeof buildExpectedToday==='function')?buildExpectedToday():{};
+  var e=exp[pid], person = e ? e.person : (typeof personByPid==='function'?personByPid(pid):null);
+  if(!person) return;
+  var ov=(STATE.shiftMod||{})[pid]||{};
+  var ss=ov.start!=null?ov.start:person.shiftStart;
+  var se=ov.end!=null?ov.end:person.shiftEnd;
+  _rotPid=pid;
+  var existing=((STATE.mgmtBlocks||{})[pid]||[]).slice().sort(function(a,b){return a.from-b.from;});
+  if(existing.length){
+    _rotDraft=existing.map(function(b){ return {from:b.from,to:b.to,station:b.station}; });
+  } else {
+    // seed from the CURRENT auto rotation so the editor starts from what the
+    // app already believes, not from an empty page
+    _rotDraft=_rotSeedFromAuto(pid, ss, se);
+  }
+  _rotRender(person, ss, se);
+}
+
+// Seed segments from the live rotation if there is one, else one shift-long block.
+function _rotSeedFromAuto(pid, ss, se){
+  try{
+    var r=(window._lastRotations||{})[pid];
+    if(r){
+      var segs=[];
+      if(r.b1) segs.push({from:r.b1.from, to:(r.lunch?r.lunch.from:r.b1.to),
+                          station:(r.b1.station==='exit'?'Exit Booth':'Counter')});
+      if(r.lunch) segs.push({from:r.lunch.from,to:r.lunch.to,station:'Lunch'});
+      if(r.b2) segs.push({from:(r.lunch?r.lunch.to:r.b2.from), to:r.b2.to,
+                          station:(r.b2.station==='exit'?'Exit Booth':'Counter')});
+      segs=segs.filter(function(x){ return x.from!=null&&x.to!=null&&x.to>x.from; });
+      if(segs.length) return segs;
+    }
+  }catch(err){}
+  if(ss!=null&&se!=null&&se>ss) return [{from:ss,to:se,station:'Counter'}];
+  return [{from:8,to:16,station:'Counter'}];
+}
+
+// Gaps/overlaps against the shift — reported, never blocked. A manager covering
+// an odd day knows their floor better than this validator does.
+function _rotIssues(ss,se){
+  var out=[], d=_rotDraft.slice().sort(function(a,b){return a.from-b.from;});
+  for(var i=0;i<d.length;i++){
+    if(d[i].to<=d[i].from) out.push({t:'bad', m:'“'+(d[i].station||'?')+'” ends before it starts'});
+    if(i>0){
+      if(d[i].from < d[i-1].to) out.push({t:'overlap', m:'overlap at '+rotFmtClock(d[i].from)});
+      else if(d[i].from > d[i-1].to) out.push({t:'gap', m:'nothing set '+rotFmtClock(d[i-1].to)+'–'+rotFmtClock(d[i].from)});
+    }
+  }
+  if(d.length && ss!=null && d[0].from>ss) out.push({t:'gap', m:'nothing set '+rotFmtClock(ss)+'–'+rotFmtClock(d[0].from)});
+  if(d.length && se!=null && d[d.length-1].to<se) out.push({t:'gap', m:'nothing set '+rotFmtClock(d[d.length-1].to)+'–'+rotFmtClock(se)});
+  return out;
+}
+
+function _rotRender(person, ss, se){
+  var isMgr=['ARM','BRM','ABRM','MT'].indexOf(person.role)>=0;
+  var stations=isMgr?ROT_STATIONS_MGR:ROT_STATIONS_CXR;
+  var nm=(typeof dispName==='function')?dispName(person):(person.nick||person.name);
+  var issues=_rotIssues(ss,se);
+  var body='<div style="font-size:12.5px;color:var(--txt3);line-height:1.5;margin-bottom:10px">'
+    +'<b style="color:var(--txt)">'+nm+'</b> · shift '+rotFmtClock(ss)+'–'+rotFmtClock(se)
+    +'<br>Type times how you say them — <b>10a</b>, <b>1p</b>, <b>130p</b>, <b>6:30p</b> all work.</div>';
+
+  body+='<div id="rot-rows">';
+  _rotDraft.forEach(function(b,i){
+    body+='<div style="display:grid;grid-template-columns:auto auto 1fr auto;gap:6px;align-items:center;margin-bottom:6px">'
+      +'<input value="'+rotFmtClock(b.from)+'" onchange="rotSet('+i+',\'from\',this.value)" '
+      +'style="width:64px;padding:8px 6px;text-align:center;background:var(--bg3);border:1px solid var(--bdr2);'
+      +'border-radius:6px;color:var(--txt);font-size:13px;font-family:var(--ff-mono)">'
+      +'<input value="'+rotFmtClock(b.to)+'" onchange="rotSet('+i+',\'to\',this.value)" '
+      +'style="width:64px;padding:8px 6px;text-align:center;background:var(--bg3);border:1px solid var(--bdr2);'
+      +'border-radius:6px;color:var(--txt);font-size:13px;font-family:var(--ff-mono)">'
+      +'<select onchange="rotSet('+i+',\'station\',this.value)" '
+      +'style="padding:8px 6px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;color:var(--txt);font-size:13px">'
+      + stations.map(function(st){ return '<option value="'+st+'"'+(st===b.station?' selected':'')+'>'+(ROT_ICON[st]||'')+' '+st+'</option>'; }).join('')
+      +'</select>'
+      +'<button onclick="rotRemove('+i+')" title="Remove this segment" '
+      +'style="padding:8px 10px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;'
+      +'color:var(--txt3);font-size:13px;cursor:pointer">×</button>'
+      +'</div>';
+  });
+  body+='</div>';
+  body+='<button onclick="rotAdd()" style="width:100%;padding:9px;margin-top:2px;border-radius:7px;'
+    +'border:1px dashed var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12.5px;'
+    +'font-weight:700;cursor:pointer">+ Add a segment</button>';
+
+  if(issues.length){
+    body+='<div style="margin-top:10px;padding:8px 10px;border-radius:7px;background:var(--bg3);'
+      +'border:1px solid var(--bdr2);font-size:11.5px;color:var(--txt3);line-height:1.6">'
+      +'<b style="color:var(--amber)">Worth a look</b><br>'
+      + issues.map(function(x){ return '· '+x.m; }).join('<br>')
+      +'<br><span style="opacity:.8">You can still save — sometimes a gap is correct.</span></div>';
+  }
+  body+='<div style="display:flex;gap:8px;margin-top:14px">'
+    +'<button onclick="rotSave()" style="flex:1;padding:12px;border-radius:8px;border:none;'
+    +'background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer">✓ Save rotation</button>'
+    +'<button class="btn btn-gh" onclick="rotClear()" title="Delete these segments and go back to the auto rotation">Use auto</button>'
+    +'</div>';
+  openModal('🔄 '+nm+' — rotation times', body);
+}
+
+function _rotReRender(){
+  var exp=(typeof buildExpectedToday==='function')?buildExpectedToday():{};
+  var e=exp[_rotPid], person=e?e.person:(typeof personByPid==='function'?personByPid(_rotPid):null);
+  if(!person) return;
+  var ov=(STATE.shiftMod||{})[_rotPid]||{};
+  _rotRender(person, ov.start!=null?ov.start:person.shiftStart, ov.end!=null?ov.end:person.shiftEnd);
+}
+function rotSet(i, field, val){
+  if(!_rotDraft||!_rotDraft[i]) return;
+  if(field==='station'){ _rotDraft[i].station=val; _rotReRender(); return; }
+  var t=rotParseClock(val);
+  if(t==null){ if(typeof toast==='function') toast('Didn’t catch “'+val+'” — try 1p, 130p or 1:30p'); _rotReRender(); return; }
+  // a segment ending at//before its start is read as crossing midnight
+  if(field==='to' && t<=_rotDraft[i].from) t+=24;
+  _rotDraft[i][field]=t;
+  _rotReRender();
+}
+function rotAdd(){
+  var last=_rotDraft[_rotDraft.length-1];
+  var from=last?last.to:8, to=from+1;
+  _rotDraft.push({from:from,to:to,station:'Counter'});   // chains off the previous end
+  _rotReRender();
+}
+function rotRemove(i){ _rotDraft.splice(i,1); _rotReRender(); }
+function rotSave(){
+  var pid=_rotPid;
+  var clean=_rotDraft.filter(function(b){ return b && b.to>b.from && b.station; })
+                     .sort(function(a,b){ return a.from-b.from; })
+                     .map(function(b){ return {from:b.from,to:b.to,station:b.station}; });
+  if(!STATE.mgmtBlocks) STATE.mgmtBlocks={};
+  if(clean.length) STATE.mgmtBlocks[pid]=clean; else delete STATE.mgmtBlocks[pid];
+  if(typeof saveState==='function') saveState();
+  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+  if(typeof buildSwitchboard==='function') buildSwitchboard();
+  if(typeof renderNow==='function') { try{ renderNow(); }catch(e){} }
+  closeModal();
+  if(typeof toast==='function') toast('🔄 Rotation saved — '+clean.length+' segment'+(clean.length===1?'':'s'));
+  if(typeof openPersonPanel==='function') openPersonPanel(pid);
+}
+function rotClear(){
+  var pid=_rotPid;
+  if(STATE.mgmtBlocks) delete STATE.mgmtBlocks[pid];
+  if(typeof saveState==='function') saveState();
+  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+  closeModal();
+  if(typeof toast==='function') toast('↩ Back to the auto rotation');
+  if(typeof openPersonPanel==='function') openPersonPanel(pid);
 }
 
 function openProposedAreas(existing){
