@@ -5789,6 +5789,32 @@ function saveDayToHistory() {
     // v60.163: call-offs were never recorded, so nothing could ever learn from
     // them. Capture per day (who + how many) — no reasons, same privacy rule as
     // the accommodation feature. Prediction needs history; history starts here.
+    // v60.164: archive the HOURLY demand curve + the day's context. pasteHourly
+    // was only ever "today" — overwritten each morning — so no baseline could
+    // ever accumulate. Storing the curve WITH its drivers (day of week, flight
+    // banks, events, weather) is what makes a real forecast possible later; a
+    // curve without its context can't be separated from a one-off.
+    hourly: (function(){
+      try{
+        var ph=STATE.pasteHourly||{}, out={};
+        Object.keys(ph).forEach(function(k){
+          if(Array.isArray(ph[k]) && ph[k].some(function(v){return v>0;})) out[k]=ph[k].slice();
+        });
+        return Object.keys(out).length? out : null;
+      }catch(e){ return null; }
+    })(),
+    context: (function(){
+      try{
+        var d=new Date();
+        return {
+          dow: d.getDay(),
+          weather: (STATE.weather && (STATE.weather.summary||STATE.weather.cond)) || null,
+          outCancel: STATE.outCancel || 0,
+          events: Array.isArray(STATE.cityEvents) ? STATE.cityEvents.length : 0,
+          walkUp: STATE.walkUpPolicy || null
+        };
+      }catch(e){ return null; }
+    })(),
     callouts: (function(){
       try{
         var ov=STATE.todayOverrides||{};
@@ -10173,6 +10199,114 @@ function forecastSummary(days){
     twoDeep:f.filter(function(x){return x.fragility===1;}).length,
     soloDays:f.filter(function(x){return x.solo.length>0;}).length,
     worst:f.slice().sort(function(a,b){return (a.fragility==null?9:a.fragility)-(b.fragility==null?9:b.fragility);}).slice(0,8)
+  };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.164 · DEMAND BASELINE — learning the shape of a day
+//
+// The method here is deliberately boring, and that's the point. For ONE branch
+// with a few weeks of history, a day-of-week × hour baseline plus the
+// adjustments the app already computes (flight banks, city events, weather)
+// beats anything clever: it's explainable to a manager, it degrades honestly,
+// and it can't overfit its way into confident nonsense. No ML — n is far too
+// small, and a number a manager can't interrogate is a number they won't trust.
+//
+// Confidence is reported, never implied. Below MIN_SAMPLES for a given
+// day-of-week the answer is "not enough data yet" — not a shrug dressed as a
+// forecast. (Existing research: SCHEDULING_ENGINE_RESEARCH.md ranks demand
+// forecast as job #1 of 3; this fills the gap it left.)
+// ═══════════════════════════════════════════════════════════════════════════
+var DEMAND_MIN_SAMPLES = 3;      // per day-of-week before we'll state a number
+var DEMAND_RECENT_DAYS = 56;     // 8 weeks — recent behaviour beats ancient
+function _dmHistory(){
+  var h=[]; try{ h=(typeof loadHistory==='function')?loadHistory():[]; }catch(e){}
+  return h.filter(function(e){ return e && e.hourly; }).slice(0, DEMAND_RECENT_DAYS);
+}
+// Average hourly curve for a given day-of-week, per series (resAM/retPM/…).
+function demandBaseline(dow){
+  var hist=_dmHistory().filter(function(e){
+    var d=(e.context&&e.context.dow!=null)?e.context.dow:
+          (function(){ try{ return new Date(e.date+'T12:00:00').getDay(); }catch(x){ return null; } })();
+    return d===dow;
+  });
+  if(hist.length<DEMAND_MIN_SAMPLES){
+    return {ok:false, samples:hist.length, need:DEMAND_MIN_SAMPLES,
+            why:'Only '+hist.length+' '+['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dow]+
+                (hist.length===1?'':'s')+' recorded — need '+DEMAND_MIN_SAMPLES+' before this means anything.'};
+  }
+  var series={};
+  hist.forEach(function(e){
+    Object.keys(e.hourly||{}).forEach(function(k){
+      var arr=e.hourly[k]; if(!Array.isArray(arr)) return;
+      if(!series[k]) series[k]=new Array(24).fill(0).map(function(){return [];});
+      arr.forEach(function(v,h){ if(typeof v==='number') series[k][h].push(v); });
+    });
+  });
+  var avg={}, spread={};
+  Object.keys(series).forEach(function(k){
+    avg[k]=series[k].map(function(vals){
+      if(!vals.length) return null;
+      return Math.round(vals.reduce(function(a,b){return a+b;},0)/vals.length*10)/10;
+    });
+    // how much a given hour actually varies — a wide spread means "don't trust the mean"
+    spread[k]=series[k].map(function(vals){
+      if(vals.length<2) return null;
+      var m=vals.reduce(function(a,b){return a+b;},0)/vals.length;
+      var v=vals.reduce(function(a,b){return a+(b-m)*(b-m);},0)/vals.length;
+      return Math.round(Math.sqrt(v)*10)/10;
+    });
+  });
+  return {ok:true, samples:hist.length, dow:dow, avg:avg, spread:spread};
+}
+// Forecast a date = baseline for its weekday, then the adjustments the app
+// ALREADY computes. Each adjustment is reported separately so a manager can see
+// WHY the number moved, and disagree with a specific part of it.
+function demandForecast(dateKey){
+  var d; try{ d=new Date(dateKey+'T12:00:00'); }catch(e){ return {ok:false, why:'bad date'}; }
+  var base=demandBaseline(d.getDay());
+  if(!base.ok) return {ok:false, samples:base.samples, why:base.why};
+  var adj=[];
+  try{
+    var fa=0; for(var h=6;h<24;h++){ fa+=(typeof flightArrBump==='function')?flightArrBump(h):0; }
+    if(fa) adj.push({what:'flight arrivals', effect:'+'+fa+' counter-hours'});
+  }catch(e){}
+  try{
+    var ev=(typeof eventBumpAt==='function')?eventBumpAt(12):0;
+    if(ev) adj.push({what:'city events', effect:'+'+ev+' at counter'});
+  }catch(e){}
+  try{ if(STATE.outCancel) adj.push({what:'cancellations logged', effect:'-'+STATE.outCancel+' out'}); }catch(e){}
+  var peak=null;
+  Object.keys(base.avg).forEach(function(k){
+    base.avg[k].forEach(function(v,h){
+      if(v!=null && (!peak || v>peak.v)) peak={series:k, hour:h, v:v};
+    });
+  });
+  return {ok:true, date:dateKey, samples:base.samples, baseline:base.avg, spread:base.spread,
+          adjustments:adj, peak:peak,
+          confidence: base.samples>=8 ? 'good' : base.samples>=5 ? 'fair' : 'thin'};
+}
+// What the branch needs to keep capturing for this to get better.
+function demandDataHealth(){
+  var h=[]; try{ h=(typeof loadHistory==='function')?loadHistory():[]; }catch(e){}
+  var withHourly=h.filter(function(e){return e&&e.hourly;}).length;
+  var byDow={};
+  h.forEach(function(e){
+    if(!e||!e.hourly) return;
+    var d=(e.context&&e.context.dow!=null)?e.context.dow:null;
+    if(d==null){ try{ d=new Date(e.date+'T12:00:00').getDay(); }catch(x){ return; } }
+    byDow[d]=(byDow[d]||0)+1;
+  });
+  var names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  return {
+    daysRecorded:h.length,
+    daysWithHourly:withHourly,
+    perWeekday:names.map(function(n,i){ return n+': '+(byDow[i]||0); }),
+    ready:names.filter(function(n,i){ return (byDow[i]||0)>=DEMAND_MIN_SAMPLES; }),
+    note: withHourly===0
+      ? 'No hourly curves stored yet — they start accumulating from the next end-of-day save (v60.164).'
+      : withHourly+' day'+(withHourly===1?'':'s')+' captured. Each weekday needs '+DEMAND_MIN_SAMPLES+' before it will state a number.'
   };
 }
 
