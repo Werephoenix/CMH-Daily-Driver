@@ -766,6 +766,14 @@ select option { background: var(--bg3); }
 .group-tile.gt-ov { box-shadow: inset 0 0 0 1.5px var(--up); }   /* manual override active */
 .gt-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
 .gt-code { font-size: 11px; font-weight: 800; letter-spacing: .04em; color: var(--txt3); text-transform: uppercase; }
+/* v60.168: name leads, code sits under it (Matt). The group NAME is what a manager
+   thinks in; the code is the lookup they need second. */
+.gt-name-top { font-family: var(--ff-hd); font-size: 13px; font-weight: 800; line-height: 1.15;
+  color: var(--txt); letter-spacing: -.01em; padding-right: 6px; }
+.gt-coderow { display: flex; align-items: center; gap: 5px; margin: 2px 0 8px; }
+.gt-i { border: none; background: none; padding: 0; cursor: pointer; line-height: 1;
+  font-size: 11px; color: var(--acc); opacity: .85; }
+.gt-i:hover { opacity: 1; }
 .gt-badge {
   width: 26px; height: 26px; border-radius: 7px;
   display: inline-flex; align-items: center; justify-content: center;
@@ -4014,7 +4022,7 @@ function loadState() {
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
     stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
-    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, soloChecked:{}, corpAvg:null, mgrAnchorOverride:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
+    closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, soloChecked:{}, corpAvg:null, absenceType:{}, mgrAnchorOverride:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
     mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{}, pto:{},
   };
 }
@@ -4366,11 +4374,14 @@ function sodEarlyHtml(){
       var e=exp[pid], off=(STATE.todayOverrides||{})[pid]==='callout';
       var nm=(typeof dispName==='function')?dispName(e.person):(e.person.nick||e.person.name);
       var stn=(STATE.staffStation||{})[pid]||'';
+      var _t=(typeof absenceTypeOf==='function')?absenceTypeOf(pid):null;
+      var _m=(_t && typeof absenceMeta==='function')?absenceMeta(_t):null;
       out+='<div class="sod-p'+(off?' off':'')+'">'
         +'<span class="sod-p-nm">'+nm+'</span>'
-        +(stn?'<span class="sod-p-st">'+stn.replace(/ (Booth|Manager)$/,'')+'</span>':'')
-        +'<button onclick="sodToggleHere(\''+pid+'\')">'+(off?'↩ here':'no-show')+'</button>'
-        +'</div>';
+        +(_m?'<span class="sod-p-tag" style="color:'+_m.tone+'">'+_m.icon+' '+_m.short+'</span>'
+            :(stn?'<span class="sod-p-st">'+stn.replace(/ (Booth|Manager)$/,'')+'</span>':''))
+        +'</div>'
+        + ((typeof absencePickerHtml==='function')?absencePickerHtml(pid):'');
     });
     out+='</div>';
   });
@@ -4419,7 +4430,10 @@ function sodInjectStyle(){
   +'.sod-p.off{opacity:.55;background:rgba(255,69,58,.08);border-color:rgba(255,69,58,.35)}'
   +'.sod-p-nm{font-size:13px;font-weight:700;color:var(--txt);flex:1;min-width:0}'
   +'.sod-p-st{font-size:10px;color:var(--txt3)}'
-  +'.sod-p button{flex-shrink:0;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);border-radius:6px;padding:4px 9px;font-size:10.5px;font-weight:700;cursor:pointer}';
+  +'.sod-p button{flex-shrink:0;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);border-radius:6px;padding:4px 9px;font-size:10.5px;font-weight:700;cursor:pointer}'
+  +'.sod-p-tag{font-size:10.5px;font-weight:800;white-space:nowrap}'
+  +'.abs-pick{display:flex;gap:4px;flex-wrap:wrap;margin:-2px 0 7px}'
+  +'.abs-pick button{flex:1;min-width:74px;border-radius:7px;padding:6px 4px;font-size:10.5px;font-weight:700;cursor:pointer}';
   var st=document.createElement('style'); st.id='sod-style'; st.textContent=css; document.head.appendChild(st);
 }
 function sodToPaste() {
@@ -5210,11 +5224,15 @@ function buildBoardGrid() {
     html += `<div class="group-tile ${st}${_ovRing}" onclick="tileClick('${g.name.replace(/'/g,"\\'")}')"
         oncontextmenu="event.preventDefault();cycleGroupOverride('${g.name.replace(/'/g,"\\'")}')">
       <div class="gt-top">
-        <span class="gt-code">${(typeof groupRepCode==='function'?groupRepCode(g.name):'')||''}</span>
+        <span class="gt-name-top">${g.name}</span>
         <span class="gt-badge ${st}">${_icn}</span>
       </div>
+      <div class="gt-coderow">
+        <span class="gt-code">${(typeof groupRepCode==='function'?groupRepCode(g.name):'')||''}</span>
+        <button class="gt-i" title="All codes in this group"
+          onclick="event.stopPropagation();openGroupCodes('${g.name.replace(/'/g,"\\'")}')">ⓘ</button>
+      </div>
       <div class="gt-num ${st}">${_num}</div>
-      <div class="gt-name">${g.name}</div>
     </div>`;
   });
 
@@ -6016,6 +6034,18 @@ function saveDayToHistory() {
         var ov=STATE.todayOverrides||{};
         return Object.keys(ov).filter(function(k){ return ov[k]==='callout'; });
       }catch(e){ return []; }
+    })(),
+    // v60.169: WHY they were off, kept apart. Lumping a phoned-in absence in with
+    // a no-call-no-show would put an attendance mark on someone who did the right
+    // thing. Categories only — never a reason.
+    absences: (function(){
+      try{
+        var ov=STATE.todayOverrides||{}, out={};
+        Object.keys(ov).forEach(function(k){
+          if(ov[k]==='callout') out[k]=(typeof absenceTypeOf==='function')?absenceTypeOf(k):'calledoff';
+        });
+        return Object.keys(out).length? out : null;
+      }catch(e){ return null; }
     })(),
     tmrwRes: STATE.fields.closeTmrwRes || null,
     tmrwRet: STATE.fields.closeTmrwRet || null,
@@ -10506,6 +10536,100 @@ function demandDataHealth(){
   };
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.169 · ABSENCE TYPES — "off today" is not one thing
+// Matt: a single "no-show" button meant someone who PHONED IN was recorded the
+// same as a no-call-no-show. That's an attendance record following a person
+// around for something they did correctly, so the distinction is kept from the
+// first tap and preserved in history.
+//   called off  — they let you know. Normal, not a mark against them.
+//   no show     — no call, didn't arrive. The only one that's an attendance issue.
+//   PTO / Vacation — planned and approved; also written to the time-off spine
+//                    (STATE.pto) so the scheduler stops offering them for shifts.
+// NO REASONS are stored — categories only, same rule as exit accommodations.
+// STATE.todayOverrides[pid] stays 'callout' for backward compatibility (a lot of
+// code checks that exact string); the TYPE rides alongside in STATE.absenceType.
+// ═══════════════════════════════════════════════════════════════════════════
+var ABSENCE_TYPES = [
+  {k:'calledoff', label:'Called off', short:'Called off', icon:'📞', tone:'#FFCC00',
+   note:'Let you know — not an attendance mark'},
+  {k:'noshow',    label:'No show',    short:'No show',    icon:'⛔', tone:'#FF453A',
+   note:'No call, did not arrive'},
+  {k:'pto',       label:'PTO',        short:'PTO',        icon:'🌴', tone:'#30D158',
+   note:'Approved time off'},
+  {k:'vaca',      label:'Vacation',   short:'Vacation',   icon:'🏖', tone:'#30D158',
+   note:'Approved vacation'}
+];
+function absenceMeta(k){ return ABSENCE_TYPES.filter(function(t){return t.k===k;})[0]||null; }
+function absenceTypeOf(pid){
+  var t=(STATE.absenceType||{})[pid];
+  if(t) return t;
+  // an absence recorded before v60.169 has no type — don't guess "no show"
+  return ((STATE.todayOverrides||{})[pid]==='callout') ? 'calledoff' : null;
+}
+function setAbsence(pid, type){
+  if(!STATE.todayOverrides) STATE.todayOverrides={};
+  if(!STATE.absenceType)    STATE.absenceType={};
+  if(!STATE.staffDuty)      STATE.staffDuty={};
+  STATE.todayOverrides[pid]='callout';
+  STATE.absenceType[pid]=type;
+  STATE.staffDuty[pid]=false;
+  // Planned time off belongs on the shared spine so the scheduler respects it —
+  // and CORRECTING a mistaken PTO to "called off" has to take it back off again,
+  // or the scheduler keeps treating them as on approved leave.
+  try{
+    var dk=(typeof todayKey==='function')?todayKey():null;
+    if(dk){
+      if(type==='pto'||type==='vaca'){
+        if(!STATE.pto) STATE.pto={};
+        if(!STATE.pto[dk]) STATE.pto[dk]={};
+        STATE.pto[dk][pid]=true;
+      } else if(STATE.pto && STATE.pto[dk]){
+        delete STATE.pto[dk][pid];
+      }
+    }
+  }catch(e){}
+  if(typeof saveState==='function') saveState();
+  _absenceRefresh(pid, type);
+}
+function clearAbsence(pid){
+  if(STATE.todayOverrides) delete STATE.todayOverrides[pid];
+  if(STATE.absenceType)    delete STATE.absenceType[pid];
+  if(STATE.staffDuty)      STATE.staffDuty[pid]=true;
+  try{
+    var dk=(typeof todayKey==='function')?todayKey():null;
+    if(dk && STATE.pto && STATE.pto[dk]) delete STATE.pto[dk][pid];
+  }catch(e){}
+  if(typeof saveState==='function') saveState();
+  _absenceRefresh(pid, null);
+}
+function _absenceRefresh(pid, type){
+  var m=type?absenceMeta(type):null;
+  if(typeof toast==='function'){
+    var who=(typeof dispName==='function')?dispName(pid):String(pid).replace(/_/g,' ');
+    toast(m ? (m.icon+' '+who+' — '+m.short) : ('↩ '+who+' back on'));
+  }
+  ['buildCoverageUI','buildMorningBriefing','buildCoverageTimeline','renderNow','coRender','soloRenderSchedBanner']
+    .forEach(function(fn){ if(typeof window[fn]==='function'){ try{ window[fn](); }catch(e){} } });
+  if(typeof showEODRecap==='function' && document.getElementById('modal-body')
+     && /Who.s in early/.test(document.body.textContent)) { try{ showEODRecap(); }catch(e){} }
+}
+// The picker used by the morning card + the call-off sheet.
+function absencePickerHtml(pid){
+  var cur=absenceTypeOf(pid);
+  var esc=String(pid).replace(/'/g,"\\'");
+  return '<div class="abs-pick">'+ABSENCE_TYPES.map(function(t){
+    var on=(cur===t.k);
+    return '<button title="'+t.note+'" onclick="event.stopPropagation();setAbsence(\''+esc+'\',\''+t.k+'\')" '
+      +'style="border:1px solid '+(on?t.tone:'var(--bdr2)')+';background:'+(on?t.tone+'22':'var(--bg2)')
+      +';color:'+(on?t.tone:'var(--txt3)')+'">'+t.icon+' '+t.short+'</button>';
+  }).join('')
+  + (cur?'<button onclick="event.stopPropagation();clearAbsence(\''+esc+'\')" '
+       +'style="border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3)">↩ Here</button>':'')
+  +'</div>';
+}
+
 function renderNow() {
   const el = document.getElementById('now-hero');
   if (!el) return;
@@ -12257,6 +12381,39 @@ function autoParseOnPaste(n, el) {
 }
 
 
+
+// ── v60.168 · group code list (the ⓘ on each tile) ────────────────────────
+// A group holds several codes; the tile shows the representative one. This is
+// where the rest live, with example vehicles, so nothing is hidden.
+function _titleCaseModels(str){
+  if(!str) return '';
+  return String(str).split(/\s+/).reduce(function(acc,w,i){
+    return acc + (i?' ':'') + w.charAt(0).toUpperCase()+w.slice(1);
+  },'');
+}
+function openGroupCodes(name){
+  var codes=(typeof groupAllCodes==='function')?groupAllCodes(name):[];
+  var rep=(typeof groupRepCode==='function')?groupRepCode(name):'';
+  if(!codes.length){ if(typeof toast==='function') toast('No codes mapped to '+name); return; }
+  var rows=codes.map(function(c){
+    var models=(typeof MODEL_INDEX!=='undefined' && MODEL_INDEX[c])?MODEL_INDEX[c]:'';
+    var isRep=(c===rep);
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--bdr)">'
+      +'<span style="font-family:var(--ff-mono);font-size:13px;font-weight:800;min-width:52px;'
+      +'color:'+(isRep?'var(--accent)':'var(--txt)')+'">'+c+'</span>'
+      +'<div style="flex:1;min-width:0">'
+      + (isRep?'<div style="font-size:9.5px;font-weight:800;letter-spacing:.05em;color:var(--accent);text-transform:uppercase;margin-bottom:2px">shown on the board</div>':'')
+      + '<div style="font-size:11.5px;color:var(--txt3);line-height:1.5">'
+      + (models? _titleCaseModels(models) : '<i>no example models listed</i>')+'</div></div></div>';
+  }).join('');
+  openModal('🚗 '+name+' — codes',
+    '<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:10px">'
+    +codes.length+' code'+(codes.length===1?'':'s')+' map to this group. The board shows <b>'+rep
+    +'</b>; any of these count toward the same tile.</div>'+rows
+    +'<div style="font-size:11px;color:var(--txt3);margin-top:12px;line-height:1.5">'
+    +'Wrong code on the board? It\'s set in <code>GROUP_REP_CODE</code> — tell me and it\'s a one-line change.</div>');
+}
+
 function tileClick(name) {
   const data = getGroupNetData();
   const d = data[name];
@@ -12339,6 +12496,32 @@ function tileClick(name) {
       </button>
       ${override ? '<button class="btn btn-gh btn-sm" onclick="delete STATE.groupOverrides[\''+name+'\'];saveState();buildBoardGrid();closeModal()">↩ Reset to Auto</button>' : ''}
     </div>`;
+
+  // v60.168: what IS this class? The codes that feed the tile + example vehicles,
+  // so a newer CXR can answer "what actually counts as a Fullsize SUV" without
+  // leaving the board.
+  try{
+    const _codes = (typeof groupAllCodes==='function') ? groupAllCodes(name) : [];
+    const _rep   = (typeof groupRepCode==='function') ? groupRepCode(name) : '';
+    if(_codes.length){
+      const _models = _codes.map(c => (typeof MODEL_INDEX!=='undefined' && MODEL_INDEX[c]) ? MODEL_INDEX[c] : '')
+        .filter(Boolean).join(' ').split(/\s+/);
+      const _seen = {}; const _uniq = [];
+      _models.forEach(w => { const k=w.toLowerCase(); if(!_seen[k]){ _seen[k]=1; _uniq.push(w); } });
+      body += `<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--bdr)">
+        <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:6px">What's in this class</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px">${
+          _codes.map(c=>`<span style="font-family:var(--ff-mono);font-size:11px;font-weight:800;padding:3px 8px;border-radius:5px;
+            background:${c===_rep?'rgba(35,201,131,.16)':'var(--bg3)'};color:${c===_rep?'var(--accent)':'var(--txt2)'};
+            border:1px solid ${c===_rep?'var(--accent)':'var(--bdr2)'}">${c}</span>`).join('')
+        }</div>
+        ${_uniq.length?`<div style="font-size:11.5px;color:var(--txt3);line-height:1.55">e.g. ${
+          _uniq.slice(0,14).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ')
+        }${_uniq.length>14?' …':''}</div>`:''}
+        <button class="btn btn-gh btn-sm" style="margin-top:9px" onclick="closeModal();openGroupCodes('${name.replace(/'/g,"\\'")}')">See all codes &amp; models →</button>
+      </div>`;
+    }
+  }catch(e){}
 
   openModal(name, body);
 }
