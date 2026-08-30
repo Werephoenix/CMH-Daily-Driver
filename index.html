@@ -3170,7 +3170,8 @@ var ROSTER_CXR = [
    daysOn:[0,1,2,3,4],  // Sun-Thu — NEW bid shift #7 (2026-08), off Fri/Sat
    pref:'none', exitFairness:0,
    lunchCode:'30min',
-   notes:'Sun-Thu 10a-6:30p. Off Fri/Sat. New bid shift #7 (2026-08). Last name Haile (not Hale).'},
+   aka:['Tightisty'],
+   notes:'Sun-Thu 10a-6:30p. Off Fri/Sat. New bid shift #7 (2026-08). Last name Haile (not Hale). ⚠ FIRST-NAME SPELLING UNCONFIRMED — roster says "Tighisty", the Sept 2026 grid says "Tightisty" (extra t); Matt is double-checking. Both accepted via aka[]. She goes by TT.'},
 
   {id:'sammi',    name:'Samantha (Sammi) Smith',  nick:'Sammi',   role:'CXR',
    shiftCode:'10A-630P', shiftStart:10.0, shiftEnd:18.5,
@@ -3194,8 +3195,8 @@ var ROSTER_CXR = [
    daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat
    pref:'none', exitFairness:0,
    lunchCode:'30min',
-   active:false, onLeave:true, departedDate:'2026-08-20', departedReason:'On leave — returning',
-   notes:'ON LEAVE 2026-08-20 (returning) — off the active schedule while out; Reinstate when back. Was Sun/Mon/Thu/Fri/Sat 4:30p-1:00a.'},
+   active:true,
+   notes:'REINSTATED 2026-08-29 — the September 2026 grid has him working 5p-1:30a all month, so the leave ended. Was on leave 2026-08-20.'},
 
   {id:'leslie',   name:'Leslie Hamler',            nick:'Leslie',  role:'CXR',
    shiftCode:'430P-100A', shiftStart:16.5, shiftEnd:25.0,
@@ -3233,7 +3234,8 @@ var ROSTER_CXR = [
    daysOn:[0,1,4,5,6],  // Sun/Mon/Thu/Fri/Sat — off Tue/Wed
    pref:'none', exitFairness:0, _new:true,
    lunchCode:'30min',
-   notes:'New hire 2026-08. 10a-6:30p. Off Tue/Wed. Bid shift #9. Different from Toney (Returns). Last name TBD.'},
+   aka:['Anthony'],
+   notes:'New hire 2026-08. 10a-6:30p. Off Tue/Wed. Bid shift #9. GOES BY BOTH Tony AND Anthony (Matt 2026-08-29) — the Sept grid uses "Anthony"; same person, do NOT create a second record. STILL different from Toney (Returns) — three-way near-collision: Tony/Anthony (CXR) vs Toney (Returns). Last name TBD.'},
 
   // ═══ EXIT AGENTS — Full shift at Exit, no counter rotation ══════════════════,
 ];
@@ -3255,6 +3257,11 @@ var ROSTER_RETURNS = [
   {id:'robert',  name:'Robert Payne',             nick:'Robert', role:'RETURNS',
    shiftCode:'4P-1230A', shiftStart:16.0, shiftEnd:24.5,
    daysOn:[1,2,3,4,5], notes:'Self-managing. Mon-Fri approx 4:00p-12:30a.'},
+  {id:'abdi',   name:'Abdi',          nick:'Abdi',   role:'RETURNS',
+   daysOn:[0,1,2,3,4,5,6], shiftStart:3.5, shiftEnd:12,
+   shiftCode:'330A-12P',
+   active:true, _new:true,
+   notes:'Returns agent. ADDED 2026-08-29 from the September 2026 grid — was working but absent from the roster entirely. Two patterns in that grid: 3:30a-12p (early) and 9a-5:30p on some days. Last name TBD.'},
   {id:'nas',    name:'Nas Returns',    nick:'Nas',    role:'RETURNS',
    daysOn:[0,3,4,5,6], shiftStart:14, shiftEnd:23,
    shiftCode:'2P-11P',
@@ -3263,6 +3270,12 @@ var ROSTER_RETURNS = [
 
 
 var ROSTER_EXIT = [
+  {id:'shawnee', name:'Shawnee', nick:'Shawnee', role:'EXIT',
+   daysOn:[3,4], shiftStart:6.75, shiftEnd:16,
+   shiftCode:'645A-4P',
+   active:true, _new:true,
+   notes:'Exit agent. ADDED 2026-08-29 from the September 2026 grid — was working but absent from the roster. Covers Thu/Fri 6:45a-4p (the days Fatuma is off). Last name TBD.'},
+
   // v60.99/101: current exit agents = Zina + Fatuma (set shifts) + Duria (still here, shift TBD).
   // Lisa quit → archived, data kept (Matt 2026-08-20).
   {id:'zina', name:'Zina Kellen', nick:'Zina', role:'EXIT',
@@ -3273,11 +3286,11 @@ var ROSTER_EXIT = [
    daysOn:[0,1,2,3,6], shiftStart:7, shiftEnd:16,
    shiftCode:'7A-400P',
    notes:'Exit agent. Sat–Wed (off Thu/Fri). 7a-4p. No counter rotation. Last name TBD.', active:true},
-  {id:'duria', name:'Duria', nick:'Duria', role:'EXIT',
-   daysOn:[], shiftStart:18, shiftEnd:26.5,
-   shiftCode:'TBD',
-   active:true, _new:true,
-   notes:'Exit agent (still here). Evening. Shift TBD — Matt to provide. No counter rotation.'},
+  {id:'duria', name:'Dariu', nick:'Dariu', role:'EXIT', aka:['Duria'],
+   daysOn:[0,1,2,4,5], shiftStart:17, shiftEnd:25.5,
+   shiftCode:'5P-130A',
+   active:true,
+   notes:'Exit agent, evenings 5p-1:30a. SPELLING: "Dariu" is correct (Matt 2026-08-29) — the roster said "Duria" until the Sept 2026 grid; old spelling kept in aka[]. Shift confirmed from that grid (was TBD). No counter rotation. id left as duria so stored history still matches.'},
   {id:'lisa_exit', name:'Lisa (Exit)', nick:'Lisa', role:'EXIT',
    daysOn:[0], shiftStart:16.5, shiftEnd:24.5,
    shiftCode:'430P-1230A',
@@ -5301,6 +5314,43 @@ function parseShiftEndHour(code) {
   if (ap === 'A' && num >= 12 && num < 13) num -= 12;   // 12a→0, 12:30a→0.5
   return num;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.160 · ONE definition of "not on the floor" (learned from the Sept 2026 grid)
+// The real schedule uses markers the app had never seen — BRM RETREAT, TEAM NC
+// VISIT, CXR TRAINING, MQI — and there were FOUR divergent off-day checks, none
+// of which caught them. Worse: those strings don't parse as a shift either, so
+// start/end came back null and the person counted as ON the floor ALL DAY,
+// inflating coverage and silently suppressing real gaps.
+// One canonical test now, used everywhere.
+//   • Away entirely: OFF, VACA/VAC, PTO, LOA, JURY, BEREAVE, SICK, NCNS
+//   • On the clock but NOT on the floor: RETREAT, TRAINING, MQI, VISIT,
+//     MEETING/MTG, CONFERENCE, ARMS, TOP20, STRONGER
+// A real shift with a note in it — "8A-12P(HALFDAY)" — stays WORKING.
+var OFF_MARKERS = /\b(OFF|VACA?|PTO|LOA|JURY|BEREAVE\w*|SICK|NCNS)\b/i;
+var AWAY_MARKERS = /\b(RETREAT|TRAINING|MQI|VISIT|MEETING|MTG|CONFERENCE|ARMS|TOP ?20|STRONGER)\b/i;
+function isOffCode(code){
+  if(code==null) return true;
+  var c=String(code).trim();
+  if(!c || c==='—' || c==='-') return true;
+  if(OFF_MARKERS.test(c)) return true;
+  if(AWAY_MARKERS.test(c)) return true;
+  return false;
+}
+// Why they're not on the floor — for honest labelling ("Retreat", not "OFF").
+function offCodeReason(code){
+  var c=String(code==null?'':code).trim();
+  if(!c||c==='—'||c==='-') return 'Off';
+  var m=c.match(/\b(RETREAT|TRAINING|MQI|VISIT|MEETING|MTG|CONFERENCE)\b/i);
+  if(m){ var w=m[1].toUpperCase();
+    return w==='MQI' ? 'MQI' : w.charAt(0)+w.slice(1).toLowerCase(); }
+  if(/VACA?\b/i.test(c)) return 'Vacation';
+  if(/PTO/i.test(c)) return 'PTO';
+  if(/LOA/i.test(c)) return 'Leave';
+  if(/SICK/i.test(c)) return 'Sick';
+  return 'Off';
+}
+
 function parseShiftToTimes(code) {
   if (!code || code === 'OFF') return { shiftStart: null, shiftEnd: null };
   const start = parseShiftStartHour(code);
@@ -7043,6 +7093,11 @@ function parseGridSchedule(text, rosterFilter) {
       const pn = p.name.toLowerCase();
       const nn = (p.nick||'').toLowerCase();
       const nl = nameRaw.toLowerCase();
+      // v60.160: roster-level aka[] — the Sept 2026 grid called Tony "Anthony"
+      // and TT "Tightisty". Same people, different pens. Baking the known
+      // variants into the roster means the next paste just matches, instead of
+      // relying on someone noticing and confirming a fuzzy prompt.
+      if (Array.isArray(p.aka) && p.aka.some(a => String(a).toLowerCase() === nl)) return true;
       return pn===nl || nn===nl || pn.startsWith(nl) ||
              nl===pn.split(' ')[0] || (nl.length>3 && pn.includes(nl));
     });
@@ -7843,8 +7898,7 @@ function confirmToday() {
 
   // Apply schedule to STATE.staffDuty and STATE.staffStation
   Object.entries(todayShifts).forEach(([pid, shift]) => {
-    const isOff = shift === 'OFF' || shift.includes('VACA') || shift.includes('TRAINING') ||
-                  shift.includes('ARMS') || shift.includes('TOP20') || shift.includes('STRONGER');
+    const isOff = isOffCode(shift);   // v60.160: canonical off-test
     const isCallout = todayOverrides[pid] === 'callout';
 
     STATE.staffDuty[pid] = (!isOff && !isCallout);
@@ -7912,7 +7966,7 @@ function detectManagersFromSchedule(todayShifts, allRoster) {
     return epid === npid || p.name.replace(/\s/g,'_') === pid;
   });
     if (!person || !['ARM','BRM','ABRM'].includes(person.role)) return;
-    const isOff = shift === 'OFF' || shift.includes('VACA');
+    const isOff = isOffCode(shift);   // v60.160: canonical off-test
     if (isOff) return;
     const isClose = shift.toUpperCase().includes('-C');
     const startH = shiftToHour(shift.split('-')[0]) || 99;
@@ -12578,7 +12632,7 @@ function buildExpectedToday() {
   const mgmtSched = getStoredSection('mgmt');
   if (mgmtSched && mgmtSched.grid && mgmtSched.grid[today]) {
     Object.entries(mgmtSched.grid[today]).forEach(([pid, shift]) => {
-      if (!shift || shift === 'OFF' || shift.toUpperCase().includes('VACA')) return;
+      if (isOffCode(shift)) return;   // v60.160: canonical off-test
       // Find person: try all pid variants of each roster name
       const person = allRoster.find(p => namePidVariants(p.name).includes(pid) ||
         namePidVariants(p.name).some(v => pid.startsWith(v.slice(0,8)) || v.startsWith(pid.slice(0,8))));
@@ -12596,7 +12650,7 @@ function buildExpectedToday() {
   const cxrSched = getStoredSection('cxr');
   if (cxrSched && cxrSched.grid && cxrSched.grid[today]) {
     Object.entries(cxrSched.grid[today]).forEach(([pid, shift]) => {
-      if (!shift || shift === 'OFF' || shift.toUpperCase().includes('VACA')) return;
+      if (isOffCode(shift)) return;   // v60.160: canonical off-test
       const person = allRoster.find(p => normPid(p.name) === pid);
       if (person) expected[normPid(person.name)] = { person, shift, source:'schedule' };
     });
@@ -20334,7 +20388,7 @@ function mcEventsOn(key){
 function mcNormMD(s){ if(!s) return ''; var m=String(s).match(/(\d{1,2})[\/\-](\d{1,2})/); if(!m) return ''; return String(parseInt(m[1])).padStart(2,'0')+'-'+String(parseInt(m[2])).padStart(2,'0'); }
 function mcCelebsOn(key){ var md=key.slice(5); return (STATE.celebrations||[]).filter(function(c){ return mcNormMD(c.date)===md; }); }
 function mcScheduleObj(key){ try{ return (typeof getScheduleForDate==='function' ? getScheduleForDate(key) : null) || {}; }catch(e){ return {}; } }
-function mcStaffCount(key){ var s=mcScheduleObj(key); return Object.keys(s).filter(function(p){ var c=s[p]; return c && !/OFF|VACA|PTO/i.test(String(c)); }).length; }
+function mcStaffCount(key){ var s=mcScheduleObj(key); return Object.keys(s).filter(function(p){ return !isOffCode(s[p]); }).length; }
 // v60.115: time-off layer — who's OFF/VACA/PTO on a date (schedule markers +
 // the optional PTO store), for the calendar's 🌴 marker + day detail.
 function mcTimeOffOn(key){
