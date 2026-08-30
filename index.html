@@ -789,6 +789,19 @@ select option { background: var(--bg3); }
 .gt-num.na { color: var(--na); }
 .gt-num.no-data { color: var(--txt3); font-size: 22px; }
 .gt-name { font-size: 12px; color: var(--txt3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* v60.170 quick lists — names only; the grid below carries the detail */
+#board-quick { background:var(--bg2); border:1px solid var(--bdr); border-radius:12px;
+  padding:11px 13px 9px; margin-bottom:12px; position:relative; }
+.bq-row { display:flex; gap:10px; align-items:flex-start; padding:5px 0; }
+.bq-row + .bq-row { border-top:1px solid var(--bdr); margin-top:3px; padding-top:8px; }
+.bq-lbl { flex:0 0 128px; font-size:11px; font-weight:800; letter-spacing:.03em;
+  text-transform:uppercase; padding-top:5px; }
+.bq-chips { flex:1; min-width:0; display:flex; flex-wrap:wrap; gap:5px; }
+.bq-empty { font-size:11.5px; color:var(--txt3); padding-top:5px; }
+.bq-hide { position:absolute; top:8px; right:10px; border:none; background:none;
+  color:var(--txt3); font-size:10.5px; cursor:pointer; }
+@media (max-width:640px){ .bq-row{flex-direction:column;gap:5px} .bq-lbl{flex:none;padding-top:0} }
+
 /* v60.88: filter pills (All · Available · W/up only · Core · Non-Core) */
 .board-fpills { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 10px; }
 .board-fpills::-webkit-scrollbar { display: none; }
@@ -2243,6 +2256,12 @@ button { cursor: pointer; }
 
   <!-- v60.81 (Design §3.5): collapsed POLICY PILL — tap to expand walk-up + 24hr + overrides -->
   <button class="board-pill" onclick="toggleBoardControls()"><span id="board-policy-line" class="board-policy2">🚦 Walk-ups</span><span class="board-pill-chev" id="board-pill-chev">Set ⌄</span></button>
+  <!-- v60.170: what can I sell right now — condensed, above the detail grid -->
+  <div id="board-quick" style="display:none"></div>
+  <button id="board-quick-show" onclick="toggleBoardQuick()" style="display:none;margin-bottom:10px;
+    font-size:11px;padding:5px 11px;border-radius:999px;border:1px solid var(--bdr2);
+    background:var(--bg3);color:var(--txt3);font-weight:700;cursor:pointer">🚶 Show what's sellable</button>
+
   <!-- v60.167: board sort chips. Default is vehicle size order; picking a chip
        replaces it for the session. -->
   <div id="board-sortbar" style="display:none;gap:6px;flex-wrap:wrap;margin:0 0 10px"></div>
@@ -5044,6 +5063,50 @@ function renderBoardSortChips(){
   }).join('');
 }
 
+
+// ── v60.170 · quick lists: what can I actually sell right now ──────────────
+// Two questions get asked at the counter constantly — "what can I put a walk-up
+// in?" and "what can I upgrade this person into?" — and both were answerable
+// only by reading 30 tiles and doing the threshold maths in your head.
+// DESIGN CALL (Matt asked toggle-vs-both): NEITHER as a full second view. A
+// toggle hides one answer behind the other, and two full grids is clutter. This
+// is a CONDENSED always-visible strip — names only, no numbers — above the
+// detail grid, which stays exactly as it is. Glance up for the answer, look
+// down for the detail.
+// The lists never overlap: 'wu' = rentable to a walk-up, 'up' = upgrade only
+// (threshold met, but policy or count won't cover a walk-up).
+function boardQuickLists(){
+  var el=document.getElementById('board-quick'); if(!el) return;
+  var showBtn=document.getElementById('board-quick-show');
+  if(window._bqHide){ el.style.display='none'; if(showBtn) showBtn.style.display='inline-block'; return; }
+  if(showBtn) showBtn.style.display='none';
+  var data={}; try{ data=getGroupNetData()||{}; }catch(e){}
+  var wu=[], up=[];
+  (GROUP_META||[]).forEach(function(g){
+    var d=data[g.name]; if(!d||!d.has) return;
+    var ov=(STATE.groupOverrides||{})[g.name];
+    var st; try{ st = ov==='close' ? 'na' : getGroupStatus(g.name, d.net); }catch(e){ return; }
+    if(st==='wu') wu.push(g.name); else if(st==='up') up.push(g.name);
+  });
+  var chip=function(n,tone){
+    return '<button onclick="tileClick(\''+String(n).replace(/'/g,"\\'")+'\')" '
+      +'style="border:1px solid '+tone+'55;background:'+tone+'14;color:'+tone+';'
+      +'border-radius:999px;padding:4px 10px;font-size:11.5px;font-weight:700;cursor:pointer;'
+      +'white-space:nowrap">'+n+'</button>';
+  };
+  var row=function(icon,label,arr,tone,empty){
+    return '<div class="bq-row"><div class="bq-lbl" style="color:'+tone+'">'+icon+' '+label
+      +' <span style="opacity:.7">'+arr.length+'</span></div><div class="bq-chips">'
+      +(arr.length?arr.map(function(n){return chip(n,tone);}).join('')
+        :'<span class="bq-empty">'+empty+'</span>')+'</div></div>';
+  };
+  el.style.display='block';
+  el.innerHTML = row('🚶','Walk-up OK', wu, '#30D158', 'Nothing clears walk-up right now.')
+    + row('⇧','Upgrade only', up, '#FFCC00', 'Nothing sitting in upgrade-only.')
+    + '<button class="bq-hide" onclick="toggleBoardQuick()">hide</button>';
+}
+function toggleBoardQuick(){ window._bqHide=!window._bqHide; boardQuickLists(); }
+
 function toggleOvShowAll(){ window._ovShowAll = !window._ovShowAll; buildBoardOverrides(); }
 // v60.75 (Round 3 ⑥): board search + policy status line
 function setBoardSearch(v){ window._boardSearch=(v||'').trim().toLowerCase(); buildBoardGrid(); }
@@ -5237,6 +5300,7 @@ function buildBoardGrid() {
   });
 
   grid.innerHTML = html;
+  if(typeof boardQuickLists==='function'){ try{ boardQuickLists(); }catch(e){} }   // v60.170
   // Refresh flow chart after board updates
   setTimeout(function(){if(typeof buildBoardFlow==="function")buildBoardFlow();},0);
 
