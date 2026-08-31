@@ -5101,7 +5101,32 @@ function groupAllCodes(name){
   var out=[]; try{ for(var c in CODE_MAP){ if(CODE_MAP[c]===name) out.push(c); } }catch(e){}
   return out;
 }
+// ── v60.178 · THE BRANCH'S ANSWER BEATS MY GUESS ───────────────────────────
+// GROUP_REP_CODE only ever had 4 of 31 groups set deliberately; the other 27
+// fell back to "first code declared in CODE_MAP", which is arbitrary — and one
+// of the four I DID set (Large Pickup: QPAR) turned out to be wrong, corrected
+// to PPAR by Matt against the fleet sheet. So the file's opinion is a starting
+// point, not the truth. These overrides come from the branch survey and win.
+function fleetCfg(){ if(!STATE.fleet) STATE.fleet={rep:{},rename:{},flags:{},confirmed:{},strays:[]}; 
+  var f=STATE.fleet;
+  if(!f.rep)f.rep={}; if(!f.rename)f.rename={}; if(!f.flags)f.flags={};
+  if(!f.confirmed)f.confirmed={}; if(!f.strays)f.strays=[];
+  return f; }
+// Is this group's main code a confirmed branch answer, a deliberate default,
+// or just the first code that happened to be declared?
+function groupCodeSource(name){
+  var f=fleetCfg();
+  if(f.rep && f.rep[name]) return 'confirmed';
+  if(GROUP_REP_CODE[name]) return 'default';
+  return 'guessed';
+}
+function groupLabel(name){
+  var f=fleetCfg();
+  return (f.rename && f.rename[name]) ? f.rename[name] : name;
+}
 function groupRepCode(name){
+  var f=fleetCfg();
+  if(f.rep && f.rep[name]) return f.rep[name];
   if(GROUP_REP_CODE[name]) return GROUP_REP_CODE[name];
   if(!_grpCodeRev){ _grpCodeRev={}; try{ for(const c in CODE_MAP){ const g=CODE_MAP[c]; if(g && !_grpCodeRev[g]) _grpCodeRev[g]=c; } }catch(e){} }
   return _grpCodeRev[name] || '';
@@ -5354,7 +5379,7 @@ function buildBoardGrid() {
     if(_view==='list'){   // v60.82: compact list row
       const _icn = st==='wu'?'▲':st==='up'?'▶':st==='na'?'■':'○';
       const _icc = st==='wu'?'var(--green)':st==='up'?'var(--amber)':st==='na'?'var(--red)':'var(--txt3)';
-      html += `<div class="board-lrow ${st}" onclick="tileClick('${g.name.replace(/'/g,"\\'")}')"><span class="bl-code">${(typeof groupRepCode==='function'?groupRepCode(g.name):'')||''}</span><span class="bl-name">${g.name}</span><span class="bl-net ${netClass}">${netDisplay}</span><span class="bl-st" style="color:${_icc}">${_icn}</span></div>`;
+      html += `<div class="board-lrow ${st}" onclick="tileClick('${g.name.replace(/'/g,"\\'")}')"><span class="bl-code">${(typeof groupRepCode==='function'?groupRepCode(g.name):'')||''}</span><span class="bl-name">${(typeof groupLabel==='function'?groupLabel(g.name):g.name)}</span><span class="bl-net ${netClass}">${netDisplay}</span><span class="bl-st" style="color:${_icc}">${_icn}</span></div>`;
       return;
     }
     // v60.88: Design tile — code + status badge (top), big colored number, group name (bottom).
@@ -5365,7 +5390,7 @@ function buildBoardGrid() {
     html += `<div class="group-tile ${st}${_ovRing}" onclick="tileClick('${g.name.replace(/'/g,"\\'")}')"
         oncontextmenu="event.preventDefault();cycleGroupOverride('${g.name.replace(/'/g,"\\'")}')">
       <div class="gt-top">
-        <span class="gt-name-top">${g.name}</span>
+        <span class="gt-name-top">${(typeof groupLabel==='function'?groupLabel(g.name):g.name)}</span>
         <span class="gt-badge ${st}">${_icn}</span>
       </div>
       <div class="gt-coderow">
@@ -21324,6 +21349,198 @@ function biField(q,val){
   }
   return '<input class="bi-in" style="max-width:200px" type="text" placeholder="'+biEsc(q.ph||'')+'" value="'+(val!=null?biEsc(val):'')+'" oninput="biSet(\''+q.k+'\',this.value)">';
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.178 · CAR GROUPS & CODES — a branch-survey section
+//
+// Matt: "Add the car group chart as part of the branch survey. Ask to clarify
+// naming and grouping of any stray codes misplaced or mistyped, etc."
+//
+// Why this belongs in the survey and not in my head: of 31 car groups only FOUR
+// had a main code set deliberately, and one of those four (Large Pickup) was
+// WRONG — I had QPAR, the fleet says PPAR. The other 27 show whichever code
+// happens to be declared first in CODE_MAP, which is arbitrary. The branch is
+// the authority on its own fleet; this is where it says so.
+//
+// Deliberately NOT auto-corrected: nothing here guesses a better answer. It
+// shows what the app currently believes, marks how confident that is, and gives
+// one place to correct it. Answers go to STATE.fleet and beat the file.
+// ═══════════════════════════════════════════════════════════════════════════
+var FLEET_FLAGS = [
+  {k:'wrong-group', label:'Wrong group', hint:'belongs under a different car group'},
+  {k:'typo',        label:'Mistyped',    hint:'the code itself is wrong'},
+  {k:'retired',     label:'Not stocked', hint:'we do not carry this'},
+  {k:'unknown',     label:'Not sure',    hint:'flag for someone who knows'}
+];
+function fleetGroupsOrdered(){
+  var groups={};
+  try{ for(var c in CODE_MAP){ var g=CODE_MAP[c]; (groups[g]=groups[g]||[]).push(c); } }catch(e){}
+  return Object.keys(groups).sort(function(a,b){
+    var i=GROUP_SIZE_ORDER.indexOf(a), j=GROUP_SIZE_ORDER.indexOf(b);
+    if(i<0)i=999; if(j<0)j=999;
+    return i-j || a.localeCompare(b);
+  }).map(function(g){ return {name:g, codes:groups[g]}; });
+}
+function fleetProgress(){
+  var all=fleetGroupsOrdered(), done=0;
+  all.forEach(function(g){ if(groupCodeSource(g.name)==='confirmed') done++; });
+  return {done:done, total:all.length};
+}
+function biFleetHtml(){
+  var f=fleetCfg(), rows=fleetGroupsOrdered(), pr=fleetProgress();
+  var h='<div style="font-size:12px;color:var(--txt3);line-height:1.55;margin-bottom:10px">'
+    +'The <b>main code</b> is the one printed big on the board tile. '
+    +'<b>'+pr.done+' of '+pr.total+'</b> confirmed by the branch — the rest are the app’s best guess. '
+    +'Fix a name, pick the right main code, or flag a code that’s in the wrong place or mistyped.'
+    +'</div>';
+  h+='<div style="max-height:56vh;overflow-y:auto;-webkit-overflow-scrolling:touch;'
+    +'border:1px solid var(--bdr);border-radius:9px">';
+  rows.forEach(function(g,gi){
+    var src=groupCodeSource(g.name), rep=groupRepCode(g.name), nm=groupLabel(g.name);
+    var esc=String(g.name).replace(/'/g,"\\'");
+    var badge = src==='confirmed'
+      ? '<span style="font-size:9px;font-weight:800;color:var(--green)">✓ confirmed</span>'
+      : src==='default'
+        ? '<span style="font-size:9px;font-weight:800;color:var(--amber)">default</span>'
+        : '<span style="font-size:9px;font-weight:800;color:var(--txt3)">guess</span>';
+    h+='<div style="padding:9px 10px;border-top:'+(gi?'1px solid var(--bdr)':'none')+'">'
+      +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
+      +'<input value="'+biEsc(nm)+'" onchange="fleetRename(\''+esc+'\',this.value)" '
+      +'style="flex:1;min-width:0;padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr2);'
+      +'border-radius:6px;color:var(--txt);font-size:12.5px;font-weight:700">'
+      +badge+'</div>'
+      +'<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">'
+      +'<span style="font-size:10.5px;color:var(--txt3)">Main code</span>'
+      +'<select onchange="fleetSetRep(\''+esc+'\',this.value)" '
+      +'style="padding:5px 7px;background:var(--bg3);border:1px solid '
+      +(src==='confirmed'?'var(--green)':'var(--bdr2)')
+      +';border-radius:6px;color:var(--txt);font-size:12px;font-family:var(--ff-mono)">'
+      + g.codes.map(function(c){ return '<option value="'+c+'"'+(c===rep?' selected':'')+'>'+c+'</option>'; }).join('')
+      +'</select>';
+    h+='<span style="font-size:10.5px;color:var(--txt3);margin-left:4px">All codes — tap to flag</span></div>';
+    h+='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">';
+    g.codes.forEach(function(c){
+      var fl=f.flags[c];
+      h+='<button onclick="fleetFlagPrompt(\''+c+'\',\''+esc+'\')" title="'+(fl?biEsc(fl.type+(fl.note?' — '+fl.note:'')):'Tap to flag')+'" '
+        +'style="font-size:10.5px;font-family:var(--ff-mono);padding:3px 7px;border-radius:5px;cursor:pointer;'
+        +'border:1px solid '+(fl?'var(--amber)':'var(--bdr2)')+';background:'+(fl?'rgba(245,158,11,.12)':'var(--bg2)')
+        +';color:'+(fl?'var(--amber)':(c===rep?'var(--txt)':'var(--txt3)'))+';'
+        +(c===rep?'font-weight:800':'')+'">'+(fl?'⚑ ':'')+c+'</button>';
+    });
+    h+='</div></div>';
+  });
+  h+='</div>';
+  // stray codes the app has never heard of
+  h+='<div style="margin-top:10px;padding:9px 10px;border:1px dashed var(--bdr2);border-radius:9px">'
+    +'<div style="font-size:11.5px;font-weight:800;color:var(--txt2);margin-bottom:5px">A code that isn’t listed anywhere above</div>'
+    +'<div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-bottom:7px">'
+    +'If the fleet sheet has a code this app has never heard of, put it here with where it belongs. '
+    +'Nothing is guessed from it — it’s a note for whoever updates the code list.</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +'<input id="fleet-stray-code" placeholder="CODE" maxlength="8" '
+    +'style="width:86px;padding:7px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:6px;'
+    +'color:var(--txt);font-size:12.5px;font-family:var(--ff-mono);text-transform:uppercase">'
+    +'<input id="fleet-stray-note" placeholder="What is it / which group should it be in?" '
+    +'style="flex:1;min-width:140px;padding:7px;background:var(--bg3);border:1px solid var(--bdr2);'
+    +'border-radius:6px;color:var(--txt);font-size:12.5px">'
+    +'<button onclick="fleetAddStray()" style="padding:7px 12px;border-radius:6px;border:none;'
+    +'background:var(--accent);color:#04160e;font-size:12px;font-weight:800;cursor:pointer">Add</button>'
+    +'</div>';
+  if(f.strays.length){
+    h+='<div style="margin-top:8px;display:flex;flex-direction:column;gap:4px">';
+    f.strays.forEach(function(s2,i){
+      h+='<div style="display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--txt2)">'
+        +'<b style="font-family:var(--ff-mono);color:var(--amber)">'+biEsc(s2.code)+'</b>'
+        +'<span style="flex:1;min-width:0">'+biEsc(s2.note||'')+'</span>'
+        +'<button onclick="fleetRemoveStray('+i+')" style="background:none;border:none;color:var(--txt3);cursor:pointer">×</button></div>';
+    });
+    h+='</div>';
+  }
+  h+='</div>';
+  var flagged=Object.keys(f.flags).length;
+  if(flagged){
+    h+='<div style="margin-top:9px;font-size:11.5px;color:var(--amber)">⚑ '+flagged
+      +' code'+(flagged===1?'':'s')+' flagged for review — they still work on the board, they’re just marked.</div>';
+  }
+  return h;
+}
+function fleetRefresh(){
+  var el=document.getElementById('bi-fleet');
+  if(el) el.innerHTML=biFleetHtml();
+  if(typeof renderBoard==='function'){ try{ renderBoard(); }catch(e){} }
+}
+function fleetSetRep(group, code){
+  var f=fleetCfg(); f.rep[group]=code; f.confirmed[group]=true;
+  if(typeof saveState==='function') saveState();
+  if(typeof toast==='function') toast('✓ '+groupLabel(group)+' → '+code);
+  fleetRefresh();
+}
+function fleetRename(group, name){
+  var f=fleetCfg();
+  name=String(name||'').trim();
+  if(!name || name===group) delete f.rename[group]; else f.rename[group]=name;
+  if(typeof saveState==='function') saveState();
+  fleetRefresh();
+}
+function fleetFlagPrompt(code, group){
+  var f=fleetCfg(), cur=f.flags[code];
+  var body='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
+    +'<b style="font-family:var(--ff-mono);color:var(--txt)">'+code+'</b> currently sits under '
+    +'<b>'+biEsc(groupLabel(group))+'</b>. What’s wrong with it?</div>';
+  FLEET_FLAGS.forEach(function(t){
+    var on=cur&&cur.type===t.k;
+    body+='<button onclick="fleetSetFlag(\''+code+'\',\''+t.k+'\')" '
+      +'style="width:100%;text-align:left;margin-bottom:6px;padding:10px;border-radius:8px;cursor:pointer;'
+      +'border:1px solid '+(on?'var(--amber)':'var(--bdr2)')+';background:'+(on?'rgba(245,158,11,.12)':'var(--bg3)')
+      +';color:var(--txt2);font-size:13px"><b>'+t.label+'</b>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-top:2px">'+t.hint+'</div></button>';
+  });
+  body+='<input id="fleet-flag-note" placeholder="Where should it go / what should it be? (optional)" '
+    +'value="'+biEsc((cur&&cur.note)||'')+'" '
+    +'style="width:100%;margin-top:6px;padding:9px;background:var(--bg3);border:1px solid var(--bdr2);'
+    +'border-radius:7px;color:var(--txt);font-size:13px;box-sizing:border-box">'
+    +'<div style="display:flex;gap:8px;margin-top:12px">'
+    +'<button onclick="fleetSaveFlagNote(\''+code+'\')" style="flex:1;padding:11px;border-radius:8px;border:none;'
+    +'background:var(--accent);color:#04160e;font-size:13px;font-weight:800;cursor:pointer">Save</button>'
+    + (cur?'<button class="btn btn-gh" onclick="fleetClearFlag(\''+code+'\')">Clear flag</button>':'')
+    +'</div>';
+  openModal('⚑ '+code, body);
+}
+function fleetSetFlag(code, type){
+  var f=fleetCfg();
+  var note=(document.getElementById('fleet-flag-note')||{}).value||'';
+  f.flags[code]={type:type, note:note, at:(typeof todayKey==='function'?todayKey():'')};
+  if(typeof saveState==='function') saveState();
+  fleetFlagPrompt(code, CODE_MAP[code]||'');       // re-render so the choice shows
+}
+function fleetSaveFlagNote(code){
+  var f=fleetCfg(), note=(document.getElementById('fleet-flag-note')||{}).value||'';
+  if(!f.flags[code]) f.flags[code]={type:'unknown', at:(typeof todayKey==='function'?todayKey():'')};
+  f.flags[code].note=note;
+  if(typeof saveState==='function') saveState();
+  closeModal(); fleetRefresh();
+  if(typeof toast==='function') toast('⚑ '+code+' flagged for review');
+}
+function fleetClearFlag(code){
+  var f=fleetCfg(); delete f.flags[code];
+  if(typeof saveState==='function') saveState();
+  closeModal(); fleetRefresh();
+}
+function fleetAddStray(){
+  var c=(document.getElementById('fleet-stray-code')||{}).value||'';
+  var n=(document.getElementById('fleet-stray-note')||{}).value||'';
+  c=c.trim().toUpperCase();
+  if(!c){ if(typeof toast==='function') toast('Enter the code first'); return; }
+  fleetCfg().strays.push({code:c, note:String(n).trim(), at:(typeof todayKey==='function'?todayKey():'')});
+  if(typeof saveState==='function') saveState();
+  fleetRefresh();
+  if(typeof toast==='function') toast('Noted '+c+' for review');
+}
+function fleetRemoveStray(i){
+  fleetCfg().strays.splice(i,1);
+  if(typeof saveState==='function') saveState();
+  fleetRefresh();
+}
+
 function biRender(){
   var o=document.getElementById('bi-overlay'); if(!o) return;
   biCurResp(); var curName=STATE.biRespondent;
@@ -21355,6 +21572,8 @@ function biRender(){
     });
     h+='</div>';
   });
+  h+='<div class="bi-sec"><div class="bi-sec-hd">🚗 Car groups &amp; codes <span class="bi-scope fact">branch fact</span>'
+    +'<span class="bi-tunes">→ the board</span></div><div id="bi-fleet">'+biFleetHtml()+'</div></div>';
   h+='<div class="bi-sec"><div class="bi-sec-hd">⚡ Engine readiness <span class="bi-tunes">→ what’s still blocking auto-suggestions</span></div><div id="bi-engine-ready">'+biEngineReadyHtml()+'</div></div>';
   h+='<div class="bi-sec"><div class="bi-sec-hd">🤝 Consistency <span class="bi-tunes">→ one branch standard</span></div><div id="bi-consistency">'+biConsistencyHtml()+'</div></div>';
   h+='</div><div class="bi-foot"><button class="bi-btn gh" onclick="biExportWith()">⤓ Export</button><button class="bi-btn" onclick="biApply()">Save &amp; close</button></div>';
