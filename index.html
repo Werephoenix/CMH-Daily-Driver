@@ -2427,6 +2427,11 @@ button { cursor: pointer; }
           background:rgba(35,201,131,.12);color:var(--accent);font-size:11px;font-weight:800;cursor:pointer">
         🖨 Reports &amp; sheets…
       </button>
+      <button onclick="openSends()"
+        style="padding:7px 12px;border-radius:6px;border:1px solid var(--accent);
+          background:rgba(35,201,131,.12);color:var(--accent);font-size:11px;font-weight:800;cursor:pointer">
+        ✉️ Emails &amp; sends…
+      </button>
       <button onclick="printScheduleGrid()"
         style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
           background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
@@ -18490,6 +18495,586 @@ function openDemoMenu(){
    +'Tap anything on screen at any point and the script pauses — whoever grabs the phone takes over. '
    +'It exits itself after 30 minutes idle.</div>';
   openModal('▶ Demo mode', b);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.189 · NIGHTLY EMAILS & SCHEDULE SENDS (Design v2, Aug 31 drop)
+//
+// Five outbound artifacts on ONE grammar: black masthead → one-line lede →
+// four-number band → ruled lists → hairline footer. Each is email AND print
+// from the same markup, because the alternative is two things that drift.
+//
+// "Recipient scope picks the AUDIENCE, not a different document" — full, group
+// and individual are the same header grid, tints and footer, narrowed.
+//
+// THE RULE THAT OUTRANKS THE REST: nothing here sends itself. Every one is
+// composed by the app and released by a manager tap. That is the same line the
+// app already holds for the text blast (no stored phone numbers, no automatic
+// outbound) and it is stated in the footer of every send so the person holding
+// it knows.
+// ═══════════════════════════════════════════════════════════════════════════
+var SEND_INK='#1a1a1a', SEND_SEC='#6d6961', SEND_RED='#a01008', SEND_AMB='#8a5a00', SEND_GRN='#14602f';
+var SEND_AT_MIN='#faf8f0', SEND_BELOW='#fdf4f3';
+
+function sendCss(landscape){
+  return '@page{size:letter '+(landscape?'landscape':'portrait')+';margin:.45in}'
+   +'*{box-sizing:border-box}'
+   +'body{margin:0;background:#eceae4;color:'+SEND_INK+';'
+     +'font:13px/1.5 "Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+   +'.artifact{background:#fff;max-width:7.6in;margin:0 auto 26px;border:1px solid #ddd9d0}'
+   +'.mast{background:'+SEND_INK+';color:#fff;padding:14px 20px;display:flex;align-items:flex-end;justify-content:space-between}'
+   +'.mast h1{margin:0;font-size:21px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}'
+   +'.mast .when{font-size:11px;line-height:1.45;text-align:right;opacity:.92}'
+   +'.lede{padding:14px 20px 0;font-size:15px;font-weight:600;line-height:1.45}'
+   +'.band{display:grid;grid-template-columns:repeat(4,1fr);margin:12px 20px 0;'
+     +'border-top:1px solid '+SEND_INK+';border-bottom:1px solid #d9d5cc}'
+   +'.band>div{padding:9px 12px 11px;border-right:1px solid #e6e2d9}'
+   +'.band>div:last-child{border-right:none}'
+   +'.band .l{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:'+SEND_SEC+'}'
+   +'.band .n{font-size:24px;font-weight:700;line-height:1.05;margin-top:3px}'
+   +'.band .d{font-size:10.5px;color:'+SEND_SEC+';margin-top:3px}'
+   +'.cols{display:grid;grid-template-columns:1fr 1fr;gap:26px;padding:16px 20px 0}'
+   +'.sec{font-size:9.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;'
+     +'border-bottom:1px solid '+SEND_INK+';padding-bottom:3px;margin-bottom:7px}'
+   +'.li{font-size:12px;line-height:1.5;padding:5px 0;border-bottom:1px solid #eae7e0}'
+   +'.li b{font-weight:700}'
+   +'.li .t{color:'+SEND_SEC+';font-size:10.5px}'
+   +'.foot{margin:18px 20px 0;padding:10px 0 16px;border-top:1px solid #d9d5cc;'
+     +'font-size:10.5px;color:'+SEND_SEC+';line-height:1.5}'
+   +'table{width:100%;border-collapse:collapse}'
+   +'th,td{text-align:left;padding:7px 9px;font-size:11.5px;vertical-align:top}'
+   +'thead th{background:'+SEND_INK+';color:#fff;font-size:11px;font-weight:700}'
+   +'thead th span{display:block;font-weight:400;opacity:.8;font-size:10px}'
+   +'tbody td{border-bottom:1px solid #eae7e0;border-right:1px solid #eae7e0}'
+   +'tbody td:last-child{border-right:none}'
+   +'.stname{font-size:11.5px;font-weight:700}'
+   +'.stmin{font-size:9.5px;color:'+SEND_SEC+';font-weight:400}'
+   +'.cnt{font-size:13px;font-weight:700}'
+   +'.who{font-size:10.5px;color:'+SEND_INK+';line-height:1.5}'
+   +'.atmin{background:'+SEND_AT_MIN+'}'
+   +'.below{background:'+SEND_BELOW+'}'
+   +'.tag{font-size:8.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;margin-left:4px}'
+   +'.tag.a{color:'+SEND_AMB+'} .tag.b{color:'+SEND_RED+'}'
+   +'.legend{display:flex;gap:18px;flex-wrap:wrap;padding:10px 20px 16px;font-size:10.5px;color:'+SEND_SEC+'}'
+   +'.legend i{display:inline-block;width:11px;height:11px;border:1px solid #cfcabf;margin-right:5px;vertical-align:-1px}'
+   +'.drow{display:flex;align-items:baseline;gap:12px;padding:9px 20px;border-bottom:1px solid #eae7e0}'
+   +'.drow .day{width:62px;flex-shrink:0}'
+   +'.drow .day b{display:block;font-size:12px}'
+   +'.drow .day span{font-size:10.5px;color:'+SEND_SEC+'}'
+   +'.drow .time{font-size:17px;font-weight:700;flex:1}'
+   +'.drow .time small{display:block;font-size:11px;font-weight:400;color:'+SEND_SEC+';margin-top:2px}'
+   +'.drow .hrs{font-size:12px;font-weight:700}'
+   +'.drow.off{background:#fafaf8}'
+   +'.drow.off .time{font-size:15px;font-weight:500;color:#9a958b}'
+   +'.drow.short{background:'+SEND_BELOW+'}'
+   +'.deskNote{max-width:7.6in;margin:0 auto;padding:6px 2px 8px;font-size:11px;color:#6d6961}'
+   +'.deskNote b{color:'+SEND_INK+';letter-spacing:.08em;text-transform:uppercase;font-size:9.5px}'
+   +'@media screen{body{padding:24px 16px}'
+     +'.bar{position:sticky;top:0;background:#eceae4;padding:6px 0 12px;max-width:7.6in;margin:0 auto;display:flex;gap:8px}'
+     +'.bar button{padding:8px 16px;font-size:12px;border:1px solid '+SEND_INK+';background:#fff;border-radius:4px;cursor:pointer}}'
+   +'@media print{body{background:#fff;padding:0}.bar,.deskNote{display:none}'
+     +'.artifact{border:none;margin:0;max-width:none;page-break-after:always}'
+     +'.artifact:last-child{page-break-after:auto}}';
+}
+function sendShell(title, body, landscape){
+  var w=window.open('','_blank');
+  if(!w){ if(typeof toast==='function') toast('Allow pop-ups to open the send'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+title+'</title>'
+    +'<style>'+sendCss(landscape)+'</style></head><body>'
+    +'<div class="bar"><button onclick="window.print()">🖨 Print</button>'
+    +'<button onclick="(function(){var r=document.createRange();r.selectNode(document.querySelector(\'.artifact\'));'
+    +'var s=getSelection();s.removeAllRanges();s.addRange(r);document.execCommand(\'copy\');s.removeAllRanges();'
+    +'alert(\'Copied — paste into Mail, then send it yourself.\');})()">⧉ Copy for email</button>'
+    +'<span style="font-size:11px;color:#6d6961;align-self:center">'+title+' — nothing sends on its own</span></div>'
+    + body + '</body></html>');
+  w.document.close();
+}
+function _sEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _sFmt(h){
+  if(h==null) return '—';
+  var t=((h%24)+24)%24, hh=Math.floor(t), m=Math.round((t-hh)*60);
+  if(m===60){m=0;hh=(hh+1)%24;}
+  var d=hh>12?hh-12:(hh===0?12:hh);
+  return d+(m?':'+String(m).padStart(2,'0'):'')+(hh>=12?'p':'a');
+}
+function _sMast(title, lines){
+  return '<div class="mast"><h1>'+title+'</h1><div class="when">'+lines.join('<br>')+'</div></div>';
+}
+function _sBand(cells){
+  return '<div class="band">'+cells.map(function(c){
+    return '<div><div class="l">'+_sEsc(c.l)+'</div>'
+      +'<div class="n"'+(c.color?' style="color:'+c.color+'"':'')+'>'+(c.v==null||c.v===''?'—':_sEsc(c.v))+'</div>'
+      +'<div class="d"'+(c.dcolor?' style="color:'+c.dcolor+'"':'')+'>'+(c.d||'')+'</div></div>';
+  }).join('')+'</div>';
+}
+function _sFoot(txt){ return '<div class="foot">'+txt+'</div>'; }
+function _sWeekStart(offsetWeeks){
+  var d=new Date(); var day=d.getDay();
+  var monOff=(day===0?-6:1-day);                 // Monday-start weeks, per the drop
+  d.setDate(d.getDate()+monOff+((offsetWeeks||0)*7));
+  d.setHours(12,0,0,0);
+  return d;
+}
+function _sDayKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+// ── ① OPEN EMAIL — 6:15 AM, everyone on today ──────────────────────────────
+// Numbers are the PLAN, not the result. Two lists: what to read before the
+// counter opens, and who is covering what.
+function sendOpenEmail(){
+  var f=(STATE.fields)||{}, now=new Date();
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
+  var onFloor=Object.keys(exp).filter(function(p){
+    return (STATE.todayOverrides||{})[p]!=='callout'; }).length;
+  var offs=Object.keys(STATE.todayOverrides||{}).filter(function(p){
+    return STATE.todayOverrides[p]==='callout'; }).length;
+  var wu=STATE.walkUpPolicy||'—';
+  var wuColor = /clos/i.test(wu)?SEND_RED : /cap|restrict/i.test(wu)?SEND_AMB : SEND_GRN;
+
+  // read-before-the-floor: the flags that change how someone behaves
+  var read=[];
+  (STATE.dnr||[]).forEach(function(r){ read.push({b:'DNR · '+_sEsc(r.name||'—'), t:_sEsc(r.reason||'')}); });
+  (STATE.dnq||[]).forEach(function(r){ read.push({b:'DNQ · '+_sEsc(r.name||'—'), t:_sEsc(r.reason||'')}); });
+  if(/cap|restrict|clos/i.test(wu)) read.push({b:'Walk-ups '+_sEsc(wu), t:'Set at capture — check before promising a car'});
+  (STATE.announcements||[]).slice(0,3).forEach(function(a){ read.push({b:_sEsc(a.title||'Notice'), t:_sEsc(a.text||'')}); });
+  if(!read.length) read.push({b:'Nothing flagged', t:'No DNR/DNQ, no caps, no notices'});
+
+  // coverage today: each block, have vs need, named when short
+  var cov=[], dow=now.getDay();
+  try{
+    [['Open',7],['Midday',13],['PM',18],['Night',21]].forEach(function(b){
+      var need=gfNeedsAt(b[1],dow)||{}, have=gfCountsAt(exp,b[1]+0.5)||{};
+      var short=Object.keys(need).filter(function(k){ return (need[k]||0)>(have[k]||0); });
+      cov.push({b:b[0]+' · '+_sFmt(b[1]),
+        t: short.length
+            ? short.map(function(k){ return k+' '+(have[k]||0)+'/'+need[k]; }).join(' · ')
+            : 'all stations met'});
+    });
+  }catch(e){}
+
+  var body='<div class="deskNote"><b>Nightly send · morning open</b> — composed at capture, released by a manager tap.</div>'
+   +'<div class="artifact">'
+   + _sMast('CMH · Open', [now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),
+                           'Sent 6:15 AM · everyone on today'])
+   + '<div class="lede">'+(read[0].b==='Nothing flagged'
+        ? 'Game plan is captured and on every phone. Nothing flagged before the counter opens.'
+        : 'Game plan is captured and on every phone. '+read.length+' flag'+(read.length===1?'':'s')+' to read before the counter opens.')+'</div>'
+   + _sBand([
+       {l:'Reservations', v:(f.res!=null?f.res:f.tmrwRes), d:'out today'},
+       {l:'Returns due',  v:(f.ret!=null?f.ret:f.tmrwRet), d:'in today'},
+       {l:'On the floor', v:onFloor, d:(offs?offs+' call-off'+(offs===1?'':'s'):'0 call-offs')},
+       {l:'Walk-ups',     v:wu, d:(f.walkUpNote||''), color:wuColor, dcolor:wuColor}
+     ])
+   + '<div class="cols">'
+   + '<div><div class="sec">Read before the floor</div>'
+   + read.map(function(r){ return '<div class="li"><b>'+r.b+'</b>'+(r.t?'<div class="t">'+r.t+'</div>':'')+'</div>'; }).join('')
+   + '</div>'
+   + '<div><div class="sec">Coverage today</div>'
+   + cov.map(function(r){ return '<div class="li"><b>'+r.b+'</b><div class="t">'+r.t+'</div></div>'; }).join('')
+   + '</div></div>'
+   // ── v60.189b · the sections CMH has always sent ────────────────────────
+   // Matt: "I'm open to improvements to the open/close emails based off what
+   // they have historically sent." The design drop supplies the GRAMMAR; the
+   // branch's existing opening email supplies the CONTENT that people actually
+   // read — brand split, peak hours, availability, flexible assignments. The
+   // drop's own additions (read-before-the-floor, coverage) sit above because
+   // they change behaviour before the counter opens; the reference numbers
+   // follow.
+   + '<div class="cols">'
+   + '<div><div class="sec">Today at a glance</div>'
+   + [['Completely Satisfied', f.cs],['Hot Alerts', f.hot],['OOS', f.oos],
+      ['Opening', f.openMgr],['Closing', f.closeMgr],
+      ['Sales leader (yesterday)', f.salesLeader],['Inventory agent', f.invAgent]]
+      .filter(function(r){ return r[1]!=null && r[1]!==''; })
+      .map(function(r){ return '<div class="li"><b>'+r[0]+'</b><div class="t">'+_sEsc(r[1])+'</div></div>'; }).join('')
+   + '</div>'
+   + '<div><div class="sec">Reservations</div>'
+   + '<div class="li"><b>Total for the day</b><div class="t">'+_sEsc(f.totalRes||f.res||'—')+'</div></div>'
+   + ((f.brandNational||f.brandAlamo||f.brandEnterprise||f.brand20)
+      ? '<div class="li"><b>By brand</b><div class="t">National '+_sEsc(f.brandNational||'—')
+        +' · Alamo '+_sEsc(f.brandAlamo||'—')+' · Enterprise '+_sEsc(f.brandEnterprise||'—')
+        +' · 2.0 '+_sEsc(f.brand20||'—')+'</div></div>' : '')
+   + (f.peakRes?'<div class="li"><b>Peak res hours</b><div class="t">'+_sEsc(String(f.peakRes).replace(/\n/g,' · '))+'</div></div>':'')
+   + (f.peakRet?'<div class="li"><b>Peak ret hours</b><div class="t">'+_sEsc(String(f.peakRet).replace(/\n/g,' · '))+'</div></div>':'')
+   + (f.fboCount!=null?'<div class="li"><b>FBOs</b><div class="t">'+_sEsc(f.fboCount)+(f.fboNotes?' — '+_sEsc(f.fboNotes):'')+'</div></div>':'')
+   + '</div></div>'
+   + ((f.xxar||f.sxar||f.pxar)
+      ? '<div class="cols"><div><div class="sec">Flexible assignments</div>'
+        + (f.xxar?'<div class="li"><b>XXAR — we pick</b><div class="t">'+_sEsc(f.xxar)+'</div></div>':'')
+        + (f.sxar?'<div class="li"><b>SXAR</b><div class="t">'+_sEsc(f.sxar)+'</div></div>':'')
+        + (f.pxar?'<div class="li"><b>PXAR</b><div class="t">'+_sEsc(f.pxar)+'</div></div>':'')
+        + '</div><div></div></div>' : '')
+   + _sFoot('Composed by the app from this morning’s capture. <b>It does not mail on its own</b> — a manager sends it. '
+           +'The plain-text version CMH has always sent is under “Copy for email”.')
+   + '</div>';
+  sendShell('CMH open — '+now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}), body);
+}
+
+// ── ② CLOSE EMAIL — 11:58 PM, managers + area ──────────────────────────────
+// Same four slots, now the RESULT. "What tomorrow inherits" is always last,
+// because it is the only part anyone acts on.
+function sendCloseEmail(){
+  var f=(STATE.fields)||{}, now=new Date();
+  var exc=[];
+  try{
+    var ov=STATE.todayOverrides||{}, ab=STATE.absenceType||{};
+    Object.keys(ov).forEach(function(pid){
+      if(ov[pid]!=='callout') return;
+      var t=ab[pid], m=(t&&typeof absenceMeta==='function')?absenceMeta(t):null;
+      exc.push({b:(m?m.short:'Absent')+' · '+((typeof dispName==='function')?dispName(pid):pid),
+                t:'logged by '+_sEsc(f.openMgr||'—')});
+    });
+  }catch(e){}
+  if(f.lateStaff) exc.push({b:'Stayed late', t:_sEsc(f.lateStaff)});
+  if(f.closeNotes) exc.push({b:'Note', t:_sEsc(f.closeNotes)});
+  if(!exc.length) exc.push({b:'Nothing to flag', t:'No call-offs, no exceptions logged'});
+
+  // coverage gaps across the day
+  var gaps=0, dow=now.getDay();
+  try{
+    var exp=buildExpectedToday();
+    for(var h=6;h<=23;h++){
+      var need=gfNeedsAt(h,dow)||{}, have=gfCountsAt(exp,h+0.5)||{};
+      if(Object.keys(need).some(function(k){ return (need[k]||0)>(have[k]||0); })) gaps++;
+    }
+  }catch(e){}
+
+  var inherits=[
+    {b:'Tomorrow out / in', t:_sEsc(f.tmrwRes||'—')+' out · '+_sEsc(f.tmrwRet||'—')+' in'},
+    {b:'Opening manager',   t:_sEsc(f.openMgr||'—')},
+    {b:'Left on the lot',   t:_sEsc(f.oosFinal||f.oos||'—')+' OOS'},
+    {b:'Anything unfinished', t:_sEsc(f.closeNotes||'nothing carried over')}
+  ];
+  var body='<div class="deskNote"><b>Nightly send · close</b> — managers + area. Composed at close, released by a manager tap.</div>'
+   +'<div class="artifact">'
+   + _sMast('CMH · Close', [now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),
+                            'Sent 11:58 PM · managers + area'])
+   + '<div class="lede">'+(gaps? gaps+' hour'+(gaps===1?'':'s')+' ran below a station minimum today.'
+                                : 'Every hour met its station minimums today.')+'</div>'
+   // v60.189b: CS · Hot Alerts · Final OOS are the three the branch has always
+   // led its close email with. Coverage gaps is the app's addition and earns
+   // the fourth slot because nothing else reports it.
+   + _sBand([
+       {l:'Completely satisfied', v:f.cs, d:(f.salesLeader?'sales led by '+_sEsc(f.salesLeader):'')},
+       {l:'Hot alerts', v:f.hot, d:(Number(f.hot)>=3?'over the line':''),
+        color:(Number(f.hot)>=3?SEND_RED:SEND_INK), dcolor:SEND_RED},
+       {l:'Final OOS', v:(f.oosFinal||f.oos), d:''},
+       {l:'Coverage gaps', v:gaps, d:(gaps?'hours below a minimum':'none'),
+        color:(gaps?SEND_AMB:SEND_GRN)}
+     ])
+   + '<div class="cols">'
+   + '<div><div class="sec">What happened</div>'
+   + exc.map(function(r){ return '<div class="li"><b>'+r.b+'</b><div class="t">'+r.t+'</div></div>'; }).join('')
+   + '</div>'
+   + '<div><div class="sec">Checklists</div>'
+   + (function(){
+       // the branch's close email has always carried these three — a manager
+       // reading it wants to know what did not get finished, not just the numbers
+       var out='';
+       ['opening','mid','closing'].forEach(function(k){
+         var c=(typeof countCLDone==='function')?countCLDone(k):null;
+         if(!c) return;
+         var full=(c.total>0 && c.done>=c.total);
+         out+='<div class="li"><b>'+k.charAt(0).toUpperCase()+k.slice(1)+'</b>'
+            +'<div class="t"'+(full?'':' style="color:'+SEND_AMB+'"')+'>'+c.done+' of '+c.total
+            +(full?' — complete':' done')+'</div></div>';
+       });
+       return out || '<div class="li"><span class="t">No checklist data captured.</span></div>';
+     })()
+   + '</div></div>'
+   + '<div class="cols">'
+   + '<div><div class="sec">At close</div>'
+   + '<div class="li"><b>Walk-up policy</b><div class="t">'+_sEsc(STATE.walkUpPolicy||'—')+'</div></div>'
+   + (f.lateStaff?'<div class="li"><b>Stayed late</b><div class="t">'+_sEsc(f.lateStaff)+'</div></div>':'')
+   + (f.fboCount!=null?'<div class="li"><b>FBOs</b><div class="t">'+_sEsc(f.fboCount)+(f.fboNotes?' — '+_sEsc(f.fboNotes):'')+'</div></div>':'')
+   + '</div>'
+   + '<div><div class="sec">What tomorrow inherits</div>'
+   + inherits.map(function(r){ return '<div class="li"><b>'+r.b+'</b><div class="t">'+r.t+'</div></div>'; }).join('')
+   + '</div></div>'
+   + _sFoot('The forward block is last on purpose — it is the part the opener acts on. '
+           +'<b>Nothing mails automatically</b>; a manager releases this.')
+   + '</div>';
+  sendShell('CMH close — '+now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}), body);
+}
+
+// ── shared week model for the three schedule sends ─────────────────────────
+// One computation, three audiences: "recipient scope picks the audience, not a
+// different document."
+function _sWeek(offsetWeeks){
+  var start=_sWeekStart(offsetWeeks), days=[];
+  for(var i=0;i<7;i++){ var d=new Date(start); d.setDate(start.getDate()+i); days.push(d); }
+  var STATIONS=[
+    {k:'counter', label:'Counter', roles:['CXR']},
+    {k:'exit',    label:'Exit',    roles:['EXIT']},
+    {k:'returns', label:'Returns', roles:['RETURNS']},
+    {k:'office',  label:'Office',  roles:['ARM','BRM','ABRM','MT']}
+  ];
+  var people={};   // pid → {nick, role, days:{key:{start,end}}}
+  days.forEach(function(d){
+    var key=_sDayKey(d), sched=null;
+    try{ sched=(typeof getScheduleForDate==='function')?getScheduleForDate(key):null; }catch(e){}
+    if(sched){
+      Object.keys(sched).forEach(function(pid){
+        var st=_asStartOfStoredShift(sched[pid]), en=_asEndOfStoredShift(sched[pid]);
+        if(st==null||en==null) return;
+        if(en<st) en+=24;
+        var p=(typeof personByPid==='function')?personByPid(pid):null;
+        people[pid]=people[pid]||{nick:(typeof dispName==='function')?dispName(pid):String(pid).replace(/_/g,' '),
+                                  role:(p&&p.role)||'CXR', days:{}};
+        people[pid].days[key]={start:st,end:en};
+      });
+    } else {
+      // no stored day → fall back to each person's roster days, so a future
+      // week still reads rather than printing an empty grid
+      var roster=(typeof getEffectiveRoster==='function')?getEffectiveRoster():[];
+      roster.forEach(function(p){
+        if(!p||p.shiftStart==null) return;
+        if(Array.isArray(p.daysOn) && p.daysOn.indexOf(d.getDay())<0) return;
+        var pid=String(p.name).replace(/\s/g,'_');
+        people[pid]=people[pid]||{nick:(typeof dispName==='function')?dispName(p):(p.nick||p.name),
+                                  role:p.role||'CXR', days:{}};
+        people[pid].days[key]={start:p.shiftStart,end:p.shiftEnd};
+      });
+    }
+  });
+  return {start:start, days:days, stations:STATIONS, people:people};
+}
+// ── v60.189c · a MINIMUM YOU CAN FAIRLY COMPARE TO ────────────────────────
+// First version compared each row against gfNeedsAt(), and the wall sheet said
+// "BELOW MIN" on Exit every single day. That was my bug, not the schedule's:
+// gfNeedsAt().exit is 4 because it assumes CXRs ROTATE INTO exit, while the row
+// counts only the five dedicated exit agents. Apples to oranges — and a sheet
+// that cries wolf on a wall every day is worse than one with no tint at all.
+//
+// A schedule sheet shows who is ROSTERED, so the fair comparison is how many of
+// that role the branch actually schedules. Measured from the newest 28 stored
+// days, same approach as the manager minimums (v60.180): recency over sample
+// size, zero-days dropped as missing data. Under three samples it returns null
+// and the sheet prints no minimum and no tint rather than inventing a verdict.
+var _sRoleMinCache=null;
+function _sRoleMin(roles){
+  if(!_sRoleMinCache){
+    _sRoleMinCache={};
+    try{
+      var all=[];
+      try{ Object.keys(SEPT_SCHEDULE||{}).forEach(function(k){ all.push([k,SEPT_SCHEDULE[k]]); }); }catch(e){}
+      try{ Object.keys(MAY_SCHEDULE||{}).forEach(function(k){ all.push([k,MAY_SCHEDULE[k]]); }); }catch(e){}
+      all.sort(function(a,b){ return String(b[0]).localeCompare(String(a[0])); });
+      all.slice(0,28).forEach(function(row){
+        var day=row[1]||{}, tally={};
+        Object.keys(day).forEach(function(pid){
+          if(_asStartOfStoredShift(day[pid])==null) return;      // OFF / VACA / marker
+          var p=(typeof personByPid==='function')?personByPid(pid):null;
+          var r=(p&&p.role)||'CXR';
+          tally[r]=(tally[r]||0)+1;
+        });
+        // keep the per-DAY tally whole. Pooling each role's count as its own
+        // sample made "Office" read *usually 1* on a day with 1 ARM + 2 BRM +
+        // 3 MT — six bodies scored as three separate ones. A role GROUP has to
+        // be summed per day before it is ranked.
+        _sRoleMinCache.__days=_sRoleMinCache.__days||[];
+        _sRoleMinCache.__days.push(tally);
+      });
+    }catch(e){}
+  }
+  var days=_sRoleMinCache.__days||[];
+  var vals=days.map(function(t){
+    return (roles||[]).reduce(function(sum,r){ return sum + (t[r]||0); }, 0);
+  }).filter(function(v){ return v>0; });                          // 0 = the role wasn't in that import
+  if(vals.length<3) return null;                                  // not enough to claim anything
+  vals.sort(function(a,b){ return a-b; });
+  return vals[Math.floor(vals.length*0.25)];                      // the lean day, not the average
+}
+function _sMinFor(stationKey, d, roles){
+  return _sRoleMin(roles);
+}
+function _sHours(rec){ return rec? Math.max(0,(rec.end-rec.start)) : 0; }
+
+// ── ③ FULL-BRANCH SCHEDULE — stations down, days across ────────────────────
+function sendFullSchedule(offsetWeeks){
+  var W=_sWeek(offsetWeeks||0);
+  var head='<thead><tr><th>Station<span>minimum</span></th>'
+    + W.days.map(function(d){
+        return '<th>'+['MON','TUE','WED','THU','FRI','SAT','SUN'][(d.getDay()+6)%7]
+             +'<span>'+d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span></th>'; }).join('')
+    + '</tr></thead>';
+  var body='', below=0, atmin=0;
+  W.stations.forEach(function(st){
+    var _min=_sMinFor(st.k, W.days[0], st.roles);
+    body+='<tr><td><div class="stname">'+st.label+'</div><div class="stmin">'
+        +(_min==null?'no baseline yet':'seldom below '+_min)+'</div></td>';
+    W.days.forEach(function(d){
+      var key=_sDayKey(d), min=_sMinFor(st.k,d,st.roles), on=[];
+      Object.keys(W.people).forEach(function(pid){
+        var p=W.people[pid]; if(st.roles.indexOf(p.role)<0) return;
+        var rec=p.days[key]; if(!rec) return;
+        on.push({nick:p.nick, start:rec.start});
+      });
+      on.sort(function(a,b){ return a.start-b.start; });
+      var cls='', tag='';
+      if(min!=null && min>0 && on.length<min){ cls=' class="below"'; tag='<span class="tag b">thin</span>'; below++; }
+      else if(min!=null && min>0 && on.length===min){ cls=' class="atmin"'; tag='<span class="tag a">at the floor</span>'; atmin++; }
+      body+='<td'+cls+'><div class="cnt"'+(min!=null&&min>0&&on.length<min?' style="color:'+SEND_RED+'"':'')+'>'
+          + on.length + tag + '</div>'
+          + '<div class="who">'+(on.length? on.map(function(x){ return _sEsc(x.nick)+' '+_sFmt(x.start); }).join('<br>')
+                                          : '<span style="color:'+SEND_RED+'">— open —</span>')+'</div></td>';
+    });
+    body+='</tr>';
+  });
+  var art='<div class="deskNote"><b>Schedule send · full branch</b> — everyone, one week. Prints landscape for the wall.</div>'
+   +'<div class="artifact">'
+   +'<div style="padding:16px 20px 0"><div style="font-size:19px;font-weight:800;letter-spacing:.02em">'
+   +'FULL SCHEDULE · WEEK OF '+W.days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase()+'</div>'
+   +'<div style="font-size:11px;color:'+SEND_SEC+';margin-top:3px">Columbus airport · start times shown, station minimum in the left column</div></div>'
+   +'<div style="padding:12px 20px 0"><table>'+head+'<tbody>'+body+'</tbody></table></div>'
+   +'<div class="legend">'
+   +'<span><i style="background:#fff"></i>above the level this branch seldom drops below</span>'
+   +'<span><i style="background:'+SEND_AT_MIN+'"></i>right at that floor — one call-off breaks it</span>'
+   +'<span><i style="background:'+SEND_BELOW+'"></i>below it — worth a look before Monday</span>'
+   +'<span style="margin-left:auto">Full send · 1 of 3</span></div>'
+   + _sFoot('Swaps go through a manager. <b>The posted copy wins over any screenshot.</b> '
+           +below+' day'+(below===1?'':'s')+' below the floor · '+atmin+' right at it. '
+           +'The floor is the lean day from this branch’s own recent schedules — what you seldom go under, '
+           +'<b>not a target</b>. Confirm the real minimums in Setup and this sheet will use those instead.')
+   +'</div>';
+  sendShell('Full schedule — week of '+W.days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'}), art, true);
+}
+
+// ── ④ GROUP SCHEDULE — one station's crew ──────────────────────────────────
+function sendGroupSchedule(stationKey, offsetWeeks){
+  var W=_sWeek(offsetWeeks||0);
+  var st=W.stations.filter(function(x){ return x.k===stationKey; })[0] || W.stations[0];
+  var crew=Object.keys(W.people).filter(function(pid){ return st.roles.indexOf(W.people[pid].role)>=0; });
+  var head='<thead><tr><th>'+st.label+' crew<span>'+crew.length+' people</span></th>'
+    + W.days.map(function(d){ return '<th>'+['MON','TUE','WED','THU','FRI','SAT','SUN'][(d.getDay()+6)%7]
+        +'<span>'+d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span></th>'; }).join('')
+    + '<th>Hours<span>this week</span></th></tr></thead>';
+  var rows='', thin=[];
+  crew.forEach(function(pid){
+    var p=W.people[pid], tot=0;
+    rows+='<tr><td><div class="stname">'+_sEsc(p.nick)+'</div></td>';
+    W.days.forEach(function(d){
+      var key=_sDayKey(d), rec=p.days[key];
+      tot+=_sHours(rec);
+      // is this person the ONLY body at this station that day?
+      var same=crew.filter(function(q){ return W.people[q].days[key]; }).length;
+      var solo=(rec && same===1);
+      if(solo && thin.indexOf(d)<0) thin.push(d);
+      rows+='<td'+(solo?' class="atmin"':'')+'>'
+          + (rec? '<div class="cnt" style="font-size:11.5px">'+_sFmt(rec.start)+'–'+_sFmt(rec.end)+'</div>'
+                 +(solo?'<div class="who" style="color:'+SEND_AMB+'">only one on</div>':'')
+                : '<div class="who" style="color:'+SEND_SEC+'">off</div>')
+          + '</td>';
+    });
+    var under=(tot<30);
+    rows+='<td><div class="cnt"'+(under?' style="color:'+SEND_AMB+'"':'')+'>'+(Math.round(tot*10)/10)+'</div>'
+        + (under?'<div class="who" style="color:'+SEND_AMB+'">under 30</div>':'')+'</td></tr>';
+  });
+  var notes=[];
+  thin.slice(0,3).forEach(function(d){
+    notes.push('<b>'+d.toLocaleDateString('en-US',{weekday:'long'})+'</b> has one person on '+st.label
+              +' for part of the day — ask a manager before booking anything off that day.');
+  });
+  if(!notes.length) notes.push('No day this week leaves '+st.label+' with a single body. Swaps still go through a manager.');
+  var art='<div class="deskNote"><b>Schedule send · group</b> — one station’s crew. Goes only to the people on it.</div>'
+   +'<div class="artifact">'
+   +'<div style="padding:16px 20px 0"><div style="font-size:19px;font-weight:800">'
+   + st.label.toUpperCase()+' · WEEK OF '+W.days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'}).toUpperCase()+'</div>'
+   +'<div style="font-size:11px;color:'+SEND_SEC+';margin-top:3px">'+crew.length+' on the crew · hours shown per person</div></div>'
+   +'<div style="padding:12px 20px 0"><table>'+head+'<tbody>'+rows+'</tbody></table></div>'
+   +'<div style="padding:14px 20px 0"><div class="sec">Before you plan your week</div>'
+   + notes.map(function(n){ return '<div class="li">'+n+'</div>'; }).join('')
+   +'</div>'
+   + _sFoot('Group send · 2 of 3. Hours are what is posted, not what you will be paid — '
+           +'clock times still rule. <b>Swaps go through a manager.</b>')
+   +'</div>';
+  sendShell(st.label+' schedule — week of '+W.days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'}), art, true);
+}
+
+// ── ⑤ INDIVIDUAL SCHEDULE — phone-first ────────────────────────────────────
+function sendIndividual(pid, offsetWeeks){
+  var W=_sWeek(offsetWeeks||0);
+  var p=W.people[pid];
+  if(!p){ if(typeof toast==='function') toast('No schedule for that person this week'); return; }
+  var tot=0, rows='', thin=[];
+  W.days.forEach(function(d){
+    var key=_sDayKey(d), rec=p.days[key], h=_sHours(rec);
+    tot+=h;
+    var short=(rec && h>0 && h<6);
+    // is anyone else from their station on that day?
+    var mates=Object.keys(W.people).filter(function(q){
+      return q!==pid && W.people[q].role===p.role && W.people[q].days[key]; });
+    var solo=(rec && mates.length===0);
+    if(solo) thin.push(d);
+    rows+='<div class="drow'+(rec?(short?' short':''):' off')+'">'
+       + '<div class="day"><b>'+['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][(d.getDay()+6)%7]+'</b>'
+       + '<span>'+d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+'</span></div>'
+       + '<div class="time"'+(short?' style="color:'+SEND_RED+'"':'')+'>'
+       + (rec? (_sFmt(rec.start)+' – '+_sFmt(rec.end)) : 'Off')
+       + '<small>'+(rec
+            ? (p.role==='CXR'?'Counter':p.role==='EXIT'?'Exit':p.role==='RETURNS'?'Returns':'Office')
+              + (solo?' · you are the only one on that day':'')
+            : 'No shift scheduled')+'</small></div>'
+       + '<div class="hrs">'+(rec? (Math.round(h*10)/10) : '—')+'</div></div>';
+  });
+  var notes=[];
+  thin.slice(0,2).forEach(function(d){
+    notes.push('<b>'+d.toLocaleDateString('en-US',{weekday:'long'})+'</b> you are the only one on your station. '
+              +'Flag a manager if you need cover for a break.');
+  });
+  notes.push(tot<30
+    ? 'You are at <b>'+(Math.round(tot*10)/10)+' hours</b> this week — under 30. Say the word if you want more.'
+    : 'You are at <b>'+(Math.round(tot*10)/10)+' hours</b> this week.');
+  var art='<div class="deskNote"><b>Schedule send · individual</b> — phone-first, one person. Prints as a half sheet.</div>'
+   +'<div class="artifact" style="max-width:4.4in">'
+   + _sMast(_sEsc(p.nick), [
+       (p.role==='CXR'?'Counter':p.role==='EXIT'?'Exit':p.role==='RETURNS'?'Returns':'Office'),
+       'Week of '+W.days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'}),
+       '<span style="font-size:30px;font-weight:700;line-height:1.1">'+(Math.round(tot*10)/10)+'</span> hours'])
+   + rows
+   +'<div style="padding:14px 20px 0"><div class="sec">Read before Monday</div>'
+   + notes.map(function(n){ return '<div class="li">'+n+'</div>'; }).join('')
+   +'</div>'
+   + _sFoot('Swaps: talk to a manager before you trade. <b>Nothing counts until it shows on the posted schedule.</b> '
+           +'Individual send · 3 of 3.')
+   +'</div>';
+  sendShell(p.nick+' — week of '+W.days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'}), art);
+}
+
+// ── the menu ───────────────────────────────────────────────────────────────
+function openSends(){
+  var W=_sWeek(0);
+  var wk=W.days[0].toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
+   +'Five sends, one grammar. Each one prints on a sheet and reads on a phone. '
+   +'<b>Nothing sends by itself</b> — you press send.</div>';
+  function row(icon,name,sub,fn){
+    return '<button onclick="closeModal();'+fn+'" style="width:100%;margin-bottom:7px;padding:12px;'
+      +'border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);'
+      +'font-size:13.5px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:17px">'+icon+'</span><span style="flex:1">'
+      +'<b style="color:var(--txt)">'+name+'</b>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-top:1px">'+sub+'</div></span>'
+      +'<span style="opacity:.5">›</span></button>';
+  }
+  b+=row('🌅','Open email','6:15 AM · everyone on today','sendOpenEmail()');
+  b+=row('🌙','Close email','End of night · managers + area','sendCloseEmail()');
+  b+=row('🗓','Full branch schedule','Week of '+wk+' · for the wall','sendFullSchedule(0)');
+  b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;'
+   +'color:var(--txt3);margin:12px 0 6px">One station’s crew</div>';
+  W.stations.forEach(function(st){
+    b+=row('👥',st.label,'Goes only to the '+st.label.toLowerCase()+' crew','sendGroupSchedule(\''+st.k+'\',0)');
+  });
+  b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;'
+   +'color:var(--txt3);margin:12px 0 6px">One person</div>'
+   +'<select id="send-who" style="width:100%;padding:10px;background:var(--bg3);border:1px solid var(--bdr2);'
+   +'border-radius:8px;color:var(--txt);font-size:13px;margin-bottom:7px">'
+   + Object.keys(W.people).sort(function(a,b2){ return W.people[a].nick.localeCompare(W.people[b2].nick); })
+       .map(function(pid){ return '<option value="'+pid+'">'+_sEsc(W.people[pid].nick)+'</option>'; }).join('')
+   +'</select>'
+   +'<button onclick="var v=(document.getElementById(\'send-who\')||{}).value;closeModal();sendIndividual(v,0)" '
+   +'style="width:100%;padding:11px;border-radius:9px;border:none;background:var(--accent);color:#04160e;'
+   +'font-size:13px;font-weight:800;cursor:pointer">Build their week →</button>';
+  openModal('✉️ Emails & schedule sends', b);
 }
 
 function openPrintables(){
