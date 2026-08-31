@@ -8829,6 +8829,17 @@ function openExitAccommodation(pid, name){
       '<button class="btn btn-gh" onclick="closeModal()">Cancel</button>'+
     '</div>');
 }
+// ── v60.192 · ONE CACHE, ONE INVALIDATOR ───────────────────────────────────
+// window._lastRotations is rebuilt only WHEN EMPTY (renderers check
+// Object.keys().length), so every writer that changes who rotates where must
+// clear it or the coverage bars keep showing the old world. Six mutators
+// already cleared it inline; the newer writers below did not — found in the
+// v60.192 integration sweep when an accommodation held in the ENGINE but the
+// cached rotation still showed the person at Exit.
+function rotInvalidate(){
+  window._lastRotations = {};
+}
+
 function saveExitAccommodation(pid){
   var s=(document.getElementById('ea-start')||{}).value||'';
   var e=(document.getElementById('ea-end')||{}).value||'';
@@ -8836,6 +8847,7 @@ function saveExitAccommodation(pid){
   if(e && e<s){ toast('End can’t be before start'); return; }
   if(!STATE.exitAccommodation) STATE.exitAccommodation={};
   STATE.exitAccommodation[pid]={start:s, end:e||null};
+  rotInvalidate();
   // if they're currently at exit, move them to counter now
   if((STATE.staffStation||{})[pid]==='Exit Booth' && exitAccommodated(pid)){ STATE.staffStation[pid]='Counter'; }
   saveState(); closeModal();
@@ -8846,6 +8858,7 @@ function saveExitAccommodation(pid){
 }
 function clearExitAccommodation(pid){
   if(STATE.exitAccommodation) delete STATE.exitAccommodation[pid];
+  rotInvalidate();
   saveState(); closeModal();
   toast('Accommodation cleared');
   if(typeof buildSwitchboard==='function') buildSwitchboard();
@@ -10960,6 +10973,7 @@ function absenceTypeOf(pid){
   return ((STATE.todayOverrides||{})[pid]==='callout') ? 'calledoff' : null;
 }
 function setAbsence(pid, type){
+  if(typeof rotInvalidate==='function') rotInvalidate();   // v60.192: pool changed
   if(!STATE.todayOverrides) STATE.todayOverrides={};
   if(!STATE.absenceType)    STATE.absenceType={};
   if(!STATE.staffDuty)      STATE.staffDuty={};
@@ -10985,6 +10999,7 @@ function setAbsence(pid, type){
   _absenceRefresh(pid, type);
 }
 function clearAbsence(pid){
+  if(typeof rotInvalidate==='function') rotInvalidate();   // v60.192
   if(STATE.todayOverrides) delete STATE.todayOverrides[pid];
   if(STATE.absenceType)    delete STATE.absenceType[pid];
   if(STATE.staffDuty)      STATE.staffDuty[pid]=true;
@@ -19273,6 +19288,7 @@ function meetingSave(m){
     moved.push((typeof dispName==='function'?dispName(pid):pid)+' → '+_sFmt(cand));
   });
   meetingsSync();
+  if(typeof rotInvalidate==='function') rotInvalidate();   // v60.192: lunch may have moved
   if(typeof saveState==='function') saveState();
   ['buildCoverageTimeline','buildSwitchboard','renderNow'].forEach(function(f){
     if(typeof window[f]==='function') try{ window[f](); }catch(e){}
@@ -19282,6 +19298,7 @@ function meetingSave(m){
 function meetingDelete(id){
   STATE.meetings=(STATE.meetings||[]).filter(function(m){return m.id!==id;});
   meetingsSync();
+  if(typeof rotInvalidate==='function') rotInvalidate();   // v60.192
   if(typeof saveState==='function') saveState();
   ['buildCoverageTimeline','renderNow'].forEach(function(f){
     if(typeof window[f]==='function') try{ window[f](); }catch(e){} });
@@ -21602,7 +21619,28 @@ var DNR_REASONS = [
 // saveDNR/saveDNQ call saveState() so additions/removals push to the cloud and
 // reach every device. The pull-side union merge (mergeRemoteIntoState) ensures
 // concurrent additions from two devices both survive.
-function getDNRList(){ if(!Array.isArray(STATE.dnr)) STATE.dnr=[]; return STATE.dnr; }
+// v60.192: two fictional demo-fixture records ("Robert Calloway" chargeback /
+// "Terrence Braddock" declined CC — the design drop's sample names) were found
+// in LIVE state with no `added` stamp, crashing refreshDNRDNQCards on every
+// page load AND showing fake fraud flags on the real morning gate. They were
+// leak-test residue from the v60.186 demo build that synced like real data.
+// This migration removes exactly those two (matched by name AND the missing
+// stamp — a real record entered through the UI always gets `added`), and
+// stamps any other legacy record so a missing field can never crash the gate.
+function _dnrPurgeFixtures(){
+  try{
+    var FIX=['Robert Calloway','Terrence Braddock'];
+    ['dnr','dnq'].forEach(function(k){
+      if(!Array.isArray(STATE[k])) return;
+      STATE[k]=STATE[k].filter(function(r){
+        return !(r && !r.added && FIX.indexOf(r.name)>=0);
+      });
+      STATE[k].forEach(function(r){ if(r && !r.added) r.added=new Date().toISOString(); });
+    });
+  }catch(e){}
+}
+_dnrPurgeFixturesQueued=true;
+function getDNRList(){ if(!Array.isArray(STATE.dnr)) STATE.dnr=[]; if(typeof _dnrPurgeFixtures==='function'&&window._dnrPurgeFixturesQueued){window._dnrPurgeFixturesQueued=false;_dnrPurgeFixtures();} return STATE.dnr; }
 function getDNQList(){ if(!Array.isArray(STATE.dnq)) STATE.dnq=[]; return STATE.dnq; }
 function saveDNR(list){ STATE.dnr = Array.isArray(list)?list:[]; saveState(); }
 function saveDNQ(list){ STATE.dnq = Array.isArray(list)?list:[]; saveState(); }
@@ -21738,8 +21776,8 @@ function buildDNRDNQCards(){
   dnrHtml+=`</div>`;
 
   // DNQ card
-  const todayDNQ=dnq.filter(r=>r.added.startsWith(today));
-  const yestDNQ =dnq.filter(r=>!r.added.startsWith(today));
+  const todayDNQ=dnq.filter(r=>String(r.added||'').startsWith(today));
+  const yestDNQ =dnq.filter(r=>!String(r.added||'').startsWith(today));
   let dnqHtml=`<div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.35);
     border-left:3px solid var(--amber);border-radius:8px;padding:10px 12px;margin-bottom:8px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
