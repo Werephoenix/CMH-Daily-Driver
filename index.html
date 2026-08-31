@@ -4038,6 +4038,43 @@ function saveIncompleteReasons(mode){
 
 
 // CXR ROTATION CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.187 · THE OPENER LUNCH RULE (Matt, 2026-08-31)
+//
+//   "If starting at exit, lunch should always be 9:30. If starting at counter,
+//    lunch should not be until at least 10, no earlier unless it's requested by
+//    the cxr. That is to allow them the 4 hr minimum at counter that we are
+//    supposed to be striving to give them. If lunch is later than 9:30 for a cxr
+//    opener, they never get a chance to get 4 hrs at counter."
+//
+// Both halves protect the SAME thing — four hours at Counter:
+//   • Exit first  → lunch AT 9:30. Exit 5:30–9:30 is exactly the 4h exit cap,
+//                   and Counter 10:00–2:00 is a clean 4h. Push lunch later and
+//                   the counter block is what gets squeezed, which is Matt's
+//                   point: a late lunch costs them counter time, not exit time.
+//   • Counter first → lunch NO EARLIER than 10:00, so Counter 5:30–10:00 is
+//                   4.5h. The old default put lunch at the shift midpoint,
+//                   which for Laura (5:30a–2:30p) meant lunch at 9:00 →
+//                   3.5h counter and a 5h exit block that already tripped the
+//                   app's own "exceeds 4h max" warning. The rule fixes both.
+//
+// A CXR's own request wins: STATE.customLunch is checked BEFORE this, so asking
+// for an earlier lunch still gets it. This only replaces the automatic default.
+var OPENER_MAX_START   = 7;     // a "morning opener" starts at or before 7:00
+var OPENER_EXIT_LUNCH  = 9.5;   // exit-first: lunch AT 9:30
+var OPENER_CTR_LUNCH   = 10;    // counter-first: lunch NOT BEFORE 10:00
+function openerLunchStart(shiftStart, shiftEnd, startStation, proposed){
+  if(shiftStart==null || shiftStart > OPENER_MAX_START) return proposed;   // not an opener
+  var want = (startStation==='exit') ? OPENER_EXIT_LUNCH
+           : (startStation==='counter') ? Math.max(proposed, OPENER_CTR_LUNCH)
+           : proposed;
+  // Never let the rule produce a nonsense day: the block after lunch has to be
+  // worth walking back for. A short opener shift keeps the computed midpoint.
+  if(shiftEnd!=null && (shiftEnd - (want + ROTATION.lunchHours)) < 1) return proposed;
+  if(want <= shiftStart) return proposed;
+  return want;
+}
+
 var ROTATION = {
   blockHours:    4.0,   // target block length at each station
   lunchHours:    0.5,   // lunch break
@@ -6769,8 +6806,8 @@ function buildSmartRotation() {
       const mid2 = shift.start + (shift.end - shift.start) / 2;
       const ls2  = noLunch ? null
         : (typeof customLunch_ef === 'number' && customLunch_ef > shift.start && customLunch_ef < shift.end)
-            ? customLunch_ef
-            : mid2 - ROTATION.lunchHours / 2;
+            ? customLunch_ef                                    // the CXR asked — honour it
+            : openerLunchStart(shift.start, shift.end, 'exit', mid2 - ROTATION.lunchHours / 2);
       const le2  = noLunch ? null : ls2  + ROTATION.lunchHours;
       return {
         pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
@@ -6835,6 +6872,14 @@ function buildSmartRotation() {
     } else {
       block1H = Math.min(ROTATION.blockHours, totalWork / 2);
       block2H = totalWork - block1H;
+      // v60.187: the opener rule. `normal` starts at Counter, so lunch must not
+      // land before 10:00 or the counter block comes up short.
+      const _startsAt = (startStation === 'exit') ? 'exit' : 'counter';
+      const _want = openerLunchStart(shift.start, shift.end, _startsAt, shift.start + block1H);
+      if (_want !== shift.start + block1H) {
+        block1H = _want - shift.start;
+        block2H = totalWork - block1H;
+      }
     }
 
     const lunchStart = shift.start + block1H;
@@ -6997,6 +7042,25 @@ function buildSmartRotation() {
     // HARD: lunch.from >= shiftStart + 3.0 — NEVER violated
     if (newFrom < r.shiftStart + LUNCH_MIN_FROM_START_HARD - 0.01) {
       if (!opts || !opts.allowEmergency) return false;
+    }
+    // ── v60.187 · THE OPENER LUNCH RULE IS A CEILING ON THIS PASS ──────────
+    // The stagger exists to protect exit coverage and it moves lunches LATER
+    // to do it. For a morning opener that is exactly the wrong direction:
+    // pushing an opener's lunch back does not cost them exit time, it costs
+    // them COUNTER time, because counter is what comes after. Measured before
+    // this guard: Laura (5:30a–2:30p, exit first) was moved 9:30 → 11:00,
+    // leaving 5.5h at exit and only 3h at counter — the precise outcome Matt
+    // described ("if lunch is later than 9:30 for a cxr opener, they never get
+    // a chance to get 4 hrs at counter").
+    //
+    // So the rule bounds the pass rather than merely seeding it. The stagger
+    // may still move an opener EARLIER (that protects counter time) — it just
+    // cannot push them past their ceiling. A CXR's own requested lunch is
+    // exempt: customLunchFor() already refuses to move those at all.
+    if (r.shiftStart != null && r.shiftStart <= OPENER_MAX_START) {
+      const _startsExit = !!(r.b1 && r.b1.station === 'exit');
+      const _ceiling = _startsExit ? OPENER_EXIT_LUNCH : OPENER_CTR_LUNCH;
+      if (newFrom > _ceiling + 0.01) return false;
     }
     // v58 MIDPOINT CAP: lunch stays within +/-1hr of shift midpoint
     // per Matt: "Lunches for anyone should never be over 1 hr off of
