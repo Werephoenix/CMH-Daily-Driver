@@ -3754,6 +3754,10 @@ function mgrMigrateEmerald(){
       Object.keys(t[dt]).forEach(function(bk){
         var b=t[dt][bk]; if(!b) return;
         if(b.emerald!=null && b.eb1==null){ b.eb1=b.emerald; }
+        // EB1 IS the opener/closer, so a saved opening/closing seat is the
+        // same person — take the max rather than summing a body twice.
+        var _oc=Math.max(b.opening||0, b.closing||0);
+        if(_oc>(b.eb1||0)) b.eb1=_oc;
       });
     });
   }catch(e){}
@@ -3769,28 +3773,34 @@ var MGR_AREAS = [
   {k:'shuttle', label:'Shuttler', color:'#FF9F0A',
    note:'Separate job from Floater (Matt, 2026-08-31).'},
   {k:'counter', label:'Counter', color:'#0A84FF'},  // LAST-CASE only (usually MT/ABRM)
-  {k:'opening', label:'Opening', color:'#FF9F0A'},
-  {k:'closing', label:'Closing', color:'#FF453A'},
+  // v60.190: Opening and Closing REMOVED as separate posts. Matt: "EB1 in the
+  // morning and Opener is the same and EB1 in the night and closer is the
+  // same." Keeping them double-counted one person as two. A branch that wants
+  // them back can add them in the survey — the list is theirs now.
 ];
 // Order an exit gap gets filled from — role codes, best-first. ARM = AM/Area Mgr.
 var EXIT_FILL_ORDER = ['EXIT','CXR','MT','ABRM','BRM','ARM'];
 var MGR_TARGETS = {
+  // v60.190: keyed to the EB1/EB2 station list. EB1 IS the opener (morning)
+  // and the closer (night) — Matt's ruling — so there are no separate
+  // opening/closing posts to double-count. EB2 joins at the peak as EB1's
+  // help. These are only DEFAULTS; the branch's saved answers win.
   weekday: {
-    preopen:{emerald:0, returns:0, exit:0, floater:0, counter:0, opening:0, closing:0}, // 3:30–6a — no mgr yet
-    open: {emerald:1, returns:1, exit:0, floater:0, counter:0, opening:1, closing:0}, // 3 — opener+Emerald+Returns
-    amid: {emerald:1, returns:1, exit:1, floater:0, counter:0, opening:0, closing:0}, // 3
-    mid:  {emerald:1, returns:1, exit:1, floater:1, counter:0, opening:0, closing:0}, // 4 — daily peak
-    pm:   {emerald:1, returns:1, exit:1, floater:0, counter:0, opening:0, closing:1}, // 4 — peak + closer
-    night:{emerald:1, returns:1, exit:0, floater:0, counter:0, opening:0, closing:1}, // 3 — closer+Emerald+Returns
+    preopen:{eb1:0, eb2:0, returns:0, exit:0, floater:0, shuttle:0, counter:0}, // 3:30–6a — no mgr yet
+    open: {eb1:1, eb2:0, returns:1, exit:0, floater:0, shuttle:0, counter:0}, // 2 — EB1 (the opener) + Returns
+    amid: {eb1:1, eb2:0, returns:1, exit:1, floater:0, shuttle:0, counter:0}, // 3
+    mid:  {eb1:1, eb2:1, returns:1, exit:1, floater:0, shuttle:0, counter:0}, // 4 — peak; EB2 backs EB1
+    pm:   {eb1:1, eb2:1, returns:1, exit:1, floater:0, shuttle:0, counter:0}, // 4 — closer is on as EB1-night
+    night:{eb1:1, eb2:0, returns:1, exit:0, floater:0, shuttle:0, counter:0}, // 2 — EB1 (the closer) + Returns
   },
   weekend: {
-    preopen:{emerald:0, returns:0, exit:0, floater:0, counter:0, opening:0, closing:0}, // 3:30–6a
-    open: {emerald:1, returns:1, exit:0, floater:0, counter:0, opening:1, closing:0}, // 3
-    amid: {emerald:1, returns:1, exit:0, floater:0, counter:0, opening:0, closing:0}, // 2
-    mid:  {emerald:1, returns:1, exit:1, floater:0, counter:0, opening:0, closing:0}, // 3 — lighter peak
-    pm:   {emerald:1, returns:1, exit:0, floater:0, counter:0, opening:0, closing:1}, // 3
-    night:{emerald:1, returns:1, exit:0, floater:0, counter:0, opening:0, closing:1}, // 3
-  }
+    preopen:{eb1:0, eb2:0, returns:0, exit:0, floater:0, shuttle:0, counter:0},
+    open: {eb1:1, eb2:0, returns:1, exit:0, floater:0, shuttle:0, counter:0}, // 2
+    amid: {eb1:1, eb2:0, returns:1, exit:0, floater:0, shuttle:0, counter:0}, // 2
+    mid:  {eb1:1, eb2:0, returns:1, exit:1, floater:0, shuttle:0, counter:0}, // 3 — lighter peak
+    pm:   {eb1:1, eb2:1, returns:1, exit:0, floater:0, shuttle:0, counter:0}, // 3
+    night:{eb1:1, eb2:0, returns:1, exit:0, floater:0, shuttle:0, counter:0}, // 2
+  },
 };
 function mgrTargetsFor(dtype){ return (STATE.mgrTargets && STATE.mgrTargets[dtype]) || MGR_TARGETS[dtype]; }
 
@@ -4103,11 +4113,21 @@ function saveIncompleteReasons(mode){
 //
 // A CXR's own request wins: STATE.customLunch is checked BEFORE this, so asking
 // for an earlier lunch still gets it. This only replaces the automatic default.
-var OPENER_MAX_START   = 7;     // a "morning opener" starts at or before 7:00
+// v60.190 · NARROWED (Matt, 2026-08-31): "It applies only to CXRs who come in
+// at 5:30 am. We don't open at counter until 6am so 30 minutes of set up aka
+// 30 minutes of sales loss at counter is money lost for that CXR."
+// So the arithmetic only bites at 5:30: counter-first with lunch at 10 gives
+// exactly 4h of OPEN counter (6:00–10:00) after the setup half-hour. A 6:00 or
+// 7:00 starter has no setup loss and the ordinary midpoint maths is fine.
+var OPENER_START       = 5.5;   // the 5:30a open shift — the ONLY one the rule touches
+var OPENER_TOL         = 0.26;  // quarter-hour slop for imports like "5:35"
+function _isOpener(shiftStart){
+  return shiftStart!=null && Math.abs(shiftStart-OPENER_START)<=OPENER_TOL;
+}
 var OPENER_EXIT_LUNCH  = 9.5;   // exit-first: lunch AT 9:30
 var OPENER_CTR_LUNCH   = 10;    // counter-first: lunch NOT BEFORE 10:00
 function openerLunchStart(shiftStart, shiftEnd, startStation, proposed){
-  if(shiftStart==null || shiftStart > OPENER_MAX_START) return proposed;   // not an opener
+  if(!_isOpener(shiftStart)) return proposed;   // only the 5:30 open shift
   var want = (startStation==='exit') ? OPENER_EXIT_LUNCH
            : (startStation==='counter') ? Math.max(proposed, OPENER_CTR_LUNCH)
            : proposed;
@@ -7100,7 +7120,7 @@ function buildSmartRotation() {
     // may still move an opener EARLIER (that protects counter time) — it just
     // cannot push them past their ceiling. A CXR's own requested lunch is
     // exempt: customLunchFor() already refuses to move those at all.
-    if (r.shiftStart != null && r.shiftStart <= OPENER_MAX_START) {
+    if (_isOpener(r.shiftStart)) {
       const _startsExit = !!(r.b1 && r.b1.station === 'exit');
       const _ceiling = _startsExit ? OPENER_EXIT_LUNCH : OPENER_CTR_LUNCH;
       if (newFrom > _ceiling + 0.01) return false;
@@ -17230,7 +17250,7 @@ function buildCoverageTimeline() {
       } else { area=_areaOf((STATE.staffStation||{})[pid]); }
       if(area) _have[area]=(_have[area]||0)+1;
     });
-    const _primaryBroken = ['emerald','returns'].some(k=>(_mb[k]||0)>0 && !(_have[k]||0));
+    const _primaryBroken = ['eb1','returns'].some(k=>(_mb[k]||0)>0 && !(_have[k]||0));
     const _nextFill = (typeof EXIT_FILL_ORDER!=='undefined')?(EXIT_FILL_ORDER[2]||'MT'):'MT';
     let _tone, _label, _detail;
     if(!_haveData){
@@ -17247,7 +17267,7 @@ function buildCoverageTimeline() {
       _label = `${_on}/${_need} on station`;
       _detail = mgrAreas().filter(a=>(_mb[a.k]||0)>0||(_have[a.k]||0)>0).map(a=>{
         const hv=_have[a.k]||0, nd=_mb[a.k]||0, gap=nd-hv;
-        const isPrimary=(a.k==='emerald'||a.k==='returns');
+        const isPrimary=(a.k==='eb1'||a.k==='returns');
         const col = a.k==='counter' ? 'var(--txt3)'                    // Counter never colored
           : gap>0 ? (isPrimary&&hv===0 ? 'var(--red)' : 'var(--amber)')
           : a.color;
@@ -22345,11 +22365,12 @@ function mgrFillFromMeasured(dt, bk){
   var m=(mgrMeasuredHeadcount(dt)||{})[bk];
   if(!m || !m.days){ if(typeof toast==='function') toast('No schedule data for that block yet'); return; }
   var total=m.median;
-  var fill={emerald:0, returns:0, exit:0, floater:0, counter:0, opening:0, closing:0};
+  // v60.190: EB1 IS the opener/closer, so there is no separate opening/closing
+  // seat to reserve — EB1 first, then Returns and Exit, then EB2 as the
+  // Emerald backup, and any spare bodies float. Counter stays zero always.
+  var fill={eb1:0, eb2:0, returns:0, exit:0, floater:0, shuttle:0, counter:0};
   var left=total;
-  if(bk==='open'   && left>0){ fill.opening=1; left--; }
-  if((bk==='pm'||bk==='night') && left>0){ fill.closing=1; left--; }
-  ['emerald','returns','exit'].forEach(function(a){ if(left>0){ fill[a]=1; left--; } });
+  ['eb1','returns','exit','eb2'].forEach(function(a){ if(left>0){ fill[a]=1; left--; } });
   if(left>0) fill.floater=left;                      // spare bodies float, never counter
   mgrAreas().forEach(function(a){ updateMgrTarget(dt, bk, a.k, fill[a.k]||0); });
   if(typeof saveState==='function') saveState();
@@ -26168,8 +26189,8 @@ function dnSaveOverrides(){
 // ═══════════════════════════════════════════════════════════════════════════
 var PMA_BLOCKS = [['preopen',3.5,6],['open',6,9],['amid',9,12],['mid',12,16],['pm',16,20],['night',20,24]];
 // Fill priority follows the model: primaries first, Counter genuinely last.
-var PMA_PRIORITY = ['emerald','returns','exit','floater','counter'];
-var PMA_STATION = {emerald:'Emerald Booth', returns:'Returns', exit:'Exit Booth',
+var PMA_PRIORITY = ['eb1','returns','exit','eb2','floater','shuttle','counter'];  // v60.190: eb1 first (it IS the opener/closer), counter still last-case
+var PMA_STATION = {eb1:'Emerald Booth', eb2:'EB2', shuttle:'Shuttling', returns:'Returns', exit:'Exit Booth',
                    floater:'Floater', counter:'Counter Manager',
                    opening:'Opening Manager', closing:'Closing Manager'};
 // Seniority for "who takes the least-desirable slot": MTs/ABRMs step in before BRM/AM.
@@ -26201,15 +26222,28 @@ function proposeManagerAreas(opts){
     // opens, the latest-ending one closes. Resolve those first in their own block,
     // otherwise the coverage flag can never satisfy "Opening 1 / Closing 1".
     var order = PMA_PRIORITY.slice();
-    if(bk==='open')                  order.unshift('opening');
-    if(bk==='pm' || bk==='night')    order.unshift('closing');   // the closer arrives at 4p
+    // v60.190: no separate opening/closing areas — EB1 IS that person. The
+    // block decides WHICH EB1: earliest-in at open, latest-out at pm/night.
+    // (The unshift lines were: order.unshift('opening'/'closing').)
     order.forEach(function(area){
       var n = need[area]||0;
       for(var i=0;i<n;i++){
         // rank candidates: their usual station → continuity → least senior first
         var pool = avail.filter(function(pid){ return !used[pid]; });
         if(!pool.length) break;
-        if(area==='opening'||area==='closing'){
+        if(area==='eb1' && (bk==='open' || bk==='pm' || bk==='night')){
+          var _wantOpener=(bk==='open');
+          pool.sort(function(a,bb){
+            var sa=(STATE.shiftMod||{})[a]||{}, sb=(STATE.shiftMod||{})[bb]||{};
+            var pa=exp[a].person, pb=exp[bb].person;
+            if(_wantOpener){
+              var s1=(sa.start!=null?sa.start:pa.shiftStart), s2=(sb.start!=null?sb.start:pb.shiftStart);
+              return (s1==null?99:s1)-(s2==null?99:s2);            // earliest in opens
+            }
+            var e1=(sa.end!=null?sa.end:pa.shiftEnd), e2=(sb.end!=null?sb.end:pb.shiftEnd);
+            return (e2==null?0:e2)-(e1==null?0:e1);                // latest out closes
+          });
+        } else if(area==='opening'||area==='closing'){
           pool.sort(function(a,bb){
             var sa=(STATE.shiftMod||{})[a]||{}, sb=(STATE.shiftMod||{})[bb]||{};
             var pa=exp[a].person, pb=exp[bb].person;
@@ -26553,7 +26587,7 @@ function openProposedAreas(existing){
   // doesn't silently regenerate the plan and throw away what was just changed.
   var p = existing || proposeManagerAreas();
   window._pmaDraft=p;
-  var AREA_LBL={emerald:'🌟 Emerald', returns:'↩ Returns', exit:'🟩 Exit',
+  var AREA_LBL={eb1:'🌟 EB1', eb2:'✨ EB2', shuttle:'🚌 Shuttler', returns:'↩ Returns', exit:'🟩 Exit',
     floater:'🚗 Floater', counter:'🟦 Counter', opening:'🌅 Opening', closing:'🌙 Closing'};
   var BL=(typeof FLOOR_BLOCK_LABELS!=='undefined')?FLOOR_BLOCK_LABELS:{};
   var any=p.rows.some(function(r){ return r.assigned.length; });
@@ -26672,7 +26706,7 @@ function _coOverrideHtml(g, exp){
 function _coImpactHtml(){
   var imp=window._coImpact; if(!imp||!imp.opened||!imp.opened.length) return '';
   var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
-  var AREA_LBL={exit:'🟩 Exit', counter:'🟦 Counter', returns:'↩ Returns', emerald:'🌟 Emerald'};
+  var AREA_LBL={exit:'🟩 Exit', counter:'🟦 Counter', returns:'↩ Returns', eb1:'🌟 EB1', eb2:'✨ EB2', shuttle:'🚌 Shuttler'};
   var BL=(typeof FLOOR_BLOCK_LABELS!=='undefined')?FLOOR_BLOCK_LABELS:{};
   var rows=imp.opened.map(function(g){
     var s=null; try{ s=gfSuggest({area:g.area,hour:g.hour,short:g.short},exp); }catch(e){}
