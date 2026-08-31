@@ -2504,6 +2504,8 @@ button { cursor: pointer; }
     <span class="sp-n">②</span> Where are the gaps
   </div>
 
+  <!-- v60.193: ① the coverage distribution strip — the whole day in two rows -->
+  <div id="cov-strip"></div>
   <!-- Zone map — right now -->
   <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
     gap:6px;margin-bottom:10px"></div>
@@ -2521,6 +2523,10 @@ button { cursor: pointer; }
   <div id="sched-auto-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
     <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Auto-distribute Exit & Counter rotations for TODAY based on coverage rules">
       ⚡ Fill today's gaps
+    </button>
+    <button class="btn btn-sm" onclick="gfxStart()" title="One gap at a time — apply or skip, with the reasoning shown"
+      style="border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-weight:800">
+      ▶ Guided fix
     </button>
     <span id="auto-why" style="font-size:9px;color:var(--txt3)">
       Fills today's exit gaps using available CXRs · respects manager overrides
@@ -10906,6 +10912,24 @@ function demandForecast(dateKey){
     var ev=(typeof eventBumpAt==='function')?eventBumpAt(12):0;
     if(ev) adj.push({what:'city events', effect:'+'+ev+' at counter'});
   }catch(e){}
+  // v60.193 · THE DEMAND RIPPLE (design, Aug-17 block): a heavy event presses
+  // on the days AROUND it — day before +1 (prep), event day +4, day after +2
+  // (the returns wave); moderate is half. The events sheet has existed since
+  // v60.15x; this is the first time an entry actually moves a forecast.
+  try{
+    (Array.isArray(STATE.cityEvents)?STATE.cityEvents:[]).forEach(function(e){
+      if(!e||!e.date) return;
+      var evd=new Date(e.date+'T12:00:00'); if(isNaN(evd)) return;
+      var delta=Math.round((d-evd)/86400000);
+      var heavy=/heavy/i.test(e.level||e.sev||'');
+      var bump= delta===0 ? (heavy?4:2)
+              : delta===-1 ? (heavy?1:0)
+              : delta===1 ? (heavy?2:1) : 0;
+      if(!bump) return;
+      adj.push({what:(e.name||'event')+(delta===0?'':delta<0?' (tomorrow)':' (yesterday)'),
+                effect:'+'+bump+(delta===1?' returns':' demand')});
+    });
+  }catch(e){}
   try{ if(STATE.outCancel) adj.push({what:'cancellations logged', effect:'-'+STATE.outCancel+' out'}); }catch(e){}
   var peak=null;
   Object.keys(base.avg).forEach(function(k){
@@ -14920,6 +14944,20 @@ async function sbMigrateIfNeeded(){
   } catch(e){ return {ok:false, why:e.message}; }
 }
 
+// v60.193: #tab=<name> deep-link — opens the app on that tab. Exists for the
+// before/after design shots (headless Chrome can't click), and doubles as the
+// deep-link target for meeting reminders later.
+try{
+  window.addEventListener('load', function(){
+    try{
+      var m=(location.hash||'').match(/tab=([a-z]+)/);
+      if(m && typeof showTab==='function') setTimeout(function(){ showTab(m[1]); }, 700);
+      // screenshot flag: open the guided-fix overlay after the tab settles
+      if(/gfx/.test(location.hash||'') ) setTimeout(function(){ if(typeof gfxStart==='function') gfxStart(); }, 1600);
+    }catch(e){}
+  });
+}catch(e){}  // test harness stubs window without addEventListener
+
 // v60.191: keep today's meeting blocks projected — load + every remote sync
 // (a meeting made on another device must land here too).
 try{ meetingsSync(); }catch(e){}
@@ -14936,7 +14974,9 @@ function initSync() {
     // _syncPullNow is harmless while signed out: cloudPull exits at the
     // no-token check without making a single network request.
     setSyncStatus('offline', 'Sign in to sync');
-    setTimeout(function(){ if (!sbSignedIn()) sbPrompt(); }, 1500);
+    // v60.193: #nosign suppresses the prompt — design screenshots only (a fresh
+    // headless profile is never signed in, and the sheet covered every capture).
+    if(!/nosign/.test(location.hash||'')) setTimeout(function(){ if (!sbSignedIn()) sbPrompt(); }, 1500);
   } else {
     sbMigrateIfNeeded().then(function(){ _syncPullNow(); sbRealtime(); });
   }
@@ -16670,7 +16710,7 @@ function renderScheduleView() {
   if (_dw) _dw.className = 'seg' + (p==='week' ? ' on' : '');
   // id → its normal display value (so hide/restore keeps flex/grid layouts intact)
   // v60.145: the ② / ③ spine labels are day-view furniture — hidden in Week mode.
-  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','solo-banner':'block','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block','sp-step-2':'flex','sp-step-3':'flex'};
+  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','solo-banner':'block','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block','sp-step-2':'flex','sp-step-3':'flex','cov-strip':'block'};
   if (p === 'week') {
     Object.keys(_dayRestore).forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
     if (wkEl) wkEl.style.display = 'block';
@@ -16992,6 +17032,7 @@ function buildCoverageTimeline() {
   // v60.44: if a non-timeline pattern is active, any caller (Auto-Distribute,
   // edits, nowFix…) routes to that pattern's renderer instead of the bars.
   const _pat = STATE.schedPattern || 'timeline';
+  if(typeof renderCovStrip==='function') try{ renderCovStrip(); }catch(e){}   // v60.193
   if (_pat === 'coverage') { return renderCoverageFirst(); }
   if (_pat === 'roster')   { return renderRoster(); }
   updateManagerModeUI();
@@ -19442,6 +19483,213 @@ function mtgCommit(){
   if(res.impact.dips.length) msg+=' · heads up: '+res.impact.dips.length+' coverage dip'+(res.impact.dips.length===1?'':'s');
   if(typeof toast==='function') toast(msg, 7000);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.193 · FROM THE FULL-PACKET AUDIT — the workflow family, built in order
+//
+//   ① Coverage distribution strip — the day at a glance, recolors live
+//   ② Guided Fix — one gap at a time, apply/skip, re-detect, undo-all
+//   ③ Event demand ripple — a heavy event pressures the days around it
+//   ④ Idle re-lock — an unlocked manager panel locks itself after 5 min
+//
+// Order rationale: the strip is the shared read both the wizard and Guided Fix
+// open with (build the instrument before the procedure); Guided Fix turns the
+// existing primitives (gfDetectGaps → gfRankCandidates → coApplyFill) into the
+// loop the spec calls "detect → rank → guard → stage → re-detect"; the ripple
+// completes an input that already existed (events had a sheet but no effect);
+// the re-lock is one interval. The Plan-today wizard composes ① and ② and is
+// deliberately AFTER them.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── ① COVERAGE DISTRIBUTION STRIP ──────────────────────────────────────────
+// Two rows (Exit / Counter), 6a–12a. 🟥 short (−n) · 🟨 met exactly · 🟩 spare.
+// The spec's rule: it re-renders from current state, so every lunch, flip and
+// fill visibly recolors the day the moment it lands. It is wired into
+// buildCoverageTimeline, which every mutation already calls.
+function covStripHtml(){
+  var exp; try{ exp=buildExpectedToday(); }catch(e){ return ''; }
+  if(!Object.keys(exp).length) return '';
+  var dow=new Date().getDay(), nowH=new Date().getHours();
+  var rows=[['exit','Exit'],['counter','Ctr']];
+  var h='<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:9px;padding:8px 10px;margin-bottom:10px">'
+   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+   +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3)">Coverage distribution · today</span>'
+   +'<span style="font-size:9.5px;color:var(--txt3)">🟥 short · 🟨 exact · 🟩 spare</span></div>';
+  rows.forEach(function(r){
+    h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
+     +'<span style="font-size:9.5px;font-weight:700;color:var(--txt3);width:26px;flex-shrink:0">'+r[1]+'</span>'
+     +'<div style="display:flex;gap:2px;flex:1">';
+    for(var hr=6; hr<24; hr++){
+      var closed=false;
+      try{ var cr=COVERAGE_BY_HOUR(hr,dow,0); closed=!!(cr&&cr.closed); }catch(e){}
+      var need={},have={};
+      try{ need=gfNeedsAt(hr,dow)||{}; have=gfCountsAt(exp,hr+0.01)||{}; }catch(e){}
+      var nd=need[r[0]]||0, hv=have[r[0]]||0, diff=hv-nd;
+      var bg, txt='';
+      if(closed || nd===0){ bg='var(--bg3)'; }
+      else if(diff<0){ bg='rgba(255,69,58,.55)'; txt=String(diff); }
+      else if(diff===0){ bg='rgba(255,204,0,.5)'; }
+      else { bg='rgba(48,209,88,.4)'; }
+      h+='<div title="'+r[1]+' '+(hr%24)+':00 — have '+hv+' need '+nd+'" '
+       +'style="flex:1;height:16px;border-radius:3px;background:'+bg+';'
+       +(hr===nowH?'outline:1.5px solid var(--red);outline-offset:1px;':'')
+       +'display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff">'+txt+'</div>';
+    }
+    h+='</div></div>';
+  });
+  h+='<div style="display:flex;gap:2px;margin-left:32px">';
+  for(var hr2=6;hr2<24;hr2++){
+    h+='<div style="flex:1;text-align:center;font-size:7.5px;color:var(--txt3)">'
+     +(hr2%3===0?((hr2%12===0?12:hr2%12)+(hr2>=12?'p':'a')):'')+'</div>';
+  }
+  h+='</div></div>';
+  return h;
+}
+function renderCovStrip(){
+  var el=document.getElementById('cov-strip');
+  if(el) el.innerHTML=covStripHtml();
+}
+
+// ── ② GUIDED FIX ───────────────────────────────────────────────────────────
+// The loop from SCHEDULE_IA turn 3: detect → rank → guard → apply → RE-DETECT
+// (a fix that opens a new hole re-enters the queue immediately). Every apply
+// goes through coApplyFill — the same primitive the one-tap fixes use — and is
+// recorded so Undo-all can put the world back.
+var _gfx={queue:[], idx:0, applied:[], snapshot:null};
+function gfxGaps(){
+  var exp; try{ exp=buildExpectedToday(); }catch(e){ return []; }
+  var nowH=new Date().getHours()+new Date().getMinutes()/60;
+  var gaps=[]; try{ gaps=gfDetectGaps(exp, Math.floor(nowH))||[]; }catch(e){}
+  // spec rank: primary touchpoints first → soonest → largest shortfall
+  var prim={returns:0, eb1:0, exit:1, counter:2};
+  return gaps.slice().sort(function(a,b){
+    var pa=(prim[a.area]!=null?prim[a.area]:3), pb=(prim[b.area]!=null?prim[b.area]:3);
+    if(pa!==pb) return pa-pb;
+    if(a.hour!==b.hour) return a.hour-b.hour;
+    return (b.short||1)-(a.short||1);
+  });
+}
+function gfxStart(){
+  _gfx={queue:gfxGaps(), idx:0, applied:[],
+        snapshot:{staffStation:JSON.stringify(STATE.staffStation||{}),
+                  altSchedule:JSON.stringify(STATE.altSchedule||{}),
+                  mgmtBlocks:JSON.stringify(STATE.mgmtBlocks||{})}};
+  if(!_gfx.queue.length){ if(typeof toast==='function') toast('✓ No coverage gaps from this hour on'); return; }
+  gfxRender();
+}
+function _gfxFmtH(h){ var d=h%24, x=d>12?d-12:(d===0?12:d); return x+(d>=12?'p':'a'); }
+function gfxRender(){
+  var q=_gfx.queue, i=_gfx.idx;
+  if(i>=q.length){ return gfxSummary(); }
+  var g=q[i];
+  var exp; try{ exp=buildExpectedToday(); }catch(e){ exp={}; }
+  var cands=[]; try{ cands=gfRankCandidates(g, exp)||[]; }catch(e){}
+  var free=cands.filter(function(c){ return c.tier!=='protected'; });
+  var top=free[0];
+  var lbl={exit:'🟩 Exit', counter:'🟦 Counter', returns:'↩ Returns', eb1:'🌟 EB1', emerald:'🌟 Emerald'}[g.area]||g.area;
+  var b='<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">Gap '+(i+1)+' of '+q.length
+   +' · '+_gfx.applied.length+' fixed so far</div>'
+   +'<div style="padding:12px;border-radius:10px;background:rgba(255,69,58,.10);border:1px solid rgba(255,69,58,.4);margin-bottom:12px">'
+   +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--red)">Short at '+lbl+'</div>'
+   +'<div style="font-size:17px;font-weight:800;color:var(--txt);margin-top:3px">'
+   +_gfxFmtH(g.hour)+' — need '+(g.need||'?')+', have '+(g.have!=null?g.have:'?')+'</div></div>';
+  if(top){
+    b+='<button onclick="gfxApply()" style="width:100%;padding:14px;border-radius:10px;border:none;'
+     +'background:var(--accent);color:#04160e;font-size:14.5px;font-weight:800;cursor:pointer;margin-bottom:8px">'
+     +'Send '+top.nick+' → '+lbl.replace(/^[^ ]+ /,'')+'</button>'
+     +'<div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">'
+     +(top.why||('Next in the fill order ('+(top.tier==='free'?'free':'flexible')+')'))+'</div>';
+  } else {
+    b+='<div style="padding:10px;border-radius:8px;background:var(--bg3);font-size:12.5px;color:var(--txt2);margin-bottom:10px">'
+     +'Nobody free or flexible — everyone else is holding a station at its minimum. '
+     +'A true shortage: leave it open or make a call the app shouldn’t make for you.</div>';
+  }
+  if(free.length>1){
+    b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin-bottom:5px">Or pick someone else</div>'
+     +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'
+     +free.slice(1,4).map(function(c,j){
+        return '<button onclick="gfxApply('+(j+1)+')" style="padding:7px 11px;border-radius:8px;'
+         +'border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">'
+         +c.nick+'</button>'; }).join('')+'</div>';
+  }
+  var locked=cands.filter(function(c){ return c.tier==='protected'; });
+  if(locked.length){
+    b+='<div style="font-size:10.5px;color:var(--txt3);margin-bottom:10px">🔒 '
+     +locked.slice(0,4).map(function(c){return c.nick;}).join(', ')
+     +(locked.length>4?' +'+(locked.length-4):'')+' — protected (holding a primary or a minimum), never auto-suggested</div>';
+  }
+  b+='<div style="display:flex;gap:8px">'
+   +'<button class="btn btn-gh" style="flex:1" onclick="gfxSkip()">Skip · leave open</button>'
+   +'<button class="btn btn-gh" onclick="gfxEnd()">Exit</button></div>';
+  openModal('▶ Guided fix', b);
+}
+function gfxApply(altIdx){
+  var g=_gfx.queue[_gfx.idx]; if(!g) return gfxSummary();
+  var exp; try{ exp=buildExpectedToday(); }catch(e){ exp={}; }
+  var free=(gfRankCandidates(g,exp)||[]).filter(function(c){ return c.tier!=='protected'; });
+  var pick=free[altIdx||0]; if(!pick) return gfxSkip();
+  try{ coApplyFill(g.area, g.hour, pick.pid); }catch(e){}
+  _gfx.applied.push({pid:pick.pid, nick:pick.nick, area:g.area, hour:g.hour});
+  if(typeof rotInvalidate==='function') rotInvalidate();
+  try{ buildCoverageTimeline(); renderCovStrip(); }catch(e){}
+  // THE RE-DETECT: rebuild the remaining queue from live state — a fix that
+  // opened a new hole enqueues it; a fix that closed two skips the second.
+  var done=_gfx.applied.length;
+  _gfx.queue=_gfx.queue.slice(0,_gfx.idx).concat(gfxGaps());
+  _gfx.idx=Math.min(_gfx.idx, _gfx.queue.length);
+  if(typeof toast==='function') toast('✓ '+pick.nick+' → '+g.area+' · '+done+' fixed');
+  gfxRender();
+}
+function gfxSkip(){ _gfx.idx++; gfxRender(); }
+function gfxEnd(){ closeModal(); }
+function gfxUndoAll(){
+  var s=_gfx.snapshot; if(!s) return;
+  try{
+    STATE.staffStation=JSON.parse(s.staffStation);
+    STATE.altSchedule=JSON.parse(s.altSchedule);
+    STATE.mgmtBlocks=JSON.parse(s.mgmtBlocks);
+    if(typeof rotInvalidate==='function') rotInvalidate();
+    if(typeof saveState==='function') saveState();
+    buildCoverageTimeline(); renderCovStrip();
+    if(typeof renderNow==='function') renderNow();
+  }catch(e){}
+  _gfx.applied=[];
+  closeModal();
+  if(typeof toast==='function') toast('↩ All guided-fix moves undone');
+}
+function gfxSummary(){
+  var n=_gfx.applied.length;
+  var left=gfxGaps().length;
+  var b='<div style="font-size:15px;font-weight:800;color:var(--txt);margin-bottom:8px">'
+   +(n? n+' gap'+(n===1?'':'s')+' fixed' : 'Nothing changed')+'</div>';
+  if(_gfx.applied.length){
+    b+='<div style="margin-bottom:10px">'+_gfx.applied.map(function(a){
+      return '<div style="font-size:12.5px;color:var(--txt2);padding:3px 0">✓ '+a.nick+' → '+a.area+' at '+_gfxFmtH(a.hour)+'</div>';
+    }).join('')+'</div>';
+  }
+  b+='<div style="font-size:12px;color:'+(left?'var(--amber)':'var(--accent)')+';margin-bottom:12px">'
+   +(left? left+' gap'+(left===1?'':'s')+' still open — skipped or unfillable.' : '✓ No gaps left from this hour on.')+'</div>'
+   +'<div style="display:flex;gap:8px">'
+   +'<button onclick="closeModal()" style="flex:1;padding:12px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer">Done</button>'
+   +(n?'<button class="btn btn-gh" onclick="gfxUndoAll()">↩ Undo all</button>':'')
+   +'</div>';
+  openModal('▶ Guided fix — summary', b);
+}
+
+// ── ④ IDLE RE-LOCK ─────────────────────────────────────────────────────────
+// The spec: "manager panels blur-lock after 5 min, tap to re-PIN." The lock
+// half is what matters operationally — an unlocked admin panel on an unattended
+// counter iPad is the risk. Reuses the _lastActivity timestamp the sync poller
+// already maintains from every click/keydown/touch.
+setInterval(function(){
+  try{
+    if(typeof _adminUnlocked!=='undefined' && _adminUnlocked &&
+       typeof _lastActivity!=='undefined' && (Date.now()-_lastActivity) > 5*60*1000){
+      _adminUnlocked=false;
+      if(typeof toast==='function') toast('🔒 Admin re-locked after 5 min idle');
+    }
+  }catch(e){}
+}, 30000);
 
 function openPrintables(){
   var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
