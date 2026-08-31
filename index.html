@@ -20585,6 +20585,97 @@ function openThresholdQuiz() {
 }
 function setFtDaytype(dt){ window._ftDaytype = (dt==='weekend'?'weekend':'weekday'); ftRenderModal(); }
 function setFtMode(m){ window._ftMode = (m==='mgr'?'mgr':'staff'); ftRenderModal(); }
+// ── v60.180 · WHAT THE BRANCH ACTUALLY RUNS ────────────────────────────────
+// The manager minimums have never been confirmed by anyone — they are the app's
+// DEFAULTS. Checking them against the REAL September + May schedules shows they
+// are wrong in BOTH directions:
+//
+//   block            app assumed   actually run
+//   weekday amid          3             5        under by 2
+//   weekday mid           4             6        under by 2
+//   weekday night         3             2        over  by 1
+//   weekend open          3             2        over  by 1
+//   weekend pm            3             4        under by 1
+//
+// That matters because these numbers drive the manager-coverage flag: too low
+// midday keeps it quiet when the floor is genuinely thin, and too high at night
+// makes it cry wolf every evening — the exact failure the alert design set out
+// to avoid ("an alert system earns trust by what it REFUSES to colour").
+//
+// This measures the truth from schedules already in the app and shows it beside
+// the number being edited. It deliberately does NOT auto-fill: a headcount says
+// how many managers were on, never which station they stood at, so filling the
+// per-area boxes from it would be inventing detail we do not have.
+function _asStartOfStoredShift(v){
+  try{
+    if(Array.isArray(v)&&v.length===2) return v[0];
+    if(typeof v!=='string') return null;
+    if(/\b(OFF|VACA?|PTO|LOA|SICK|NCNS)\b/i.test(v)) return null;
+    var m=v.match(/^(\d{1,4})(?::(\d{2}))?\s*([ap])/i); if(!m) return null;
+    var n=parseInt(m[1],10), mn=parseInt(m[2]||0,10);
+    if(n>99){ mn=n%100; n=Math.floor(n/100); }
+    var h=n+mn/60, ap=m[3].toLowerCase();
+    if(ap==='p'&&n!==12) h+=12;
+    if(ap==='a'&&n===12) h-=12;
+    return h;
+  }catch(e){ return null; }
+}
+function mgrMeasuredHeadcount(dtype){
+  var BLOCKS=[['preopen',3.5,6],['open',6,9],['amid',9,12],['mid',12,16],['pm',16,20],['night',20,24]];
+  var mgrIds={};
+  try{ (ROSTER_MGMT||[]).forEach(function(p){ if(p&&p.name) mgrIds[p.name.replace(/\s/g,'_')]=1; }); }catch(e){}
+  var buckets={};
+  function feed(dk, day){
+    var d=new Date(dk+'T12:00:00'); if(isNaN(d)) return;
+    var dow=d.getDay(), dt=(dow===0||dow===6)?'weekend':'weekday';
+    if(dt!==dtype) return;
+    BLOCKS.forEach(function(bl){
+      var mid=bl[1]+(bl[2]-bl[1])/2, n=0;
+      Object.keys(day||{}).forEach(function(pid){
+        if(!mgrIds[pid]) return;
+        var st=_asStartOfStoredShift(day[pid]);
+        var en=(typeof _asEndOfStoredShift==='function')?_asEndOfStoredShift(day[pid]):null;
+        if(st==null||en==null) return;
+        if(en<st) en+=24;
+        if(st<=mid && en>mid) n++;
+      });
+      // A day with ZERO managers in a block is almost always missing data (an
+      // import that didn't cover that person), not a real unstaffed block.
+      // Counting it drags the median below anything the branch ever ran.
+      if(n>0) (buckets[bl[0]]=buckets[bl[0]]||[]).push(n);
+    });
+  }
+  // v60.180: NEWEST 28 DAYS ONLY. Pooling May with September looked like "more
+  // data" and was worse: May ran a 6-manager team, September runs 11, so the
+  // combined median described a branch that no longer exists. Recency beats
+  // sample size when the thing being measured has changed.
+  var all=[];
+  try{ Object.keys(SEPT_SCHEDULE||{}).forEach(function(dk){ all.push([dk, SEPT_SCHEDULE[dk]]); }); }catch(e){}
+  try{ Object.keys(MAY_SCHEDULE||{}).forEach(function(dk){ all.push([dk, MAY_SCHEDULE[dk]]); }); }catch(e){}
+  try{
+    var stored=(typeof getStoredSection==='function')?getStoredSection('mgmt'):null;
+    if(stored&&stored.grid) Object.keys(stored.grid).forEach(function(dk){ all.push([dk, stored.grid[dk]]); });
+  }catch(e){}
+  all.sort(function(a,b){ return String(b[0]).localeCompare(String(a[0])); });   // newest first
+  all.slice(0,28).forEach(function(r){ feed(r[0], r[1]); });
+  var out={};
+  Object.keys(buckets).forEach(function(k){
+    var a=buckets[k].slice().sort(function(x,y){return x-y;});
+    out[k]={median:a[Math.floor(a.length/2)], min:a[0], max:a[a.length-1], days:a.length};
+  });
+  return out;
+}
+function mgrMeasuredHint(dt, bk, want){
+  var m=mgrMeasuredHeadcount(dt)[bk];
+  if(!m || !m.days) return '';
+  var diff=m.median-want;
+  var tone = Math.abs(diff)>=2 ? 'var(--amber)' : 'var(--txt3)';
+  return '<div style="font-size:10.5px;color:'+tone+';margin-top:4px;line-height:1.45">'
+    +'On your real schedules you run about <b>'+m.median+'</b> here ('+m.min+'–'+m.max+' across '+m.days+' days)'
+    + (diff===0 ? ' — matches.' : (diff>0 ? ' — <b>'+diff+' more</b> than set below.' : ' — <b>'+(-diff)+' fewer</b> than set below.'))
+    +'</div>';
+}
+
 function ftRenderModal(){
   // v60.151: the .ft-* styles live in the shared qa stylesheet, which is injected
   // lazily by the call-off / staffing overlays — this modal can open first.
@@ -20628,6 +20719,7 @@ function ftRenderModal(){
       ${modeSeg}${daySeg}
       ${blockPick}
       <div class="ft-blockhd">${(FLOOR_BLOCK_LABELS[curBk]||curBk)} · <b>${tot}</b> manager${tot===1?'':'s'} on station</div>
+      ${(typeof mgrMeasuredHint==='function')?mgrMeasuredHint(dt,curBk,tot):''}
       ${MGR_AREAS.map(stepper).join('')}
       <button class="ft-copy" onclick="copyMgrBlockToAll('${dt}','${curBk}')">⇊ Use these numbers for every block</button>
       <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">Min managers per station, per block. Managers <b>never default to Counter</b> — Emerald first, then Returns; they fill Exit/Returns or help Emerald; Counter is last-case (usually MT/ABRM). <b>Starting numbers were guesstimated from the rotation</b> — adjust to your branch.</div>
