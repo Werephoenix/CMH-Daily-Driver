@@ -6712,7 +6712,19 @@ function buildSmartRotation() {
   // Build rotation blocks for each CXR
   const rotations = workingCXRs.map(cxr => {
     const { shift, startStation, pid } = cxr;
-    const altPos     = (STATE.altSchedule || {})[pid] || 'normal';
+    let   altPos     = (STATE.altSchedule || {})[pid] || 'normal';
+    // ── v60.181 · AN ACCOMMODATION HAS TO COVER THE WHOLE SHIFT ──────────────
+    // The v60.142 guard set startStation='counter' and stopped there, but the
+    // DEFAULT rotation is counter → lunch → EXIT, and it never reads
+    // startStation for block 2. So an accommodated CXR was still planned for
+    // 4.5h at Exit after lunch: the accommodation delayed exit by half a shift
+    // instead of preventing it. Verified by reproduction, not by reading.
+    //
+    // Forcing full-counter here catches EVERY pattern in one place — 'normal',
+    // 'exit-first' and 'full-exit' all collapse to counter — rather than
+    // patching each of the four return blocks below and missing the fifth when
+    // someone adds one.
+    if (typeof exitAccommodated === 'function' && exitAccommodated(pid)) altPos = 'full-counter';
     const custSplit  = (STATE.customSplits || {})[pid];
     const noLunch    = (STATE.altSchedule || {})[pid + '_nolunch'] === true;
     const totalWork  = (shift.end - shift.start) - (noLunch ? 0 : ROTATION.lunchHours);
@@ -7995,92 +8007,18 @@ function buildSwitchboard() {
 // inline cards, so the switchboard's name buttons (still wired to it) silently
 // did nothing. It is now the single canonical "open this person's card" entry.
 function tapPerson(pid) { return openPersonPanel(pid); }
-function _tapPersonLegacy(pid) {
-  if (_adjustPid === pid) { closeAdjustPanel(); return; }
-  _adjustPid = pid;
-
-  const allRoster = [...ROSTER_CXR, ...ROSTER_MGMT];
-  const person = allRoster.find(p => {
-    const epid = p.name.replace(/[^A-Za-z0-9]/g,'_').replace(/__+/g,'_');
-    const npid  = pid.replace(/__+/g,'_');
-    return epid === npid || p.name.replace(/\s/g,'_') === pid;
-  });
-  if (!person) return;
-
-  const nick     = person.nick || person.name.split(' ')[0];
-  const shiftMod = (STATE.shiftMod||{})[pid];
-  const shift    = shiftMod ? shiftMod.display : (person.shiftCode || '—');
-  const station  = STATE.staffStation[pid] || '';
-  const altPos   = (STATE.altSchedule||{})[pid] || 'normal';
-  const isCallout= (STATE.todayOverrides||{})[pid] === 'callout';
-  const isCXR    = person.role === 'CXR';
-  const isExit   = person.role === 'EXIT';
-  const isMgmt   = ['ARM','BRM','ABRM','MT'].includes(person.role);
-  const pref     = (STATE.stationPref||{})[pid] || 'none';
-
-  setEl('adjust-name', nick);
-  setEl('adjust-shift', shift);
-
-  let actions = '';
-
-  // ── Callout toggle ──────────────────────────────────────────────────────
-  actions += btn(isCallout?'↩ Unmark Callout':'❌ Mark Called Off',
-    `toggleCallout('${pid}');buildSwitchboard()`, isCallout?'red':'');
-
-  if (!isCallout) {
-    // ── Station (CXR only) ────────────────────────────────────────────────
-    if (isCXR) {
-      actions += btn('🟦 Counter',    `setStation('${pid}','Counter');buildSwitchboard()`,    station==='Counter'?'blue':'');
-      actions += btn('🟩 Exit Booth', `setStation('${pid}','Exit Booth');buildSwitchboard()`, station==='Exit Booth'?'green':'');
-    }
-    // ── Management station ────────────────────────────────────────────────
-    if (isMgmt) {
-      ['Counter Manager','Emerald Booth Manager','Returns Manager','Floater','Off Site'].forEach(s => {
-        actions += btn(s, `setStation('${pid}','${s}');buildSwitchboard()`, station===s?'blue':'');
-      });
-    }
-    // ── Rotation (CXR only) ──────────────────────────────────────────────
-    if (isCXR) {
-      const altOpts = [['Normal','normal'],['Full Counter','full-counter'],
-                       ['Full Exit','full-exit'],['Ctr+30','counter-first'],['Exit+30','exit-first']];
-      altOpts.forEach(([lbl,key]) => {
-        actions += btn(lbl, `setAltPosition('${pid}','${key}');buildSwitchboard()`, altPos===key?'amber':'');
-      });
-    }
-    // ── Time mod ─────────────────────────────────────────────────────────
-    if (!isMgmt) {
-      [['Normal Time',0],['Late +30',1],['Late +1hr',2],['Late +2hr',3],
-       ['Early Out −30',4],['Early Out −1hr',5],['Early In −30',6],['Early In −1hr',7]
-      ].forEach(([lbl,idx]) => {
-        const isActive = idx===0 ? !shiftMod : shiftMod&&shiftMod.display===lbl;
-        actions += btn('⏰ '+lbl, `applyShiftMod('${pid}',${idx});buildSwitchboard()`, isActive?'amber':'');
-      });
-    }
-    // ── Preference ───────────────────────────────────────────────────────
-    if (isCXR) {
-      actions += btn(`☐ Pref: ${pref==='counter'?'🟦 Counter':pref==='exit'?'🟩 Exit':'None'}`,
-        `cycleStationPref('${pid}','${nick}');buildSwitchboard()`, pref!=='none'?'amber':'');
-    }
-  }
-
-  const actEl = document.getElementById('adjust-actions');
-  if (actEl) actEl.innerHTML = actions;
-  const panel = document.getElementById('adjust-panel');
-  if (panel) panel.style.display = 'block';
-  buildSwitchboard(); // re-render to show active state on row
-}
-
 function btn(label, onclick, color) {
   const cls = color ? ' adj-'+color : '';
   return `<button class="adj-btn${cls}" onclick="${onclick}">${label}</button>`;
 }
-
-function closeAdjustPanel() {
-  _adjustPid = null;
-  const panel = document.getElementById('adjust-panel');
-  if (panel) panel.style.display = 'none';
-  buildSwitchboard();
-}
+// v60.181 CLEANUP: _tapPersonLegacy, closeAdjustPanel and toggleCallout were
+// removed here. All three drove the old slide-up "adjust panel", whose element
+// (id="adjust-panel") no longer exists in the document at all — it was replaced
+// by the inline person card. _tapPersonLegacy was already unreachable (v60.173
+// made tapPerson delegate straight to openPersonPanel), and it held the ONLY
+// call sites for the other two. toggleCallout was also the last of the untyped
+// binary call-off writers; every surface now records an explicit absence type
+// via setAbsence(), so a person who phoned in can never read as a no-show.
 
 function resetSchedDay() {
   STATE.staffDuty = {}; STATE.staffStation = {};
@@ -8247,30 +8185,6 @@ function sbQuickAbsence(pid){
   else   { if(typeof setAbsence==='function')  setAbsence(pid,'calledoff'); }
   if(typeof buildSwitchboard==='function') buildSwitchboard();
 }
-
-function toggleCallout(pid) {
-  if (!STATE.todayOverrides) STATE.todayOverrides = {};
-  const wasCallout = STATE.todayOverrides[pid] === 'callout';
-
-  if (wasCallout) {
-    delete STATE.todayOverrides[pid];
-    STATE.staffDuty[pid] = true;
-  } else {
-    STATE.todayOverrides[pid] = 'callout';
-    STATE.staffDuty[pid] = false;
-  }
-  saveState();
-  buildMorningBriefing();
-  buildCoverageUI();
-
-  if (!wasCallout) {
-    // Show coverage suggestion after a callout
-    showCalloutSuggestion(pid);
-  } else {
-    toast('Callout removed');
-  }
-}
-
 // Reinstate a person who was previously marked called off.
 // Used by the called-off banner at the top of the coverage timeline,
 // where a one-tap pill restores anyone marked callout — important
@@ -8782,6 +8696,14 @@ function clearExitAccommodation(pid){
 // Stored in STATE.mgmtBlocks[pid] = [...]. When non-empty, the timeline
 // renders these blocks INSTEAD of the single staffStation.
 
+// v60.181 CLEANUP: addMgmtBlockPrompt() and submitMgmtBlock() removed. They were
+// the old one-block-at-a-time editor that asked for DECIMAL HOURS ("8.5 = 8:30am").
+// The v60.176 segment editor writes the same STATE.mgmtBlocks using real clock
+// times with the whole shift on one screen, and both card buttons now open it —
+// so this was a second, strictly worse way to edit one piece of data.
+// addMgmtBlock()/removeMgmtBlock() below are the STORE and are still very much in
+// use (the segment editor and the drag handles both go through them).
+
 // Add a new time block for a manager. Validates from < to and clips overlap
 // with existing blocks (later block trims earlier ones at the boundary,
 // matching how managers usually re-assign in real time).
@@ -8835,93 +8757,6 @@ function removeMgmtBlock(pid, idx) {
   if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
   refreshOpenPersonUI(pid); // v60.39: don't force the old panel open
 }
-
-// Modal-based block editor. Triggered by "+ Add Block" button on manager
-// person panel. Pre-fills from/to with current shift bounds and Counter
-// Manager as default station.
-function addMgmtBlockPrompt(pid) {
-  const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
-  const entry = exp[pid]; if (!entry) return;
-  const p = entry.person;
-  const mods = STATE.shiftMod||{}, ov = mods[pid]||{};
-  const ss = ov.start!=null ? ov.start : p.shiftStart;
-  const se = ov.end!=null   ? ov.end   : p.shiftEnd;
-  const isMgmt = ['ARM','BRM','ABRM','MT'].includes(p.role);
-  // Station options are role-aware. Managers get the full list (they
-  // bounce between Emerald, Counter, Exit, Returns, Floater, Shuttle).
-  // CXRs get a smaller list (Counter, Exit, Returns, Shuttle) since they
-  // don't typically work the Emerald booth or float positions.
-  // v58: added Lunch / Break / Training to CXR options so managers can
-  // explicitly mark a lunch slot (or short break, or training session)
-  // as part of the manual block override. The timeline renderer's
-  // getZone() recognizes these station names and shows them with the
-  // right zone color.
-  const stations = isMgmt
-    ? ['Emerald Booth','Counter Manager','Exit Booth','Returns','Floater','Shuttling','Lunch','Break','Training']
-    : ['Counter','Exit Booth','Returns','Lunch','Break','Shuttling','Training'];
-  const stIcons = {'Emerald Booth':'🌟','Counter Manager':'🟦','Counter':'🟦','Exit Booth':'🟩','Returns':'↩','Floater':'🚗','Shuttling':'🚌','Lunch':'🍽️','Break':'☕','Training':'📚'};
-
-  const html = `
-    <div style="display:grid;gap:10px">
-      <div style="font-size:11px;color:var(--txt3)">
-        Add a station block for <b>${(typeof dispName==='function')?dispName(p):(p.nick||p.name)}</b>'s shift.
-        Times in 24-hour format (e.g. 8.5 = 8:30am, 14 = 2pm, 22 = 10pm).
-        Overlapping existing blocks will be auto-trimmed.
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <label style="font-size:11px;color:var(--txt2)">From
-          <input type="number" id="mgb-from" step="0.5" min="0" max="26" value="${ss!=null?ss:8}"
-            style="width:100%;padding:6px 8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);margin-top:4px"/>
-        </label>
-        <label style="font-size:11px;color:var(--txt2)">To
-          <input type="number" id="mgb-to" step="0.5" min="0" max="26" value="${se!=null?se:16}"
-            style="width:100%;padding:6px 8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);margin-top:4px"/>
-        </label>
-      </div>
-      <label style="font-size:11px;color:var(--txt2)">Station
-        <select id="mgb-station"
-          style="width:100%;padding:7px 8px;font-size:13px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);margin-top:4px">
-          ${stations.map(s=>`<option value="${s}">${stIcons[s]||''} ${s}</option>`).join('')}
-        </select>
-      </label>
-      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:6px">
-        <button onclick="closeModal()"
-          style="padding:7px 14px;border-radius:5px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:11px;cursor:pointer">
-          Cancel
-        </button>
-        <button onclick="submitMgmtBlock('${pid}')"
-          style="padding:7px 14px;border-radius:5px;border:1px solid var(--green);background:rgba(22,163,74,.12);color:var(--green);font-size:11px;font-weight:700;cursor:pointer">
-          Add Block
-        </button>
-      </div>
-    </div>`;
-  if (typeof openModal === 'function') openModal('+ Add Time Block', html);
-}
-
-// Submit handler for the addMgmtBlockPrompt modal.
-function submitMgmtBlock(pid) {
-  const fromEl = document.getElementById('mgb-from');
-  const toEl   = document.getElementById('mgb-to');
-  const stEl   = document.getElementById('mgb-station');
-  if (!fromEl || !toEl || !stEl) return;
-  const from = parseFloat(fromEl.value);
-  const to   = parseFloat(toEl.value);
-  const st   = stEl.value;
-  if (isNaN(from) || isNaN(to) || from >= to) {
-    if (typeof toast === 'function') toast('From must be before To');
-    return;
-  }
-  const r = addMgmtBlock(pid, from, to, st);
-  if (!r.ok) {
-    if (typeof toast === 'function') toast(r.error || 'Could not add block');
-    return;
-  }
-  if (typeof closeModal === 'function') closeModal();
-  if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
-  refreshOpenPersonUI(pid); // v60.39: don't force the old panel open
-  if (typeof toast === 'function') toast(`Added: ${st}`);
-}
-
 // ───────────────────────────────────────────────────────────────────────
 //  Manager block — TAP TO EDIT + DRAG TO RESIZE
 // ───────────────────────────────────────────────────────────────────────
@@ -11794,7 +11629,7 @@ var FEATURE_AUDIT = [
   {cat:'👥 Schedule', feature:'Auto-detect Closing Manager', excel:'SCHEDULE_ENGINE -C shift detection', app:'✅ Built — closeMgr detection in updateSchedHelper()'},
   {cat:'👥 Schedule', feature:'EB Manager detection (≤6am opener)', excel:'SCHEDULE_ENGINE H col start#', app:'✅ Built — startH ≤ 6.5 logic in updateSchedHelper()'},
   {cat:'👥 Schedule', feature:'Morning briefing + confirm flow', excel:'Not in Excel (manual)', app:'✅ Built — Morning Briefing card with ✅ Confirm button'},
-  {cat:'👥 Schedule', feature:'Callout toggle per person', excel:'Not in Excel', app:'✅ Built — toggleCallout() with immediate coverage recalc'},
+  {cat:'👥 Schedule', feature:'Callout toggle per person', excel:'Not in Excel', app:'✅ Built — typed absences (called off / no show / PTO / vacation) with immediate coverage recalc'},
   {cat:'👥 Schedule', feature:'CXR 4-hour rotation blocks', excel:'Not in Excel (manual whiteboard)', app:'✅ Built — buildSmartRotation(), auto Block1→Block2 flip'},
   {cat:'👥 Schedule', feature:'One-tap Counter/Exit assignment', excel:'Not in Excel', app:'✅ Built — tapStation() buttons on CXR cards'},
   {cat:'👥 Schedule', feature:'±30min bump suggestions', excel:'Not in Excel', app:'✅ Built — gap suggestions shown, manager decides'},
@@ -18800,40 +18635,70 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
     </div>`;
   }
 
-  // v60.143: ROTATION as the quick top toggle on a CXR card (Matt: should be one of
-  // the quickest/easiest buttons). Big 1-tap targets, at the very top.
-  if(person.role==='CXR'){
-    h+=`<div style="margin-bottom:12px">
-      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:5px">🔄 Rotation — tap to set</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">`;
-    [['normal','Ctr → Exit','var(--acc)'],['exit-first','Exit → Ctr','var(--green)'],['full-counter','All Counter','var(--acc)'],['full-exit','All Exit','var(--green)']].forEach(([key,lbl,col])=>{
-      const on=altPos===key;
-      h+=`<button onclick="setAltPosition('${pid}','${key}');openPersonPanel('${pid}')"
-        style="padding:12px 6px;border-radius:9px;border:1.5px solid;font-size:13.5px;font-weight:800;cursor:pointer;
-          background:${on?col+'22':'var(--bg3)'};border-color:${on?col:'var(--bdr2)'};color:${on?col:'var(--txt2)'}">${lbl}</button>`;
-    });
-    h+=`</div></div>`;
-  }
-
-  // v60.176: custom times for each leg of the rotation. Sits directly under the
-  // presets because it is the same question — "where are they, when" — just
-  // without the assumption that lunch splits the shift in half.
+  // ═══════════════════════════════════════════════════════════════════════
+  // v60.181 · ONE QUESTION, ONE ANSWER: "where do they work today?"
+  //
+  // The card used to show the rotation presets AND the custom-times button as
+  // if they were peers. They are not: getZone() gives custom time blocks
+  // ABSOLUTE priority over the rotation. So a manager could tap "All Counter",
+  // watch the button light up as selected, and the floor would still show Exit
+  // — a control that LOOKS applied and silently does nothing. Reproduced before
+  // changing anything.
+  //
+  // Now the card shows whichever one is actually in charge, and offers the
+  // other as an explicit switch. You can never be looking at two answers.
+  // ═══════════════════════════════════════════════════════════════════════
   {
-    const _cb = ((STATE.mgmtBlocks||{})[pid]||[]);
-    const _on = _cb.length>0;
-    h+=`<button onclick="openRotationEditor('${pid}')"
-      style="width:100%;margin-bottom:12px;padding:10px;border-radius:8px;
-        border:1.5px solid ${_on?'var(--accent)':'var(--bdr2)'};
-        background:${_on?'rgba(35,201,131,.10)':'var(--bg3)'};
-        color:${_on?'var(--accent)':'var(--txt2)'};font-size:12.5px;font-weight:700;
-        cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px">
-      <span>⏱</span>
-      <span style="flex:1">${_on
-        ? ('Custom times · '+_cb.length+' segment'+(_cb.length===1?'':'s')+' — '+
-           _cb.map(b=>rotFmtClock(b.from)+'–'+rotFmtClock(b.to)).join(', '))
-        : 'Set custom times for each leg…'}</span>
-      <span style="opacity:.6">Edit</span>
-    </button>`;
+    const _cb = ((STATE.mgmtBlocks||{})[pid]||[]).slice().sort((a,b)=>a.from-b.from);
+    const _custom = _cb.length>0;
+    const _canRotate = person.role==='CXR';
+
+    h+=`<div style="margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+        color:var(--txt3);margin-bottom:5px">📍 Where they work today</div>`;
+
+    if(_custom){
+      // Custom times are in charge — show the actual plan, not a set of buttons
+      // that wouldn't do anything.
+      h+=`<div style="border:1.5px solid var(--accent);background:rgba(35,201,131,.08);
+        border-radius:9px;padding:9px 10px;margin-bottom:6px">
+        <div style="font-size:10px;font-weight:800;color:var(--accent);margin-bottom:5px">
+          ⏱ CUSTOM TIMES — these are what the floor shows</div>
+        ${_cb.map(b=>`<div style="display:flex;gap:8px;font-size:12.5px;color:var(--txt2);padding:1px 0">
+            <span style="font-family:var(--ff-mono);color:var(--txt3);min-width:96px">${rotFmtClock(b.from)}–${rotFmtClock(b.to)}</span>
+            <span style="font-weight:700;color:var(--txt)">${b.station}</span></div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <button onclick="openRotationEditor('${pid}')"
+          style="padding:11px 6px;border-radius:8px;border:1.5px solid var(--accent);
+            background:rgba(35,201,131,.10);color:var(--accent);font-size:12.5px;font-weight:800;cursor:pointer">
+          ⏱ Edit times</button>
+        <button onclick="rotClearFor('${pid}')"
+          style="padding:11px 6px;border-radius:8px;border:1.5px solid var(--bdr2);
+            background:var(--bg3);color:var(--txt2);font-size:12.5px;font-weight:700;cursor:pointer">
+          ↩ ${_canRotate?'Simple rotation':'Clear'}</button>
+      </div>`;
+    } else if(_canRotate){
+      h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">`;
+      [['normal','Ctr → Exit','var(--acc)'],['exit-first','Exit → Ctr','var(--green)'],
+       ['full-counter','All Counter','var(--acc)'],['full-exit','All Exit','var(--green)']].forEach(([key,lbl,col])=>{
+        const on=altPos===key;
+        h+=`<button onclick="setAltPosition('${pid}','${key}');openPersonPanel('${pid}')"
+          style="padding:12px 6px;border-radius:9px;border:1.5px solid;font-size:13.5px;font-weight:800;cursor:pointer;
+            background:${on?col+'22':'var(--bg3)'};border-color:${on?col:'var(--bdr2)'};color:${on?col:'var(--txt2)'}">${lbl}</button>`;
+      });
+      h+=`</div>
+      <button onclick="openRotationEditor('${pid}')"
+        style="width:100%;margin-top:6px;padding:9px;border-radius:8px;border:1px dashed var(--bdr2);
+          background:var(--bg3);color:var(--txt3);font-size:12px;font-weight:700;cursor:pointer;text-align:left">
+        ⏱ …or set exact times for each leg</button>`;
+    } else {
+      h+=`<button onclick="openRotationEditor('${pid}')"
+        style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bdr2);
+          background:var(--bg3);color:var(--txt2);font-size:12.5px;font-weight:700;cursor:pointer;text-align:left">
+        ⏱ Set times for each part of the shift…</button>`;
+    }
+    h+=`</div>`;
   }
 
   if(!isExit){
@@ -18847,14 +18712,22 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
       // instead of the single staffStation across whole shift. This is the
       // mechanism behind manager flexibility and exit-coverage credit.
       const mblocks = (STATE.mgmtBlocks||{})[pid]||[];
-      h+=`<div style="margin-bottom:10px;padding:8px;border:1px solid var(--bdr2);border-radius:6px;background:var(--bg3)">
+      // v60.181: only render this panel when blocks EXIST. With none set it was
+      // an empty box restating what the section above already offers — noise on
+      // a card Matt asked to streamline.
+      if (mblocks.length) h+=`<div style="margin-bottom:10px;padding:8px;border:1px solid var(--bdr2);border-radius:6px;background:var(--bg3)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">
             ✨ Time Blocks ${mblocks.length?`(${mblocks.length})`:''}
           </div>
-          <button onclick="addMgmtBlockPrompt('${pid}')"
+          <!-- v60.181: was addMgmtBlockPrompt() — one modal per block, times typed
+               as DECIMAL HOURS ("8.5 = 8:30am"). The v60.176 segment editor edits
+               exactly the same STATE.mgmtBlocks with real clock times and the whole
+               shift on one screen, so pointing here removes the second, worse way
+               to edit one thing. -->
+          <button onclick="openRotationEditor('${pid}')"
             style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--acc);background:rgba(37,99,235,.1);color:var(--acc);font-weight:700;cursor:pointer">
-            + Add Block
+            ⏱ Edit times
           </button>
         </div>`;
       if (mblocks.length) {
@@ -18887,12 +18760,8 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
         h+=`<div style="font-size:9px;color:var(--txt3);font-style:italic;margin-top:4px">
           Blocks override the single station above. Exit Booth blocks count toward exit coverage.
         </div>`;
-      } else {
-        h+=`<div style="font-size:10px;color:var(--txt3);font-style:italic;padding:4px 0">
-          No blocks set — manager stays at single station all shift (above).
-        </div>`;
       }
-      h+=`</div>`;
+      if (mblocks.length) h+=`</div>`;
 
       // Single-station picker (default — used when no blocks set)
       // Managers get: Emerald Booth, Counter, Exit, Returns, Floater
@@ -18924,14 +18793,22 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
       // station options (Counter / Exit / Returns / Lunch / Break /
       // Training).
       const mblocks = (STATE.mgmtBlocks||{})[pid]||[];
-      h+=`<div style="margin-bottom:10px;padding:8px;border:1px solid var(--bdr2);border-radius:6px;background:var(--bg3)">
+      // v60.181: only render this panel when blocks EXIST. With none set it was
+      // an empty box restating what the section above already offers — noise on
+      // a card Matt asked to streamline.
+      if (mblocks.length) h+=`<div style="margin-bottom:10px;padding:8px;border:1px solid var(--bdr2);border-radius:6px;background:var(--bg3)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
           <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">
             ✨ Assignment Blocks ${mblocks.length?`(${mblocks.length})`:''}
           </div>
-          <button onclick="addMgmtBlockPrompt('${pid}')"
+          <!-- v60.181: was addMgmtBlockPrompt() — one modal per block, times typed
+               as DECIMAL HOURS ("8.5 = 8:30am"). The v60.176 segment editor edits
+               exactly the same STATE.mgmtBlocks with real clock times and the whole
+               shift on one screen, so pointing here removes the second, worse way
+               to edit one thing. -->
+          <button onclick="openRotationEditor('${pid}')"
             style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid var(--acc);background:rgba(37,99,235,.1);color:var(--acc);font-weight:700;cursor:pointer">
-            + Add Block
+            ⏱ Edit times
           </button>
         </div>`;
       if (mblocks.length) {
@@ -18962,12 +18839,8 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
         h+=`<div style="font-size:9px;color:var(--txt3);font-style:italic;margin-top:4px">
           Blocks override auto-rotation. Exit Booth blocks count toward exit coverage.
         </div>`;
-      } else {
-        h+=`<div style="font-size:10px;color:var(--txt3);font-style:italic;padding:4px 0">
-          No blocks set — auto-rotation applies (above buttons).
-        </div>`;
       }
-      h+=`</div>`;
+      if (mblocks.length) h+=`</div>`;
     }
     // Rotation moved to the top of the card (v60.143) — quick 1-tap toggle.
     // Split adjuster
@@ -24514,6 +24387,19 @@ var ROT_STATIONS_MGR = ['Emerald Booth','Counter Manager','Exit Booth','Returns'
 var ROT_ICON = {'Emerald Booth':'🌟','Counter Manager':'🟦','Counter':'🟦','Exit Booth':'🟩',
   'Returns':'↩','Floater':'🚗','Shuttling':'🚌','Lunch':'🍽️','Break':'☕','Training':'📚'};
 var _rotDraft = null, _rotPid = null;
+
+// v60.181: clear a person's custom time blocks straight from their card, so
+// "switch back to a simple rotation" is one tap and not a trip through the
+// editor. rotClear() does the same thing but assumes the editor is open.
+function rotClearFor(pid){
+  if(STATE.mgmtBlocks) delete STATE.mgmtBlocks[pid];
+  if(typeof saveState==='function') saveState();
+  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+  if(typeof buildSwitchboard==='function') buildSwitchboard();
+  if(typeof renderNow==='function'){ try{ renderNow(); }catch(e){} }
+  if(typeof toast==='function') toast('↩ Back to the rotation');
+  if(typeof openPersonPanel==='function') openPersonPanel(pid);
+}
 
 function openRotationEditor(pid){
   var exp=(typeof buildExpectedToday==='function')?buildExpectedToday():{};
