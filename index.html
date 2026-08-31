@@ -3720,11 +3720,49 @@ function floorBlockKey(h){ if(h<6) return 'preopen'; if(h<9) return 'open'; if(h
 // PRIMARY = Emerald FIRST (always covered), then Returns (≥1 usually); they fill Exit &
 // Returns first, or help at Emerald. Help priority Returns > Exit > Counter. Full
 // per-manager function detail is PENDING a list from the AM (STATE.mgrFunctionsNote).
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.188 · MANAGER STATIONS ARE DATA, NOT A CONSTANT
+//
+// Today's checklist (8/31) named posts this list did not have: EB1 and EB2 —
+// "EB1 would be the opener/closer… their help/backup is EB2" (Matt) — and it
+// treated Floater and Shuttler as separate jobs, which the app was collapsing
+// into one. Rather than me re-deriving the branch's taxonomy from a photo,
+// Matt's call: ASK IN THE SURVEY. So the list below is only the DEFAULT; the
+// branch's own answer wins, exactly like the car codes and the minimums.
+//
+// mgrAreas() is the resolver every consumer reads. The array underneath stays
+// as the seed so a branch that never answers still gets a sensible app.
+// ═══════════════════════════════════════════════════════════════════════════
+function mgrAreas(){
+  var cfg=(STATE && STATE.mgrStations);
+  if(Array.isArray(cfg) && cfg.length) return cfg;
+  return MGR_AREAS;
+}
+// Saved minimums are keyed by area. Splitting 'emerald' into eb1/eb2 would
+// silently orphan anything already entered, so carry the old key's value onto
+// EB1 (the primary post) the first time the new list is used.
+function mgrMigrateEmerald(){
+  try{
+    var t=STATE.mgrTargets; if(!t) return;
+    ['weekday','weekend'].forEach(function(dt){
+      if(!t[dt]) return;
+      Object.keys(t[dt]).forEach(function(bk){
+        var b=t[dt][bk]; if(!b) return;
+        if(b.emerald!=null && b.eb1==null){ b.eb1=b.emerald; }
+      });
+    });
+  }catch(e){}
+}
 var MGR_AREAS = [
-  {k:'emerald', label:'Emerald', color:'#AF9CFF'},  // primary — always covered
-  {k:'returns', label:'Returns', color:'#64D2FF'},  // primary — >=1 usually
+  {k:'eb1',     label:'EB1',     color:'#AF9CFF', primary:true,
+   note:'Emerald Booth 1 — the opener/closer. Always covered.'},
+  {k:'eb2',     label:'EB2',     color:'#C7B9FF',
+   note:'Emerald Booth 2 — EB1’s help/backup.'},
+  {k:'returns', label:'Returns', color:'#64D2FF', primary:true},  // >=1 usually
   {k:'exit',    label:'Exit',    color:'#23C983'},  // mgrs fill exit holes (MT/ABRM first)
   {k:'floater', label:'Floater', color:'#FFCC00'},
+  {k:'shuttle', label:'Shuttler', color:'#FF9F0A',
+   note:'Separate job from Floater (Matt, 2026-08-31).'},
   {k:'counter', label:'Counter', color:'#0A84FF'},  // LAST-CASE only (usually MT/ABRM)
   {k:'opening', label:'Opening', color:'#FF9F0A'},
   {k:'closing', label:'Closing', color:'#FF453A'},
@@ -17148,11 +17186,11 @@ function buildCoverageTimeline() {
 
   // ── v60.142: Manager-minimum coverage flag (this block: floor mgrs on-now vs mins) ──
   const mcEl=document.getElementById('mgr-coverage');
-  if(mcEl && typeof mgrTargetsFor==='function' && typeof MGR_AREAS!=='undefined'){
+  if(mcEl && typeof mgrTargetsFor==='function' && typeof mgrAreas==='function'){
     const _bk=(typeof floorBlockKey==='function')?floorBlockKey(nowH):'mid';
     const _dt=(dow===0||dow===6)?'weekend':'weekday';
     const _mb=(mgrTargetsFor(_dt)||{})[_bk]||{};
-    const _need=MGR_AREAS.reduce((s,a)=>s+(_mb[a.k]||0),0);
+    const _need=mgrAreas().reduce((s,a)=>s+(_mb[a.k]||0),0);
     // floor managers on shift now (Off-Site ARMs excluded; call-offs excluded)
     const _on=people.filter(pr=>{
       const e=pr[1],pid=pr[0]; if(!e||!e.person) return false;
@@ -17196,13 +17234,13 @@ function buildCoverageTimeline() {
       // nobody is on at all, which is unambiguous. Otherwise grey + "Assign areas".
       _tone = (_on===0 && _need>0) ? 'red' : 'grey';
       _label = `${_on} on · block needs ${_need}`;
-      _detail = MGR_AREAS.filter(a=>(_mb[a.k]||0)>0).map(a=>`<span style="color:${a.color}">${a.label} ${_mb[a.k]}</span>`).join(' · ')
+      _detail = mgrAreas().filter(a=>(_mb[a.k]||0)>0).map(a=>`<span style="color:${a.color}">${a.label} ${_mb[a.k]}</span>`).join(' · ')
         + ` <span style="color:var(--txt3)">· Assign areas ›</span>`;
     } else {
       // STATE 1 — FULL DATA: per-area chips in model order.
-      _tone = _primaryBroken ? 'red' : (MGR_AREAS.some(a=>a.k!=='counter'&&(_mb[a.k]||0)>(_have[a.k]||0)) ? 'amber' : 'ok');
+      _tone = _primaryBroken ? 'red' : (mgrAreas().some(a=>a.k!=='counter'&&(_mb[a.k]||0)>(_have[a.k]||0)) ? 'amber' : 'ok');
       _label = `${_on}/${_need} on station`;
-      _detail = MGR_AREAS.filter(a=>(_mb[a.k]||0)>0||(_have[a.k]||0)>0).map(a=>{
+      _detail = mgrAreas().filter(a=>(_mb[a.k]||0)>0||(_have[a.k]||0)>0).map(a=>{
         const hv=_have[a.k]||0, nd=_mb[a.k]||0, gap=nd-hv;
         const isPrimary=(a.k==='emerald'||a.k==='returns');
         const col = a.k==='counter' ? 'var(--txt3)'                    // Counter never colored
@@ -18981,10 +19019,12 @@ var GF_PRIMARY_AREAS = ['emerald','returns'];
 
 function gfAreaOf(station){
   if(!station) return null; var s=String(station);
-  if(/emerald/i.test(s))            return 'emerald';
+  if(/eb ?2|emerald ?2/i.test(s))    return 'eb2';
+  if(/emerald|eb ?1/i.test(s))      return 'eb1';
   if(/return/i.test(s))             return 'returns';
   if(/exit/i.test(s))               return 'exit';
-  if(/float|shuttl/i.test(s))       return 'floater';
+  if(/shuttl/i.test(s))             return 'shuttle';   // v60.188: NOT the same job as Floater
+  if(/float/i.test(s))              return 'floater';
   if(/counter/i.test(s))            return 'counter';
   if(/off ?site/i.test(s))          return 'offsite';
   if(/clos/i.test(s))               return 'closing';   // "Closing Manager"
@@ -21726,7 +21766,7 @@ function mgrFillFromMeasured(dt, bk){
   if((bk==='pm'||bk==='night') && left>0){ fill.closing=1; left--; }
   ['emerald','returns','exit'].forEach(function(a){ if(left>0){ fill[a]=1; left--; } });
   if(left>0) fill.floater=left;                      // spare bodies float, never counter
-  MGR_AREAS.forEach(function(a){ updateMgrTarget(dt, bk, a.k, fill[a.k]||0); });
+  mgrAreas().forEach(function(a){ updateMgrTarget(dt, bk, a.k, fill[a.k]||0); });
   if(typeof saveState==='function') saveState();
   if(typeof toast==='function') toast('Filled from your real schedule ('+total+') — adjust any of it');
   ftRenderModal();
@@ -21781,7 +21821,7 @@ function ftRenderModal(){
           <button onclick="bumpMgrTarget('${dt}','${curBk}','${a.k}',1)">+</button>
         </div></div>`;
     };
-    const tot = MGR_AREAS.reduce((n,a)=>n+(b[a.k]||0),0);
+    const tot = mgrAreas().reduce((n,a)=>n+(b[a.k]||0),0);
     body = `
       ${modeSeg}${daySeg}
       ${blockPick}
@@ -21795,7 +21835,7 @@ function ftRenderModal(){
               background:rgba(35,201,131,.10);color:var(--accent);font-size:12px;font-weight:800;cursor:pointer">
             ⇊ Use what we actually run (${m.median}) — then adjust</button>`;
         })()}
-      ${MGR_AREAS.map(stepper).join('')}
+      ${mgrAreas().map(stepper).join('')}
       <button class="ft-copy" onclick="copyMgrBlockToAll('${dt}','${curBk}')">⇊ Use these numbers for every block</button>
       <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">Min managers per station, per block. Managers <b>never default to Counter</b> — Emerald first, then Returns; they fill Exit/Returns or help Emerald; Counter is last-case (usually MT/ABRM). <b>Starting numbers were guesstimated from the rotation</b> — adjust to your branch.</div>
       <div style="margin-top:12px;padding:10px 11px;background:var(--bg2);border:1px solid var(--bdr);border-radius:8px">
@@ -21840,7 +21880,7 @@ function copyMgrBlockToAll(dt, bk){
   var T=mgrTargetsFor(dt); var src=Object.assign({}, (T&&T[bk])||MGR_TARGETS[dt][bk]||{});
   ['preopen','open','amid','mid','pm','night'].forEach(function(k){
     if(k===bk) return;
-    MGR_AREAS.forEach(function(a){ updateMgrTarget(dt, k, a.k, src[a.k]||0); });
+    mgrAreas().forEach(function(a){ updateMgrTarget(dt, k, a.k, src[a.k]||0); });
   });
   if(typeof toast==='function') toast('Copied to every block — adjust any one after');
   ftRenderModal();
@@ -22843,7 +22883,120 @@ function fleetRemoveStray(i){
   fleetRefresh();
 }
 
+// ── v60.188 · the survey section: what stations, and how do you assign them ──
+// Matt: "make it part of the survey to ask what all manager stations there are
+// and what is the logic for assignment usually."
+//
+// Two halves on purpose. The LIST is structured (it drives the minimums grid,
+// the coverage flag and the manager draft, so it has to be machine-readable).
+// The LOGIC is freeform, because "Emerald first, then Returns, MT/ABRM fill
+// exit, counter last-case" is a sentence a manager can write in ten seconds and
+// a form would take ten minutes to fail at capturing. Structuring it before the
+// branch has said it in their own words would be inventing the model again.
+var MGR_STATION_PALETTE = ['#AF9CFF','#C7B9FF','#64D2FF','#23C983','#FFCC00','#FF9F0A','#0A84FF','#FF6961','#30D158'];
+function mgrStationsCfg(){
+  if(!Array.isArray(STATE.mgrStations) || !STATE.mgrStations.length){
+    STATE.mgrStations = MGR_AREAS.map(function(a){ return Object.assign({}, a); });
+  }
+  return STATE.mgrStations;
+}
+function msRefresh(){
+  var el=document.getElementById('bi-mgrstations');
+  if(el) el.innerHTML=biMgrStationsHtml();
+}
+function msSetLabel(i, v){
+  var L=mgrStationsCfg(); if(!L[i]) return;
+  v=String(v||'').trim(); if(!v) return;
+  L[i].label=v;
+  if(typeof saveState==='function') saveState();
+}
+function msTogglePrimary(i){
+  var L=mgrStationsCfg(); if(!L[i]) return;
+  L[i].primary=!L[i].primary;
+  if(typeof saveState==='function') saveState();
+  msRefresh();
+}
+function msRemove(i){
+  var L=mgrStationsCfg(); if(!L[i]) return;
+  L.splice(i,1);
+  if(typeof saveState==='function') saveState();
+  msRefresh();
+}
+function msAdd(){
+  var v=(document.getElementById('ms-new')||{}).value||'';
+  v=String(v).trim(); if(!v){ if(typeof toast==='function') toast('Name the station first'); return; }
+  var L=mgrStationsCfg();
+  // a stable key from the label; never collide with an existing one
+  var base=v.toLowerCase().replace(/[^a-z0-9]+/g,'').slice(0,12)||('post'+L.length);
+  var k=base, n=2; while(L.some(function(x){return x.k===k;})){ k=base+n; n++; }
+  L.push({k:k, label:v, color:MGR_STATION_PALETTE[L.length % MGR_STATION_PALETTE.length]});
+  if(typeof saveState==='function') saveState();
+  var el=document.getElementById('ms-new'); if(el) el.value='';
+  msRefresh();
+  if(typeof toast==='function') toast('Added '+v);
+}
+function msReset(){
+  STATE.mgrStations = MGR_AREAS.map(function(a){ return Object.assign({}, a); });
+  if(typeof saveState==='function') saveState();
+  msRefresh();
+  if(typeof toast==='function') toast('Back to the app’s default list');
+}
+function msSetLogic(v){
+  STATE.mgrAssignLogic=String(v||'');
+  if(typeof saveState==='function') saveState();
+}
+function biMgrStationsHtml(){
+  var L=mgrStationsCfg();
+  var h='<div style="font-size:12px;color:var(--txt3);line-height:1.55;margin-bottom:10px">'
+   +'These are the posts a <b>manager</b> can be assigned to. They drive the minimums grid, '
+   +'the coverage flag and the draft — so they should be the names your floor actually uses. '
+   +'Mark a post <b>primary</b> if it must always be covered.</div>';
+  h+='<div style="border:1px solid var(--bdr);border-radius:9px;overflow:hidden">';
+  L.forEach(function(a,i){
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;'
+      +(i?'border-top:1px solid var(--bdr);':'')+'">'
+      +'<span style="width:9px;height:9px;border-radius:50%;background:'+(a.color||'var(--txt3)')+';flex-shrink:0"></span>'
+      +'<input value="'+biEsc(a.label||a.k)+'" onchange="msSetLabel('+i+',this.value)" '
+      +'style="flex:1;min-width:0;padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr2);'
+      +'border-radius:6px;color:var(--txt);font-size:12.5px;font-weight:700">'
+      +'<button onclick="msTogglePrimary('+i+')" title="Must always be covered" '
+      +'style="padding:4px 9px;border-radius:6px;font-size:10px;font-weight:800;cursor:pointer;'
+      +'border:1px solid '+(a.primary?'var(--accent)':'var(--bdr2)')+';'
+      +'background:'+(a.primary?'rgba(35,201,131,.12)':'var(--bg2)')+';'
+      +'color:'+(a.primary?'var(--accent)':'var(--txt3)')+'">primary</button>'
+      +'<button onclick="msRemove('+i+')" title="Remove" '
+      +'style="background:none;border:none;color:var(--txt3);font-size:15px;cursor:pointer;padding:0 3px">×</button>'
+      +'</div>';
+    if(a.note) h+='<div style="padding:0 10px 8px 27px;font-size:10.5px;color:var(--txt3)">'+biEsc(a.note)+'</div>';
+  });
+  h+='</div>';
+  h+='<div style="display:flex;gap:6px;margin-top:8px">'
+   +'<input id="ms-new" placeholder="Add a post — e.g. EB2, Shuttler, Lot" '
+   +'style="flex:1;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;'
+   +'color:var(--txt);font-size:12.5px">'
+   +'<button onclick="msAdd()" style="padding:8px 14px;border-radius:7px;border:none;background:var(--accent);'
+   +'color:#04160e;font-size:12px;font-weight:800;cursor:pointer">Add</button>'
+   +'<button class="btn btn-gh" onclick="msReset()">Reset</button></div>';
+  // the logic — freeform on purpose
+  h+='<div style="margin-top:14px">'
+   +'<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;'
+   +'color:var(--txt2);margin-bottom:5px">How do you decide who goes where?</div>'
+   +'<div style="font-size:11.5px;color:var(--txt3);line-height:1.5;margin-bottom:7px">'
+   +'In your own words — the order you fill posts, who covers what first, who only goes somewhere '
+   +'as a last resort, and anything that depends on the day. This is what the draft copies.</div>'
+   +'<textarea oninput="msSetLogic(this.value)" '
+   +'placeholder="e.g. EB1 is whoever opens or closes. EB2 backs them up once it gets busy. '
+   +'There’s always a Returns manager. MTs and ABRMs fill exit holes first, then the BRM. '
+   +'Counter only as a last resort, and usually an MT…" '
+   +'style="width:100%;min-height:96px;padding:10px;background:var(--bg3);border:1px solid var(--bdr2);'
+   +'border-radius:8px;color:var(--txt);font-size:12.5px;line-height:1.5;font-family:inherit;'
+   +'box-sizing:border-box;resize:vertical">'+biEsc(STATE.mgrAssignLogic||'')+'</textarea>'
+   +'</div>';
+  return h;
+}
+
 function biRender(){
+  if(typeof mgrMigrateEmerald==='function') try{ mgrMigrateEmerald(); }catch(e){}
   var o=document.getElementById('bi-overlay'); if(!o) return;
   biCurResp(); var curName=STATE.biRespondent;
   // respondent chips = roster managers ∪ any custom respondents
@@ -22877,6 +23030,9 @@ function biRender(){
     });
     h+='</div>';
   });
+  h+='<div class="bi-sec"><div class="bi-sec-hd">🧭 Manager stations <span class="bi-scope fact">branch fact</span>'
+    +'<span class="bi-tunes">→ minimums, coverage flag, the draft</span></div>'
+    +'<div id="bi-mgrstations">'+biMgrStationsHtml()+'</div></div>';
   h+='<div class="bi-sec"><div class="bi-sec-hd">🚗 Car groups &amp; codes <span class="bi-scope fact">branch fact</span>'
     +'<span class="bi-tunes">→ the board</span></div><div id="bi-fleet">'+biFleetHtml()+'</div></div>';
   h+='<div class="bi-sec"><div class="bi-sec-hd">⚡ Engine readiness <span class="bi-tunes">→ what’s still blocking auto-suggestions</span></div><div id="bi-engine-ready">'+biEngineReadyHtml()+'</div></div>';
@@ -26027,7 +26183,7 @@ function _snMgrRows(dtype){
   var blocks=['preopen','open','amid','mid','pm','night'];
   return blocks.map(function(bk){
     var b=(T&&T[bk])||MGR_TARGETS[dtype][bk];
-    var tot=MGR_AREAS.reduce(function(s,a){return s+(b[a.k]||0);},0);
+    var tot=mgrAreas().reduce(function(s,a){return s+(b[a.k]||0);},0);
     return {block:FLOOR_BLOCK_LABELS[bk],b:b,tot:tot};
   });
 }
@@ -26143,11 +26299,11 @@ function snRender(){
   h+='<div class="qa-sec">👔 Managers needed per station</div>';
   var mrows=_snMgrRows(_snView);
   h+='<div class="sn-card" style="overflow-x:auto"><table class="sn-tbl" style="min-width:420px"><tr><th>Block</th>'+
-     MGR_AREAS.map(function(a){return '<th style="color:'+a.color+'">'+a.label+'</th>';}).join('')+
+     mgrAreas().map(function(a){return '<th style="color:'+a.color+'">'+a.label+'</th>';}).join('')+
      '<th>All</th></tr>';
   mrows.forEach(function(r){
     h+='<tr><td>'+r.block+'</td>'+
-       MGR_AREAS.map(function(a){var v=r.b[a.k]||0;return '<td'+(v?'':' style="color:var(--txt3,#8E8E93)"')+'>'+v+'</td>';}).join('')+
+       mgrAreas().map(function(a){var v=r.b[a.k]||0;return '<td'+(v?'':' style="color:var(--txt3,#8E8E93)"')+'>'+v+'</td>';}).join('')+
        '<td class="tot">'+r.tot+'</td></tr>';
   });
   var mPeak=mrows.reduce(function(a,b){return b.tot>a.tot?b:a;},mrows[0]);
