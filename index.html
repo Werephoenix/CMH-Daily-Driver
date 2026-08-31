@@ -9584,7 +9584,7 @@ function opsSignalsHtml() {
   const nowFloor = Math.floor(new Date().getHours() + new Date().getMinutes()/60);
   let nextBank = null;
   for (let h=nowFloor; h<25 && !nextBank; h++) { if ((fb.arr[h]||0) > 0) nextBank = { h, n: fb.arr[h] }; }
-  const hLbl = h => { const hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };
+  const hLbl = h => { const hh=Math.floor(((h%24)+24)%24), ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };  // v60.183: floor first
   if (nextBank) flightRow += `<div class="ops-sig warn"><span style="font-size:16px">✈️</span><span>Next arrival bank: <b>${hLbl(nextBank.h)}</b> (${nextBank.n} flight${nextBank.n>1?'s':''}) — counter demand incoming</span></div>`;
   flightRow += `<button class="more-row" onclick="showFlightSheet()"><span class="more-ic">✈️</span><span class="more-lbl">Flight banks (arrivals / departures)</span><span class="more-ch">›</span></button>`;
   // v60.62: city events banner + editor entry
@@ -9656,7 +9656,7 @@ function buildFlightSheet() {
   if (!wrap) return;
   const now = new Date(); const nowFloor = Math.floor(now.getHours() + now.getMinutes()/60);
   const H_START = Math.max(6, nowFloor), H_END = 25;
-  const hLbl = h => { const hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };
+  const hLbl = h => { const hh=Math.floor(((h%24)+24)%24), ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };  // v60.183: floor first
   const fb = _fb();
   let html = `<p style="font-size:12px;color:var(--txt3);margin-bottom:10px">Log how many flights land / depart each hour (from the boards you already see). Arrivals raise <b>counter</b> need; departures flag heavy <b>returns</b>. Advisory — you decide.</p>`;
   html += `<div class="more-group">`;
@@ -9766,7 +9766,7 @@ function _evtKindSel(k) { _evtKind = k; ['festival','game'].forEach(function(x){
 function _evtAdd() { const nm=(document.getElementById('evt-name')||{}).value; const dt=(document.getElementById('evt-date')||{}).value; addCityEvent(nm,_evtLevel,_evtKind,dt); _evtLevel='moderate'; _evtKind='festival'; }
 function buildEventSheet() {
   const wrap = document.getElementById('event-sheet'); if (!wrap) return;
-  const hLbl = h => { const hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };
+  const hLbl = h => { const hh=Math.floor(((h%24)+24)%24), ap=hh>=12?'p':'a', d=hh>12?hh-12:hh===0?12:hh; return d+ap; };  // v60.183: floor first
   const evs = _events();
   let html = `<p style="font-size:12px;color:var(--txt3);margin-bottom:10px">Log a major event by its <b>date</b>. The app raises <b>counter</b> demand in the days before (pickups) and flags heavy <b>returns</b> after — a <b>Game</b> is busy the day before + on the day. Advisory — you decide.</p>`;
   html += `<div class="more-group" style="padding:12px;margin-bottom:10px">
@@ -9845,8 +9845,14 @@ var SOLO_ZONES = [
 ];
 function _soloFmtH(h){
   if(h==null) return '';
-  var hh=((h%24)+24)%24, ap=hh>=12?'p':'a', d=hh>12?hh-12:(hh===0?12:hh);
-  var m=Math.round((h-Math.floor(h))*60);
+  // v60.183: the hour was NOT floored before the 12-hour conversion, so a shift
+  // ending 23.5 printed "11.5:30p" on the Now screen. Same bug class as the
+  // timeline's hLbl (fixed in v60.176) — this one just also appends minutes,
+  // which is what made it visible.
+  var t=((h%24)+24)%24;
+  var hh=Math.floor(t), m=Math.round((t-hh)*60);
+  if(m===60){ m=0; hh=(hh+1)%24; }
+  var ap=hh>=12?'p':'a', d=hh>12?hh-12:(hh===0?12:hh);
   return d+(m?':'+String(m).padStart(2,'0'):'')+ap;
 }
 // When does this person stop being alone? Next arrival into their zone, else
@@ -9870,6 +9876,67 @@ function _soloUntil(exp, zone, pid, nowH){
   return end!=null ? {h:end, why:'shiftend'} : null;
 }
 // Everyone currently alone in a zone, with tone + a surplus-only float suggestion.
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.183 · SOLO ALERT — ESCALATION (Design v2)
+//
+// The alert already found the right people and already stored each check-in as
+// a TIMESTAMP — but read it as a boolean, so one check silenced it for the rest
+// of the day. Someone left alone at Returns from 8pm to close registered the
+// same as someone who had a manager walk over five minutes ago.
+//
+// Four tiers, driven by the clock (Design v2):
+//   0  checked within 45 min   green one-line strip
+//   1  under 15 min alone      yellow one-line strip
+//   2  15–40 min               amber card with float suggestion
+//   3  over 40 min             red card, pulses, "Go now or send someone"
+//
+// A check-in GOES STALE after 45 minutes and the notice re-opens at whatever
+// tier the clock has since reached — because a check at 8:05 says nothing about
+// 9:30.
+//
+// ONE DELIBERATE DEPARTURE from the spec: a PLANNED solo (the block's minimum
+// really is 1, e.g. Returns after 8pm) is capped at tier 2 and keeps the gentler
+// wording. Matt's v60.153 ruling was that a planned solo should stay quiet — an
+// alert that goes red every single night for something the schedule intends is
+// one a manager learns to ignore. It still escalates; it just never screams.
+// ═══════════════════════════════════════════════════════════════════════════
+var SOLO_STALE_MIN = 45;    // a check-in older than this stops counting
+var SOLO_T2_MIN    = 15;    // 15–40 min alone → amber card
+var SOLO_T3_MIN    = 40;    // over 40 min alone → red
+
+// When did this stretch of being alone actually start? Walk back in 10-minute
+// steps until the zone had someone else in it. Bounded at 4h so the loop can
+// never run away on a long quiet evening.
+function soloAloneSince(exp, zone, h){
+  var step=1/6, limit=4, t=h, hitLimit=true;
+  for(var i=0;i<limit/step;i++){
+    var prev=t-step;
+    if(prev<0){ hitLimit=false; break; }
+    var c={}; try{ c=gfCountsAt(exp, prev); }catch(e){ hitLimit=false; break; }
+    if((c[zone]||0)!==1){ hitLimit=false; break; }   // someone else was there → stretch began after this
+    t=prev;
+  }
+  // v60.183: report the clamp. Walking back further costs more than it is worth,
+  // but printing a flat "4h" for a stretch that might be five hours understates
+  // the very thing the alert exists to surface — so the UI says "4h+".
+  return {h:t, clamped:hitLimit};
+}
+function soloCheckAge(zone,pid){
+  var rec=(STATE.soloChecked||{})[_soloKey(zone,pid)];
+  if(!rec||!rec.at) return null;
+  var mins=(Date.now()-new Date(rec.at).getTime())/60000;
+  return (mins>=0 && mins<24*60) ? mins : null;
+}
+// tier + the words that go with it
+function soloTierOf(s){
+  var age=soloCheckAge(s.zone,s.pid);
+  if(age!=null && age < SOLO_STALE_MIN) return 0;         // recently checked
+  var m=s.minsAlone||0;
+  var t = m>SOLO_T3_MIN ? 3 : (m>=SOLO_T2_MIN ? 2 : 1);
+  if(s.planned && t>2) t=2;                                // see note above
+  return t;
+}
+
 function soloCoverage(atHour){
   var out=[];
   var exp={}; try{ exp=(typeof buildExpectedToday==='function')?buildExpectedToday():{}; }catch(e){ return out; }
@@ -9898,13 +9965,22 @@ function soloCoverage(atHour){
       }catch(e){}
     }
     var until=_soloUntil(exp,z.k,who,h);
-    out.push({
+    var sinceRes=soloAloneSince(exp,z.k,h);
+    var since=sinceRes.h;
+    var rec={
       zone:z.k, zoneLbl:z.lbl, pid:who,
       nick:(typeof dispName==='function')?dispName(exp[who].person):(exp[who].person.nick||who),
       planned:planned, need:(need[z.k]||0),
       until:until, float:float,
+      since:since,
+      minsAlone:Math.max(0, Math.round((h-since)*60)),
+      minsClamped:!!sinceRes.clamped,
+      checkAge:soloCheckAge(z.k,who),
       checked: !!((STATE.soloChecked||{})[_soloKey(z.k,who)])
-    });
+    };
+    rec.tier=soloTierOf(rec);
+    rec.fresh=(rec.tier===0);          // checked AND still within the stale window
+    out.push(rec);
   });
   return out;
 }
@@ -9922,34 +9998,76 @@ function soloMarkChecked(zone,pid){
   if(typeof buildCoverageTimeline==='function') try{ buildCoverageTimeline(); }catch(e){}
   if(typeof soloRenderSchedBanner==='function') soloRenderSchedBanner();
 }
-// Full card — Now screen.
+// Full card — Now screen. v60.183: renders by TIER, not one shape for all.
+// Tiers 0 and 1 are deliberately one-line strips: most of the time someone is
+// briefly alone and that is ordinary, so it should read as information, not an
+// emergency. The card shape is reserved for tier 2+, and the pulse for tier 3.
 function soloCardHtml(){
   var list=[]; try{ list=soloCoverage(); }catch(e){ return ''; }
   if(!list.length) return '';
+  soloInjectStyle();
   return list.map(function(s){
+    var dur = s.minsAlone>=60
+      ? (Math.floor(s.minsAlone/60)+'h'+(s.minsAlone%60?' '+(s.minsAlone%60)+'m':''))
+      : (s.minsAlone+' min');
+    if(s.minsClamped) dur+='+';        // we stopped counting back, it may be longer
     var untilTxt = s.until ? (' until '+_soloFmtH(s.until.h)) : '';
-    var tone = s.planned ? 'solo-quiet' : 'solo-warn';
-    var head = s.planned
-      ? '<div class="solo-kick quiet">🫱 On their own</div>'
-      : '<div class="solo-kick">⚠ Alone at '+s.zoneLbl+'</div>';
-    var body = '<div class="solo-h">'+s.nick+' is alone at '+s.zoneLbl+untilTxt+'</div>'
-      + '<div class="solo-p">'
-      + (s.planned
+    var esc = function(v){ return String(v).replace(/'/g,"\\'"); };
+    var checkBtn = '<button class="solo-btn" onclick="soloMarkChecked(\'' + esc(s.zone) + '\',\'' + esc(s.pid) + '\')">'
+                 + (s.tier===3 ? 'I’m going now' : 'I checked on them') + '</button>';
+    var floatBtn = s.float
+      ? '<button class="solo-btn ghost" onclick="soloSendFloat(\'' + esc(s.zone) + '\',' + Math.floor((s.until&&s.until.h)||new Date().getHours()) + ',\'' + esc(s.float.pid) + '\')">Send ' + s.float.nick + ' →</button>'
+      : '';
+
+    // ── tier 0 · checked recently ──────────────────────────────────────────
+    if(s.tier===0){
+      var ago=Math.round(s.checkAge||0);
+      return '<div class="solo-strip ok">✓ <b>'+s.nick+'</b> checked on · '+dur+' alone at '+s.zoneLbl
+           + ' <span class="solo-ago">'+(ago<1?'just now':ago+' min ago')+'</span></div>';
+    }
+    // ── tier 1 · briefly alone ─────────────────────────────────────────────
+    if(s.tier===1){
+      return '<div class="solo-strip warn"><span><b>'+s.nick+'</b> is on their own at '+s.zoneLbl
+           + ' · '+dur+'</span>'+checkBtn+'</div>';
+    }
+    // ── tier 2 / 3 · the card ──────────────────────────────────────────────
+    var t3=(s.tier===3);
+    var head = t3 ? '⚠ Alone '+dur+' at '+s.zoneLbl
+                  : (s.planned ? '🫱 On their own at '+s.zoneLbl : '⚠ Alone at '+s.zoneLbl);
+    var copy = t3
+      ? 'Go now or send someone. Nobody should hold a station this long without a break.'
+      : (s.planned
           ? 'That’s how the day is planned — still worth a check that they’ve had a break.'
-          : 'Below your minimum of '+s.need+'. Check in — help, a bathroom break, or a breather.')
-      + '</div>';
-    var actions='<div class="solo-acts">';
-    if(s.checked){
-      actions+='<span class="solo-done">✓ Checked on</span>';
-    } else {
-      actions+='<button class="solo-btn" onclick="soloMarkChecked(\''+s.zone+'\',\''+s.pid+'\')">I checked on them</button>';
-    }
-    if(s.float){
-      actions+='<button class="solo-btn ghost" onclick="soloSendFloat(\''+s.zone+'\','+Math.floor((s.until&&s.until.h)||new Date().getHours())+',\''+s.float.pid+'\')">Send '+s.float.nick+' →</button>';
-    }
-    actions+='</div>';
-    return '<div class="now-attn '+tone+'">'+head+body+actions+'</div>';
+          : 'Below your minimum of '+s.need+'. Check in — help, a bathroom break, or a breather.');
+    return '<div class="now-attn '+(t3?'solo-t3':'solo-warn')+'">'
+         + '<div class="solo-kick'+(s.planned&&!t3?' quiet':'')+'">'+head+'</div>'
+         + '<div class="solo-h'+(t3?' big':'')+'">'+s.nick+' is alone at '+s.zoneLbl+untilTxt+'</div>'
+         + '<div class="solo-p">'+copy+'</div>'
+         + '<div class="solo-acts">'+checkBtn+floatBtn+'</div>'
+         + '</div>';
   }).join('');
+}
+function soloInjectStyle(){
+  if(document.getElementById('solo-tier-style')) return;
+  var st=document.createElement('style'); st.id='solo-tier-style';
+  st.textContent =
+    '.solo-strip{display:flex;align-items:center;gap:8px;justify-content:space-between;'
+   +'padding:8px 11px;border-radius:10px;font-size:12.5px;margin-bottom:8px;line-height:1.4}'
+   +'.solo-strip.ok{background:rgba(48,209,88,.13);border:1px solid rgba(48,209,88,.34);color:var(--green)}'
+   +'.solo-strip.warn{background:rgba(255,214,51,.13);border:1px solid rgba(255,214,51,.36);color:#FFD633}'
+   +'.solo-strip .solo-ago{opacity:.72;font-size:11px;white-space:nowrap}'
+   +'.solo-strip .solo-btn{flex-shrink:0}'
+   +'.now-attn.solo-t3{border:1.5px solid var(--red,#FF453A);background:rgba(255,69,58,.17);'
+   +'animation:soloPulse 2.2s ease-in-out infinite}'
+   +'.now-attn.solo-t3 .solo-kick{color:var(--red,#FF453A);font-weight:800}'
+   +'.solo-h.big{font-size:17px;font-weight:800}'
+   +'@keyframes soloPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,.34)}'
+   +'50%{box-shadow:0 0 0 6px rgba(255,69,58,0)}}'
+   // Calm Mode and the OS reduce-motion setting are the opt-outs, same as
+   // everywhere else in the app — the colour still escalates, only the pulse stops.
+   +'@media (prefers-reduced-motion:reduce){.now-attn.solo-t3{animation:none}}'
+   +'body.calm .now-attn.solo-t3{animation:none}';
+  document.head.appendChild(st);
 }
 function soloSendFloat(zone,hour,pid){
   if(typeof coApplyFill==='function'){ coApplyFill(zone, (new Date()).getHours(), pid); }
@@ -16413,7 +16531,7 @@ function buildStationView() {
 
   // Hourly coverage strip
   const H_START = 6, H_END = 25;
-  const hLbl = h => { const hh = h%24, d = hh>12?hh-12:hh===0?12:hh, ap = hh>=12?'p':'a'; return d+ap; };
+  const hLbl = h => { const hh = Math.floor(h%24), d = hh>12?hh-12:hh===0?12:hh, ap = hh>=12?'p':'a'; return d+ap; };  // v60.183: floor first
   const hours = Array.from({length: H_END - H_START}, (_, i) => H_START + i);
   const nowH = new Date().getHours() + new Date().getMinutes()/60;
 
@@ -19736,7 +19854,7 @@ function buildHourlyFlowChart() {
   }
 
   const HOURS = Array.from({length:24},(_,i)=>i);
-  const hLbl  = h => { const d=h>12?h-12:h===0?12:h,s=h>=12?'p':'a'; return d+s; };
+  const hLbl  = h => { const hh=Math.floor(h), d=hh>12?hh-12:hh===0?12:hh, s=hh>=12?'p':'a'; return d+s; };  // v60.183: floor first
   const maxV  = Math.max(...res,...ret,1);
   const W=18, H=50;
 
