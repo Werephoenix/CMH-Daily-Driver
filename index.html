@@ -20538,6 +20538,39 @@ function mgrMeasuredHeadcount(dtype){
   });
   return out;
 }
+// ── v60.182 · "USE WHAT WE ACTUALLY RUN" ───────────────────────────────────
+// v60.180 showed the branch the truth beside each number but still made them
+// type it in. This fills the block from the measured headcount, apportioned by
+// the branch's OWN stated manager model (Matt, v60.141):
+//
+//   "Managers should never default to counter, they will always fill Emerald
+//    first, then there is a Returns mgr, at least 1 usually. They fill in at
+//    exit and returns first or help at emerald."
+//
+// So: Emerald, then Returns, then Exit, then Floater — and Counter stays ZERO
+// no matter how many bodies there are, because counter is last-case and usually
+// an MT/ABRM rather than a planned manager post. Opening/Closing are shift-time
+// roles, not areas, so they are seeded only in the blocks that need them.
+//
+// This is a PROPOSAL, not a fact: a headcount cannot tell us which station
+// anyone stood at. It is labelled as a starting point and every box stays
+// editable — the branch still owns the answer.
+function mgrFillFromMeasured(dt, bk){
+  var m=(mgrMeasuredHeadcount(dt)||{})[bk];
+  if(!m || !m.days){ if(typeof toast==='function') toast('No schedule data for that block yet'); return; }
+  var total=m.median;
+  var fill={emerald:0, returns:0, exit:0, floater:0, counter:0, opening:0, closing:0};
+  var left=total;
+  if(bk==='open'   && left>0){ fill.opening=1; left--; }
+  if((bk==='pm'||bk==='night') && left>0){ fill.closing=1; left--; }
+  ['emerald','returns','exit'].forEach(function(a){ if(left>0){ fill[a]=1; left--; } });
+  if(left>0) fill.floater=left;                      // spare bodies float, never counter
+  MGR_AREAS.forEach(function(a){ updateMgrTarget(dt, bk, a.k, fill[a.k]||0); });
+  if(typeof saveState==='function') saveState();
+  if(typeof toast==='function') toast('Filled from your real schedule ('+total+') — adjust any of it');
+  ftRenderModal();
+}
+
 function mgrMeasuredHint(dt, bk, want){
   var m=mgrMeasuredHeadcount(dt)[bk];
   if(!m || !m.days) return '';
@@ -20593,6 +20626,14 @@ function ftRenderModal(){
       ${blockPick}
       <div class="ft-blockhd">${(FLOOR_BLOCK_LABELS[curBk]||curBk)} · <b>${tot}</b> manager${tot===1?'':'s'} on station</div>
       ${(typeof mgrMeasuredHint==='function')?mgrMeasuredHint(dt,curBk,tot):''}
+      ${(function(){
+          var m=(typeof mgrMeasuredHeadcount==='function')?(mgrMeasuredHeadcount(dt)||{})[curBk]:null;
+          if(!m||!m.days||m.median===tot) return '';
+          return `<button onclick="mgrFillFromMeasured('${dt}','${curBk}')"
+            style="width:100%;margin:6px 0 2px;padding:9px;border-radius:7px;border:1px solid var(--accent);
+              background:rgba(35,201,131,.10);color:var(--accent);font-size:12px;font-weight:800;cursor:pointer">
+            ⇊ Use what we actually run (${m.median}) — then adjust</button>`;
+        })()}
       ${MGR_AREAS.map(stepper).join('')}
       <button class="ft-copy" onclick="copyMgrBlockToAll('${dt}','${curBk}')">⇊ Use these numbers for every block</button>
       <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">Min managers per station, per block. Managers <b>never default to Counter</b> — Emerald first, then Returns; they fill Exit/Returns or help Emerald; Counter is last-case (usually MT/ABRM). <b>Starting numbers were guesstimated from the rotation</b> — adjust to your branch.</div>
@@ -21073,7 +21114,17 @@ var BRANCH_INTERVIEW = [
     {k:'minOffExit',     type:'number', q:'Min at Exit — SLOW', scope:'fact'},
     {k:'minOffReturns',  type:'number', q:'Min at Returns — SLOW', scope:'fact'},
   ]},
-  { title:'Manager shift windows', tunes:'the manager rotation', qs:[
+  { title:'Manager shift windows', tunes:'the manager rotation',
+    // v60.182: the measured impact rides WITH the question. Asking someone to
+    // approve a new shift type without showing what it buys is asking them to
+    // guess. Numbers are from 24 simulated weeks (~1,114 manager shifts).
+    note:'Measured over 24 weeks: allowing 11a–9p takes the longest run of closing shifts from '
+        +'5 down to 3, means nobody is stuck on 4+ nights in a row (6 people are today), and drops '
+        +'the most nights on one person from 37 to 25 — with NO change to coverage at any hour. '
+        +'It gets used about twice a month, always for the same thing: stepping someone down off '
+        +'nights. A 9a shift was tested too and does nothing (9a after an 11:30p finish is 9.5h '
+        +'rest, still under the 11h minimum; 11a is 11.5h).',
+    qs:[
     {k:'mgrLateWindow', type:'single', scope:'fact',
      q:'Could a manager work 11a–9p? (Today the latest non-closing shift is 10a–8p.)',
      opts:['No — keep the five we have','Yes — allow 11a–9p']},
@@ -21434,6 +21485,37 @@ function fleetProgress(){
   all.forEach(function(g){ if(groupCodeSource(g.name)==='confirmed') done++; });
   return {done:done, total:all.length};
 }
+// v60.182: a correct guess should cost ONE tap, not a trip through a dropdown.
+// 31 groups is a lot of clicking if every one needs the picker opened; most of
+// them are probably already right, so confirming as-is is the common action and
+// the picker is for the exceptions.
+//
+// NOTE: nothing here is auto-confirmed. A pattern-based guess was tried first —
+// "the master code is the one ending AR" — and scored 0 for 4 against the codes
+// we actually know (FJBR, ITAR, ICAE, PPAR). It was not shipped. There is no
+// reliable way to derive these; a person with the fleet sheet has to say.
+function fleetConfirmAsIs(group){
+  var f=fleetCfg();
+  f.rep[group]=groupRepCode(group);
+  f.confirmed[group]=true;
+  if(typeof saveState==='function') saveState();
+  fleetRefresh();
+}
+function fleetUnconfirm(group){
+  var f=fleetCfg();
+  delete f.rep[group]; delete f.confirmed[group];
+  if(typeof saveState==='function') saveState();
+  fleetRefresh();
+}
+function fleetConfirmRemaining(){
+  var rows=fleetGroupsOrdered(), n=0;
+  rows.forEach(function(g){ if(groupCodeSource(g.name)!=='confirmed'){ 
+    var f=fleetCfg(); f.rep[g.name]=groupRepCode(g.name); f.confirmed[g.name]=true; n++; } });
+  if(typeof saveState==='function') saveState();
+  fleetRefresh();
+  if(typeof toast==='function') toast('Confirmed '+n+' group'+(n===1?'':'s')+' as shown');
+}
+
 function biFleetHtml(){
   var f=fleetCfg(), rows=fleetGroupsOrdered(), pr=fleetProgress();
   var h='<div style="font-size:12px;color:var(--txt3);line-height:1.55;margin-bottom:10px">'
@@ -21441,22 +21523,32 @@ function biFleetHtml(){
     +'<b>'+pr.done+' of '+pr.total+'</b> confirmed by the branch — the rest are the app’s best guess. '
     +'Fix a name, pick the right main code, or flag a code that’s in the wrong place or mistyped.'
     +'</div>';
+  if(pr.done < pr.total){
+    h+='<button onclick="fleetConfirmRemaining()" '
+      +'style="width:100%;margin-bottom:8px;padding:9px;border-radius:7px;border:1px solid var(--bdr2);'
+      +'background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">'
+      +'✓ All '+(pr.total-pr.done)+' remaining are correct as shown</button>'
+      +'<div style="font-size:10.5px;color:var(--txt3);line-height:1.5;margin-bottom:10px">'
+      +'Use that if the codes below already look right, then fix the odd one out. '
+      +'Only 4 of these were ever set deliberately — and one of those four was wrong.</div>';
+  }
   h+='<div style="max-height:56vh;overflow-y:auto;-webkit-overflow-scrolling:touch;'
     +'border:1px solid var(--bdr);border-radius:9px">';
   rows.forEach(function(g,gi){
     var src=groupCodeSource(g.name), rep=groupRepCode(g.name), nm=groupLabel(g.name);
     var esc=String(g.name).replace(/'/g,"\\'");
-    var badge = src==='confirmed'
-      ? '<span style="font-size:9px;font-weight:800;color:var(--green)">✓ confirmed</span>'
-      : src==='default'
-        ? '<span style="font-size:9px;font-weight:800;color:var(--amber)">default</span>'
-        : '<span style="font-size:9px;font-weight:800;color:var(--txt3)">guess</span>';
     h+='<div style="padding:9px 10px;border-top:'+(gi?'1px solid var(--bdr)':'none')+'">'
       +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'
       +'<input value="'+biEsc(nm)+'" onchange="fleetRename(\''+esc+'\',this.value)" '
       +'style="flex:1;min-width:0;padding:6px 8px;background:var(--bg3);border:1px solid var(--bdr2);'
       +'border-radius:6px;color:var(--txt);font-size:12.5px;font-weight:700">'
-      +badge+'</div>'
+      + (src==='confirmed'
+          ? '<button onclick="fleetUnconfirm(\''+esc+'\')" title="Mark as unconfirmed again" '
+            +'style="background:none;border:none;color:var(--green);font-size:10px;font-weight:800;cursor:pointer">✓ confirmed</button>'
+          : '<button onclick="fleetConfirmAsIs(\''+esc+'\')" title="The code shown is correct" '
+            +'style="padding:3px 8px;border-radius:5px;border:1px solid var(--bdr2);background:var(--bg2);'
+            +'color:var(--txt3);font-size:10px;font-weight:800;cursor:pointer;white-space:nowrap">✓ correct</button>')
+      +'</div>'
       +'<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">'
       +'<span style="font-size:10.5px;color:var(--txt3)">Main code</span>'
       +'<select onchange="fleetSetRep(\''+esc+'\',this.value)" '
@@ -21611,7 +21703,10 @@ function biRender(){
     h+='<div class="bi-sec'+(isView?' view':'')+'"><div class="bi-sec-hd">'+biEsc(sec.title)
       +(isView?' <span class="bi-scope view">your view</span>':' <span class="bi-scope fact">branch fact</span>')
       +(sec.opt?' <span class="bi-optional">optional</span>':'')
-      +(sec.tunes?'<span class="bi-tunes">→ '+biEsc(sec.tunes)+'</span>':'')+'</div>';
+      +(sec.tunes?'<span class="bi-tunes">→ '+biEsc(sec.tunes)+'</span>':'')+'</div>'
+      +(sec.note?'<div style="font-size:11.5px;color:var(--txt3);line-height:1.6;margin:0 0 10px;'
+        +'padding:8px 10px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px">'
+        +biEsc(sec.note)+'</div>':'');
     sec.qs.forEach(function(q){
       var nt=biNotes()[q.k]||'';
       var val=biVal(q);
