@@ -2419,6 +2419,14 @@ button { cursor: pointer; }
       padding:6px 12px;border-radius:6px;border:1px solid var(--bdr2);background:var(--bg3);
       color:var(--txt3);font-size:11px;font-weight:700;user-select:none">🖨 Print…</summary>
     <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+      <!-- v60.184: the five designed sheets lead. The three below are the older
+           one-off prints, kept because they are still what someone reaches for
+           mid-shift; the new set is what gets posted or emailed. -->
+      <button onclick="openPrintables()"
+        style="padding:7px 12px;border-radius:6px;border:1px solid var(--accent);
+          background:rgba(35,201,131,.12);color:var(--accent);font-size:11px;font-weight:800;cursor:pointer">
+        🖨 Reports &amp; sheets…
+      </button>
       <button onclick="printScheduleGrid()"
         style="padding:7px 12px;border-radius:6px;border:1px solid var(--bdr2);
           background:var(--bg3);color:var(--txt);font-size:11px;font-weight:700;cursor:pointer">
@@ -2669,6 +2677,9 @@ button { cursor: pointer; }
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">⚡ Operations</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
             <button class="btn btn-g btn-sm" id="adm-tab-annc" onclick="showAdminSection('annc')">📣 Announcements</button>
+            <!-- v60.185: the quote is a communications act, so it lives beside
+                 announcements rather than in settings. -->
+            <button class="btn btn-g btn-sm" onclick="openQuotePost()">“ Quote of the day</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-celeb" onclick="showAdminSection('celeb')">🎂 Celebrations</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-edit" onclick="showAdminSection('edit')">✏️ Edit Schedule</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
@@ -10855,6 +10866,138 @@ function absencePickerHtml(pid){
   +'</div>';
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.185 · QUOTE OF THE DAY (Design v2)
+//
+// Picked by day-of-year so the WHOLE BRANCH sees the same one — that is the
+// point of it. A random pick per device would mean the opener and the closer
+// are looking at different quotes, and nobody could refer to "today's".
+//
+// A manager can post their own from Admin; blank falls back to the rotation.
+// qSettledDay is a DATE KEY, not a boolean, so dismissing settles it for today
+// and the hero returns tomorrow. Posting a new quote re-arms it the same day.
+// ═══════════════════════════════════════════════════════════════════════════
+var QOTD = [
+  {t:'Quality is never an accident. It is always the result of intelligent effort.', w:'John Ruskin'},
+  {t:'How you do anything is how you do everything.', w:'—'},
+  {t:'The best way out is always through.', w:'Robert Frost'},
+  {t:'Be regular and orderly in your life, so that you may be violent and original in your work.', w:'Gustave Flaubert'},
+  {t:'It does not matter how slowly you go as long as you do not stop.', w:'Confucius'},
+  {t:'Nobody made a greater mistake than the one who did nothing because they could only do a little.', w:'Edmund Burke'},
+  {t:'People will forget what you said, but they will never forget how you made them feel.', w:'Maya Angelou'},
+  {t:'The standard you walk past is the standard you accept.', w:'David Morrison'},
+  {t:'Do the hard jobs first. The easy jobs will take care of themselves.', w:'Dale Carnegie'},
+  {t:'A smooth sea never made a skilled sailor.', w:'—'},
+  {t:'Courtesy is the one coin you can never have too much of, or be stingy with.', w:'John Wanamaker'},
+  {t:'We are what we repeatedly do. Excellence, then, is not an act but a habit.', w:'Will Durant'},
+  {t:'If you are not taking care of your customer, your competitor will.', w:'Bob Hooey'},
+  {t:'Take care of your people and they will take care of everything else.', w:'—'}
+];
+function _qDayOfYear(d){
+  var s=new Date(d.getFullYear(),0,0);
+  return Math.floor((d-s)/86400000);
+}
+function qotdToday(){
+  var posted=(STATE.quotePost)||null;
+  if(posted && posted.text && String(posted.text).trim()){
+    return {text:posted.text, who:posted.who||'', posted:true};
+  }
+  var q=QOTD[_qDayOfYear(new Date()) % QOTD.length];
+  return {text:q.t, who:q.w, posted:false};
+}
+function qotdSettled(){
+  return (STATE.qSettledDay || '') === ((typeof todayKey==='function')?todayKey():'');
+}
+function qotdSettle(){
+  STATE.qSettledDay=(typeof todayKey==='function')?todayKey():'';
+  if(typeof saveState==='function') saveState();
+  if(typeof renderNow==='function') try{ renderNow(); }catch(e){}
+}
+function _qGreeting(){
+  var h=new Date().getHours();
+  var part = h<12 ? 'Good morning' : (h<17 ? 'Good afternoon' : 'Good evening');
+  var who=(STATE.fields&&(STATE.fields.openMgr))||'';
+  // first name only — the greeting should read like a person, not a record
+  who=String(who).trim().split(/[\s,]+/)[0]||'';
+  return part + (who ? ', '+who : '');
+}
+// The hero — first open of the day, above everything else on Now.
+function qotdHeroHtml(){
+  if(qotdSettled()) return '';
+  var q=qotdToday();
+  qotdInjectStyle();
+  return '<div class="qotd-hero">'
+    +'<div class="qotd-greet">'+_qGreeting()+'</div>'
+    +'<div class="qotd-q">'+String(q.text).replace(/</g,'&lt;')+'</div>'
+    +(q.who&&q.who!=='—'?'<div class="qotd-w">— '+String(q.who).replace(/</g,'&lt;')+'</div>':'')
+    +'<button class="qotd-go" onclick="qotdSettle()">Start the day</button>'
+    +'</div>';
+}
+// The quiet line it settles to, above the reference block.
+function qotdQuietHtml(){
+  if(!qotdSettled()) return '';
+  var q=qotdToday();
+  qotdInjectStyle();
+  return '<div class="qotd-quiet">'+String(q.text).replace(/</g,'&lt;')
+    +(q.who&&q.who!=='—'?' <span>— '+String(q.who).replace(/</g,'&lt;')+'</span>':'')+'</div>';
+}
+function qotdInjectStyle(){
+  if(document.getElementById('qotd-style')) return;
+  var st=document.createElement('style'); st.id='qotd-style';
+  st.textContent=
+   '.qotd-hero{border:1px solid var(--bdr2);background:var(--bg2);border-radius:14px;'
+  +'padding:16px 16px 14px;margin-bottom:12px}'
+  +'.qotd-greet{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;'
+  +'color:var(--accent);margin-bottom:7px}'
+  +'.qotd-q{font-size:16.5px;font-weight:600;line-height:1.45;color:var(--txt)}'
+  +'.qotd-w{font-size:12px;color:var(--txt3);margin-top:6px}'
+  +'.qotd-go{width:100%;margin-top:13px;padding:12px;border-radius:10px;border:none;'
+  +'background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer}'
+  +'.qotd-quiet{border-top:2px solid var(--bdr);padding-top:9px;margin-top:14px;'
+  +'font-size:12px;color:var(--txt3);line-height:1.5}'
+  +'.qotd-quiet span{opacity:.75}';
+  document.head.appendChild(st);
+}
+// Manager override — Admin.
+function openQuotePost(){
+  var p=(STATE.quotePost)||{};
+  var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
+   +'Everyone sees the same quote each day. Leave this blank and the app rotates '
+   +'through its own list; post something and it leads the Now screen until '
+   +'someone taps “Start the day”.</div>'
+   +'<textarea id="q-text" placeholder="Something worth reading at 5:30 in the morning…" '
+   +'style="width:100%;min-height:84px;padding:11px;background:var(--bg3);border:1px solid var(--bdr2);'
+   +'border-radius:9px;color:var(--txt);font-size:14px;line-height:1.5;font-family:inherit;'
+   +'box-sizing:border-box;resize:vertical">'+String(p.text||'').replace(/</g,'&lt;')+'</textarea>'
+   +'<input id="q-who" placeholder="Who said it (optional)" value="'+String(p.who||'').replace(/"/g,'&quot;')+'" '
+   +'style="width:100%;margin-top:8px;padding:10px;background:var(--bg3);border:1px solid var(--bdr2);'
+   +'border-radius:9px;color:var(--txt);font-size:13.5px;box-sizing:border-box">'
+   +'<div style="display:flex;gap:8px;margin-top:13px">'
+   +'<button onclick="qotdPost()" style="flex:1;padding:12px;border-radius:9px;border:none;'
+   +'background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer">Post it</button>'
+   +'<button class="btn btn-gh" onclick="qotdClear()">Back to the list</button></div>';
+  openModal('“ Quote of the day', b);
+}
+function qotdPost(){
+  var t=(document.getElementById('q-text')||{}).value||'';
+  var w=(document.getElementById('q-who')||{}).value||'';
+  STATE.quotePost={text:String(t).trim(), who:String(w).trim()};
+  // posting re-arms the hero even if today was already dismissed — a new quote
+  // is worth showing, otherwise posting mid-morning does nothing visible.
+  STATE.qSettledDay='';
+  if(typeof saveState==='function') saveState();
+  closeModal();
+  if(typeof toast==='function') toast(STATE.quotePost.text?'Posted — everyone sees it':'Back to the rotating list');
+  if(typeof renderNow==='function') try{ renderNow(); }catch(e){}
+}
+function qotdClear(){
+  STATE.quotePost=null; STATE.qSettledDay='';
+  if(typeof saveState==='function') saveState();
+  closeModal();
+  if(typeof toast==='function') toast('Back to the rotating list');
+  if(typeof renderNow==='function') try{ renderNow(); }catch(e){}
+}
+
 function renderNow() {
   const el = document.getElementById('now-hero');
   if (!el) return;
@@ -10994,7 +11137,13 @@ function renderNow() {
   rail += `<button class="more-row" onclick="showTab('checklist')"><span class="more-ic">✅</span><span class="more-lbl">${ritual} ritual</span><span class="more-ch">›</span></button>`;
   rail += `</div>`;
 
-  el.innerHTML = `<div class="now-cockpit"><div class="now-main">${html}</div><div class="now-rail">${rail}</div></div>`;
+  // v60.185: the quote leads the first open of the day and settles to a quiet
+  // line once someone taps "Start the day". It sits ABOVE everything because
+  // that is the whole idea — it is the first thing read, before the numbers.
+  const _qHero  = (typeof qotdHeroHtml==='function')  ? qotdHeroHtml()  : '';
+  const _qQuiet = (typeof qotdQuietHtml==='function') ? qotdQuietHtml() : '';
+  el.innerHTML = _qHero
+    + `<div class="now-cockpit"><div class="now-main">${html}${_qQuiet}</div><div class="now-rail">${rail}</div></div>`;
 }
 
 function autoRoute() { if(typeof autoRouteByTime==="function") autoRouteByTime(); }
@@ -17433,6 +17582,445 @@ function buildCoverageTimeline() {
 // blocks, and lunch markers. Designed for letter landscape print.
 // Matches the live timeline's data sources (rotations, mgmtBlocks,
 // staffStation, specialBlocks) so what you see is what you print.
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.184 · PRINTABLES — five sheets on ONE shared grid (Design v2)
+//
+// Same four-number band, same hairline rules, same signature block on every
+// sheet, so a manager who has read one can read all five. Ink-economical by
+// design: black text, hairlines, and tinted fills ONLY where the tint means
+// something — a printer on a branch counter is not a display.
+//
+// Honesty rule that shapes most of this: the app has 60 days of history at
+// most, and a fresh install has one. Every comparison here shows its sample
+// count and prints "—" when it has nothing. It NEVER invents a baseline; a
+// close report that quietly compares today against a single Tuesday would be
+// worse than one that admits it cannot yet.
+// ═══════════════════════════════════════════════════════════════════════════
+var PS_SHEETS = [
+  {k:'close',    icon:'📄', name:'Close report',        who:'Wall copy · branch numbers only',    fn:'psCloseReport'},
+  {k:'emails',   icon:'✉️', name:'Open & close emails', who:'Composed here, you send it',          fn:'psEmails'},
+  {k:'schedmap', icon:'🗓', name:'Schedule map',        who:'Two weeks · stations × days',         fn:'psScheduleMap'},
+  {k:'whosout',  icon:'🌴', name:'Who’s out',           who:'Safe to post — dates only',           fn:'psWhosOut'},
+  {k:'fairness', icon:'⚖️', name:'Rotation fairness',   who:'Turns taken vs the floor average',    fn:'psFairness'}
+];
+
+function psCss(landscape){
+  return '@page{size:letter '+(landscape?'landscape':'portrait')+';margin:.5in}'
+   +'*{box-sizing:border-box}'
+   +'body{font:12px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;'
+     +'color:#000;background:#fff;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+   +'.ps-hd{display:flex;align-items:baseline;justify-content:space-between;'
+     +'border-bottom:2px solid #000;padding-bottom:6px;margin-bottom:10px}'
+   +'.ps-t{font-size:19px;font-weight:800;letter-spacing:-.2px}'
+   +'.ps-sub{font-size:11px;color:#333}'
+   +'.ps-meta{font-size:10.5px;color:#444;text-align:right;line-height:1.4}'
+   +'.ps-read{border:1.5px solid #000;padding:8px 10px;margin-bottom:12px}'
+   +'.ps-read b{display:block;font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}'
+   +'.ps-read li{margin:1px 0}'
+   +'.ps-read ul{margin:0;padding-left:16px;font-size:12px}'
+   // the four-number band — identical on every sheet that carries numbers
+   +'.ps-band{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #000;margin-bottom:12px}'
+   +'.ps-band>div{padding:7px 9px;border-right:1px solid #bbb}'
+   +'.ps-band>div:last-child{border-right:none}'
+   +'.ps-band .n{font-size:21px;font-weight:800;line-height:1}'
+   +'.ps-band .l{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:#444;margin-top:2px}'
+   +'.ps-band .d{font-size:9.5px;color:#333;margin-top:3px}'
+   +'.ps-sec{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;'
+     +'border-bottom:1px solid #000;padding-bottom:2px;margin:14px 0 6px}'
+   +'table{width:100%;border-collapse:collapse;font-size:11px}'
+   +'th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:#333;'
+     +'border-bottom:1px solid #000;padding:3px 4px}'
+   +'td{padding:3px 4px;border-bottom:1px solid #ddd;vertical-align:top}'
+   +'.ps-num{text-align:right;font-variant-numeric:tabular-nums}'
+   +'.ps-low{background:#fff;color:#000;font-weight:800}'      // below minimum: white + heavy, reads on any printer
+   +'.ps-at{background:#eee}'                                   // at minimum: tinted — one call-off breaks it
+   +'.ps-muted{color:#555}'
+   +'.ps-note{font-size:10px;color:#444;margin-top:4px;line-height:1.45}'
+   +'.ps-sig{display:grid;grid-template-columns:1fr 1fr 130px;gap:16px;margin-top:22px;'
+     +'border-top:1px solid #000;padding-top:10px}'
+   +'.ps-sig div{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:#333}'
+   +'.ps-sig .line{border-bottom:1px solid #000;height:26px;margin-bottom:3px}'
+   +'.ps-page{page-break-after:always}'
+   +'.ps-page:last-child{page-break-after:auto}'
+   +'.ps-bars{display:flex;align-items:flex-end;gap:2px;height:54px;border-bottom:1px solid #000;'
+     +'padding-bottom:0;margin-bottom:2px}'
+   +'.ps-bar{flex:1;background:#ccc;position:relative;min-height:1px}'
+   +'.ps-bar.short{background:#000}'
+   +'.ps-xlbl{display:flex;gap:2px;font-size:7.5px;color:#444}'
+   +'.ps-xlbl span{flex:1;text-align:center}'
+   +'@media screen{body{padding:22px;max-width:8in;margin:0 auto}'
+     +'.ps-toolbar{position:sticky;top:0;background:#fff;border-bottom:1px solid #ccc;'
+     +'padding:8px 0 10px;margin-bottom:14px;display:flex;gap:8px;align-items:center}'
+     +'.ps-toolbar button{padding:7px 16px;font-size:12px;cursor:pointer;border:1px solid #000;background:#fff;border-radius:4px}}'
+   +'@media print{.ps-toolbar{display:none}}';
+}
+function psShell(title, body, landscape){
+  var w=window.open('','_blank');
+  if(!w){ if(typeof toast==='function') toast('Allow pop-ups to print'); return; }
+  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+title+'</title>'
+    +'<style>'+psCss(landscape)+'</style></head><body>'
+    +'<div class="ps-toolbar"><button onclick="window.print()">🖨 Print</button>'
+    +'<span style="font-size:11px;color:#555">'+title+'</span></div>'
+    + body + '</body></html>');
+  w.document.close();
+}
+function psHead(title, sub, metaLines){
+  return '<div class="ps-hd"><div><div class="ps-t">'+title+'</div>'
+    +(sub?'<div class="ps-sub">'+sub+'</div>':'')+'</div>'
+    +'<div class="ps-meta">'+(metaLines||[]).join('<br>')+'</div></div>';
+}
+function psSig(a,b){
+  return '<div class="ps-sig">'
+    +'<div><div class="line"></div>'+(a||'Closing manager')+'</div>'
+    +'<div><div class="line"></div>'+(b||'Reviewed by')+'</div>'
+    +'<div><div class="line"></div>Date</div></div>';
+}
+function psEsc(v){ return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function psDateLabel(d){ return d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }
+
+// ── trailing same-weekday average, with its sample count ───────────────────
+// Same weekday only: a Tuesday tells you nothing about a Saturday at an airport
+// branch. Returns null when there is nothing to compare against — callers print
+// "—" rather than a number built from one day.
+function psTrailing(field, weeks){
+  try{
+    var hist=(typeof loadHistory==='function')?loadHistory():[];
+    var today=new Date(), dow=today.getDay(), tk=today.toISOString().slice(0,10);
+    var vals=hist.filter(function(h){
+        if(!h||!h.date||h.date===tk) return false;
+        var d=new Date(h.date+'T12:00:00');
+        if(isNaN(d) || d.getDay()!==dow) return false;
+        var v=(typeof field==='function')?field(h):h[field];
+        return v!=null && v!=='' && !isNaN(Number(v));
+      })
+      .slice(0,(weeks||4))
+      .map(function(h){ var v=(typeof field==='function')?field(h):h[field]; return Number(v); });
+    if(!vals.length) return null;
+    return {avg: vals.reduce(function(s,v){return s+v;},0)/vals.length, n: vals.length};
+  }catch(e){ return null; }
+}
+function psDelta(now, tr){
+  if(now==null || now==='' || isNaN(Number(now))) return '<span class="ps-muted">—</span>';
+  if(!tr) return '<span class="ps-muted">no history yet</span>';
+  var d=Number(now)-tr.avg, s=(d>0?'+':'')+(Math.round(d*10)/10);
+  return s+' vs '+(Math.round(tr.avg*10)/10)+' avg <span class="ps-muted">('+tr.n+'&nbsp;wk'+(tr.n===1?'':'s')+')</span>';
+}
+function psBand(cells){
+  return '<div class="ps-band">'+cells.map(function(c){
+    return '<div><div class="n">'+(c.v==null||c.v===''?'—':psEsc(c.v))+'</div>'
+      +'<div class="l">'+psEsc(c.l)+'</div>'
+      +'<div class="d">'+(c.d||'')+'</div></div>';
+  }).join('')+'</div>';
+}
+
+// ── ① CLOSE REPORT ─────────────────────────────────────────────────────────
+// Wall copy carries BRANCH totals only. Per-agent detail is a second page the
+// drop marks manager-only — printed separately so the wall copy can never
+// accidentally carry someone's individual numbers.
+function psCloseReport(){
+  var f=(STATE.fields)||{}, now=new Date();
+  var hist=(typeof loadHistory==='function')?loadHistory():[];
+  var today=hist.filter(function(h){return h.date===now.toISOString().slice(0,10);})[0]||{};
+  var res=f.res!=null?f.res:today.tmrwRes, ret=f.ret!=null?f.ret:today.tmrwRet;
+  var cs=f.cs!=null?f.cs:today.cs, hot=f.hot!=null?f.hot:today.hot;
+  var oos=f.oosFinal||f.oos||today.oos;
+  var fbo=f.fboCount!=null?f.fboCount:today.fboCount;
+
+  // exceptions — timestamped AND attributed, per the drop
+  var exc=[];
+  try{
+    var ab=(STATE.absenceType)||{}, ov=(STATE.todayOverrides)||{};
+    Object.keys(ov).forEach(function(pid){
+      if(ov[pid]!=='callout') return;
+      var t=ab[pid], m=(t&&typeof absenceMeta==='function')?absenceMeta(t):null;
+      exc.push({what:(m?m.short:'Absent'), who:(typeof dispName==='function')?dispName(pid):pid,
+                by:f.openMgr||'—', when:'—'});
+    });
+  }catch(e){}
+  if(f.lateStaff) exc.push({what:'Stayed late', who:psEsc(f.lateStaff), by:f.closeMgr||'—', when:'—'});
+  if(f.closeNotes) exc.push({what:'Note', who:psEsc(f.closeNotes), by:f.closeMgr||'—', when:'—'});
+
+  // hour-by-hour coverage strip: bar height = people on, black = below minimum
+  var bars='', labels='', dow=now.getDay(), maxN=1, rows=[];
+  try{
+    var exp=buildExpectedToday();
+    for(var h=6; h<=23; h++){
+      var c=gfCountsAt(exp,h+0.5), n=0;
+      Object.keys(c||{}).forEach(function(k){ n+=(c[k]||0); });
+      var need=gfNeedsAt(h,dow), needTot=0;
+      Object.keys(need||{}).forEach(function(k){ needTot+=(need[k]||0); });
+      rows.push({h:h, n:n, need:needTot});
+      if(n>maxN) maxN=n;
+    }
+    rows.forEach(function(r){
+      var pct=Math.max(3, Math.round(r.n/maxN*100));
+      bars+='<div class="ps-bar'+(r.need>0&&r.n<r.need?' short':'')+'" style="height:'+pct+'%" '
+          + 'title="'+r.h+':00 — '+r.n+' on, need '+r.need+'"></div>';
+      labels+='<span>'+((r.h%12)||12)+'</span>';
+    });
+  }catch(e){}
+  var shortHours=rows.filter(function(r){return r.need>0&&r.n<r.need;}).length;
+
+  var body='<div class="ps-page">'
+   + psHead('Close report', 'CMH · Columbus airport (38N6)',
+       [psDateLabel(now), 'Closed by '+psEsc(f.closeMgr||'—')])
+   + '<div class="ps-read"><b>Read first</b><ul>'
+   + '<li>'+(shortHours? shortHours+' hour'+(shortHours===1?'':'s')+' ran below the station minimum today.'
+                       : 'Every hour met the station minimums today.')+'</li>'
+   + '<li>'+(exc.length? exc.length+' exception'+(exc.length===1?'':'s')+' logged below — each attributed.'
+                       : 'No exceptions logged.')+'</li>'
+   + '<li>'+(f.tmrwRes||f.tmrwRet
+        ? 'Tomorrow opens on '+psEsc(f.tmrwRes||'—')+' out / '+psEsc(f.tmrwRet||'—')+' in.'
+        : 'Tomorrow’s numbers were not captured — the opener starts blind.')+'</li>'
+   + '</ul></div>'
+   + psBand([
+       {v:res, l:'Reservations', d:psDelta(res, psTrailing('tmrwRes'))},
+       {v:ret, l:'Returns',      d:psDelta(ret, psTrailing('tmrwRet'))},
+       {v:cs,  l:'CS',           d:psDelta(cs,  psTrailing('cs'))},
+       {v:hot, l:'HoT',          d:psDelta(hot, psTrailing('hot'))}
+     ])
+   + psBand([
+       {v:oos, l:'OOS', d:psDelta(oos, psTrailing('oos'))},
+       {v:fbo, l:'FBOs', d:psDelta(fbo, psTrailing('fboCount'))},
+       {v:exc.length, l:'Exceptions', d:''},
+       {v:shortHours, l:'Hours below min', d:shortHours?'see strip':'clear'}
+     ])
+   + '<div class="ps-sec">Coverage by hour — bar height is people on the floor</div>'
+   + '<div class="ps-bars">'+(bars||'<div class="ps-muted">no schedule loaded</div>')+'</div>'
+   + '<div class="ps-xlbl">'+labels+'</div>'
+   + '<div class="ps-note">Solid black = the hour ran below its station minimum.</div>'
+   + '<div class="ps-sec">Exceptions</div>'
+   + (exc.length
+      ? '<table><tr><th>What</th><th>Who</th><th>Logged by</th><th>Time</th></tr>'
+        + exc.map(function(e){ return '<tr><td>'+psEsc(e.what)+'</td><td>'+e.who+'</td>'
+            +'<td>'+psEsc(e.by)+'</td><td class="ps-num">'+psEsc(e.when)+'</td></tr>'; }).join('')
+        + '</table>'
+      : '<div class="ps-muted">None.</div>')
+   + psSig('Closing manager','Reviewed by')
+   + '<div class="ps-note" style="margin-top:8px">Branch totals only — safe to post. Per-agent detail prints separately.</div>'
+   + '</div>';
+  psShell('Close report', body);
+}
+
+// ── ② OPEN & CLOSE EMAILS ──────────────────────────────────────────────────
+// The same grid in email shape. Composed here; a manager sends it. Nothing mails
+// automatically — the drop is explicit about that and so is the app.
+function psEmails(){
+  var now=new Date(), f=(STATE.fields)||{};
+  function block(mode){
+    var d=null; try{ d=(typeof buildEmailData==='function')?buildEmailData(mode):null; }catch(e){}
+    var subj=(d&&(d.subject||d.subj))||((mode==='morning'?'Open':'Close')+' — CMH '+(now.getMonth()+1)+'/'+now.getDate());
+    var to=(d&&(d.to||d.toLine))||'—';
+    var bodyTxt=(d&&(d.body||d.text))||'';
+    return '<div class="ps-sec">'+(mode==='morning'?'Open — the plan':'Close — the result')+'</div>'
+      + '<table><tr><th style="width:52px">To</th><td>'+psEsc(to)+'</td></tr>'
+      + '<tr><th>Subject</th><td><b>'+psEsc(subj)+'</b></td></tr></table>'
+      + '<div style="border:1px solid #000;padding:9px 11px;margin-top:6px;white-space:pre-wrap;'
+      + 'font-size:11px;line-height:1.5">'+(psEsc(bodyTxt)||'<span class="ps-muted">Nothing captured yet — fill the ritual first.</span>')+'</div>';
+  }
+  var body='<div class="ps-page">'
+   + psHead('Open & close emails','Composed here — you send them', [psDateLabel(now)])
+   + '<div class="ps-read"><b>Read first</b><ul>'
+   + '<li>Nothing sends automatically. Copy each block into Mail and send it yourself.</li>'
+   + '<li>The close block ends with what tomorrow inherits — that is the part the opener needs.</li>'
+   + '</ul></div>'
+   + block('morning') + block('evening')
+   + '<div class="ps-sec">What tomorrow inherits</div>'
+   + '<table><tr><th>Tomorrow out</th><td class="ps-num">'+psEsc(f.tmrwRes||'—')+'</td>'
+   + '<th>Tomorrow in</th><td class="ps-num">'+psEsc(f.tmrwRet||'—')+'</td></tr>'
+   + '<tr><th>Opening manager</th><td colspan="3">'+psEsc(f.openMgr||'—')+'</td></tr>'
+   + '<tr><th>Left over</th><td colspan="3">'+psEsc(f.closeNotes||'—')+'</td></tr></table>'
+   + psSig('Sent by','Reviewed by')
+   + '</div>';
+  psShell('Open & close emails', body);
+}
+
+// ── ③ SCHEDULE MAP — two weeks, stations down / days across ────────────────
+// Below-minimum cells print WHITE with the count heavy (not red — red fails on a
+// mono printer, which is what a branch has). At-minimum cells are tinted: one
+// call-off breaks them, and that is the whole point of looking at this sheet.
+function psScheduleMap(){
+  var start=new Date(); start.setDate(start.getDate()-start.getDay());   // this Sunday
+  var days=[]; for(var i=0;i<14;i++){ var d=new Date(start); d.setDate(start.getDate()+i); days.push(d); }
+  var STATIONS=[{k:'counter',l:'Counter'},{k:'exit',l:'Exit'},{k:'returns',l:'Returns'}];
+  var head='<tr><th>Station</th>'+days.map(function(d){
+      return '<th class="ps-num">'+['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()]+'<br>'+(d.getMonth()+1)+'/'+d.getDate()+'</th>';
+    }).join('')+'</tr>';
+  var rows='', atMin=0, below=0;
+  STATIONS.forEach(function(st){
+    rows+='<tr><td><b>'+st.l+'</b></td>';
+    days.forEach(function(d){
+      var have=null, need=null;
+      try{
+        var dow=d.getDay();
+        var nd=gfNeedsAt(13,dow); need=(nd&&nd[st.k])||0;
+        // supply at the midday peak from the stored schedule for that date
+        var sched=(typeof getScheduleForDate==='function')?getScheduleForDate(_asDateKeyOf(d)):null;
+        if(sched){
+          have=0;
+          Object.keys(sched).forEach(function(pid){
+            var s=_asStartOfStoredShift(sched[pid]), e=_asEndOfStoredShift(sched[pid]);
+            if(s==null||e==null) return;
+            if(e<s) e+=24;
+            if(s<=13 && e>13) have++;
+          });
+        }
+      }catch(e){}
+      var cls='', txt = have==null ? '·' : have;
+      if(have!=null && need>0){
+        if(have<need){ cls='ps-low'; below++; }
+        else if(have===need){ cls='ps-at'; atMin++; }
+      }
+      rows+='<td class="ps-num '+cls+'">'+txt+'</td>';
+    });
+    rows+='</tr>';
+  });
+  var body='<div class="ps-page">'
+   + psHead('Schedule map','Two weeks · people on at the midday peak',
+       [psDateLabel(days[0])+' → '+psDateLabel(days[13])])
+   + '<div class="ps-read"><b>Read first</b><ul>'
+   + '<li><b>Heavy number on white</b> = below the station minimum that day.</li>'
+   + '<li><b>Tinted cell</b> = exactly at minimum. One call-off breaks it.</li>'
+   + '<li>A dot means no schedule is stored for that date yet.</li>'
+   + '</ul></div>'
+   + '<table>'+head+rows+'</table>'
+   + '<div class="ps-note">'+below+' below minimum · '+atMin+' at minimum across 14 days.</div>'
+   + '<div class="ps-sec">Review pass — in this order</div>'
+   + '<table>'
+   + ['Any cell below minimum — can it be covered from another station that day?',
+      'Any tinted cell on a day with known PTO — that is the one that breaks.',
+      'Two tinted cells back to back — no slack for a second call-off.',
+      'Weekend cover: Saturday and Sunday read together, not separately.',
+      'Openers and closers present on every day.',
+      'Anyone on 6+ days in a row across the fortnight.'
+     ].map(function(t,i){ return '<tr><td style="width:22px" class="ps-num">'+(i+1)+'</td><td>'+t+'</td></tr>'; }).join('')
+   + '</table>'
+   + psSig('Planned by','Reviewed by')
+   + '</div>';
+  psShell('Schedule map', body);
+}
+
+// ── ④ WHO'S OUT — safe to post ─────────────────────────────────────────────
+// DATES ONLY, NEVER A REASON. Same hard rule as the exit accommodation: this
+// sheet is designed to go on a wall where anyone can read it, so there is no
+// field in it that could carry a medical or personal detail.
+function psWhosOut(){
+  var now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  var first=new Date(y,m,1), dim=new Date(y,m+1,0).getDate();
+  var pto=(STATE.pto)||{};
+  var byDay={};
+  for(var d=1; d<=dim; d++){
+    var dt=new Date(y,m,d), key=_asDateKeyOf(dt), list=[];
+    var rec=pto[key];
+    if(Array.isArray(rec)) list=rec.slice();
+    else if(rec&&typeof rec==='object') list=Object.keys(rec).filter(function(p){return rec[p];});
+    // scheduled OFF/VACA from the stored month reads as "out" too
+    try{
+      var sched=(typeof getScheduleForDate==='function')?getScheduleForDate(key):null;
+      if(sched) Object.keys(sched).forEach(function(pid){
+        if(/\bVACA?\b|\bPTO\b/i.test(String(sched[pid])) && list.indexOf(pid)<0) list.push(pid);
+      });
+    }catch(e){}
+    byDay[d]=list.map(function(p){ return (typeof dispName==='function')?dispName(p):String(p).replace(/_/g,' '); });
+  }
+  var cells='', wd=first.getDay();
+  for(var b=0;b<wd;b++) cells+='<td></td>';
+  for(var dd=1; dd<=dim; dd++){
+    if((wd+dd-1)%7===0 && dd>1) cells+='</tr><tr>';
+    var names=byDay[dd]||[];
+    cells+='<td style="height:58px;vertical-align:top'+(names.length>=2?';background:#eee':'')+'">'
+        + '<div style="font-size:10px;font-weight:800">'+dd+'</div>'
+        + names.map(function(n){ return '<div style="font-size:9.5px">'+psEsc(n)+'</div>'; }).join('')
+        + '</td>';
+  }
+  var thin=Object.keys(byDay).filter(function(k){ return (byDay[k]||[]).length>=2; }).length;
+  var body='<div class="ps-page">'
+   + psHead('Who’s out', now.toLocaleDateString('en-US',{month:'long',year:'numeric'}),
+       ['Dates only — no reasons recorded', 'Safe to post'])
+   + '<div class="ps-read"><b>Read first</b><ul>'
+   + '<li>This sheet carries <b>dates only</b>. No reason is stored anywhere in the app, so none can print here.</li>'
+   + '<li>Tinted days have two or more people out — those are the thin ones.</li>'
+   + '</ul></div>'
+   + '<table><tr>'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(function(x){return '<th>'+x+'</th>';}).join('')+'</tr>'
+   + '<tr>'+cells+'</tr></table>'
+   + '<div class="ps-note">'+thin+' day'+(thin===1?'':'s')+' this month with two or more people out.</div>'
+   + psSig('Approved by','Posted by')
+   + '</div>';
+  psShell('Who’s out', body);
+}
+
+// ── ⑤ ROTATION FAIRNESS & FLOW ─────────────────────────────────────────────
+// Turns taken against the floor average, then the queue as a flow. The rule the
+// drop is emphatic about, and so is the app: A SKIP MOVES TO THE BACK OF THE
+// QUEUE WITH THE REASON BLANK. Nobody loses their place by being accommodated,
+// and the sheet cannot reveal why anyone skipped.
+function psFairness(){
+  var now=new Date(), exp={}; try{ exp=buildExpectedToday(); }catch(e){}
+  var people=Object.keys(exp).filter(function(p){ return exp[p].person.role==='CXR'; });
+  var rows=people.map(function(pid){
+    var acc=(typeof exitAccommodated==='function')&&exitAccommodated(pid);
+    return { pid:pid,
+      nick:(typeof dispName==='function')?dispName(exp[pid].person):pid,
+      hrs:(typeof getExitHoursWeek==='function')?(getExitHoursWeek(pid)||0):0,
+      acc:acc };
+  });
+  var pool=rows.filter(function(r){ return !r.acc; });
+  var avg=pool.length? pool.reduce(function(s,r){return s+r.hrs;},0)/pool.length : 0;
+  var maxH=Math.max(1, Math.max.apply(null, rows.map(function(r){return r.hrs;}).concat([avg])));
+  pool.sort(function(a,b){ return a.hrs-b.hrs; });
+
+  var bars=rows.slice().sort(function(a,b){ return b.hrs-a.hrs; }).map(function(r){
+    var pct=Math.round(r.hrs/maxH*100);
+    return '<tr><td style="width:92px">'+psEsc(r.nick)+(r.acc?' <span class="ps-muted">◌</span>':'')+'</td>'
+      +'<td><div style="background:'+(r.acc?'#eee':'#000')+';height:9px;width:'+Math.max(1,pct)+'%"></div></td>'
+      +'<td class="ps-num" style="width:52px">'+(Math.round(r.hrs*10)/10)+'h</td></tr>';
+  }).join('');
+
+  var q=pool.slice(0,5);
+  var flow=['took it','up now','next up','then','then'];
+  var body='<div class="ps-page">'
+   + psHead('Rotation fairness & flow','Exit turns this week',
+       [psDateLabel(now), 'Floor average '+(Math.round(avg*10)/10)+'h'])
+   + '<div class="ps-read"><b>Read first</b><ul>'
+   + '<li>The bar is exit hours this week. The rule line is the floor average.</li>'
+   + '<li><b>◌</b> = not in the rotation right now. <b>Dates only — no reason is recorded or printed.</b></li>'
+   + '<li><b>A skip moves to the back of the queue with the reason blank.</b> Nobody loses their place by being accommodated.</li>'
+   + '</ul></div>'
+   + '<div class="ps-sec">Turns taken vs the floor average</div>'
+   + '<table>'+ (bars||'<tr><td class="ps-muted">No CXRs scheduled.</td></tr>') +'</table>'
+   + '<div class="ps-note">Rule line = '+(Math.round(avg*10)/10)+'h, averaged across the '+pool.length+' people currently in the rotation.</div>'
+   + '<div class="ps-sec">The queue</div>'
+   + (q.length
+      ? '<table><tr><th style="width:78px">Position</th><th>Who</th><th class="ps-num">Exit this week</th></tr>'
+        + q.map(function(r,i){ return '<tr><td>'+(flow[i]||'then')+'</td><td>'+psEsc(r.nick)+'</td>'
+            +'<td class="ps-num">'+(Math.round(r.hrs*10)/10)+'h</td></tr>'; }).join('')
+        + '</table>'
+      : '<div class="ps-muted">Nobody in the rotation today.</div>')
+   + '<div class="ps-sec">Out-of-order overrides this period</div>'
+   + '<div class="ps-muted">None logged. Any override of the queue order is recorded here with the name of whoever made it.</div>'
+   + psSig('Rotation run by','Reviewed by')
+   + '</div>';
+  psShell('Rotation fairness & flow', body);
+}
+
+// ── the menu ───────────────────────────────────────────────────────────────
+function openPrintables(){
+  var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
+   +'Five sheets on one grid. Everything reads on a black-and-white printer — '
+   +'tint means something, it is not decoration.</div>';
+  PS_SHEETS.forEach(function(s){
+    b+='<button onclick="closeModal();'+s.fn+'()" '
+      +'style="width:100%;margin-bottom:7px;padding:12px;border-radius:9px;border:1px solid var(--bdr2);'
+      +'background:var(--bg3);color:var(--txt2);font-size:13.5px;cursor:pointer;text-align:left;'
+      +'display:flex;align-items:center;gap:10px">'
+      +'<span style="font-size:17px">'+s.icon+'</span>'
+      +'<span style="flex:1"><b style="color:var(--txt)">'+s.name+'</b>'
+      +'<div style="font-size:11px;color:var(--txt3);margin-top:1px">'+s.who+'</div></span>'
+      +'<span style="opacity:.5">🖨</span></button>';
+  });
+  openModal('🖨 Print', b);
+}
+
 function printScheduleMap() {
   const exp = typeof buildExpectedToday === 'function' ? buildExpectedToday() : {};
   if (!Object.keys(exp).length) {
