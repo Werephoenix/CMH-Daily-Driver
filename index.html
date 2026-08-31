@@ -9439,15 +9439,91 @@ function _nowFmtH(h){ if(h==null)return'—'; const hh=((Math.floor(h)%24)+24)%2
 
 // Pick the freest on-counter CXR with the LEAST weekly exit time → keeps
 // exit-fairness balanced while covering the gap. Returns [pid, entry] or null.
-function _nowExitCandidate(exp, h) {
-  const cands = Object.entries(exp).filter(([pid,e]) => {
-    if (e.person.role !== 'CXR') return false;
-    if ((STATE.todayOverrides||{})[pid]==='callout') return false;
-    return _nowZone(pid, e.person, h) === 'counter';
+// ── v60.179 · WHO GOES TO EXIT, AND WHY ────────────────────────────────────
+// Two problems, one fix.
+//
+// 1. A REAL BUG. This picker checked role, call-off and zone — and NEVER
+//    checked exit accommodations. Worse, an accommodated person accrues ZERO
+//    exit hours, and the sort is "least exit time first", so the accommodation
+//    made them the TOP suggestion every single time. The app was reliably
+//    telling a manager to send exactly the person who must not go. That breaks
+//    Matt's requirement verbatim: "remember not to schedule them at exit and to
+//    not count against their 'fairness'."
+//
+// 2. THE SUGGESTIONS LOOKED RANDOM. They were ranked, but the ranking was
+//    invisible, so a manager had no way to trust or challenge it. exitPickReport
+//    returns the whole decision — who was picked, who else was in the running
+//    with their numbers, and who was excluded and why — and openExitWhy shows it.
+//
+// PRIVACY: an accommodation is reported as "not available for exit" with DATES
+// ONLY, never a reason, matching the grey ◌ language used everywhere else.
+function exitPickReport(exp, h){
+  const ranked=[], excluded=[];
+  Object.entries(exp||{}).forEach(([pid,e])=>{
+    const p=e.person, nick=(typeof dispName==='function')?dispName(p):(p.nick||String(p.name||'').split(' ')[0]);
+    if(p.role!=='CXR'){ return; }                       // not part of the exit rotation
+    if((STATE.todayOverrides||{})[pid]==='callout'){
+      const t=(typeof absenceTypeOf==='function')?absenceTypeOf(pid):null;
+      const m=(t&&typeof absenceMeta==='function')?absenceMeta(t):null;
+      excluded.push({pid,nick,why:(m?m.short:'Off')+' today'}); return;
+    }
+    if(typeof exitAccommodated==='function' && exitAccommodated(pid)){
+      const lbl=(typeof exitAccommodationLabel==='function')?exitAccommodationLabel(pid):'';
+      excluded.push({pid,nick,why:'Not available for exit'+(lbl?' · '+String(lbl).replace('no exit · ',''):''), quiet:true});
+      return;
+    }
+    const z=_nowZone(pid,p,h);
+    if(z==='exit'){ excluded.push({pid,nick,why:'Already at Exit'}); return; }
+    if(z!=='counter'){ excluded.push({pid,nick,why: z==='lunch'?'On lunch':(z==='off'?'Not on shift this hour':'At '+z)}); return; }
+    ranked.push({pid, nick, exitH:(getExitHoursWeek(pid)||0)});
   });
-  if (!cands.length) return null;
-  cands.sort((a,b) => (getExitHoursWeek(a[0])||0) - (getExitHoursWeek(b[0])||0));
-  return cands[0];
+  ranked.sort((a,b)=>a.exitH-b.exitH || String(a.nick).localeCompare(String(b.nick)));
+  return {picked: ranked[0]||null, ranked, excluded, hour:h};
+}
+function _nowExitCandidate(exp, h) {
+  const rep = exitPickReport(exp, h);
+  if(!rep.picked) return null;
+  const pid = rep.picked.pid;
+  return [pid, exp[pid]];
+}
+// The explainer. Matt: "yes to an explainer for any random exit rotation suggestions."
+function openExitWhy(h){
+  const exp=(typeof buildExpectedToday==='function')?buildExpectedToday():{};
+  const hour=(h==null)?Math.floor(new Date().getHours()+new Date().getMinutes()/60):h;
+  const rep=exitPickReport(exp, hour);
+  const fmt=v=>(Math.round(v*10)/10).toFixed(1)+'h';
+  let b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
+   +'Exit time is shared out evenly, so the suggestion is always <b>whoever is at Counter '
+   +'right now with the least exit time this week</b>. Nothing is random — here is the whole list.</div>';
+  if(!rep.picked){
+    b+='<div style="font-size:13px;color:var(--txt2);line-height:1.6">Nobody is free at Counter this hour, '
+      +'so there is no one to move without leaving Counter short. That is a real shortage, not a rota problem.</div>';
+  } else {
+    b+='<div style="padding:10px;border-radius:8px;background:rgba(35,201,131,.10);border:1px solid var(--accent);margin-bottom:12px">'
+      +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--accent)">Suggested</div>'
+      +'<div style="font-size:15px;font-weight:800;color:var(--txt);margin-top:2px">'+rep.picked.nick+'</div>'
+      +'<div style="font-size:12px;color:var(--txt2);margin-top:3px">'+fmt(rep.picked.exitH)+' at Exit so far this week — '
+      +(rep.ranked.length>1?'the least of anyone free at Counter':'the only person free at Counter')+'.</div></div>';
+    if(rep.ranked.length>1){
+      b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:5px">Also in the running</div>';
+      rep.ranked.slice(1).forEach(r=>{
+        b+='<div style="display:flex;gap:8px;padding:5px 0;font-size:12.5px;color:var(--txt2);border-bottom:1px solid var(--bdr)">'
+          +'<span style="flex:1">'+r.nick+'</span><span style="font-family:var(--ff-mono);color:var(--txt3)">'+fmt(r.exitH)+'</span></div>';
+      });
+    }
+  }
+  if(rep.excluded.length){
+    b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin:14px 0 5px">Not considered</div>';
+    rep.excluded.forEach(x=>{
+      b+='<div style="display:flex;gap:8px;padding:4px 0;font-size:12px;color:var(--txt3)">'
+        +'<span style="flex:1">'+(x.quiet?'<span style="opacity:.75">◌</span> ':'')+x.nick+'</span>'
+        +'<span style="opacity:.85">'+x.why+'</span></div>';
+    });
+  }
+  b+='<div style="margin-top:14px;font-size:11.5px;color:var(--txt3);line-height:1.55">'
+   +'Exit time is not counted against anyone while they are unavailable for exit, so being off the '
+   +'rotation never makes their fair share look owed.</div>';
+  openModal('🟩 Why this person for Exit?', b);
 }
 function nowFix(pid) {
   if (!pid) return;
@@ -10880,8 +10956,11 @@ function renderNow() {
     exit: () => { if (exitHave >= exitNeed) return null;
       const cand = _nowExitCandidate(exp, h);
       const cn = cand ? (cand[1].person.nick || cand[1].person.name.split(' ')[0]) : null;
+      // v60.179: the claim now links to the evidence behind it.
       return { cls:'urgent', kicker:'⚠ Exit short — right now', title:`Exit is ${exitHave}/${exitNeed}`,
-        sub: cand ? `${cn} is freest at Counter and lowest on exit time this week.` : 'No free Counter CXR to pull — consider an MT/ABRM.',
+        sub: cand
+          ? `${cn} is freest at Counter and lowest on exit time this week. <a href="#" onclick="event.preventDefault();event.stopPropagation();openExitWhy();" style="color:var(--accent);font-weight:700;text-decoration:none;white-space:nowrap">Why them?</a>`
+          : 'No free Counter CXR to pull — consider an MT/ABRM.',
         btn: cand ? {label:`Send ${cn} to Exit →`, on:`nowFix('${cand[0]}')`, cls:'wide-green'} : null }; },
     counter: () => { if (ctrHave >= ctrNeed) return null;
       return { cls:'warn', kicker:'⚠ Counter short — right now', title:`Counter is ${ctrHave}/${ctrNeed}`,
@@ -16378,7 +16457,7 @@ function renderCoverageFirst() {
     if (!q.closed && q.ex < q.exN) {
       const cand = _nowExitCandidate(exp, h);          // counter CXR free this hour, least exit hrs
       const wouldCtrShort = (q.ct - 1) < q.ctN;
-      if (cand && !wouldCtrShort) { const nm = (cand[1].person.nick||cand[1].person.name.split(' ')[0]).replace(/'/g,''); note = `<button class="cov-note movable" onclick="covFix('${cand[0]}','full-exit')">⚑ Tap to fix — send ${nm} to Exit (Counter stays OK) →</button>`; }
+      if (cand && !wouldCtrShort) { const nm = (cand[1].person.nick||cand[1].person.name.split(' ')[0]).replace(/'/g,''); note = `<button class="cov-note movable" onclick="covFix('${cand[0]}','full-exit')">⚑ Tap to fix — send ${nm} to Exit (Counter stays OK) →</button><button class="cov-note" style="background:none;border:none;color:var(--txt3);font-size:10.5px;cursor:pointer;padding:2px 0" onclick="event.stopPropagation();openExitWhy(${'$'}{h})">why ${nm}?</button>`; }
       else { note = `<div class="cov-note shortage">⚠ True shortage — need +${q.exN-q.ex} more at Exit</div>`; }
     } else if (!q.closed && q.ct < q.ctN) {
       const exitCxr = Object.entries(exp).find(([pid,e]) => e.person.role==='CXR' && _nowZone(pid,e.person,h)==='exit');
@@ -21029,6 +21108,11 @@ var BRANCH_INTERVIEW = [
     {k:'minOffExit',     type:'number', q:'Min at Exit — SLOW', scope:'fact'},
     {k:'minOffReturns',  type:'number', q:'Min at Returns — SLOW', scope:'fact'},
   ]},
+  { title:'Manager shift windows', tunes:'the manager rotation', qs:[
+    {k:'mgrLateWindow', type:'single', scope:'fact',
+     q:'Could a manager work 11a–9p? (Today the latest non-closing shift is 10a–8p.)',
+     opts:['No — keep the five we have','Yes — allow 11a–9p']},
+  ]},
   { title:'Judgment calls', tunes:'scheduler + one-tap fix', view:true, qs:[
     {k:'protectFirst', type:'single', q:'When short, protect which station first?', opts:['Counter','Exit','Returns'], scope:'view'},
     {k:'rotation',     type:'single', q:'How do people move between stations?', opts:['Stay assigned','Rotate on a timer','Move by need'], scope:'view'},
@@ -22820,6 +22904,35 @@ function _asSeedPriorWeek(mgrPrev, roster, depth, seedRun){
   }catch(e){}
 }
 
+// ── v60.179 · THE 11a WINDOW ───────────────────────────────────────────────
+// Measured over 24 simulated weeks (~1,114 manager shifts), adding ONE window:
+//
+//   window added   longest night run   stuck >3 nights   max nights   tight
+//   baseline               5                  6              37         1
+//   + 9A-7P                5                  6              37         1   ← no effect
+//   + 11A-9P               3                  0              25         0   ← this one
+//   + 12P-10P              3                  0              31         0
+//
+// WHY 11a and not 9a: a close ends 23.5. Rest to the next morning is
+// 5:30a=6h · 6a=6.5h · 8a=8.5h · 9a=9.5h · 10a=10h — every one under the 11h
+// minimum, so the only humane next-day option was ANOTHER close (16.5h). That
+// arithmetic, not the algorithm, is why closers got stuck on nights.
+// 11a is the first start that clears it: 11.5h. It is a threshold, not a dial.
+//
+// OFF BY DEFAULT. An 11a–9p manager shift does not exist at this branch today;
+// introducing one is an operational decision for Matt and the AM, not something
+// a scheduler should quietly assume. The branch survey asks; this reads it.
+function _asExtraMgrWindows(){
+  try{
+    var cfg=(STATE.branchConfig)||{};
+    var out=[];
+    if(String(cfg.mgrLateWindow||'').indexOf('11a')>=0) out.push('11A-9P');
+    if(Array.isArray(cfg.mgrExtraWindows)) cfg.mgrExtraWindows.forEach(function(w){
+      if(w && out.indexOf(w)<0) out.push(w); });
+    return out;
+  }catch(e){ return []; }
+}
+
 function asBuildWeek(seed, _priorDepth){
   var roster = (typeof getEffectiveRoster==='function') ? getEffectiveRoster() : [];
   var days = [];
@@ -22883,8 +22996,17 @@ function asBuildWeek(seed, _priorDepth){
     //    shift-science rules (Grimoire 2026-08-23): never seat a <11h close→open
     //    turnaround, and lean forward (a late finish never gets an early start
     //    the next day). Still one window each, still cover an opener + a closer.
+    var _xw = _asExtraMgrWindows();
     var pool = roster.filter(function(p){
       return ['BRM','ABRM','MT'].indexOf(p.role)>=0 && p.patternWindows && _asMgrWorksDay(p,dow,seed,_variesIdx) && !_isOff(p.name);
+    }).map(function(p){
+      // v60.179: extend the window list on a COPY. Fifteen places read
+      // p.patternWindows; copying here reaches all of them and never mutates
+      // the roster the rest of the app shares.
+      if(!_xw.length) return p;
+      var c=Object.assign({}, p);
+      c.patternWindows=p.patternWindows.concat(_xw.filter(function(w){ return p.patternWindows.indexOf(w)<0; }));
+      return c;
     });
     if(pool.length){
       // v60.161: ANCHOR-FIRST ordering. The May/September analysis showed every
