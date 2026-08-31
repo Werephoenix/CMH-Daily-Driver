@@ -2680,6 +2680,10 @@ button { cursor: pointer; }
             <!-- v60.185: the quote is a communications act, so it lives beside
                  announcements rather than in settings. -->
             <button class="btn btn-g btn-sm" onclick="openQuotePost()">“ Quote of the day</button>
+            <!-- v60.186: demo mode lives in Admin because starting one is a
+                 manager act, and it must never be a tap away for an agent
+                 mid-shift. -->
+            <button class="btn btn-g btn-sm" onclick="openDemoMenu()">▶ Demo mode</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-celeb" onclick="showAdminSection('celeb')">🎂 Celebrations</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-edit" onclick="showAdminSection('edit')">✏️ Edit Schedule</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-sched" onclick="showAdminSection('sched')">📅 Schedule Import</button>
@@ -4225,6 +4229,11 @@ function toggleContrast() {
 })();
 
 function saveState() {
+  // v60.186: a demo mutates STATE freely (that is how the real screens render),
+  // but it must not persist. demoStop() restores the pre-demo snapshot from
+  // memory; blocking the write here means a crash or a closed tab mid-demo also
+  // leaves the saved data untouched.
+  if (typeof demoIsOn === 'function' && demoIsOn()) return;
   // Local save always immediate. v59.2: previously silently swallowed all
   // failures — if localStorage was full or disabled, Matt would think his
   // data was being saved when it wasn't. Now logs to console (one warning
@@ -4364,6 +4373,11 @@ function autoRouteByTime() {
 // offer "Fix Schedule" (recommended) or "Live Board".
 function _sodTodayKey(){ return new Date().toISOString().slice(0,10); }
 function maybeStartOfDay() {
+  // v60.186: the start-of-day sheet must not ambush a demo. It is triggered by
+  // "first open today", and entering a demo looks exactly like that — so it
+  // opened over the presenter's first beat. The demo has its own script for the
+  // morning; this stays out of its way.
+  if (typeof demoIsOn === 'function' && demoIsOn()) return false;
   try {
     const today = _sodTodayKey();
     if (STATE.lastOpenDate === today) return false;   // already opened today
@@ -6151,6 +6165,11 @@ function clearAllDuty() {
 var HIST_KEY = 'cmh-history-v2';
 
 function loadHistory() {
+  // v60.186: history is a SEPARATE localStorage store, so clearing STATE does
+  // not touch it — a demo would otherwise read the branch's real 60 days of
+  // names and numbers straight into the close report and the charts. The drop
+  // asks for the DATA SOURCE to be swapped; this is that swap.
+  if (typeof demoIsOn === 'function' && demoIsOn()) return [];
   try { const r = localStorage.getItem(HIST_KEY); return r ? JSON.parse(r) : []; }
   catch(e) { return []; }
 }
@@ -14447,6 +14466,17 @@ function setSyncStatus(status, msg) {
 }
 
 async function cloudPush() {
+  // v60.186: THE DEMO CHOKE POINT — outbound effects stop HERE, at the service
+  // layer, not behind a flag checked in twenty features. The drop is explicit
+  // about this and it is the right shape: a new feature added next month is
+  // automatically demo-safe because it writes through this one function. If a
+  // demo could reach the shared store, one presentation would rewrite the
+  // branch's live schedule.
+  if (typeof demoIsOn === 'function' && demoIsOn()) {
+    setSyncStatus('offline','Demo — not syncing');
+    window._syncPending = false;
+    return;
+  }
   // v60.6: the push is firing now — clear the pending flag. This line stays
   // SYNCHRONOUS (before any await) so an actively-editing device resumes
   // accepting remote pulls the moment it pushes. test_sync.js asserts this.
@@ -14569,6 +14599,12 @@ function applyRemoteRecord(record, apply) {
 }
 
 async function cloudPull(apply) {
+  // v60.186: and inbound too — a live update landing mid-demo would overwrite
+  // the fixture with real staff names in front of an audience.
+  if (typeof demoIsOn === 'function' && demoIsOn()) {
+    setSyncStatus('offline','Demo — not syncing');
+    return;
+  }
   const H = await _sbHeaders();
   if (!H) { setSyncStatus('offline','Sign in to sync'); return; }
   try {
@@ -18004,6 +18040,356 @@ function psFairness(){
 }
 
 // ── the menu ───────────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.186 · DEMO MODE (Design v2)
+//
+// A presenter mode for showing the app to managers. Two tracks: SHORT (7 beats,
+// ~90s, one shift start to finish) and FULL (18 beats across 7 chapters).
+//
+// A beat is a DECLARATIVE RECORD, not code — {ch, t, k, tab, cap, why} — so the
+// script is reorderable data. The runner sets state and the REAL screens render;
+// it is never a slideshow. If a screen is broken, the demo shows it broken,
+// which is the point.
+//
+// FOUR BEHAVIOURS THE DROP CALLS OUT, all carried here:
+//  • Chapters are jumpable — "a demo you can't navigate under a question fails
+//    in the room."
+//  • Any tap inside the app PAUSES the script and the rail says YOU HAVE IT.
+//    Whoever grabs the phone takes over instantly.
+//  • Per-beat dwell — beats carrying the argument get room to talk over.
+//  • Handoff ending — the last beat hands the app over live. That is the step
+//    that converts watching into trying.
+//
+// ── THE PRODUCTION REQUIREMENT, AND HOW IT IS MET ─────────────────────────
+// The drop is explicit: demo mode must swap the DATA SOURCE to a bundled
+// fixture and hard-stop every outbound effect at the SERVICE LAYER, not per
+// feature. So:
+//   1. Entering demo SNAPSHOTS the real STATE and swaps in a fictional branch
+//      (fictional names, fixed date). Leaving restores the snapshot exactly.
+//   2. Cloud sync is stopped at cloudPush/cloudPull — ONE choke point, not a
+//      flag checked in twenty places. Nothing a demo does can ever reach the
+//      branch's real shared state.
+//   3. An undismissable badge + an auto-exit after 30 minutes idle, so no
+//      device is ever left stranded in fiction.
+// ═══════════════════════════════════════════════════════════════════════════
+var DEMO_IDLE_MS = 30*60*1000;
+var _dmOn=false, _dmSnap=null, _dmIdx=0, _dmTimer=null, _dmIdle=null, _dmPaused=false, _dmTrack='short';
+
+// A fictional branch. Deliberately not CMH and not anyone's real name.
+var DEMO_FIXTURE = {
+  branch:'RDU · Raleigh-Durham (fictional)',
+  date:'2026-08-14',
+  people:[
+    {id:'d1', name:'Avery Nolan',   nick:'Avery',  role:'CXR',     shiftCode:'530A-200P', shiftStart:5.5,  shiftEnd:14,   daysOn:[0,1,2,3,4]},
+    {id:'d2', name:'Bree Calloway', nick:'Bree',   role:'CXR',     shiftCode:'6A-230P',   shiftStart:6,    shiftEnd:14.5, daysOn:[0,1,2,3,4]},
+    {id:'d3', name:'Devon Hart',    nick:'Devon',  role:'CXR',     shiftCode:'10A-630P',  shiftStart:10,   shiftEnd:18.5, daysOn:[1,2,3,4,5]},
+    {id:'d4', name:'Imani Rowe',    nick:'Imani',  role:'CXR',     shiftCode:'12P-830P',  shiftStart:12,   shiftEnd:20.5, daysOn:[2,3,4,5,6]},
+    {id:'d5', name:'Kai Bennett',   nick:'Kai',    role:'EXIT',    shiftCode:'7A-330P',   shiftStart:7,    shiftEnd:15.5, daysOn:[0,1,2,3,4]},
+    {id:'d6', name:'Rosa Lindqvist',nick:'Rosa',   role:'RETURNS', shiftCode:'330A-12P',  shiftStart:3.5,  shiftEnd:12,   daysOn:[0,1,2,3,4]},
+    {id:'d7', name:'Theo Marsh',    nick:'Theo',   role:'BRM',     shiftCode:'530A-330P', shiftStart:5.5,  shiftEnd:15.5, daysOn:[1,2,3,4,5], patternWindows:['530A-330P','8A-6P','4P-C'], defaultStation:'Emerald Booth Manager'},
+    {id:'d8', name:'Nadia Okonkwo', nick:'Nadia',  role:'ABRM',    shiftCode:'4P-C',      shiftStart:16,   shiftEnd:23.5, daysOn:[0,3,4,5,6], patternWindows:['8A-6P','10A-8P','4P-C']}
+  ]
+};
+
+// ── the script · declarative beats ─────────────────────────────────────────
+var DEMO_BEATS = [
+  {ch:'Morning',  t:'short', tab:'now',      cap:'The day opens on one question',
+   why:'Not a dashboard. The first screen answers “what needs me this hour” and nothing else.', dwell:9500},
+  {ch:'Morning',  t:'short', tab:'now',      cap:'Someone called off',
+   why:'One tap. The app works out what it just broke before you do.', act:'callOff', dwell:11000},
+  {ch:'Morning',  t:'short', tab:'schedule', cap:'It shows you the hole',
+   why:'Coverage recomputes live. The gap is named, not implied.', dwell:9500},
+  {ch:'Rituals',  t:'full',  tab:'checklist',cap:'The open ritual',
+   why:'The same list every morning, so nothing is remembered by luck.', dwell:9500},
+  {ch:'Schedule', t:'full',  tab:'schedule', cap:'Rotation is one tap',
+   why:'Counter to Exit, or exact times per leg when the day is odd.', dwell:9500},
+  {ch:'Schedule', t:'full',  tab:'schedule', cap:'And it explains itself',
+   why:'Every suggestion says who else was considered and why they were not picked.', act:'exitWhy', dwell:14000},
+  {ch:'Midday',   t:'short', tab:'now',      cap:'Someone is alone at Exit',
+   why:'Computed, not flagged. It escalates on the clock and a check-in goes stale after 45 minutes.', act:'solo', dwell:14000},
+  {ch:'Midday',   t:'full',  tab:'board',    cap:'The live board',
+   why:'What is actually on the lot, sorted the way the floor thinks about it.', dwell:9500},
+  {ch:'Requests', t:'full',  tab:'now',      cap:'A request with its cost',
+   why:'“Impact 30 min · Exit stays 2/2 — safe to approve.” The decision carries its consequence.', dwell:11000},
+  {ch:'Close',    t:'short', tab:'checklist',cap:'The close ritual',
+   why:'Ends by capturing tomorrow’s numbers, so the opener does not start blind.', dwell:9500},
+  {ch:'Close',    t:'full',  tab:'schedule', cap:'And it prints',
+   why:'Five sheets on one grid — the close report goes on the wall, dates only where people can read it.', act:'print', dwell:11000},
+  {ch:'Admin',    t:'full',  tab:'more',     cap:'Set up without a developer',
+   why:'Staff, stations, minimums, car codes — all editable in the app.', dwell:7000},
+  {ch:'Admin',    t:'short', tab:'now',      cap:'Over to you',
+   why:'Everything is live. Tap anything.', act:'handoff', dwell:0}
+];
+
+function demoBeats(){ return DEMO_BEATS.filter(function(b){ return _dmTrack==='full' || b.t==='short'; }); }
+function demoChapters(){
+  var seen=[], out=[];
+  demoBeats().forEach(function(b,i){ if(seen.indexOf(b.ch)<0){ seen.push(b.ch); out.push({ch:b.ch, i:i}); } });
+  return out;
+}
+function demoIsOn(){ return !!_dmOn; }
+
+// ── enter / leave ──────────────────────────────────────────────────────────
+function demoStart(track){
+  if(_dmOn) return;
+  _dmTrack=(track==='full')?'full':'short';
+  _dmSnap=JSON.stringify(STATE);                       // exact restore on exit
+  _dmOn=true; _dmIdx=0; _dmPaused=false;
+  try{ localStorage.setItem('cmh-demo-active','1'); }catch(e){}
+  _dmSwapRosters();
+  demoApplyFixture();
+  demoInjectChrome();
+  document.addEventListener('click', _dmTapPause, true);
+  _dmBumpIdle();
+  _dmRepaint();
+  demoGo(0);
+  if(typeof toast==='function') toast('▶ Demo — nothing here touches the branch');
+}
+function demoStop(){
+  if(!_dmOn) return;
+  clearTimeout(_dmTimer); clearTimeout(_dmIdle);
+  document.removeEventListener('click', _dmTapPause, true);
+  _dmOn=false; _dmPaused=false;
+  try{ localStorage.removeItem('cmh-demo-active'); }catch(e){}
+  _dmRestoreRosters();
+  if(_dmSnap){
+    Object.keys(STATE).forEach(function(k){ delete STATE[k]; });
+    Object.assign(STATE, JSON.parse(_dmSnap));
+    _dmSnap=null;
+  }
+  if(typeof invalidateRosterCache==='function') try{ invalidateRosterCache(); }catch(e){}
+  if(typeof saveState==='function') saveState();
+  var el=document.getElementById('dm-chrome'); if(el) el.remove();
+  var b=document.getElementById('dm-badge'); if(b) b.remove();
+  _dmRepaint();
+  if(typeof toast==='function') toast('Demo ended — your real data is back');
+}
+// Everything in here can carry a REAL person or a real customer. The first cut
+// of this function cleared only the scheduling keys, and a test showed 7.6 KB of
+// real schedule history surviving into the demo — plus dnr/dnq, which holds
+// NAMED CUSTOMERS WITH FRAUD ALLEGATIONS and is exactly what the demo's own
+// DNR gate beat puts on screen. Showing that to a room would be the worst
+// possible outcome of a sales demo.
+//
+// So the list is explicit and errs toward clearing. Anything holding names,
+// numbers, photos or notes is emptied; only preferences (theme, density) and
+// branch configuration survive, because those shape how the app LOOKS rather
+// than who is in it.
+var DEMO_CLEAR_KEYS = [
+  // people, placement, attendance
+  'todayOverrides','absenceType','pto','exitAccommodation','mgmtBlocks','altSchedule',
+  'shiftMod','staffDuty','staffStation','shiftTimes','stationPref','customSplits',
+  'customLunch','specialBlocks','scheduleOverrides','soloChecked','mergedAvailability',
+  // named customers — the most sensitive thing in the app
+  'dnr','dnq',
+  // anything else carrying a name, a note, a photo or a branch number
+  'announcements','celebrations','carPhotos','policyLog','scheduleLog','clReasons',
+  'displayNames','nameAliases','mgrStationLog','mgrStationLoggedDates','mgrStationDeclared',
+  'branchResponses','pasteData','pasteHourly','physInventory','groupOverrides',
+  'closeFields','pendingCoverage','confirmedCoverage','checklist'
+];
+// v60.186: SWAP THE ROSTER ARRAYS THEMSELVES.
+// First attempt set STATE.adminRoster to the fixture — but _buildMergedRoster()
+// starts from the hard-coded ROSTER_* constants and treats adminRoster as
+// OVERRIDES BY ID, so the fixture was added ALONGSIDE the real staff. The demo
+// screenshot showed Kerv, Abdi, Matt and CeCe by name. A dozen functions read
+// those constants directly, so guarding each one would rot the moment someone
+// added a thirteenth.
+//
+// Replacing the array CONTENTS in place reaches every consumer — direct or
+// through the merge — from one place, which is what "swap the data source"
+// actually has to mean here.
+var _dmRosterSnap=null;
+function _dmSwapRosters(){
+  var f=DEMO_FIXTURE.people;
+  function take(arr, roles){
+    if(typeof arr==='undefined' || !arr) return null;
+    var snap=arr.slice();
+    arr.length=0;
+    f.filter(function(p){ return roles.indexOf(p.role)>=0; }).forEach(function(p){ arr.push(p); });
+    return snap;
+  }
+  _dmRosterSnap={
+    cxr:  take(typeof ROSTER_CXR    !=='undefined'?ROSTER_CXR:null,     ['CXR']),
+    mgmt: take(typeof ROSTER_MGMT   !=='undefined'?ROSTER_MGMT:null,    ['ARM','BRM','ABRM','MT']),
+    exit: take(typeof ROSTER_EXIT   !=='undefined'?ROSTER_EXIT:null,    ['EXIT']),
+    ret:  take(typeof ROSTER_RETURNS!=='undefined'?ROSTER_RETURNS:null, ['RETURNS'])
+  };
+}
+function _dmRestoreRosters(){
+  if(!_dmRosterSnap) return;
+  function put(arr, snap){ if(!arr||!snap) return; arr.length=0; snap.forEach(function(x){ arr.push(x); }); }
+  put(typeof ROSTER_CXR    !=='undefined'?ROSTER_CXR:null,     _dmRosterSnap.cxr);
+  put(typeof ROSTER_MGMT   !=='undefined'?ROSTER_MGMT:null,    _dmRosterSnap.mgmt);
+  put(typeof ROSTER_EXIT   !=='undefined'?ROSTER_EXIT:null,    _dmRosterSnap.exit);
+  put(typeof ROSTER_RETURNS!=='undefined'?ROSTER_RETURNS:null, _dmRosterSnap.ret);
+  _dmRosterSnap=null;
+}
+
+// v60.186: a demo swaps the data underneath every screen, so every screen has
+// to be redrawn. The first version refreshed only Now and the timeline, and a
+// test found the opening header still reading "Opening: Khala" and a real
+// announcement still on the dashboard — correct data, stale pixels. In a room
+// full of managers that is indistinguishable from a leak.
+// v60.186: the DNR/DNQ gate is a full-screen overlay that persists once drawn.
+// STATE.dnr is cleared for the demo, but the ALREADY-RENDERED gate kept a real
+// customer's name on screen — a test caught "Calloway" surviving into beats 0
+// and 1. The drop asks for the gate to be pre-acked for every beat except the
+// one that showcases it; this tears the drawn overlay down, and since the
+// underlying list is empty it cannot re-arm with real names.
+function _dmClearGate(){
+  try{
+    var o=document.getElementById('dnr-gate');
+    if(o){
+      var b=o.querySelector('.dg-body'); if(b) b.innerHTML='';
+      o.style.display='none';
+      document.body.style.overflow='';
+    }
+  }catch(e){}
+}
+function _dmRepaint(){
+  _dmClearGate();
+  // Every renderer that can put a NAME on screen. Found by testing, not by
+  // reading: refreshDNRDNQCards was missing from the first list and a real
+  // customer's name survived into five separate beats — the acknowledged-flags
+  // reference list is a different renderer from the gate itself.
+  ['refreshDash','renderNow','buildCoverageTimeline','buildSwitchboard','renderScheduleView',
+   'renderBoard','buildDashSchedMini','renderAnnouncements','buildDashAnnouncements',
+   'soloRenderSchedBanner','renderCalendar','buildMonthGrid','refreshDNRDNQCards',
+   'buildAdminStaffList','renderCelebrations','buildDashAnnc','renderRoster'
+  ].forEach(function(fn){ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} });
+  // anything driven by a status band / header that only redraws on tab change
+  try{ if(typeof showTab==='function' && typeof _curTab!=='undefined') showTab(_curTab); }catch(e){}
+}
+
+function demoApplyFixture(){
+  DEMO_CLEAR_KEYS.forEach(function(k){
+    var cur=STATE[k];
+    STATE[k] = Array.isArray(cur) ? [] : (cur && typeof cur==='object' ? {} : null);
+  });
+  STATE.adminRoster = [];      // the swapped ROSTER_* arrays ARE the fixture now
+  STATE.qSettledDay=''; STATE.quotePost=null;
+  STATE.fields={openMgr:'Theo', closeMgr:'Nadia'};
+  if(typeof invalidateRosterCache==='function') try{ invalidateRosterCache(); }catch(e){}
+}
+// ── the runner ─────────────────────────────────────────────────────────────
+function demoGo(i){
+  var beats=demoBeats();
+  if(i<0||i>=beats.length) return;
+  _dmIdx=i; _dmPaused=false;
+  var b=beats[i];
+  try{ if(b.tab && typeof showTab==='function') showTab(b.tab); }catch(e){}
+  try{ demoAct(b.act); }catch(e){}
+  demoRenderChrome();
+  clearTimeout(_dmTimer);
+  if(b.dwell>0 && i<beats.length-1){
+    _dmTimer=setTimeout(function(){ if(_dmOn && !_dmPaused) demoGo(i+1); }, b.dwell);
+  }
+}
+function demoAct(act){
+  if(!act) return;
+  var exp=(typeof buildExpectedToday==='function')?buildExpectedToday():{};
+  if(act==='callOff'){
+    var pid=Object.keys(exp).filter(function(p){ return exp[p].person.role==='CXR'; })[1];
+    if(pid && typeof setAbsence==='function') setAbsence(pid,'calledoff');
+  } else if(act==='solo'){
+    // thin Exit to one body so the alert is real, not mocked
+    Object.keys(exp).filter(function(p){ return exp[p].person.role==='CXR'; }).slice(0,2)
+      .forEach(function(p){ if(typeof setAbsence==='function') setAbsence(p,'calledoff'); });
+  } else if(act==='exitWhy'){
+    if(typeof openExitWhy==='function') openExitWhy();
+  } else if(act==='print'){
+    if(typeof openPrintables==='function') openPrintables();
+  } else if(act==='handoff'){
+    try{ closeModal(); }catch(e){}
+  }
+  _dmRepaint();
+}
+// any tap inside the app hands control to whoever tapped
+function _dmTapPause(e){
+  if(!_dmOn) return;
+  if(e.target && e.target.closest && e.target.closest('#dm-chrome')) return;   // the rail is ours
+  _dmPaused=true; clearTimeout(_dmTimer); _dmBumpIdle(); demoRenderChrome();
+}
+function _dmBumpIdle(){
+  clearTimeout(_dmIdle);
+  _dmIdle=setTimeout(function(){ if(_dmOn) demoStop(); }, DEMO_IDLE_MS);
+}
+function demoNext(){ demoGo(_dmIdx+1); }
+function demoPrev(){ demoGo(_dmIdx-1); }
+function demoResume(){ demoGo(_dmIdx); }
+function demoJump(i){ demoGo(i); }
+function demoReset(){ demoApplyFixture(); demoGo(0); }
+
+function demoInjectChrome(){
+  if(document.getElementById('dm-chrome')) return;
+  var st=document.createElement('style'); st.id='dm-style';
+  st.textContent=
+   '#dm-badge{position:fixed;top:0;left:0;right:0;height:3px;background:var(--amber,#FF9F0A);z-index:100095}'
+  +'#dm-badge b{position:absolute;top:3px;left:50%;transform:translateX(-50%);background:var(--amber,#FF9F0A);'
+  +'color:#1a1200;font-size:9px;font-weight:800;letter-spacing:.08em;padding:2px 10px;border-radius:0 0 6px 6px}'
+  +'#dm-chrome{position:fixed;left:0;right:0;bottom:0;z-index:100094;background:var(--bg2,#1c1c1e);'
+  +'border-top:1px solid var(--bdr2);padding:9px 12px calc(9px + env(safe-area-inset-bottom));'
+  +'box-shadow:0 -8px 24px rgba(0,0,0,.5)}'
+  +'.dm-chips{display:flex;gap:5px;overflow-x:auto;margin-bottom:7px;-webkit-overflow-scrolling:touch}'
+  +'.dm-chip{flex:0 0 auto;padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:700;'
+  +'border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer;white-space:nowrap}'
+  +'.dm-chip.on{border-color:var(--accent);color:var(--accent);background:rgba(35,201,131,.12)}'
+  +'.dm-cap{font-size:13.5px;font-weight:800;color:var(--txt)}'
+  +'.dm-why{font-size:11.5px;color:var(--txt3);line-height:1.45;margin-top:2px}'
+  +'.dm-paused{font-size:11px;font-weight:800;color:var(--amber,#FF9F0A);letter-spacing:.06em}'
+  +'.dm-row{display:flex;gap:6px;align-items:center;margin-top:8px}'
+  +'.dm-btn{padding:8px 12px;border-radius:7px;border:1px solid var(--bdr2);background:var(--bg3);'
+  +'color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer}'
+  +'.dm-btn.go{background:var(--accent);color:#04160e;border:none;flex:1}';
+  document.head.appendChild(st);
+  var badge=document.createElement('div'); badge.id='dm-badge'; badge.innerHTML='<b>DEMO</b>';
+  document.body.appendChild(badge);
+  var bar=document.createElement('div'); bar.id='dm-chrome';
+  document.body.appendChild(bar);
+}
+function demoRenderChrome(){
+  var bar=document.getElementById('dm-chrome'); if(!bar) return;
+  var beats=demoBeats(), b=beats[_dmIdx]||{}, chs=demoChapters();
+  bar.innerHTML=
+    '<div class="dm-chips">'
+    + chs.map(function(c){
+        return '<button class="dm-chip'+(c.ch===b.ch?' on':'')+'" onclick="demoJump('+c.i+')">'+c.ch+'</button>';
+      }).join('')
+    + '</div>'
+    + (_dmPaused
+        ? '<div class="dm-paused">PAUSED — YOU HAVE THE PHONE</div>'
+        : '<div class="dm-cap">'+(b.cap||'')+'</div>')
+    + '<div class="dm-why">'+(_dmPaused?'Tap Resume when you want the script back.':(b.why||''))+'</div>'
+    + '<div class="dm-row">'
+    + '<button class="dm-btn" onclick="demoPrev()">‹</button>'
+    + (_dmPaused
+        ? '<button class="dm-btn go" onclick="demoResume()">Resume</button>'
+        : '<button class="dm-btn go" onclick="demoNext()">'+(_dmIdx>=beats.length-1?'Free roam →':'Next ›')+'</button>')
+    + '<button class="dm-btn" onclick="demoReset()">Reset</button>'
+    + '<button class="dm-btn" onclick="demoStop()">Exit</button>'
+    + '<span style="font-size:10.5px;color:var(--txt3);white-space:nowrap">'+(_dmIdx+1)+'/'+beats.length+'</span>'
+    + '</div>';
+}
+function openDemoMenu(){
+  var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:14px">'
+   +'Runs the real app on a <b>fictional branch</b> with fictional names. '
+   +'Your data is put back exactly as it was when you exit, and nothing a demo does '
+   +'can reach the branch — sync is stopped at the source, not per screen.</div>'
+   +'<button onclick="closeModal();demoStart(\'short\')" style="width:100%;margin-bottom:8px;padding:14px;'
+   +'border-radius:10px;border:none;background:var(--accent);color:#04160e;font-size:14px;font-weight:800;'
+   +'cursor:pointer;text-align:left">▶ Short demo<div style="font-size:11.5px;font-weight:600;opacity:.8;'
+   +'margin-top:2px">One shift, start to finish · about 90 seconds</div></button>'
+   +'<button onclick="closeModal();demoStart(\'full\')" style="width:100%;padding:14px;border-radius:10px;'
+   +'border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:14px;font-weight:800;'
+   +'cursor:pointer;text-align:left">▶ Full walkthrough<div style="font-size:11.5px;font-weight:600;'
+   +'opacity:.75;margin-top:2px">7 chapters · about 5 minutes</div></button>'
+   +'<div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:12px">'
+   +'Tap anything on screen at any point and the script pauses — whoever grabs the phone takes over. '
+   +'It exits itself after 30 minutes idle.</div>';
+  openModal('▶ Demo mode', b);
+}
+
 function openPrintables(){
   var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
    +'Five sheets on one grid. Everything reads on a black-and-white printer — '
@@ -20552,6 +20938,11 @@ function importedScheduleForDate(dateStr) {
 }
 
 function getScheduleForDate(dateStr) {
+  // v60.186: MAY_SCHEDULE / SEPT_SCHEDULE are real people. A demo reading them
+  // would put real names on the board and in the printed schedule map. Returning
+  // nothing makes the app fall back to each person's roster days — which is now
+  // the fixture — so the demo still has a full, believable week.
+  if (typeof demoIsOn === 'function' && demoIsOn()) return null;
   // v60.20: the IMPORTED schedule is the authoritative source for the live
   // "today" path; fall back to the legacy built-in MAY_SCHEDULE only when the
   // import has nothing for this date. Per-date schedule-editor overrides
