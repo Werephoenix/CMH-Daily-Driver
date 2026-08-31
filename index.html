@@ -2281,8 +2281,15 @@ button { cursor: pointer; }
       <button class="seg" id="wu-noncore-b" onclick="setWU('noncore')">Non-Core</button>
       <button class="seg" id="wu-closed-b"  onclick="setWU('closed')">Closed</button>
     </div>
-    <div class="board-ctl-lbl" style="margin-top:12px">📅 24-hour booking</div>
-    <div class="seg-ctl" style="margin-bottom:0">
+    <!-- v60.194: demoted per Matt — rare, worst-case-only control (college
+         move-in minivans, holiday weekends). Collapsed unless a restriction is
+         live; updateBoardHeader auto-expands + tints it amber when it is. -->
+    <button id="b24-disclose" onclick="var d=document.getElementById('b24-ctl');var on=d.style.display==='none';d.style.display=on?'':'none';this.querySelector('span').textContent=on?'⌄':'›'"
+      style="margin-top:12px;width:100%;text-align:left;background:none;border:none;cursor:pointer;
+        font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);padding:4px 0">
+      📅 24-hour booking · <b id="b24-cur">Open</b> <span style="float:right">›</span>
+    </button>
+    <div class="seg-ctl" id="b24-ctl" style="margin-bottom:0;display:none">
       <button class="seg" id="b24-open-b"       onclick="set24hr('open')">Open</button>
       <button class="seg" id="b24-restricted-b" onclick="set24hr('restricted')">Restricted</button>
       <button class="seg" id="b24-emerald-b"    onclick="set24hr('emerald-only')">Emerald</button>
@@ -2409,6 +2416,11 @@ button { cursor: pointer; }
       style="flex:1;min-width:150px;padding:12px 14px;border-radius:9px;border:1px solid var(--bdr2);
         background:var(--bg3);color:var(--txt);font-size:14px;font-weight:800;cursor:pointer">
       📊 Who I need today
+    </button>
+    <button id="pt-entry" onclick="openPlanToday()" title="Six steps, in order — schedule, targets, lunches, rotation, gaps, publish"
+      style="flex-basis:100%;padding:11px 14px;border-radius:9px;border:1px solid var(--bdr2);
+        background:var(--bg3);color:var(--txt);font-size:13px;font-weight:800;cursor:pointer">
+      📋 Plan today
     </button>
   </div>
 
@@ -4556,8 +4568,16 @@ function showEODRecap() {
       `<button class="${cur===o[0]?'on':''}" onclick="${fn}('${o[0]}');showEODRecap()">${o[1]}</button>`).join('') + `</div>`;
   body += `<div class="sod-q">🚦 Walk-ups</div>`
        +  seg([['open','All open'],['core','Core'],['noncore','Non-core'],['closed','Closed']], wu, 'setWU');
-  body += `<div class="sod-q">📅 24-hour booking</div>`
-       +  seg([['open','Open'],['restricted','Restricted'],['emerald-only','Emerald'],['closed','Closed']], b24, 'set24hr');
+  // v60.194 (Matt): "The 24 hr booking doesn't need to be here… not a common
+  // used thing anymore. that's worst case moments" — minivans on college
+  // move-in weekend, holiday weekends. So the morning card only mentions it
+  // when a restriction is ACTUALLY ON (same pattern as the closing-extension
+  // carry-over): active worst-case stays loud, the everyday case asks nothing.
+  if (b24 !== 'open') {
+    body += `<div class="sod-q">📅 24-hour booking is <b>${b24.replace('-',' ')}</b> <i>(carried over)</i></div>`
+         +  `<div class="sod-seg"><button onclick="set24hr('open');showEODRecap()">Back to open</button>`
+         +  `<button class="on" onclick="showEODRecap()">Keep it</button></div>`;
+  }
 
   // closing extension carried over from last night — only when it's actually set
   if (STATE.closingExtension && STATE.closingExtension.until) {
@@ -4615,10 +4635,13 @@ function sodEarlyHtml(){
       var _m=(_t && typeof absenceMeta==='function')?absenceMeta(_t):null;
       out+='<div class="sod-p'+(off?' off':'')+'">'
         +'<span class="sod-p-nm">'+nm+'</span>'
-        +(_m?'<span class="sod-p-tag" style="color:'+_m.tone+'">'+_m.icon+' '+_m.short+'</span>'
+        +(_m?'<span class="sod-p-tag" style="color:'+_m.tone+'">'+_m.icon+' '+_m.short
+             +((STATE.todayOverrides||{})[pid]==='off'?' · from the schedule':'')+'</span>'
             :(stn?'<span class="sod-p-st">'+stn.replace(/ (Booth|Manager)$/,'')+'</span>':''))
         +'</div>'
-        + ((typeof absencePickerHtml==='function')?absencePickerHtml(pid):'');
+        // v60.194: an ANSWERED person gets no picker — the schedule (or an
+        // earlier tap) already said. Change it from their card if it's wrong.
+        + ((_m)?'':((typeof absencePickerHtml==='function')?absencePickerHtml(pid):''));
     });
     out+='</div>';
   });
@@ -4754,6 +4777,16 @@ function restoreFields() {
   // Checklist fields (cl-f-*) are rendered dynamically — restored by renderChecklist
   // All Morning Setup fields were removed from dashboard — now live in checklist
 
+  // v60.194: the demoted 24hr control — label shows the live value; a live
+  // restriction auto-expands the section and goes amber so it can't hide.
+  try{
+    var _b24v=(STATE.fields&&STATE.fields.book24hr)||'open';
+    var _cur=document.getElementById('b24-cur');
+    if(_cur){ _cur.textContent=({open:'Open',restricted:'Restricted','emerald-only':'Emerald only',closed:'Closed'})[_b24v]||_b24v;
+      _cur.style.color=_b24v==='open'?'var(--txt3)':'var(--amber)'; }
+    var _ctl=document.getElementById('b24-ctl');
+    if(_ctl && _b24v!=='open') _ctl.style.display='';
+  }catch(e){}
   // Restore 24hr booking select (board screen — always present)
   const f = STATE.fields || {};
   const b24 = document.getElementById('f-24hr-board');
@@ -5625,6 +5658,17 @@ function updateBoardTotals() {
 }
 
 function updateBoardHeader() {
+  // v60.194: demoted 24hr control — keep the collapsed label truthful and
+  // auto-expand + amber when a restriction is live (worst-case must not hide).
+  try{
+    var _b24v=(STATE.fields&&STATE.fields.book24hr)||'open';
+    var _cur=document.getElementById('b24-cur');
+    if(_cur){ _cur.textContent=({open:'Open',restricted:'Restricted','emerald-only':'Emerald only',closed:'Closed'})[_b24v]||_b24v;
+      _cur.style.color=_b24v==='open'?'var(--txt3)':'var(--amber)'; }
+    var _ctl=document.getElementById('b24-ctl');
+    if(_ctl && _b24v!=='open') _ctl.style.display='';
+  }catch(e){}
+
   // v59.2: defensive — STATE.fields could be null if state got partially
   // wiped (corruption, manual localStorage edit, etc.). Default to {} so
   // we don't crash reading .cs / .openMgr.
@@ -14954,6 +14998,7 @@ try{
       if(m && typeof showTab==='function') setTimeout(function(){ showTab(m[1]); }, 700);
       // screenshot flag: open the guided-fix overlay after the tab settles
       if(/gfx/.test(location.hash||'') ) setTimeout(function(){ if(typeof gfxStart==='function') gfxStart(); }, 1600);
+      if(/plan/.test(location.hash||'')) setTimeout(function(){ if(typeof openPlanToday==='function') openPlanToday(); }, 1600);
     }catch(e){}
   });
 }catch(e){}  // test harness stubs window without addEventListener
@@ -17033,6 +17078,7 @@ function buildCoverageTimeline() {
   // edits, nowFix…) routes to that pattern's renderer instead of the bars.
   const _pat = STATE.schedPattern || 'timeline';
   if(typeof renderCovStrip==='function') try{ renderCovStrip(); }catch(e){}   // v60.193
+  if(typeof ptEntryRefresh==='function') try{ ptEntryRefresh(); }catch(e){}   // v60.194
   if (_pat === 'coverage') { return renderCoverageFirst(); }
   if (_pat === 'roster')   { return renderRoster(); }
   updateManagerModeUI();
@@ -19691,6 +19737,277 @@ setInterval(function(){
   }catch(e){}
 }, 30000);
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.194 · PLAN TODAY — the six-step wizard (design, SCHEDULE_IA turn 3)
+//
+// "Six gated steps… each must be DONE or deliberately ACCEPTED before the next
+// opens; publish is last and re-arms if anything changes after."
+//
+// The wizard OWNS no logic — it sequences what already exists:
+//   1 Schedule in      → getScheduleForDate / buildExpectedToday
+//   2 Floor targets    → STATE.floorTargets / mgrTargets (v60.180 measured fill)
+//   3 Lunches          → coverage-scored slot → STATE.customLunch (CXRs, the
+//                        channel every pass honours) or a lunch specialBlock
+//   4 Rotation flips   → setAltPosition — and per Matt's ruling the direction
+//                        carries NO counter/exit weight: it is chosen by
+//                        scanning the SECOND HALF of the shift for whichever
+//                        station is short, and the suggestion says why
+//   5 Coverage gaps    → the v60.193 Guided Fix loop, re-detected AFTER 3+4
+//                        because lunches and flips can open new holes
+//   6 Publish          → confirmToday(), then a state-hash stamp so any later
+//                        edit flips the entry button to "Republish"
+//
+// "Accepted" is a first-class answer at every step — a manager who looks at a
+// shortfall and decides to run thin has made a decision, not skipped one.
+// ═══════════════════════════════════════════════════════════════════════════
+function _ptS(){
+  var tk=(typeof todayKey==='function')?todayKey():'';
+  if(!STATE.planToday || STATE.planToday.date!==tk){
+    STATE.planToday={date:tk, steps:{}, publishedAt:null, pubHash:null};
+  }
+  return STATE.planToday;
+}
+// djb2 over the day-shaping state — cheap, stable, good enough to detect "you
+// changed something after publishing".
+function _ptHash(){
+  var src='';
+  try{ src=JSON.stringify([STATE.staffStation,STATE.altSchedule,STATE.customLunch,
+        STATE.mgmtBlocks,STATE.todayOverrides,STATE.specialBlocks,STATE.meetings]); }catch(e){}
+  var h=5381; for(var i=0;i<src.length;i++){ h=((h<<5)+h+src.charCodeAt(i))|0; }
+  return h;
+}
+function _ptFmt(h){ var t=((h%24)+24)%24, hh=Math.floor(t), m=Math.round((t-hh)*60);
+  var d=hh>12?hh-12:(hh===0?12:hh); return d+(m?':'+String(m).padStart(2,'0'):'')+(hh>=12?'p':'a'); }
+
+// ── step evaluators — each returns {status:'done'|'accepted'|'open', detail, items?} ──
+function ptEval(n){
+  var st=_ptS(), exp={}; try{ exp=buildExpectedToday(); }catch(e){}
+  var people=Object.keys(exp).length;
+  if(n===1){
+    var stored=null; try{ stored=getScheduleForDate(todayKey()); }catch(e){}
+    if(stored && people) return {status:'done', detail:people+' people in from the stored schedule'};
+    if(people) return {status:st.steps[1]||'open', detail:people+' people from roster patterns — no stored day. Paste the Game Plan, or accept the roster fallback.'};
+    return {status:'open', detail:'No schedule at all — import one first (Admin → Schedule).'};
+  }
+  if(n===2){
+    var hasT=!!(STATE.floorTargets||STATE.mgrTargets);
+    if(hasT) return {status:'done', detail:'Branch minimums saved — the gaps below are measured against YOUR numbers.'};
+    return {status:st.steps[2]||'open', detail:'Using the app defaults — nobody has confirmed them. Fine to accept; better to set them once in 📊 Floor targets.'};
+  }
+  if(n===3){
+    var missing=[];
+    try{ buildSmartRotation(); }catch(e){}
+    Object.keys(exp).forEach(function(pid){
+      var e=exp[pid], p=e.person;
+      var ss=(STATE.shiftMod||{})[pid]&&(STATE.shiftMod[pid].start!=null)?STATE.shiftMod[pid].start:p.shiftStart;
+      var se=(STATE.shiftMod||{})[pid]&&(STATE.shiftMod[pid].end!=null)?STATE.shiftMod[pid].end:p.shiftEnd;
+      if(ss==null||se==null||(se-ss)<6) return;
+      if((STATE.todayOverrides||{})[pid]==='callout') return;
+      if((STATE.altSchedule||{})[pid+'_nolunch']===true) return;
+      var has=false;
+      if((STATE.customLunch||{})[pid]!=null) has=true;
+      var r=(window._lastRotations||{})[pid]; if(r&&r.lunch) has=true;
+      ((STATE.specialBlocks||{})[pid]||[]).forEach(function(b){ if(b.key==='lunch') has=true; });
+      if(!has){
+        var sug=ptLunchSuggest(pid,ss,se,exp);
+        missing.push({pid:pid, nick:(typeof dispName==='function')?dispName(p):(p.nick||pid), sug:sug, ss:ss, se:se});
+      }
+    });
+    if(!missing.length) return {status:'done', detail:'Everyone on 6h+ has a lunch planned.'};
+    return {status:st.steps[3]||'open', detail:missing.length+' still need a lunch', items:missing};
+  }
+  if(n===4){
+    var flips=[];
+    Object.keys(exp).forEach(function(pid){
+      var e=exp[pid], p=e.person; if(p.role!=='CXR') return;
+      if((STATE.todayOverrides||{})[pid]==='callout') return;
+      if(typeof exitAccommodated==='function' && exitAccommodated(pid)) return;   // never suggest exit for them
+      if(((STATE.mgmtBlocks||{})[pid]||[]).length) return;                        // custom times = manager decided
+      var ss=p.shiftStart, se=p.shiftEnd; if(ss==null||se==null||(se-ss)<7.5) return;
+      var r=(window._lastRotations||{})[pid];
+      var flat = r ? !!r.fullShift : /full/.test((STATE.altSchedule||{})[pid]||'');
+      if(!flat) return;
+      var d=ptFlipDirection(pid,ss,se,exp);
+      flips.push({pid:pid, nick:(typeof dispName==='function')?dispName(p):(p.nick||pid),
+                  dir:d.dir, why:d.why});
+    });
+    if(!flips.length) return {status:'done', detail:'Every long CXR shift flips stations (or a manager set it flat on purpose).'};
+    return {status:st.steps[4]||'open', detail:flips.length+' long shift'+(flips.length===1?'':'s')+' with no station flip', items:flips};
+  }
+  if(n===5){
+    var gaps=[]; try{ gaps=gfxGaps(); }catch(e){}
+    if(!gaps.length) return {status:'done', detail:'No coverage gaps from this hour on — re-checked after lunches and flips.'};
+    return {status:st.steps[5]||'open', detail:gaps.length+' gap'+(gaps.length===1?'':'s')+' open', gaps:gaps.length};
+  }
+  return {status:'open', detail:''};
+}
+// coverage-scored lunch slot: surplus at their station first, then closeness to
+// mid-shift — which is exactly why a lunch can legitimately land mid-rotation.
+function ptLunchSuggest(pid, ss, se, exp){
+  var dow=new Date().getDay(), mid=(ss+se)/2, best=null;
+  for(var t=ss+1; t<=se-1.5; t+=0.5){
+    var area=null; try{ area=gfAreaAt(pid, exp[pid], t+0.01); }catch(e){}
+    if(!area||area==='off') continue;
+    var need={},have={};
+    try{ need=gfNeedsAt(Math.floor(t),dow)||{}; have=gfCountsAt(exp,t+0.01)||{}; }catch(e){}
+    var spare=(have[area]||0)-1-(need[area]||0);        // minus THEM while they eat
+    var score=spare*10 - Math.abs(t-mid);
+    if(!best || score>best.score) best={t:t, score:score, spare:spare};
+  }
+  return best;
+}
+// Matt's ruling made code: no weight to either direction. Scan the second half;
+// whichever station is shorter is where they land after the flip.
+function ptFlipDirection(pid, ss, se, exp){
+  var dow=new Date().getDay(), mid=(ss+se)/2, exitShort=0, ctrShort=0;
+  for(var h=Math.ceil(mid); h<se; h++){
+    var need={},have={};
+    try{ need=gfNeedsAt(h,dow)||{}; have=gfCountsAt(exp,h+0.01)||{}; }catch(e){}
+    if((need.exit||0)>(have.exit||0)) exitShort++;
+    if((need.counter||0)>(have.counter||0)) ctrShort++;
+  }
+  if(exitShort>ctrShort) return {dir:'normal',
+    why:'exit short '+exitShort+'h after '+_ptFmt(mid)+' → Counter 1st, Exit after'};
+  if(ctrShort>exitShort) return {dir:'exit-first',
+    why:'counter short '+ctrShort+'h after '+_ptFmt(mid)+' → Exit 1st, Counter after'};
+  return {dir:'normal', why:'second half is balanced — either direction works'};
+}
+
+// ── actions ────────────────────────────────────────────────────────────────
+function ptAddLunch(pid, t){
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
+  var isCXR=exp[pid]&&exp[pid].person&&exp[pid].person.role==='CXR';
+  if(isCXR){ if(!STATE.customLunch) STATE.customLunch={}; STATE.customLunch[pid]=t; }
+  else {
+    if(!STATE.specialBlocks) STATE.specialBlocks={};
+    STATE.specialBlocks[pid]=((STATE.specialBlocks[pid]||[]).filter(function(b){return b.key!=='lunch';}));
+    STATE.specialBlocks[pid].push({key:'lunch',label:'Lunch',icon:'🍽',from:t,to:t+0.5});
+  }
+  if(typeof rotInvalidate==='function') rotInvalidate();
+  if(typeof saveState==='function') saveState();
+  try{ buildCoverageTimeline(); }catch(e){}
+  ptRender();
+}
+function ptApplyFlip(pid, dir){
+  try{ setAltPosition(pid, dir); }catch(e){}
+  if(typeof rotInvalidate==='function') rotInvalidate();
+  try{ buildCoverageTimeline(); }catch(e){}
+  ptRender();
+}
+function ptAccept(n){
+  var st=_ptS(); st.steps[n]='accepted';
+  if(typeof saveState==='function') saveState();
+  ptRender();
+}
+function ptPublish(){
+  var st=_ptS();
+  try{ if(typeof confirmToday==='function') confirmToday(); }catch(e){}
+  st.publishedAt=new Date().toISOString();
+  st.pubHash=_ptHash();
+  if(typeof saveState==='function') saveState();
+  try{ buildCoverageTimeline(); if(typeof renderNow==='function') renderNow(); }catch(e){}
+  closeModal();
+  if(typeof toast==='function') toast('📋 Day published — the floor plan is live', 6000);
+  ptEntryRefresh();
+}
+
+// ── render ─────────────────────────────────────────────────────────────────
+function ptFirstOpen(){
+  for(var n=1;n<=5;n++){ if(ptEval(n).status==='open') return n; }
+  return 6;
+}
+function ptRender(){
+  var st=_ptS(); var cur=ptFirstOpen();
+  var dots='';
+  for(var n=1;n<=6;n++){
+    var s2 = n===6 ? (st.publishedAt&&st.pubHash===_ptHash()?'done':'open') : ptEval(n).status;
+    var col = s2==='done'?'var(--accent)': s2==='accepted'?'var(--amber)': n===cur?'var(--txt)':'var(--txt3)';
+    dots+='<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;'
+      +'border-radius:50%;font-size:10px;font-weight:800;margin-right:4px;'
+      +'border:1.5px solid '+col+';color:'+col+';'
+      +(n===cur?'background:rgba(255,255,255,.06);':'')+'">'
+      +(s2==='done'?'✓': s2==='accepted'?'~': n)+'</span>';
+  }
+  var NAMES=['','Schedule in','Floor targets','Lunches','Rotation','Coverage gaps','Publish'];
+  var b='<div style="margin-bottom:12px">'+dots
+    +'<span style="font-size:11px;color:var(--txt3);margin-left:6px">step '+cur+' of 6 · '+NAMES[cur]+'</span></div>';
+  // completed/accepted steps as one-liners
+  for(var m=1;m<cur;m++){
+    var ev=ptEval(m);
+    b+='<div style="font-size:11.5px;color:var(--txt3);padding:3px 0">'
+      +(ev.status==='done'?'✓':'~')+' <b style="color:var(--txt2)">'+NAMES[m]+'</b> — '+ev.detail
+      +(ev.status==='accepted'?' <span style="color:var(--amber)">(accepted as-is)</span>':'')+'</div>';
+  }
+  // the current step card
+  if(cur<=5){
+    var e=ptEval(cur);
+    b+='<div style="margin-top:10px;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bdr2)">'
+      +'<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:6px">'+NAMES[cur]+'</div>'
+      +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5;margin-bottom:10px">'+e.detail+'</div>';
+    if(cur===3 && e.items){
+      e.items.slice(0,6).forEach(function(it){
+        b+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--bdr)">'
+          +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+it.nick
+          +' <span style="color:var(--txt3);font-size:10.5px">'+_ptFmt(it.ss)+'–'+_ptFmt(it.se)+'</span></span>'
+          +(it.sug? '<button onclick="ptAddLunch(\''+it.pid+'\','+it.sug.t+')" '
+             +'style="padding:6px 11px;border-radius:7px;border:1px solid var(--accent);background:rgba(35,201,131,.10);'
+             +'color:var(--accent);font-size:11.5px;font-weight:800;cursor:pointer">🍽 '+_ptFmt(it.sug.t)
+             +(it.sug.spare>0?' · '+it.sug.spare+' spare':'')+'</button>'
+            : '<span style="font-size:10.5px;color:var(--txt3)">no clean slot</span>')
+          +'</div>';
+      });
+    }
+    if(cur===4 && e.items){
+      e.items.slice(0,6).forEach(function(it){
+        b+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--bdr)">'
+          +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+it.nick
+          +'<div style="font-size:10.5px;color:var(--txt3)">'+it.why+'</div></span>'
+          +'<button onclick="ptApplyFlip(\''+it.pid+'\',\''+it.dir+'\')" '
+          +'style="padding:6px 11px;border-radius:7px;border:1px solid var(--accent);background:rgba(35,201,131,.10);'
+          +'color:var(--accent);font-size:11.5px;font-weight:800;cursor:pointer">'
+          +(it.dir==='exit-first'?'Exit 1st':'Counter 1st')+'</button></div>';
+      });
+    }
+    if(cur===5 && e.gaps){
+      b+='<button onclick="closeModal();gfxStart()" style="width:100%;padding:12px;border-radius:9px;border:none;'
+        +'background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:8px">'
+        +'▶ Fix with Guided fix ('+e.gaps+')</button>';
+    }
+    b+='<div style="display:flex;gap:8px;margin-top:10px">'
+      +'<button class="btn btn-gh" style="flex:1" onclick="ptAccept('+cur+')">Accept as-is → next</button>'
+      +'<button class="btn btn-gh" onclick="closeModal()">Close</button></div></div>';
+  } else {
+    var published=st.publishedAt && st.pubHash===_ptHash();
+    var stale=st.publishedAt && st.pubHash!==_ptHash();
+    b+='<div style="margin-top:10px;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid '
+      +(published?'var(--accent)':'var(--bdr2)')+'">'
+      +'<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:6px">Publish</div>'
+      +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5;margin-bottom:10px">'
+      +(published?'✓ Published '+new Date(st.publishedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' — the plan on every screen is this one.'
+        : stale?'The day changed since you published — republish so everyone sees the current plan.'
+        :'Steps 1–5 are settled. Publishing locks today\'s plan in and refreshes every screen.')+'</div>'
+      +'<button onclick="ptPublish()" style="width:100%;padding:13px;border-radius:9px;border:none;'
+      +'background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer">'
+      +(stale?'↻ Republish':'✓ Publish the day')+'</button>'
+      +'<button class="btn btn-gh" style="width:100%;margin-top:6px" onclick="closeModal()">Close</button></div>';
+  }
+  openModal('📋 Plan today', b);
+  ptEntryRefresh();
+}
+function openPlanToday(){ _ptS(); ptRender(); }
+// the entry button reflects live status without opening anything
+function ptEntryRefresh(){
+  var el=document.getElementById('pt-entry'); if(!el) return;
+  var st=_ptS(); var cur=ptFirstOpen();
+  var published=st.publishedAt && st.pubHash===_ptHash();
+  var stale=st.publishedAt && st.pubHash!==_ptHash();
+  el.innerHTML = published ? '📋 Day planned ✓'
+    : stale ? '📋 Plan today · ↻ republish'
+    : '📋 Plan today · step '+cur+'/6';
+  el.style.borderColor = published?'var(--accent)': stale?'var(--amber)':'var(--bdr2)';
+  el.style.color = published?'var(--accent)': stale?'var(--amber)':'var(--txt)';
+}
+
 function openPrintables(){
   var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
    +'Five sheets on one grid. Everything reads on a black-and-white printer — '
@@ -22296,7 +22613,14 @@ function getScheduleForDate(dateStr) {
 // loadScheduleForToday for why this has to happen before the recompute.
 function _clearDerivedOff(){
   var ov = STATE.todayOverrides || {};
-  Object.keys(ov).forEach(function(pid){ if (ov[pid] === 'off') delete ov[pid]; });
+  Object.keys(ov).forEach(function(pid){
+    if (ov[pid] === 'off'){
+      delete ov[pid];
+      // v60.194: a type riding a DERIVED 'off' can only have come from the
+      // schedule (manager-set types ride 'callout') — clear it with its off.
+      if (STATE.absenceType) delete STATE.absenceType[pid];
+    }
+  });
   return ov;
 }
 
@@ -22347,9 +22671,19 @@ function loadScheduleForToday(force) {
   _clearDerivedOff();
 
   Object.entries(sched).forEach(([pid, shift]) => {
-    if (shift === 'OFF' || shift === 'VACA') {
+    var _sTxt = (typeof shift==='string') ? shift : '';
+    if (shift === 'OFF' || shift === 'VACA' || /\b(VACA|PTO)\b/i.test(_sTxt)) {
       STATE.staffDuty[pid]      = false;
       STATE.todayOverrides[pid] = 'off';
+      // v60.194 (Matt): "pto, etc should be auto input once known." The stored
+      // schedule already SAYS vacation/PTO — asking a manager to tap it again
+      // on the morning card is data entry the app owns. Stamped here, cleared
+      // by _clearDerivedOff alongside the derived 'off' (a manager-set type
+      // rides the 'callout' override and is untouched). Plain OFF gets NO
+      // type — a day off is not an absence.
+      if(!STATE.absenceType) STATE.absenceType={};
+      if (shift==='VACA' || /VACA/i.test(_sTxt)) STATE.absenceType[pid]='vaca';
+      else if (/\bPTO\b/i.test(_sTxt))          STATE.absenceType[pid]='pto';
       // Always clear stale shiftMod when person is OFF today — otherwise
       // a previous day's shift override could linger and cause them to
       // appear on the wrong shift.
