@@ -2427,6 +2427,11 @@ button { cursor: pointer; }
           background:rgba(35,201,131,.12);color:var(--accent);font-size:11px;font-weight:800;cursor:pointer">
         🖨 Reports &amp; sheets…
       </button>
+      <button onclick="openMeetings()"
+        style="padding:7px 12px;border-radius:6px;border:1px solid var(--accent);
+          background:rgba(35,201,131,.12);color:var(--accent);font-size:11px;font-weight:800;cursor:pointer">
+        🤝 Meetings…
+      </button>
       <button onclick="openSends()"
         style="padding:7px 12px;border-radius:6px;border:1px solid var(--accent);
           background:rgba(35,201,131,.12);color:var(--accent);font-size:11px;font-weight:800;cursor:pointer">
@@ -3834,6 +3839,9 @@ var SPECIAL_ASSIGNMENTS = [
   { key:'returns',   label:'Returns',       icon:'↩️',  color:'#06b6d4' },
   { key:'break',     label:'Break',         icon:'☕',  color:'#78716c' },
   { key:'training',  label:'Training',      icon:'📚',  color:'#8b5cf6' },
+  // v60.191: meetings project into specialBlocks (see meetingsSync) so every
+  // renderer that already understands specials shows them with zero new code.
+  { key:'meeting',   label:'Meeting',       icon:'🤝',  color:'#AF9CFF' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -4199,6 +4207,7 @@ function loadState() {
       s.adminRoster  = s.adminRoster  || [];
       s.adminCodes   = s.adminCodes   || [];
       s.specialBlocks = s.specialBlocks || {};
+      s.meetings      = s.meetings      || [];
       s.mgmtBlocks   = s.mgmtBlocks   || {}; // {pid: [{from, to, station}]} — manager multi-station time blocks
       s.closeFields  = s.closeFields  || {};
       s.coverageThresholds = s.coverageThresholds || null;
@@ -4232,7 +4241,7 @@ function loadState() {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
-    stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[],
+    stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[], meetings:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
     closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, soloChecked:{}, corpAvg:null, absenceType:{}, mgrAnchorOverride:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
     mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{}, pto:{},
@@ -13414,7 +13423,7 @@ function clearBrandPaste() {
 // ═══════════════════════════════════════════════════════════════════════
 
 var ALT_POSITIONS = [
-  {key:'normal',        label:'Normal Rotation', icon:'🔄', desc:'4hr Counter + 4hr Exit (standard)'},
+  {key:'normal',        label:'Counter 1st', icon:'🔄', desc:'Counter then Exit — no weight over Exit 1st'},
   {key:'full-counter',  label:'Full Counter',     icon:'🟦', desc:'Full shift at counter (8hr) — no exit'},
   {key:'full-exit',     label:'Full Exit',        icon:'🟩', desc:'Full shift at exit (8hr) — no counter'},
   {key:'counter-first', label:'Counter+30',       icon:'🟦+', desc:'Counter 4.5hr → Exit 3.5hr'},
@@ -13613,7 +13622,7 @@ function showShiftModModal(pid, personName) {
   const _rotBtn = (key,label) => `<button onclick="setRotationFromModal('${pid}','${_escNm}','${key}')" style="flex:1;min-width:62px;padding:7px 6px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid ${_altPos===key?'var(--acc)':'var(--bdr2)'};background:${_altPos===key?'rgba(37,99,235,.14)':'var(--bg2)'};color:${_altPos===key?'var(--acc)':'var(--txt2)'}">${label}</button>`;
   const rotationHtml = _isCXR ? `<div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;padding:12px;margin-bottom:14px">
       <div style="font-size:12px;font-weight:800;color:var(--txt);margin-bottom:10px">🔀 Rotation today</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${_rotBtn('normal','🔄 Normal')}${_rotBtn('full-counter','🟦 All Counter')}${_rotBtn('full-exit','🟩 All Exit')}${_rotBtn('exit-first','↪ Exit First')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${_rotBtn('normal','🟦 Counter 1st')}${_rotBtn('full-counter','🟦 All Counter')}${_rotBtn('full-exit','🟩 All Exit')}${_rotBtn('exit-first','🟩 Exit 1st')}</div>
     </div>` : '';
   const whatifHtml = `<button class="btn btn-gh btn-sm" style="width:100%;margin-bottom:14px" onclick="showWhatif('${pid}','${_escNm}')">🔮 What If…? — coverage scenarios</button>`;
   // v60.51: tabbed sheet (Hours & Lunch / Rotation / What-If) so it's not a long scroll.
@@ -14714,6 +14723,10 @@ function applyRemoteRecord(record, apply) {
   // v60.144: detect an incoming management publish BEFORE merging (compare stamps)
   const _prevPub = (STATE.publishMeta && STATE.publishMeta.at) || '';
   mergeRemoteIntoState(STATE, remote);
+  // v60.191: a meeting created on another device rides in through this merge —
+  // its specialBlocks projection has to be rebuilt here or the reminder fires
+  // with no 🤝 on the floor view.
+  try{ if(typeof meetingsSync==='function') meetingsSync(); }catch(e){}
   rebuildAfterSync();
   const _newPub = STATE.publishMeta;
   if (_newPub && _newPub.at && _newPub.at !== _prevPub) {
@@ -14891,6 +14904,10 @@ async function sbMigrateIfNeeded(){
     return {ok:true, from:(rec&&rec.savedAt)||null};
   } catch(e){ return {ok:false, why:e.message}; }
 }
+
+// v60.191: keep today's meeting blocks projected — load + every remote sync
+// (a meeting made on another device must land here too).
+try{ meetingsSync(); }catch(e){}
 
 function initSync() {
   // v60.171: Supabase-backed. Not signed in = the app still works fully offline
@@ -19097,6 +19114,318 @@ function openSends(){
   openModal('✉️ Emails & schedule sends', b);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.191 · MEETINGS — 1:1s, huddles, strategy, HR (Matt, 2026-08-31)
+//
+//   "Managers and staff pair up for ~30 minute 1on1 meeting 2x per month. They
+//    currently have a hard time scheduling those at logic times on slow days
+//    when they are both working."
+//
+// The design leans on plumbing that already exists rather than a new engine:
+//   • A meeting is stored ONCE in STATE.meetings, then PROJECTED into each
+//     attendee's specialBlocks. getZone() checks specials before rotation and
+//     before custom blocks, so every renderer — timeline, Now card, roster —
+//     shows 🤝 with no new render code, and nobody's rotation is flattened.
+//   • gfAreaAt() now returns null during a meeting, so the coverage math, the
+//     solo alert and the fill engine all see the absence the meeting causes.
+//     Enter it early and the engine compensates ahead of time; enter it
+//     same-day and the impact check names the dip and suggests cover.
+//   • Lunch conflicts are RESOLVED, not just flagged: an attendee whose lunch
+//     overlaps gets it nudged via STATE.customLunch (the CXR-request channel,
+//     which every pass already honours) and the composer says so.
+//   • STATE syncs through Supabase, so a meeting made on the office desktop
+//     reminds people on the counter iPad. Outlook never enters into it —
+//     staff can't reach email on the floor anyway.
+//
+// A 1:1 requires AT LEAST two people (a third sitting in is fine) — enforced
+// at input, per Matt. Reminders fire 10 minutes ahead through a banner +
+// browser notification for anyone signed in.
+// ═══════════════════════════════════════════════════════════════════════════
+var MEETING_TYPES=[
+  {k:'1on1',     label:'1:1',            icon:'🤝', mins:30, minPeople:2,
+   note:'Manager + staff, twice a month. A third can sit in.'},
+  {k:'huddle',   label:'Shift huddle',   icon:'📣', mins:10, minPeople:2},
+  {k:'strategy', label:'Mgr strategy',   icon:'🧭', mins:60, minPeople:2},
+  {k:'hr',       label:'HR',             icon:'📋', mins:30, minPeople:2},
+  {k:'other',    label:'Other',          icon:'📌', mins:30, minPeople:2},
+];
+function meetingType(k){ return MEETING_TYPES.filter(function(t){return t.k===k;})[0]||MEETING_TYPES[4]; }
+
+// ── projection: STATE.meetings → today's specialBlocks ─────────────────────
+// Meeting-keyed specials are rebuilt wholesale (same pattern as the lunch
+// cleanup): the meeting record is the truth, the blocks are its shadow.
+function meetingsSync(){
+  var tk=(typeof todayKey==='function')?todayKey():null; if(!tk) return;
+  if(!STATE.specialBlocks) STATE.specialBlocks={};
+  Object.keys(STATE.specialBlocks).forEach(function(pid){
+    STATE.specialBlocks[pid]=STATE.specialBlocks[pid].filter(function(b){ return b.key!=='meeting'; });
+    if(!STATE.specialBlocks[pid].length) delete STATE.specialBlocks[pid];
+  });
+  (STATE.meetings||[]).forEach(function(m){
+    if(m.date!==tk) return;
+    var t=meetingType(m.type);
+    (m.people||[]).forEach(function(pid){
+      (STATE.specialBlocks[pid]=STATE.specialBlocks[pid]||[]).push({
+        key:'meeting', from:m.from, to:m.to,
+        label:t.icon+' '+(m.title||t.label), meetingId:m.id });
+    });
+  });
+}
+
+// ── the impact check: what does pulling these people out actually cost? ────
+function meetingImpact(dateKey, from, to, people){
+  var out={dips:[], lunchClashes:[], offShift:[]};
+  var tk=(typeof todayKey==='function')?todayKey():'';
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){ return out; }
+  var isToday=(dateKey===tk);
+  var dow=new Date(dateKey+'T12:00:00').getDay();
+  people.forEach(function(pid){
+    var e=exp[pid];
+    if(isToday && (!e || !gfOnShiftAt(pid,e,(from+to)/2))) out.offShift.push(pid);
+    var r=(window._lastRotations||{})[pid];
+    if(r && r.lunch && r.lunch.from<to && r.lunch.to>from &&
+       (STATE.customLunch||{})[pid]==null) out.lunchClashes.push(pid);
+  });
+  if(!isToday) return out;   // future days: the engine will plan around it when the day loads
+  for(var h=Math.floor(from); h<to; h++){
+    var need={}; try{ need=gfNeedsAt(h,dow)||{}; }catch(e){}
+    var have={}; try{ have=gfCountsAt(exp,Math.max(h,from)+0.01)||{}; }catch(e){}
+    Object.keys(need).forEach(function(z){
+      // subtract attendees currently credited to this zone
+      var pulled=people.filter(function(pid){
+        var a=null; try{ a=gfAreaAt(pid, exp[pid], h+0.01); }catch(e){}
+        return a===z;
+      }).length;
+      var left=(have[z]||0)-pulled;
+      if((need[z]||0)>0 && left<(need[z]||0) && (have[z]||0)>=(need[z]||0)){
+        out.dips.push({zone:z, hour:h, left:left, need:need[z]});
+      }
+    });
+  }
+  return out;
+}
+
+// ── smart suggestions: the three cleanest half-hours on that day ───────────
+function meetingSuggest(dateKey, durH, people){
+  var tk=(typeof todayKey==='function')?todayKey():'';
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
+  var isToday=(dateKey===tk);
+  var dow=new Date(dateKey+'T12:00:00').getDay();
+  var cands=[];
+  for(var t=7; t<=19.5-durH; t+=0.5){
+    var from=t, to=t+durH, ok=true, slack=0;
+    if(isToday){
+      for(var i=0;i<people.length&&ok;i++){
+        var e=exp[people[i]];
+        if(!e || !gfOnShiftAt(people[i],e,from+0.01) || !gfOnShiftAt(people[i],e,to-0.01)) ok=false;
+        var r=(window._lastRotations||{})[people[i]];
+        if(r&&r.lunch&&r.lunch.from<to&&r.lunch.to>from) ok=false;
+      }
+      if(!ok) continue;
+      var imp=meetingImpact(dateKey,from,to,people);
+      if(imp.dips.length) continue;                       // never suggest a slot that breaks coverage
+      for(var h=Math.floor(from);h<to;h++){
+        var need={},have={};
+        try{ need=gfNeedsAt(h,dow)||{}; have=gfCountsAt(exp,h+0.01)||{}; }catch(e){}
+        Object.keys(need).forEach(function(z){ slack+=Math.max(0,(have[z]||0)-(need[z]||0)); });
+      }
+    }
+    var demand=0;
+    try{
+      if(typeof demandBaseline==='function'){
+        var base=demandBaseline(dow)||{};
+        for(var h2=Math.floor(from);h2<to;h2++) demand+=(base[h2]||base[String(h2)]||0);
+      }
+    }catch(e){}
+    cands.push({from:from,to:to,slack:slack,demand:demand});
+  }
+  cands.sort(function(a,b){
+    if(a.demand!==b.demand) return a.demand-b.demand;     // quieter hours first
+    return b.slack-a.slack;                                // then the most coverage slack
+  });
+  return cands.slice(0,3);
+}
+
+// ── save / delete ──────────────────────────────────────────────────────────
+function meetingSave(m){
+  var t=meetingType(m.type);
+  if((m.people||[]).length < (t.minPeople||2)){
+    if(typeof toast==='function') toast('A '+t.label+' needs at least '+(t.minPeople||2)+' people');
+    return null;
+  }
+  if(!(m.to>m.from)){ if(typeof toast==='function') toast('End must be after start'); return null; }
+  m.id=m.id||('mtg-'+Date.now().toString(36));
+  m.createdAt=m.createdAt||new Date().toISOString();
+  if(!STATE.meetings) STATE.meetings=[];
+  var i=STATE.meetings.findIndex(function(x){return x.id===m.id;});
+  if(i>=0) STATE.meetings[i]=m; else STATE.meetings.push(m);
+  // resolve lunch clashes by nudging lunch, and say so
+  var imp=meetingImpact(m.date,m.from,m.to,m.people||[]);
+  var moved=[];
+  imp.lunchClashes.forEach(function(pid){
+    var r=(window._lastRotations||{})[pid]; if(!r||!r.lunch) return;
+    var lunchLen=r.lunch.to-r.lunch.from;
+    var e=null; try{ e=buildExpectedToday()[pid]; }catch(err){}
+    var end=(e&&e.person&&e.person.shiftEnd)||24;
+    var cand=(m.to+lunchLen<=end)? m.to : Math.max((e&&e.person&&e.person.shiftStart)||0, m.from-lunchLen);
+    if(!STATE.customLunch) STATE.customLunch={};
+    STATE.customLunch[pid]=cand;
+    moved.push((typeof dispName==='function'?dispName(pid):pid)+' → '+_sFmt(cand));
+  });
+  meetingsSync();
+  if(typeof saveState==='function') saveState();
+  ['buildCoverageTimeline','buildSwitchboard','renderNow'].forEach(function(f){
+    if(typeof window[f]==='function') try{ window[f](); }catch(e){}
+  });
+  return {meeting:m, impact:imp, lunchesMoved:moved};
+}
+function meetingDelete(id){
+  STATE.meetings=(STATE.meetings||[]).filter(function(m){return m.id!==id;});
+  meetingsSync();
+  if(typeof saveState==='function') saveState();
+  ['buildCoverageTimeline','renderNow'].forEach(function(f){
+    if(typeof window[f]==='function') try{ window[f](); }catch(e){} });
+  if(typeof toast==='function') toast('Meeting removed');
+}
+
+// ── reminders: 10 minutes ahead, banner + browser notification ─────────────
+var _mtgReminded={};
+function meetingsCheckReminders(){
+  var tk=(typeof todayKey==='function')?todayKey():null; if(!tk) return;
+  var now=new Date(); var h=now.getHours()+now.getMinutes()/60;
+  (STATE.meetings||[]).forEach(function(m){
+    if(m.date!==tk) return;
+    var lead=m.from-h;
+    if(lead>0 && lead<=(10/60) && !_mtgReminded[m.id]){
+      _mtgReminded[m.id]=true;
+      var t=meetingType(m.type);
+      var who=(m.people||[]).map(function(p){ return (typeof dispName==='function')?dispName(p):p; }).join(' + ');
+      var msg=t.icon+' '+(m.title||t.label)+' at '+_sFmt(m.from)+' — '+who;
+      if(typeof toast==='function') toast(msg, 9000);
+      try{
+        if(window.Notification && Notification.permission==='granted'){
+          new Notification('CMH · meeting in 10 minutes', {body:(m.title||t.label)+' at '+_sFmt(m.from)+' · '+who});
+        }
+      }catch(e){}
+    }
+  });
+}
+setInterval(meetingsCheckReminders, 60000);
+
+// ── the composer ───────────────────────────────────────────────────────────
+var _mtgDraft=null;
+function openMeetings(){
+  var tk=(typeof todayKey==='function')?todayKey():'';
+  _mtgDraft=_mtgDraft||{type:'1on1', date:tk, from:null, people:[], title:''};
+  _mtgRender();
+}
+function _mtgRender(){
+  var d=_mtgDraft, t=meetingType(d.type), tk=(typeof todayKey==='function')?todayKey():'';
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
+  var esc=function(v){ return String(v).replace(/'/g,"\\'"); };
+  var b='<div style="font-size:12px;color:var(--txt3);line-height:1.5;margin-bottom:10px">'
+   +'Tag everyone involved and the schedule does the rest — timelines, coverage, lunches. '
+   +'Reminders go out 10 minutes ahead on any signed-in device.</div>';
+  // type chips
+  b+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'
+   + MEETING_TYPES.map(function(x){
+      var on=d.type===x.k;
+      return '<button onclick="_mtgDraft.type=\''+x.k+'\';_mtgRender()" style="padding:7px 11px;border-radius:8px;'
+        +'font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid '+(on?'var(--accent)':'var(--bdr2)')+';'
+        +'background:'+(on?'rgba(35,201,131,.12)':'var(--bg3)')+';color:'+(on?'var(--accent)':'var(--txt2)')+'">'
+        +x.icon+' '+x.label+' <span style="opacity:.6;font-weight:400">'+x.mins+'m</span></button>';
+    }).join('')+'</div>';
+  if(t.note) b+='<div style="font-size:11px;color:var(--txt3);margin:-4px 0 10px">'+t.note+'</div>';
+  // date + time + duration
+  b+='<div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px;margin-bottom:10px">'
+   +'<label style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase">Date'
+   +'<input type="date" value="'+(d.date||tk)+'" onchange="_mtgDraft.date=this.value;_mtgRender()" '
+   +'style="width:100%;margin-top:3px;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;color:var(--txt);font-size:13px;box-sizing:border-box"></label>'
+   +'<label style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase">Start'
+   +'<input placeholder="10a / 1:30p" value="'+(d.from!=null?_sFmt(d.from):'')+'" '
+   +'onchange="var v=rotParseClock(this.value); if(v!=null){_mtgDraft.from=v;}else if(typeof toast===\'function\')toast(\'Try 10a or 1:30p\'); _mtgRender()" '
+   +'style="width:100%;margin-top:3px;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;color:var(--txt);font-size:13px;font-family:var(--ff-mono);box-sizing:border-box"></label>'
+   +'<label style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase">Minutes'
+   +'<input type="number" step="5" min="5" value="'+(d.mins||t.mins)+'" onchange="_mtgDraft.mins=Math.max(5,+this.value||30)" '
+   +'style="width:100%;margin-top:3px;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;color:var(--txt);font-size:13px;box-sizing:border-box"></label></div>';
+  // people
+  var pool=Object.keys(exp).sort(function(a,b2){
+    return String(exp[a].person.nick||a).localeCompare(String(exp[b2].person.nick||b2)); });
+  b+='<div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">'
+   +'Who — tap to tag ('+d.people.length+' tagged, needs '+(t.minPeople||2)+'+)</div>'
+   +'<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:10px;max-height:120px;overflow-y:auto">'
+   + pool.map(function(pid){
+      var on=d.people.indexOf(pid)>=0;
+      var nick=(typeof dispName==='function')?dispName(exp[pid].person):(exp[pid].person.nick||pid);
+      return '<button onclick="var i=_mtgDraft.people.indexOf(\''+esc(pid)+'\'); if(i>=0)_mtgDraft.people.splice(i,1); else _mtgDraft.people.push(\''+esc(pid)+'\'); _mtgRender()" '
+        +'style="padding:5px 10px;border-radius:999px;font-size:11.5px;font-weight:700;cursor:pointer;'
+        +'border:1px solid '+(on?'var(--accent)':'var(--bdr2)')+';'
+        +'background:'+(on?'rgba(35,201,131,.14)':'var(--bg3)')+';color:'+(on?'var(--accent)':'var(--txt2)')+'">'
+        +(on?'✓ ':'')+nick+'</button>';
+    }).join('')+'</div>';
+  // suggestions once we know who
+  if(d.people.length>=(t.minPeople||2)){
+    var sug=meetingSuggest(d.date||tk,(d.mins||t.mins)/60,d.people);
+    if(sug.length){
+      b+='<div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;margin-bottom:4px">Good times — quiet, everyone on, coverage holds</div>'
+       +'<div style="display:flex;gap:5px;margin-bottom:10px">'
+       + sug.map(function(x){
+          return '<button onclick="_mtgDraft.from='+x.from+';_mtgRender()" style="flex:1;padding:9px 4px;border-radius:8px;'
+            +'border:1px dashed var(--accent);background:rgba(35,201,131,.07);color:var(--accent);'
+            +'font-size:12.5px;font-weight:800;cursor:pointer">'+_sFmt(x.from)+'</button>';
+        }).join('')+'</div>';
+    }
+  }
+  // live impact preview
+  if(d.from!=null && d.people.length){
+    var to=d.from+(d.mins||t.mins)/60;
+    var imp=meetingImpact(d.date||tk,d.from,to,d.people);
+    if(imp.dips.length||imp.lunchClashes.length||imp.offShift.length){
+      b+='<div style="padding:8px 10px;border-radius:7px;background:var(--bg3);border:1px solid var(--amber3,var(--bdr2));font-size:11.5px;color:var(--txt3);line-height:1.55;margin-bottom:10px">';
+      imp.dips.forEach(function(x){ b+='<div style="color:var(--amber)">⚠ '+x.zone+' drops to '+x.left+'/'+x.need+' at '+_sFmt(x.hour)+' — cover will be suggested</div>'; });
+      imp.lunchClashes.forEach(function(pid){ b+='<div>🍽 Overlaps '+((typeof dispName==='function')?dispName(pid):pid)+'’s lunch — it will be moved automatically</div>'; });
+      imp.offShift.forEach(function(pid){ b+='<div style="color:var(--red)">✗ '+((typeof dispName==='function')?dispName(pid):pid)+' is not on shift then</div>'; });
+      b+='</div>';
+    } else {
+      b+='<div style="font-size:11.5px;color:var(--accent);margin-bottom:10px">✓ Everyone is on, no lunch clash, coverage holds.</div>';
+    }
+  }
+  b+='<input placeholder="Title (optional — e.g. Maddy 1:1)" value="'+(d.title||'').replace(/"/g,'&quot;')+'" '
+   +'oninput="_mtgDraft.title=this.value" '
+   +'style="width:100%;padding:9px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;color:var(--txt);font-size:13px;box-sizing:border-box;margin-bottom:10px">';
+  b+='<div style="display:flex;gap:8px">'
+   +'<button onclick="mtgCommit()" style="flex:1;padding:12px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer">✓ Put it on the schedule</button>'
+   +'<button class="btn btn-gh" onclick="closeModal();_mtgDraft=null">Cancel</button></div>';
+  // upcoming list
+  var up=(STATE.meetings||[]).filter(function(m){ return m.date>=tk; })
+    .sort(function(a,b2){ return a.date===b2.date ? a.from-b2.from : String(a.date).localeCompare(String(b2.date)); });
+  if(up.length){
+    b+='<div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;margin:14px 0 5px">Coming up</div>';
+    up.slice(0,6).forEach(function(m){
+      var mt=meetingType(m.type);
+      var who=(m.people||[]).map(function(p){ return (typeof dispName==='function')?dispName(p):p; }).join(' + ');
+      b+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px;color:var(--txt2)">'
+        +'<span>'+mt.icon+'</span><span style="flex:1"><b style="color:var(--txt)">'+(m.title||mt.label)+'</b> · '+who
+        +'<div style="font-size:10.5px;color:var(--txt3)">'+(m.date===tk?'Today':m.date)+' · '+_sFmt(m.from)+'–'+_sFmt(m.to)+'</div></span>'
+        +'<button onclick="meetingDelete(\''+m.id+'\');_mtgRender()" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px">×</button></div>';
+    });
+  }
+  openModal('🤝 Meetings & 1:1s', b);
+}
+function mtgCommit(){
+  var d=_mtgDraft, t=meetingType(d.type);
+  if(d.from==null){ if(typeof toast==='function') toast('Pick a start time — or tap a suggested one'); return; }
+  var res=meetingSave({id:d.id, type:d.type, title:d.title, date:d.date,
+    from:d.from, to:d.from+(d.mins||t.mins)/60, people:d.people.slice()});
+  if(!res) return;
+  try{ if(window.Notification && Notification.permission==='default') Notification.requestPermission(); }catch(e){}
+  closeModal(); _mtgDraft=null;
+  var msg='🤝 On the schedule';
+  if(res.lunchesMoved.length) msg+=' · lunch moved: '+res.lunchesMoved.join(', ');
+  if(res.impact.dips.length) msg+=' · heads up: '+res.impact.dips.length+' coverage dip'+(res.impact.dips.length===1?'':'s');
+  if(typeof toast==='function') toast(msg, 7000);
+}
+
 function openPrintables(){
   var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.55;margin-bottom:12px">'
    +'Five sheets on one grid. Everything reads on a black-and-white printer — '
@@ -19650,6 +19979,14 @@ function gfOnShiftAt(pid, e, h){
 }
 // Where is this person at hour h? mgmtBlocks (time-aware) wins, else staffStation.
 function gfAreaAt(pid, e, h){
+  // v60.191: someone in a MEETING is not covering a station. Without this the
+  // coverage counter and the solo alert kept counting attendees as on-post, so
+  // pulling two people into a 1:1 never showed the dip it actually causes.
+  // Scoped to key==='meeting' only — break/training keep their existing math.
+  var _sp=(STATE.specialBlocks||{})[pid]||[];
+  for(var _i=0;_i<_sp.length;_i++){
+    if(_sp[_i].key==='meeting' && h>=_sp[_i].from && h<_sp[_i].to) return null;
+  }
   var blocks=(STATE.mgmtBlocks||{})[pid]||[];
   if(blocks.length){
     var b=blocks.find(function(b){ return b && h>=b.from && h<b.to; });
@@ -20481,7 +20818,7 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
       </div>`;
     } else if(_canRotate){
       h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">`;
-      [['normal','Ctr → Exit','var(--acc)'],['exit-first','Exit → Ctr','var(--green)'],
+      [['normal','Counter 1st','var(--acc)'],['exit-first','Exit 1st','var(--green)'],
        ['full-counter','All Counter','var(--acc)'],['full-exit','All Exit','var(--green)']].forEach(([key,lbl,col])=>{
         const on=altPos===key;
         h+=`<button onclick="setAltPosition('${pid}','${key}');openPersonPanel('${pid}')"
