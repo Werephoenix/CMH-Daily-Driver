@@ -24685,6 +24685,64 @@ function biMgrStationsHtml(){
   return h;
 }
 
+// ── v60.196 · THE FAST FIVE — "I'm going to meet with the AM tomorrow for a
+// few minutes… run through the survey with him to tune everything" (Matt).
+// 51 questions won't fit in a hallway conversation. These five will, in this
+// order, because each one unblocks a whole engine:
+//   ① Manager stations & the assignment logic — feeds the draft + coverage flag
+//   ② ⚡ Fill rules — the 11 answers that gate every auto-suggestion
+//   ③ Coverage minimums — what every gap in the app is measured against
+//   ④ The 11a–9p decision — ends managers getting stuck on nights
+//   ⑤ Car groups & codes — 27 of 31 still guesses; one bulk tap if they look right
+// Each chip shows live answered-state and jumps to its section. Everything
+// else stays optional — "the rest keeps."
+var BI_FAST5 = [
+  {lbl:'① Stations & logic', find:'Manager stations',
+   done:function(){ return !!(STATE.mgrAssignLogic&&STATE.mgrAssignLogic.trim()); }},
+  {lbl:'② Fill rules', find:'Fill rules',
+   done:function(){ var c=STATE.branchConfig||{};
+     return ['fillExitFirst','fillCounter','fillReturns'].some(function(k){return c[k];}) ||
+            Object.keys(c).some(function(k){ return /^fill/i.test(k) && c[k]; }); }},
+  {lbl:'③ Minimums', find:'Coverage minimums',
+   done:function(){ var c=STATE.branchConfig||{};
+     return Object.keys(c).some(function(k){ return /^min/i.test(k) && c[k]!=null && c[k]!==''; })
+         || !!(STATE.floorTargets||STATE.mgrTargets); }},
+  {lbl:'④ 11a–9p?', find:'Manager shift windows',
+   done:function(){ return !!((STATE.branchConfig||{}).mgrLateWindow); }},
+  {lbl:'⑤ Car codes', find:'Car groups',
+   done:function(){ try{ var pr=fleetProgress(); return pr.done>=pr.total; }catch(e){ return false; } }},
+];
+function biJump(findText){
+  var secs=document.querySelectorAll('.bi-sec-hd');
+  for(var i=0;i<secs.length;i++){
+    if(secs[i].textContent.indexOf(findText)>=0){
+      secs[i].scrollIntoView({behavior:'smooth', block:'start'});
+      var sec=secs[i].parentElement;
+      sec.style.outline='2px solid var(--accent)'; sec.style.outlineOffset='3px';
+      setTimeout(function(){ sec.style.outline=''; },2200);
+      return;
+    }
+  }
+}
+function biFast5Html(){
+  var h='<div style="position:sticky;top:0;z-index:5;background:var(--bg2);padding:9px 0 7px;'
+   +'border-bottom:1px solid var(--bdr);margin-bottom:12px">'
+   +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;'
+   +'color:var(--txt3);margin-bottom:6px">⏱ Only have a few minutes? These five — in order</div>'
+   +'<div style="display:flex;gap:5px;flex-wrap:wrap">';
+  BI_FAST5.forEach(function(f){
+    var ok=false; try{ ok=f.done(); }catch(e){}
+    h+='<button onclick="biJump(\''+f.find+'\')" style="padding:7px 10px;border-radius:8px;'
+     +'font-size:11.5px;font-weight:800;cursor:pointer;'
+     +'border:1.5px solid '+(ok?'var(--accent)':'var(--bdr2)')+';'
+     +'background:'+(ok?'rgba(35,201,131,.12)':'var(--bg3)')+';'
+     +'color:'+(ok?'var(--accent)':'var(--txt2)')+'">'
+     +(ok?'✓ ':'')+f.lbl+'</button>';
+  });
+  h+='</div></div>';
+  return h;
+}
+
 function biRender(){
   if(typeof mgrMigrateEmerald==='function') try{ mgrMigrateEmerald(); }catch(e){}
   var o=document.getElementById('bi-overlay'); if(!o) return;
@@ -24701,7 +24759,7 @@ function biRender(){
     +'<button class="bi-x" onclick="closeBranchInterview()">✕</button></div>'
     +'<div class="bi-respbar"><span class="bi-resplbl">Answering as</span>'+chips+'</div>'
     +'<div class="bi-progwrap"><div class="bi-track"><i id="bi-progbar"></i></div><div class="bi-prog" id="bi-prog"></div></div>'
-    +'<div class="bi-body"><p class="bi-intro"><b style="color:#4DA3FF">Branch facts</b> are pre-filled from the app — confirm or fix. <b style="color:#AF9CFF">Your view</b> questions each manager answers separately; where you differ, reconcile to one standard at the bottom. Saves as you go.</p>';
+    +'<div class="bi-body">'+((typeof biFast5Html==='function')?biFast5Html():'')+'<p class="bi-intro"><b style="color:#4DA3FF">Branch facts</b> are pre-filled from the app — confirm or fix. <b style="color:#AF9CFF">Your view</b> questions each manager answers separately; where you differ, reconcile to one standard at the bottom. Saves as you go.</p>';
   BRANCH_INTERVIEW.forEach(function(sec){
     var isView=!!sec.view;
     h+='<div class="bi-sec'+(isView?' view':'')+'"><div class="bi-sec-hd">'+biEsc(sec.title)
