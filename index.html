@@ -2522,6 +2522,31 @@ button { cursor: pointer; }
     <button class="seg"    id="sdest-cal"   onclick="setSchedDest('cal')">📆 Calendar</button>
   </div>
 
+  <!-- v60.211 (Matt): "Today's coverage and Coverage Distribution today should
+       be merged into one info block" — the distribution strip (signed +/−
+       numbers per hour) now LEADS the same card that holds the coverage bars
+       and the person timeline. One card, one read: status → magnitude → who. -->
+  <div id="coverage-chart" style="display:none"></div>
+  <div id="sched-today-card" class="card" style="padding:10px 12px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div style="font-size:9px;font-weight:800;text-transform:uppercase;
+        letter-spacing:.08em;color:var(--txt3)">📊 Coverage · Today</div>
+      <div style="display:flex;gap:6px;font-size:8px">
+        <span style="color:var(--green)">🟩 Exit</span>
+        <span style="color:var(--acc)">🟦 Counter</span>
+        <span style="color:#6366f1">🌟 Emerald</span>
+        <span style="color:#06b6d4">↩ Returns</span>
+        <span style="color:var(--amber)">🍽 Lunch</span>
+      </div>
+    </div>
+    <div id="cov-strip"></div>
+    <div id="coverage-timeline" style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <div style="font-size:11px;color:var(--txt3);padding:8px">
+        Loading coverage...
+      </div>
+    </div>
+  </div>
+
   <!-- ① WHO'S ON -->
   <div class="sp-step" id="sp-step-1">
     <span class="sp-n">①</span> Who's on
@@ -2626,8 +2651,6 @@ button { cursor: pointer; }
     <span class="sp-n">②</span> Where are the gaps
   </div>
 
-  <!-- v60.193: ① the coverage distribution strip — the whole day in two rows -->
-  <div id="cov-strip"></div>
   <div id="counter-load"></div>
   <!-- Zone map — right now -->
   <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
@@ -2667,28 +2690,6 @@ button { cursor: pointer; }
     
   </div>
 
-  <!-- Coverage chart -->
-  <div id="coverage-chart" style="margin-bottom:8px"></div>
-
-  <!-- Person timeline -->
-  <div id="sched-today-card" class="card" style="padding:10px 12px">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <div style="font-size:9px;font-weight:800;text-transform:uppercase;
-        letter-spacing:.08em;color:var(--txt3)">Today's Coverage</div>
-      <div style="display:flex;gap:6px;font-size:8px">
-        <span style="color:var(--green)">🟩 Exit</span>
-        <span style="color:var(--acc)">🟦 Counter</span>
-        <span style="color:#6366f1">🌟 Emerald</span>
-        <span style="color:#06b6d4">↩ Returns</span>
-        <span style="color:var(--amber)">🍽 Lunch</span>
-      </div>
-    </div>
-    <div id="coverage-timeline" style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-      <div style="font-size:11px;color:var(--txt3);padding:8px">
-        Loading coverage...
-      </div>
-    </div>
-  </div>
   <!-- v60.127: Week draft pattern — the Auto-Scheduler rendered inline here (sibling of the day-view card) -->
   <div id="sched-week-view" style="display:none"></div>
 
@@ -4596,6 +4597,7 @@ window.onload = function() {
   startClock();
   restoreFields();
   if (typeof _mgrCounterPurge === 'function') _mgrCounterPurge();  // v60.210: clear auto-stamped mgr Counter
+  if (typeof checklistRolloverIfNeeded === 'function') checklistRolloverIfNeeded();  // v60.211: rituals reset with the branch day
   if (typeof applyDensity === 'function') applyDensity();  // v60.13: apply saved density pref
   if (typeof applyTheme === 'function') applyTheme();  // v60.32: apply saved bold/calm theme
   if (typeof applyContrast === 'function') applyContrast();  // v60.119: apply saved high-contrast pref
@@ -5956,10 +5958,52 @@ function updateBoardHeader() {
 
 function buildStaffSection(containerId, roster, isMgmt) { buildSwitchboard(); }
 
+// ── v60.211 · RITUALS RESET WITH THE BRANCH DAY ────────────────────────────
+// Matt: "there were ritual items already checked today that I did not do.
+// Why?" Because checks were stored by mode + item text with NO date — nothing
+// ever cleared them, so yesterday's checks (from any synced device) survived
+// into today looking freshly done. The store now carries a business-day stamp
+// and self-clears when the day turns. The boundary is 3am, NOT midnight — the
+// closer is still working their closing list at 12:15a, and wiping it mid-
+// close would be the same bug pointed the other way.
+function _clBusinessDay(){
+  var d=new Date(Date.now()-3*3600e3);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function checklistRolloverIfNeeded(){
+  try{
+    if(!STATE.checklist) STATE.checklist={};
+    var bd=_clBusinessDay();
+    if(STATE.checklistDay===bd) return false;
+    var had=Object.keys(STATE.checklist).some(function(k){
+      return Object.keys(STATE.checklist[k]||{}).some(function(t){ return STATE.checklist[k][t]; });
+    });
+    STATE.checklistDay=bd;
+    Object.keys(STATE.checklist).forEach(function(k){ STATE.checklist[k]={}; });
+    STATE.checklistWho={};
+    if(had){
+      if(typeof saveState==='function') saveState();
+      try{ if(typeof renderChecklist==='function' && window._curCLMode) renderChecklist(window._curCLMode); }catch(e){}
+    }
+    return had;
+  }catch(e){ return false; }
+}
+// v60.211: every check records who and when — so "who did this?" always has
+// an answer on the card itself (sync means another device's check is normal).
+function _clStamp(key, text, on){
+  if(!STATE.checklistWho) STATE.checklistWho={};
+  if(!STATE.checklistWho[key]) STATE.checklistWho[key]={};
+  if(on){
+    STATE.checklistWho[key][text]={
+      by:(STATE.fields&&STATE.fields.openMgr)||'',
+      at:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})};
+  } else delete STATE.checklistWho[key][text];
+}
 function toggleCheck(mode, text) {
   const key = `cl-${mode}`;
   if (!STATE.checklist[key]) STATE.checklist[key] = {};
   STATE.checklist[key][text] = !STATE.checklist[key][text];
+  _clStamp(key, text, STATE.checklist[key][text]);
   saveState();
   renderChecklist(mode);
 }
@@ -9245,6 +9289,20 @@ function cycleDuty(key) {
 
 function updateSchedHelper() { buildSwitchboard(); }
 
+// v60.211: the manager-card station picker. Same store the rest of the app
+// reads (STATE.staffStation) — setStation plus the card/floor refreshes that
+// screen needs, and delete-on-blank so "Floating" truly means unassigned.
+function mgrAssignStation(pid, val){
+  if(val){ STATE.staffStation[pid]=val; }
+  else { delete STATE.staffStation[pid]; }
+  if(typeof saveState==='function') saveState();
+  if(typeof rotInvalidate==='function') rotInvalidate();
+  try{ buildCoverageTimeline(); }catch(e){}
+  try{ if(typeof renderCovStrip==='function') renderCovStrip(); }catch(e){}
+  try{ if(typeof buildSwitchboard==='function') buildSwitchboard(); }catch(e){}
+  if(typeof toast==='function') toast(val? '📍 '+val : '📍 Floating — no station');
+  if(typeof openPersonPanel==='function') openPersonPanel(pid);
+}
 function setStation(key, val) {
   // v60.142: guard — warn (but allow) if a manager manually puts someone with an
   // active exit accommodation onto Exit Booth. Their accommodation still stands.
@@ -12400,7 +12458,9 @@ function renderChecklist(mode) {
       htm += '<div class="ci ' + (isDone?'done':'') + '" data-mode="' + mode + '" data-txt="' + it.t.replace(/"/g,'&quot;') + '" onclick="ciClick(this)">' +
         '<div class="cbox">' + (isDone?'✓':'') + '</div>' +
         '<div style="flex:1">' +
-          '<div class="ci-txt">' + it.t.replace(/^(\S+)/, '<b>$1</b>') + reqBadge + (auto&&!done?' <span style="font-size:9px;color:var(--green);opacity:.6">(auto)</span>':'') + '</div>' +
+          '<div class="ci-txt">' + it.t.replace(/^(\S+)/, '<b>$1</b>') + reqBadge + (auto&&!done?' <span style="font-size:9px;color:var(--green);opacity:.6">(auto)</span>':'')
+            + (function(){ var w=done&&((STATE.checklistWho||{})['cl-'+mode]||{})[it.t];
+                return w? ' <span style="font-size:9px;color:var(--txt3)">· ✓ '+(w.by||'someone')+' '+(w.at||'')+'</span>' : ''; })() + '</div>' +
           buildFields(fields) +
         '</div>' +
         (it.p ? '<div class="ci-photo">📷</div>' : '') +
@@ -12469,6 +12529,7 @@ function toggleCI(mode, text) {
   if (!STATE.checklist) STATE.checklist = {};
   if (!STATE.checklist[key]) STATE.checklist[key] = {};
   STATE.checklist[key][text] = !STATE.checklist[key][text];
+  if(typeof _clStamp==='function') _clStamp(key, text, STATE.checklist[key][text]);
   saveState();
   renderChecklist(mode);
   refreshDash();
@@ -15199,7 +15260,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.210'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.211'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15606,6 +15667,10 @@ try{
 var _rolloverDay=(typeof todayKey==='function')?todayKey():null;
 setInterval(function(){
   try{
+    // v60.211: rituals live on a 3am business-day boundary — checked every
+    // minute here, so a merge that resurrects yesterday's checks is cleaned
+    // within 60s too.
+    if(typeof checklistRolloverIfNeeded==='function') checklistRolloverIfNeeded();
     var tk=todayKey();
     if(_rolloverDay && tk!==_rolloverDay){
       _rolloverDay=tk;
@@ -17427,7 +17492,7 @@ function renderScheduleView() {
   if (_dw) _dw.className = 'seg' + (p==='week' ? ' on' : '');
   // id → its normal display value (so hide/restore keeps flex/grid layouts intact)
   // v60.145: the ② / ③ spine labels are day-view furniture — hidden in Week mode.
-  const _dayRestore = {'zone-map':'grid','solo-banner':'block','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block','sp-step-2':'flex','sp-step-3':'flex','cov-strip':'block'};
+  const _dayRestore = {'zone-map':'grid','solo-banner':'block','mgr-coverage':'block','sched-auto-bar':'flex','sched-today-card':'block','sp-step-2':'flex','sp-step-3':'flex'};
   if (p === 'week') {
     Object.keys(_dayRestore).forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
     if (wkEl) wkEl.style.display = 'block';
@@ -20311,12 +20376,14 @@ function buildCounterLoad(){
     +'Paste this daily and the day-of-week baseline learns it automatically.</div></div>';
 }
 
-function covStripHtml(expArg, subtitle){
+function covStripHtml(expArg, subtitle, bare){
   var exp; try{ exp=expArg||buildExpectedToday(); }catch(e){ return ''; }
   if(!Object.keys(exp).length) return '';
   var dow=new Date().getDay(), nowH=new Date().getHours();
   var rows=[['exit','Exit'],['counter','Ctr'],['returns','Ret']];   // v60.201: Returns joins
-  var h='<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:9px;padding:8px 10px;margin-bottom:10px">'
+  // v60.211: bare=true renders without its own card chrome — the merged
+  // top info block provides the card; the what-if modal keeps the chrome.
+  var h='<div style="'+(bare?'margin-bottom:6px':'background:var(--bg2);border:1px solid var(--bdr);border-radius:9px;padding:8px 10px;margin-bottom:10px')+'">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
    +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3)">'+(subtitle||'Coverage distribution · today')+'</span>'
    +'<span style="font-size:9.5px;color:var(--txt3)">🟥 short · 🟨 exact · 🟩 spare</span></div>';
@@ -20330,11 +20397,13 @@ function covStripHtml(expArg, subtitle){
       var need={},have={};
       try{ need=gfNeedsAt(hr,dow)||{}; have=(typeof gfCountsW==='function'?gfCountsW(exp,hr+0.01):gfCountsAt(exp,hr+0.01))||{}; }catch(e){}
       var nd=need[r[0]]||0, hv=have[r[0]]||0, diff=hv-nd;
+      // v60.211 (Matt): EVERY open cell says its number — short −n, exact 0,
+      // spare +n — not just the deficits.
       var bg, txt='';
       if(closed || nd===0){ bg='var(--bg3)'; }
       else if(diff<0){ bg='rgba(255,69,58,.55)'; txt=String(diff); }
-      else if(diff===0){ bg='rgba(255,204,0,.5)'; }
-      else { bg='rgba(48,209,88,.4)'; }
+      else if(diff===0){ bg='rgba(255,204,0,.5)'; txt='0'; }
+      else { bg='rgba(48,209,88,.4)'; txt='+'+Math.round(diff*10)/10; }
       h+='<div title="'+r[1]+' '+(hr%24)+':00 — have '+hv+' need '+nd+'" '
        +'style="flex:1;height:16px;border-radius:3px;background:'+bg+';'
        +(hr===nowH?'outline:1.5px solid var(--red);outline-offset:1px;':'')
@@ -20352,7 +20421,7 @@ function covStripHtml(expArg, subtitle){
 }
 function renderCovStrip(){
   var el=document.getElementById('cov-strip');
-  if(el) el.innerHTML=covStripHtml();
+  if(el) el.innerHTML=covStripHtml(null, 'Coverage · today — spare (+) and short (−) by hour', true);
   // v60.205: the Guided-fix button carries a live "· N moves" count, so the
   // move-recommender states its price before it is even opened.
   try{ var gc=document.getElementById('gfx-count');
@@ -22566,10 +22635,30 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
           background:var(--bg3);color:var(--txt3);font-size:12px;font-weight:700;cursor:pointer;text-align:left">
         ⏱ …or set exact times for each leg</button>`;
     } else {
+      // v60.211 (Matt): "Mgrs should be able to reassign on the employee card."
+      // Now that nobody auto-defaults to Counter (v60.210), this card IS the
+      // manual door: one tap sets the whole-shift station. Time blocks still
+      // outrank it when set (the panel above takes over in that case).
+      if(['ARM','BRM','ABRM','MT'].includes(person.role)){
+        const _mops=[['Emerald Booth Manager','🌟 EB1'],['EB2','🌟 EB2'],
+                     ['Counter Manager','🟦 Counter'],['Exit Booth','🟩 Exit'],
+                     ['Returns Manager','↩ Returns'],['Floater','🚶 Floater'],
+                     ['Shuttler','🚐 Shuttle'],['','✖ Floating']];
+        h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:6px">`;
+        _mops.forEach(([key,lbl])=>{
+          const on = key ? station===key : !station;
+          h+=`<button onclick="mgrAssignStation('${pid}','${key}')"
+            style="padding:9px 3px;border-radius:8px;border:1.5px solid ${on?'var(--eb)':'var(--bdr2)'};
+              background:${on?'rgba(175,156,255,.14)':'var(--bg3)'};color:${on?'var(--eb)':'var(--txt2)'};
+              font-size:10.5px;font-weight:800;cursor:pointer;white-space:nowrap">${lbl}</button>`;
+        });
+        h+=`</div>
+        <div style="font-size:10px;color:var(--txt3);margin-bottom:6px">One tap = their station for the whole shift. ✖ Floating = unassigned ('mgmt'), counted at no station.</div>`;
+      }
       h+=`<button onclick="openRotationEditor('${pid}')"
         style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bdr2);
           background:var(--bg3);color:var(--txt2);font-size:12.5px;font-weight:700;cursor:pointer;text-align:left">
-        ⏱ Set times for each part of the shift…</button>`;
+        ⏱ ${['ARM','BRM','ABRM','MT'].includes(person.role)?'…or split the shift across stations (blocks)':'Set times for each part of the shift…'}</button>`;
     }
     // ── v60.195 · RHYTHM (Matt): "something they just come to expect as their
     // normal." Shows the person's usual lunch — set once, or learned from the
