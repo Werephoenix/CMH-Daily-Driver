@@ -3233,21 +3233,62 @@ function sbSignOut(){
 
 // Access tokens expire after ~1h; the refresh_token is long-lived. Returns null
 // when this device isn't signed in, which every caller treats as "stay local".
+// v60.216 · THE DEAD-SESSION FIX (Matt: "It is still not syncing" — server
+// logs showed one device retrying a REVOKED refresh token 214 times over 15
+// hours, every attempt 400, while the UI showed only a small grey dot).
+// Three faults, three fixes:
+//   1. Refresh tokens are SINGLE-USE (rotation). Poll + push + realtime could
+//      all refresh in parallel with the same token — Supabase treats reuse as
+//      theft and revokes the whole session family. Refreshes are now
+//      SERIALIZED through one in-flight promise.
+//   2. A definitive 400/401 on refresh means the session is DEAD — retrying
+//      forever is noise. The stored session is wiped so the app knows.
+//   3. Dying quietly behind a dot hid the problem for hours. A dead session
+//      now raises a RED BANNER on every screen until someone signs back in.
+var _sbRefreshing = null;
 async function sbToken(){
   var s = _sbSess(); if(!s) return null;
   var now = Math.floor(Date.now()/1000);
   if (s.access_token && s.expires_at && s.expires_at - 30 > now) return s.access_token;
   if (!s.refresh_token) return null;
-  try {
-    const r = await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token', {
-      method:'POST', headers:{ apikey:SB_ANON, 'Content-Type':'application/json' },
-      body: JSON.stringify({ refresh_token: s.refresh_token }) });
-    const j = await r.json();
-    if (!j.access_token) return null;
-    j.expires_at = Math.floor(Date.now()/1000) + (j.expires_in||3600);
-    _sbSaveSess(j);
-    return j.access_token;
-  } catch(e){ return null; }
+  if (_sbRefreshing) return _sbRefreshing;         // rotation-safe: one at a time
+  _sbRefreshing = (async function(){
+    try {
+      const r = await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token', {
+        method:'POST', headers:{ apikey:SB_ANON, 'Content-Type':'application/json' },
+        body: JSON.stringify({ refresh_token: s.refresh_token }) });
+      const j = await r.json().catch(function(){ return {}; });
+      if (!j.access_token) {
+        if (r.status === 400 || r.status === 401) _sbKillSession();   // definitive: dead
+        return null;                                // else: server hiccup — keep token, retry later
+      }
+      j.expires_at = Math.floor(Date.now()/1000) + (j.expires_in||3600);
+      _sbSaveSess(j);
+      _sbBanner(false);
+      return j.access_token;
+    } catch(e){ return null; }                      // network blip: keep the token
+    finally { _sbRefreshing = null; }
+  })();
+  return _sbRefreshing;
+}
+function _sbKillSession(){
+  try{ localStorage.removeItem(SB_SESS_KEY); }catch(e){}
+  try{ setSyncStatus('offline','Signed out — tap the banner'); }catch(e){}
+  _sbBanner(true);
+}
+// The banner: impossible to miss, one tap to fix, gone the moment sign-in works.
+function _sbBanner(show){
+  var el=document.getElementById('sb-dead-banner');
+  if(!show){ if(el) el.remove(); return; }
+  if(el || /nosign/.test(location.hash||'')) return;
+  el=document.createElement('div');
+  el.id='sb-dead-banner';
+  el.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9999;padding:10px 14px;'
+    +'background:#D70015;color:#fff;font-size:13px;font-weight:800;text-align:center;cursor:pointer;'
+    +'box-shadow:0 2px 12px rgba(0,0,0,.4)';
+  el.innerHTML='⚠ This device stopped syncing — it was signed out. Tap here to sign back in.';
+  el.onclick=function(){ if(typeof sbPrompt==='function') sbPrompt(); };
+  try{ document.body.appendChild(el); }catch(e){}
 }
 async function sbSignIn(email, password){
   try {
@@ -15300,7 +15341,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.215'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.216'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15555,8 +15596,13 @@ function sbRealtime(){
     } catch(e){ return; }
     _sbRt.onopen = function(){
       _sbRt.send(JSON.stringify({ topic:'realtime:public:branch_state', event:'phx_join',
-        payload:{ config:{ postgres_changes:[{ event:'*', schema:'public', table:'branch_state' }] } },
+        payload:{ config:{ postgres_changes:[{ event:'*', schema:'public', table:'branch_state' }] },
+                  access_token: tok },
         ref:'1' }));
+      // v60.216: RLS-guarded tables deliver NO events to an anon-only socket —
+      // hand the user token to the channel so cross-device pings actually fire.
+      try{ _sbRt.send(JSON.stringify({ topic:'realtime:public:branch_state', event:'access_token',
+        payload:{ access_token: tok }, ref:'at' })); }catch(e){}
       _sbRtOk = true;
       clearInterval(_sbRtHeartbeat);
       _sbRtHeartbeat = setInterval(function(){
@@ -15639,6 +15685,7 @@ async function sbDoSignIn(){
   const res = await sbSignIn(em.trim(), pw);
   if (!res.ok) { if(errEl) errEl.textContent = res.err; return; }
   closeModal();
+  _sbBanner(false);
   if (typeof toast==='function') toast('🔒 Signed in — syncing');
   await sbMigrateIfNeeded();
   _syncPullNow();
