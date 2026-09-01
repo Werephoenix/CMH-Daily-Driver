@@ -2209,6 +2209,19 @@ button { cursor: pointer; }
     </div>
 
     <div class="pstep active" id="pstep-1">
+      <!-- v60.199: flip this, paste the SAME grid filtered to counter, parse.
+           It records the counter demand curve and deliberately never touches
+           the board. -->
+      <button id="ctr-only-chip" onclick="window._pasteCounterOnly=!window._pasteCounterOnly;
+          var on=window._pasteCounterOnly;
+          this.style.borderColor=on?'var(--accent)':'var(--bdr2)';
+          this.style.color=on?'var(--accent)':'var(--txt3)';
+          this.style.background=on?'rgba(35,201,131,.10)':'var(--bg3)';
+          if(typeof toast==='function') toast(on?'Next res parse = COUNTER-ONLY curve (board untouched)':'Back to normal parsing');"
+        style="width:100%;margin-bottom:8px;padding:8px;border-radius:7px;border:1px solid var(--bdr2);
+          background:var(--bg3);color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;text-align:left">
+        🟦 Next paste is COUNTER-ONLY res (GL filtered to counter) — tap to arm
+      </button>
       <div class="ps-hdr"><div class="ps-num" id="psn1">1</div><div><div class="ps-title">Reservations — AM (12a–11a)</div><div class="ps-hint">Game Plan → Reservations → By Hour → AM → Select All → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(1)" style="margin-left:auto">Parse ✓</button></div>
       <textarea class="paste-area" id="pa1" oninput="autoParseOnPaste(1, this)" placeholder="Paste AM reservations here..." rows="4"></textarea>
       <div class="parse-ok" id="pr1" style="display:none"></div>
@@ -2518,6 +2531,7 @@ button { cursor: pointer; }
 
   <!-- v60.193: ① the coverage distribution strip — the whole day in two rows -->
   <div id="cov-strip"></div>
+  <div id="counter-load"></div>
   <!-- Zone map — right now -->
   <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
     gap:6px;margin-bottom:10px"></div>
@@ -4982,9 +4996,26 @@ function parseStep(stepNum) {
     return;
   }
 
+  // ── v60.199 · COUNTER-ONLY RES PASTE (Matt) ──────────────────────────────
+  // "We have the res/ret counts, but those can also be filtered to be just
+  // res's at counter/hr as well. same set up."
+  // Same GreenLight grid, filtered to counter — so the same parser ingests it.
+  // What it unlocks: total res conflates Emerald-aisle members (who never
+  // touch the counter) with real counter transactions. Counter-only res is
+  // the TRUE counter workload curve, and (total − counter) per hour is the
+  // aisle flow that funnels through the EXIT booth. Two derived signals from
+  // one extra paste, both feeding the same series-keyed history + baseline
+  // that already exist — demandBaseline learns 'resCounter' with zero new
+  // machinery.
+  // A counter-only paste must NEVER touch the board: it is a demand filter,
+  // not availability — writing its groups would halve every count on the
+  // Live Board. It writes ONLY the hourly curve, under its own series key.
+  var _ctrOnly = !!window._pasteCounterOnly && stepNum <= 2;
   if (!STATE.pasteData) STATE.pasteData = {};
-  STATE.pasteData[key] = result;
-  STATE.boardUpdatedAt = Date.now();  // v60.65: powers the Live Board "· Updated HH:MM" header
+  if (!_ctrOnly) {
+    STATE.pasteData[key] = result;
+    STATE.boardUpdatedAt = Date.now();  // v60.65: powers the Live Board "· Updated HH:MM" header
+  }
 
   // Also try to parse brand section if present.
   // GUARD: GL hourly paste has a "Total" aggregate row at the top, which
@@ -5000,6 +5031,9 @@ function parseStep(stepNum) {
   }
 
   // Aggregate into groups for board — use total for res/ret counts
+  if (_ctrOnly) {
+    // counter-only: skip ALL board writes; only the hourly series below runs.
+  }
   const isRet = stepNum >= 3;
   const groups = {};
   const groupsRemaining = {};
@@ -5011,14 +5045,16 @@ function parseStep(stepNum) {
   }
   // Keep old format for board compatibility
   const legacyKey = {1:'res-am',2:'res-pm',3:'ret-am',4:'ret-pm',5:'brands-legacy'}[stepNum];
-  STATE.pasteData[legacyKey] = groups;
-  // Also store remaining for availability reference
-  STATE.pasteData[legacyKey+'-remaining'] = groupsRemaining;
+  if (!_ctrOnly) {
+    STATE.pasteData[legacyKey] = groups;
+    // Also store remaining for availability reference
+    STATE.pasteData[legacyKey+'-remaining'] = groupsRemaining;
+  }
 
   // Build hourly totals — spread code totals across hour slots
   // AM paste covers hours 0-11, PM paste covers hours 12-23
   if (!STATE.pasteHourly) STATE.pasteHourly = {};
-  const halfKey = key.startsWith('res') ? 'res' : 'ret';
+  const halfKey = _ctrOnly ? 'resCounter' : (key.startsWith('res') ? 'res' : 'ret');
   const isAM = result.halfDay === 'AM';
   const hourStart = isAM ? 0 : 12;
   const hourEnd   = isAM ? 12 : 24;
@@ -5084,6 +5120,17 @@ function parseStep(stepNum) {
   // UI feedback
   const total  = Object.values(result.codes).reduce((s,v)=>s+(v.remaining||0),0);
   const cCount = Object.keys(result.codes).length;
+  if (_ctrOnly) {
+    var tot2=(STATE.pasteHourly.resCounter||[]).reduce(function(a,v){return a+(v||0);},0);
+    if (pr) { pr.textContent='✓ Counter-only res captured · '+tot2+' counter transactions across the day'; pr.style.color='var(--accent)'; pr.style.display='block'; }
+    if (ta) { ta.style.borderColor='var(--accent)'; setTimeout(function(){ ta.style.borderColor=''; },2000); ta.value=''; }
+    window._pasteCounterOnly=false;
+    var chip=document.getElementById('ctr-only-chip'); if(chip){ chip.style.borderColor='var(--bdr2)'; chip.style.color='var(--txt3)'; chip.style.background='var(--bg3)'; }
+    saveState();
+    if (typeof toast==='function') toast('🟦 Counter demand curve saved — the board was not touched');
+    if (typeof buildCounterLoad==='function') try{ buildCounterLoad(); }catch(e){}
+    return;
+  }
   if (pr) {
     pr.textContent = `✓ ${cCount} codes · ${total.toLocaleString()} units remaining`;
     pr.style.color = 'var(--green)';
@@ -17104,6 +17151,7 @@ function buildCoverageTimeline() {
   // edits, nowFix…) routes to that pattern's renderer instead of the bars.
   const _pat = STATE.schedPattern || 'timeline';
   if(typeof renderCovStrip==='function') try{ renderCovStrip(); }catch(e){}   // v60.193
+  if(typeof buildCounterLoad==='function') try{ buildCounterLoad(); }catch(e){}   // v60.199
   if(typeof ptEntryRefresh==='function') try{ ptEntryRefresh(); }catch(e){}   // v60.194
   if (_pat === 'coverage') { return renderCoverageFirst(); }
   if (_pat === 'roster')   { return renderRoster(); }
@@ -19578,6 +19626,51 @@ function mtgCommit(){
 // The spec's rule: it re-renders from current state, so every lunch, flip and
 // fill visibly recolors the day the moment it lands. It is wired into
 // buildCoverageTimeline, which every mutation already calls.
+// ── v60.199 · COUNTER LOAD & AISLE FLOW — what the counter-only paste buys ──
+// counterLoad(h) = counter res that hour ÷ WEIGHTED counter bodies (effective
+// bodies rule, v60.198) — transactions per agent, the true "how slammed is the
+// desk" number. aisleFlow(h) = total res − counter res: the Emerald members
+// who skip the desk and funnel through the EXIT booth — the first real data
+// behind the exit minimum instead of a configured guess.
+function counterHourly(){ return (STATE.pasteHourly||{}).resCounter||null; }
+function aisleFlowAt(h){
+  var r=(STATE.pasteHourly||{}).res, c=counterHourly();
+  if(!r||!c) return null;
+  return Math.max(0,(r[h]||0)-(c[h]||0));
+}
+function buildCounterLoad(){
+  var el=document.getElementById('counter-load'); if(!el) return;
+  var c=counterHourly();
+  if(!c || !c.some(function(v){return v>0;})){ el.innerHTML=''; return; }
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
+  var rows='', worst=null;
+  for(var h=7;h<23;h++){
+    var res=c[h]||0; if(!res) continue;
+    var have={}; try{ have=(typeof gfCountsW==='function')?gfCountsW(exp,h+0.01):gfCountsAt(exp,h+0.01); }catch(e){}
+    var bodies=have.counter||0;
+    var load=bodies>0? Math.round(res/bodies*10)/10 : null;
+    var aisle=aisleFlowAt(h);
+    if(load!=null && (!worst||load>worst.load)) worst={h:h,load:load,res:res,bodies:bodies};
+    rows+='<div style="display:flex;gap:8px;align-items:center;font-size:11px;color:var(--txt3);padding:2px 0">'
+      +'<span style="width:34px;font-family:var(--ff-mono)">'+(h%12===0?12:h%12)+(h>=12?'p':'a')+'</span>'
+      +'<span style="width:60px">'+res+' res</span>'
+      +'<span style="width:74px">'+(bodies||0)+' at desk</span>'
+      +'<span style="font-weight:800;color:'+(load==null?'var(--red)':load>6?'var(--red)':load>4?'var(--amber)':'var(--accent)')+'">'
+      +(load==null?'nobody!':load+'/agent')+'</span>'
+      +(aisle!=null&&aisle>0?'<span style="margin-left:auto;opacity:.75">'+aisle+' via aisle→exit</span>':'')
+      +'</div>';
+  }
+  el.innerHTML='<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:9px;padding:9px 11px;margin-bottom:10px">'
+    +'<div style="display:flex;justify-content:space-between;margin-bottom:5px">'
+    +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3)">🟦 Counter load · from today\'s counter-only paste</span>'
+    +(worst?'<span style="font-size:10px;color:'+(worst.load>6?'var(--red)':'var(--txt3)')+'">peak '
+      +worst.load+'/agent at '+(worst.h%12===0?12:worst.h%12)+(worst.h>=12?'p':'a')+'</span>':'')
+    +'</div>'+rows
+    +'<div style="font-size:10px;color:var(--txt3);margin-top:5px;line-height:1.45">'
+    +'Res÷effective bodies per hour. The right-hand number is aisle flow (total − counter) — the members who skip the desk and hit the EXIT booth. '
+    +'Paste this daily and the day-of-week baseline learns it automatically.</div></div>';
+}
+
 function covStripHtml(){
   var exp; try{ exp=buildExpectedToday(); }catch(e){ return ''; }
   if(!Object.keys(exp).length) return '';
