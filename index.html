@@ -6894,6 +6894,17 @@ function buildSmartRotation() {
       const exitStartsAssigned = workingCXRs.slice(0, i).filter(c=>c.startStation==='exit').length;
       const counterStartsAssigned = i - exitStartsAssigned;
       // Keep exit:counter ratio roughly 1:2 for fairness
+      // v60.195: CONTINUITY FIRST — same start station as yesterday, so the day
+      // feels like their normal (the mgr-anchor idea applied to CXRs). Bounded
+      // by fairness: someone already >2h over the team's exit average doesn't
+      // keep an exit start, and vice versa nobody hides from exit forever.
+      var _y=(typeof rhythmYesterdayStart==='function')?rhythmYesterdayStart(cxr.pid):null;
+      if(_y==='exit'||_y==='counter'){
+        var _mine=(typeof getExitHoursWeek==='function')?(getExitHoursWeek(cxr.pid)||0):0;
+        var _avg=(typeof getTeamExitAvgWeek==='function')?(getTeamExitAvgWeek()||0):0;
+        var _fairOK = _y==='exit' ? (_mine <= _avg+2) : (_mine >= _avg-2);
+        if(_fairOK){ cxr.startStation=_y; return; }
+      }
       cxr.startStation = exitStartsAssigned < Math.ceil(i/3) ? 'exit' : 'counter';
     }
   });
@@ -6994,6 +7005,12 @@ function buildSmartRotation() {
     } else {
       block1H = Math.min(ROTATION.blockHours, totalWork / 2);
       block2H = totalWork - block1H;
+      // v60.195: aim the split at their usual lunch when one exists — the
+      // opener rule right below still gets the final word.
+      var _ur=(typeof usualLunch==='function')?usualLunch(cxr.pid):null;
+      if(_ur && _ur.t>shift.start+1 && _ur.t<shift.end-1){
+        block1H=_ur.t-shift.start; block2H=totalWork-block1H;
+      }
       // v60.187: the opener rule. `normal` starts at Counter, so lunch must not
       // land before 10:00 or the counter block comes up short.
       const _startsAt = (startStation === 'exit') ? 'exit' : 'counter';
@@ -7181,8 +7198,13 @@ function buildSmartRotation() {
     // exempt: customLunchFor() already refuses to move those at all.
     if (_isOpener(r.shiftStart)) {
       const _startsExit = !!(r.b1 && r.b1.station === 'exit');
-      const _ceiling = _startsExit ? OPENER_EXIT_LUNCH : OPENER_CTR_LUNCH;
-      if (newFrom > _ceiling + 0.01) return false;
+      // v60.195: Matt's rule is "if starting at exit, lunch should ALWAYS be
+      // 9:30" — always, not at-most. The first guard only blocked LATER moves
+      // and the stagger was caught pulling an exit-first opener to 9:00.
+      // Pinned both directions now; counter-first keeps its one-way floor
+      // (no earlier than 10, later is allowed if coverage demands).
+      if (_startsExit) { if (Math.abs(newFrom - OPENER_EXIT_LUNCH) > 0.01) return false; }
+      else if (newFrom > OPENER_CTR_LUNCH + 0.01) return false;
     }
     // v58 MIDPOINT CAP: lunch stays within +/-1hr of shift midpoint
     // per Matt: "Lunches for anyone should never be over 1 hr off of
@@ -19902,6 +19924,7 @@ function ptAccept(n){
 function ptPublish(){
   var st=_ptS();
   try{ if(typeof confirmToday==='function') confirmToday(); }catch(e){}
+  if(typeof rhythmRecord==='function') try{ rhythmRecord(); }catch(e){}   // v60.195
   st.publishedAt=new Date().toISOString();
   st.pubHash=_ptHash();
   if(typeof saveState==='function') saveState();
@@ -20006,6 +20029,83 @@ function ptEntryRefresh(){
     : '📋 Plan today · step '+cur+'/6';
   el.style.borderColor = published?'var(--accent)': stale?'var(--amber)':'var(--bdr2)';
   el.style.color = published?'var(--accent)': stale?'var(--amber)':'var(--txt)';
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// v60.195 · RHYTHM — "something they just come to expect as their normal"
+//
+// Matt: "if a rhythm could be built into their pattern… take the friction out
+// of guessing and wondering what they are gonna have today… would be nice to
+// have regularish lunches."
+//
+// Two sources, one answer:
+//   • an EXPLICIT preference (STATE.lunchPref[pid]) a manager or the CXR sets
+//     once on the card — strongest;
+//   • a LEARNED usual (median of the last published lunch times, min 3 days)
+//     for everyone who never states one — the app notices the pattern instead
+//     of asking anyone to fill in a form.
+//
+// The usual becomes the placer's TARGET, not a lock: every rule that protects
+// the floor still wins — the opener ceilings (exit-first 9:30 / counter-first
+// ≥10), the 3h hard floor, the stagger's coverage checks. Rhythm bends to
+// coverage, never the reverse; on a normal day the two agree and the lunch
+// simply stops moving around.
+//
+// History is captured at PUBLISH (the moment the plan becomes real), capped at
+// 14 days per person. Times only — no reasons, nothing else.
+// ═══════════════════════════════════════════════════════════════════════════
+function usualLunch(pid){
+  var p=(STATE.lunchPref||{})[pid];
+  if(typeof p==='number') return {t:p, src:'set'};
+  var h=((STATE.lunchHist||{})[pid]||[]).map(function(x){return x.t;}).filter(function(v){return typeof v==='number';});
+  if(h.length<3) return null;                       // don't invent a pattern from 2 days
+  var s=h.slice().sort(function(a,b){return a-b;});
+  return {t:s[Math.floor(s.length/2)], src:'learned', days:h.length};
+}
+function setLunchPref(pid, val){
+  if(!STATE.lunchPref) STATE.lunchPref={};
+  if(val==null||val===''){ delete STATE.lunchPref[pid]; }
+  else {
+    var t=(typeof rotParseClock==='function')?rotParseClock(val):null;
+    if(t==null){ if(typeof toast==='function') toast('Try 11:30a or 1130'); return; }
+    STATE.lunchPref[pid]=t;
+  }
+  if(typeof rotInvalidate==='function') rotInvalidate();
+  if(typeof saveState==='function') saveState();
+  if(typeof toast==='function') toast(val?'🍽 Usual lunch saved — the day will aim for it':'🍽 Preference cleared');
+  if(typeof openPersonPanel==='function') try{ openPersonPanel(pid); }catch(e){}
+}
+// Called at publish: write down what everyone's lunch actually WAS today, and
+// which station they started at — the raw material the rhythm learns from.
+function rhythmRecord(){
+  var tk=(typeof todayKey==='function')?todayKey():''; if(!tk) return;
+  if(!STATE.lunchHist) STATE.lunchHist={};
+  if(!STATE.startHist) STATE.startHist={};
+  var exp={}; try{ exp=buildExpectedToday(); }catch(e){ return; }
+  Object.keys(exp).forEach(function(pid){
+    if((STATE.todayOverrides||{})[pid]==='callout') return;
+    var t=null;
+    if((STATE.customLunch||{})[pid]!=null) t=STATE.customLunch[pid];
+    else { var r=(window._lastRotations||{})[pid]; if(r&&r.lunch) t=r.lunch.from; }
+    if(t==null){ ((STATE.specialBlocks||{})[pid]||[]).forEach(function(b){ if(b.key==='lunch') t=b.from; }); }
+    if(t!=null){
+      var arr=(STATE.lunchHist[pid]=STATE.lunchHist[pid]||[]).filter(function(x){return x.date!==tk;});
+      arr.push({date:tk, t:t});
+      STATE.lunchHist[pid]=arr.slice(-14);
+    }
+    var rr=(window._lastRotations||{})[pid];
+    if(rr && rr.b1 && exp[pid].person.role==='CXR'){
+      var sarr=(STATE.startHist[pid]=STATE.startHist[pid]||[]).filter(function(x){return x.date!==tk;});
+      sarr.push({date:tk, st:rr.b1.station});
+      STATE.startHist[pid]=sarr.slice(-14);
+    }
+  });
+}
+// Yesterday's start station, for continuity — same body clock two days running
+// unless fairness says otherwise (the mgr-anchor idea, applied to CXRs).
+function rhythmYesterdayStart(pid){
+  var h=(STATE.startHist||{})[pid]||[];
+  return h.length? h[h.length-1].st : null;
 }
 
 function openPrintables(){
@@ -20853,10 +20953,16 @@ function suggestLunches(){
         (st==='Exit Booth'||p.role==='EXIT');
       const isOpener=ss<8;
       let target;
+      // v60.195: the person's USUAL lunch (set or learned) is the starting aim.
+      // Every rule below still clamps it — the exit-first opener stays pinned
+      // at 9:30 (branch rule beats habit), the counter-first opener can't go
+      // before 10, the 3h floor holds. Rhythm bends to coverage, never the
+      // other way; on an ordinary day they simply agree.
+      var _u=(typeof usualLunch==='function')?usualLunch(pid):null;
       if(p.role==='EXIT'&&isOpener) target=ss+(dur/2)-LUNCH_DUR/2;
       else if(exitFirst&&isOpener) target=9.5;
-      else if(isOpener) target=Math.max(10,ss+(dur/2)-LUNCH_DUR/2);
-      else target=ss+(dur/2)-LUNCH_DUR/2;
+      else if(isOpener) target=Math.max(10, _u?_u.t:(ss+(dur/2)-LUNCH_DUR/2));
+      else target=_u?_u.t:(ss+(dur/2)-LUNCH_DUR/2);
       // Clamp: min 3h in, max 5.5h in
       target=Math.max(ss+3,Math.min(ss+5.5,target));
       // Round to nearest 15min
@@ -21417,6 +21523,27 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
         style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--bdr2);
           background:var(--bg3);color:var(--txt2);font-size:12.5px;font-weight:700;cursor:pointer;text-align:left">
         ⏱ Set times for each part of the shift…</button>`;
+    }
+    // ── v60.195 · RHYTHM (Matt): "something they just come to expect as their
+    // normal." Shows the person's usual lunch — set once, or learned from the
+    // last published days — and today's aim next to it, so the pattern is
+    // VISIBLE to the person it belongs to, not just to the engine.
+    if(person.role==='CXR' || person.role==='EXIT' || person.role==='RETURNS'){
+      const _u=(typeof usualLunch==='function')?usualLunch(pid):null;
+      const _pref=(STATE.lunchPref||{})[pid];
+      const _fmt=h2=>{const t=((h2%24)+24)%24,hh=Math.floor(t),mn=Math.round((t-hh)*60);
+        const d=hh>12?hh-12:(hh===0?12:hh);return d+(mn?':'+String(mn).padStart(2,'0'):'')+(hh>=12?'p':'a');};
+      h+=`<div style="display:flex;align-items:center;gap:8px;margin-top:6px;padding:7px 10px;
+          border-radius:8px;background:var(--bg3);border:1px dashed var(--bdr2)">
+        <span style="font-size:11.5px;color:var(--txt3);flex:1">🍽 Usual lunch: `
+        +(_u? `<b style="color:var(--txt2)">${_fmt(_u.t)}</b>`
+            +(_u.src==='learned'?` <span style="opacity:.7">(their pattern, ${_u.days} days)</span>`:' <span style="opacity:.7">(set)</span>')
+          : `<span style="opacity:.8">still learning — set one or publish a few days</span>`)
+        +`</span>
+        <button onclick="var v=prompt('Usual lunch for ${nick}? (e.g. 11:30a — blank to clear)', '${_pref!=null?_fmt(_pref):''}'); if(v!==null) setLunchPref('${pid}', v)"
+          style="padding:4px 10px;border-radius:6px;border:1px solid var(--bdr2);background:var(--bg2);
+            color:var(--txt3);font-size:10.5px;font-weight:700;cursor:pointer">${_pref!=null?'Edit':'Set'}</button>
+      </div>`;
     }
     h+=`</div>`;
   }
