@@ -2611,7 +2611,7 @@ button { cursor: pointer; }
     </button>
     <button class="btn btn-sm" onclick="gfxStart()" title="One gap at a time — apply or skip, with the reasoning shown"
       style="border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-weight:800">
-      ▶ Guided fix
+      ▶ Guided fix<span id="gfx-count" style="opacity:.85"></span>
     </button>
     <span id="auto-why" style="font-size:9px;color:var(--txt3)">
       Fills today's exit gaps using available CXRs · respects manager overrides
@@ -15068,7 +15068,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.204'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.205'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -19933,6 +19933,31 @@ function meetingDelete(id){
   if(typeof toast==='function') toast('Meeting removed');
 }
 
+// v60.205: hand a meeting to Outlook / Apple Calendar as a standard .ics file.
+// Floating local time on purpose (branch wall-clock, no timezone juggling);
+// the file carries names only — no emails, no phone numbers.
+function mtgIcs(id){
+  var m=(STATE.meetings||[]).filter(function(x){ return x.id===id; })[0]; if(!m) return;
+  var t=meetingType(m.type);
+  var dt=function(dateStr,h){ var hh=Math.floor(h), mm=Math.round((h-hh)*60); return String(dateStr).replace(/-/g,'')+'T'+String(hh).padStart(2,'0')+String(mm).padStart(2,'0')+'00'; };
+  var esc=function(x){ return String(x||'').replace(/([,;\\])/g,'\\$1'); };
+  var who=(m.people||[]).map(function(p2){ return (typeof dispName==='function')?dispName(p2):p2; }).join(', ');
+  var stamp=new Date().toISOString().replace(/[-:]/g,'').slice(0,15)+'Z';
+  var txt='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//CMH Daily Driver//EN\r\nBEGIN:VEVENT\r\n'
+    +'UID:cmh-'+m.id+'@cmh-daily-driver\r\nDTSTAMP:'+stamp+'\r\n'
+    +'DTSTART:'+dt(m.date,m.from)+'\r\nDTEND:'+dt(m.date,m.to)+'\r\n'
+    +'SUMMARY:'+esc(m.title||t.label)+'\r\nDESCRIPTION:'+esc(t.label+' — with '+who)+'\r\n'
+    +'END:VEVENT\r\nEND:VCALENDAR\r\n';
+  try{
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob([txt],{type:'text/calendar'}));
+    a.download=(String(m.title||t.label).replace(/[^\w ]+/g,'').trim()||'meeting')+'.ics';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ try{ URL.revokeObjectURL(a.href); a.remove(); }catch(e){} },500);
+    if(typeof toast==='function') toast('📅 .ics downloaded — open it and it lands on the Outlook/Apple calendar');
+  }catch(e){ if(typeof toast==='function') toast('Could not build the calendar file on this device'); }
+}
+
 // ── reminders: 10 minutes ahead, banner + browser notification ─────────────
 var _mtgReminded={};
 function meetingsCheckReminders(){
@@ -20052,6 +20077,7 @@ function _mtgRender(){
       b+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12px;color:var(--txt2)">'
         +'<span>'+mt.icon+'</span><span style="flex:1"><b style="color:var(--txt)">'+(m.title||mt.label)+'</b> · '+who
         +'<div style="font-size:10.5px;color:var(--txt3)">'+(m.date===tk?'Today':m.date)+' · '+_sFmt(m.from)+'–'+_sFmt(m.to)+'</div></span>'
+        +'<button onclick="mtgIcs(\''+m.id+'\')" title="Download a calendar file (.ics) — opens in Outlook or Apple Calendar" style="background:none;border:none;cursor:pointer;font-size:12px">📅</button>'
         +'<button onclick="meetingDelete(\''+m.id+'\');_mtgRender()" style="background:none;border:none;color:var(--txt3);cursor:pointer;font-size:14px">×</button></div>';
     });
   }
@@ -20138,14 +20164,14 @@ function buildCounterLoad(){
     +'Paste this daily and the day-of-week baseline learns it automatically.</div></div>';
 }
 
-function covStripHtml(){
-  var exp; try{ exp=buildExpectedToday(); }catch(e){ return ''; }
+function covStripHtml(expArg, subtitle){
+  var exp; try{ exp=expArg||buildExpectedToday(); }catch(e){ return ''; }
   if(!Object.keys(exp).length) return '';
   var dow=new Date().getDay(), nowH=new Date().getHours();
   var rows=[['exit','Exit'],['counter','Ctr'],['returns','Ret']];   // v60.201: Returns joins
   var h='<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:9px;padding:8px 10px;margin-bottom:10px">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-   +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3)">Coverage distribution · today</span>'
+   +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3)">'+(subtitle||'Coverage distribution · today')+'</span>'
    +'<span style="font-size:9.5px;color:var(--txt3)">🟥 short · 🟨 exact · 🟩 spare</span></div>';
   rows.forEach(function(r){
     h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'
@@ -20180,6 +20206,47 @@ function covStripHtml(){
 function renderCovStrip(){
   var el=document.getElementById('cov-strip');
   if(el) el.innerHTML=covStripHtml();
+  // v60.205: the Guided-fix button carries a live "· N moves" count, so the
+  // move-recommender states its price before it is even opened.
+  try{ var gc=document.getElementById('gfx-count');
+    if(gc){ var n=gfxGaps().length; gc.textContent = n? ' · '+n+(n===1?' move':' moves') : ''; }
+  }catch(e){}
+}
+
+// ── v60.205 · WHAT-IF SIMULATION — "what happens if X is out?" ─────────────
+// Pure read: today's expected board rebuilt WITHOUT one person, rendered as
+// the same coverage strip plus a list of the hours that would go newly short.
+// Nothing is written anywhere — it is a rehearsal, not a call-off.
+function whatIfOut(pid){
+  var exp; try{ exp=buildExpectedToday(); }catch(e){ return; }
+  if(!exp[pid]){ if(typeof toast==='function') toast('They\'re not on today\'s board — nothing to simulate'); return; }
+  var nick=(typeof dispName==='function')?dispName(exp[pid].person):pid;
+  var sim={}; Object.keys(exp).forEach(function(k){ if(k!==pid) sim[k]=exp[k]; });
+  var dow=new Date().getDay(), newShort=[];
+  ['exit','counter','returns'].forEach(function(area){
+    for(var hr=6;hr<24;hr++){
+      var need={},was={},now={};
+      try{ need=gfNeedsAt(hr,dow)||{}; }catch(e){}
+      try{ was=(typeof gfCountsW==='function'?gfCountsW(exp,hr+0.01):gfCountsAt(exp,hr+0.01))||{}; }catch(e){}
+      try{ now=(typeof gfCountsW==='function'?gfCountsW(sim,hr+0.01):gfCountsAt(sim,hr+0.01))||{}; }catch(e){}
+      var nd=need[area]||0;
+      if(nd && (now[area]||0)<nd && (was[area]||0)>=nd) newShort.push({area:area,hr:hr,have:now[area]||0,need:nd});
+    }
+  });
+  var lbl={exit:'Exit',counter:'Counter',returns:'Returns'};
+  var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.5;margin-bottom:10px">A rehearsal, not a call-off — <b style="color:var(--txt2)">nothing changes</b>. This is today\'s board with '+nick+' removed.</div>';
+  if(newShort.length){
+    b+='<div style="padding:10px 12px;border-radius:9px;background:rgba(255,69,58,.10);border:1px solid rgba(255,69,58,.4);margin-bottom:10px">'
+     +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--red);margin-bottom:4px">Goes short without them</div>'
+     + newShort.slice(0,8).map(function(x){ return '<div style="font-size:12.5px;color:var(--txt2)">'+lbl[x.area]+' at '+_gfxFmtH(x.hr)+' — '+x.have+'/'+x.need+'</div>'; }).join('')
+     + (newShort.length>8?'<div style="font-size:11px;color:var(--txt3)">+'+(newShort.length-8)+' more hours</div>':'')
+     +'</div>';
+  } else {
+    b+='<div style="font-size:12.5px;color:var(--accent);margin-bottom:10px">✓ The floor absorbs it — no hour that is covered now goes short without '+nick+'.</div>';
+  }
+  b+=covStripHtml(sim, 'If '+nick+' were out · simulated');
+  b+='<div style="font-size:11px;color:var(--txt3);margin-top:2px">If it really happens: mark it on their card (Here today?) and run ▶ Guided fix.</div>';
+  openModal('🧪 What if '+nick+' were out?', b);
 }
 
 // ── ② GUIDED FIX ───────────────────────────────────────────────────────────
@@ -20219,7 +20286,9 @@ function gfxRender(){
   var free=cands.filter(function(c){ return c.tier!=='protected'; });
   var top=free[0];
   var lbl={exit:'🟩 Exit', counter:'🟦 Counter', returns:'↩ Returns', eb1:'🌟 EB1', emerald:'🌟 Emerald'}[g.area]||g.area;
+  var _left=q.length-i;
   var b='<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">Gap '+(i+1)+' of '+q.length
+   +' · <b style="color:var(--txt2)">make '+_left+' move'+(_left===1?'':'s')+'</b> to a clean board'
    +' · '+_gfx.applied.length+' fixed so far</div>'
    +'<div style="padding:12px;border-radius:10px;background:rgba(255,69,58,.10);border:1px solid rgba(255,69,58,.4);margin-bottom:12px">'
    +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--red)">Short at '+lbl+'</div>'
@@ -22149,6 +22218,11 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
       ${(typeof absencePickerHtml==='function') ? absencePickerHtml(pid) : ''}
     </div>`;
   }
+
+  // v60.205: rehearse an absence without recording one — the what-if simulator.
+  h+=`<button onclick="whatIfOut('${String(pid).replace(/'/g,"\\x27")}')" style="width:100%;padding:8px;border-radius:8px;
+    border:1px dashed var(--bdr2);background:none;color:var(--txt3);font-size:11.5px;font-weight:700;
+    cursor:pointer;margin:-4px 0 12px">🧪 What if they were out today? · simulates, changes nothing</button>`;
 
   // ═══════════════════════════════════════════════════════════════════════
   // v60.181 · ONE QUESTION, ONE ANSWER: "where do they work today?"
@@ -26635,6 +26709,22 @@ var _asSeed = 0, _asStyled = false, _asWeekOffset = 0;
 // its OWN regenerate seed so navigating (or reshuffling one week) never disturbs another.
 var AS_MAX_WEEKS = 8;
 var _asSeeds = {};
+// v60.205 PINS (Design: week draft mode) — _asPins[dateKey][pid] = window.
+// A pinned manager slot is seated first and held through ↻ Regenerate, so the
+// planner can lock the seats that are right and reshuffle only the rest.
+// Deliberately session-local (not STATE): pins are a drafting hand, not data.
+var _asPins = {};
+function asTogglePin(date, pid, win){
+  if(!_asPins[date]) _asPins[date]={};
+  if(_asPins[date][pid]){ delete _asPins[date][pid]; if(!Object.keys(_asPins[date]).length) delete _asPins[date]; }
+  else _asPins[date][pid]=win;
+  asRerender();
+}
+function asPinCount(){
+  var sun=_asWeekStart(), n=0;
+  for(var i=0;i<7;i++){ var dt=new Date(sun); dt.setDate(sun.getDate()+i); n+=Object.keys(_asPins[_asDateKey(dt)]||{}).length; }
+  return n;
+}
 function _asWeekSeed(){ return _asSeeds[_asWeekOffset] || 0; }
 function _asWeekLabel(){ return (_asWeekOffset===0?'This week':_asWeekOffset===1?'Next week':'+'+_asWeekOffset+' wks')+' · '+_asWeekRangeLabel(); }
 // Has the current week + planner already been published (this planner's people have
@@ -26646,6 +26736,24 @@ function _asWeekApplied(){
     for(var i=0;i<7;i++){ var dt=new Date(sunday); dt.setDate(sunday.getDate()+i); var key=_asDateKeyOf(dt); var ov=(STATE.scheduleOverrides||{})[key]; if(ov){ for(var pid in ov){ if(pids[pid] && Array.isArray(ov[pid])) return true; } } }
     return false;
   }catch(e){ return false; }
+}
+// v60.205 · DAYFORCE KEYED-IN TRACKER (Design: the published week still has to
+// be typed into Dayforce by hand — track whether that happened, per week per
+// planner, so "published in the app" is never mistaken for "in payroll").
+function _asDayforceKey(){ return _asDateKey(_asWeekStart())+':'+_asPlanner; }
+function asDayforceChip(){
+  var r=(STATE.dayforceKeyed||{})[_asDayforceKey()];
+  return r
+    ? '<span class="as-chip ok" style="cursor:pointer" title="Marked keyed into Dayforce '+String(r.at||'').slice(0,10)+(r.by?' by '+r.by:'')+' — tap to unmark" onclick="asToggleDayforce()">⌨ Dayforce ✓</span>'
+    : '<span class="as-chip" style="cursor:pointer;color:var(--up,#FFCC00);border:1px solid var(--up,#FFCC00)" title="Published in the app — but has it been keyed into Dayforce yet? Tap once it has." onclick="asToggleDayforce()">⌨ Dayforce?</span>';
+}
+function asToggleDayforce(){
+  if(!STATE.dayforceKeyed) STATE.dayforceKeyed={};
+  var k=_asDayforceKey();
+  if(STATE.dayforceKeyed[k]) delete STATE.dayforceKeyed[k];
+  else STATE.dayforceKeyed[k]={at:new Date().toISOString(), by:(STATE.fields&&STATE.fields.openMgr)||''};
+  if(typeof saveState==='function') saveState();
+  asRerender();
 }
 var AS_DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var AS_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -26987,10 +27095,24 @@ function asBuildWeek(seed, _priorDepth){
         var _yEnd = (_prevRec && _prevRec.dow===_dow-1) ? _prevRec.end : null;
         mgrPrev[p.id] = {dow:_dow, end:w[1], _prevEnd:_yEnd, closeRun: (win==='4P-C' ? prevRun+1 : 0)};
       };
+      // v60.205 PINS: anything pinned in the draft is seated FIRST, exactly as
+      // pinned, before any picker runs. Pickers skip seated people via
+      // assigned[], so Regenerate reshuffles only the unpinned seats.
+      var _pinsToday = (typeof _asPins!=='undefined' ? _asPins : {})[dateKey] || {};
+      var _pinnedOpen=false, _pinnedClose=false;
+      Object.keys(_pinsToday).forEach(function(ppid){
+        var pp = pool.filter(function(q){ return String(q.name||'').replace(/\s/g,'_')===ppid; })[0];
+        if(!pp || assigned[pp.id]) return;
+        seat(pp, _pinsToday[ppid]);
+        people[people.length-1].pinned = true;
+        var pw=_asParseWin(_pinsToday[ppid])||[8,18];
+        if(pw[0]<=6) _pinnedOpen=true;
+        if(pw[1]>=22) _pinnedClose=true;
+      });
       // OPENER (prefer 530A-330P, else 6A-4P) — must clear ≥11h rest.
       // v60.161: anchored openers get first refusal.
       order = order.slice().sort(function(a,b){ return _asAnchorRank(a,'open')-_asAnchorRank(b,'open'); });
-      var opener = null;
+      var opener = _pinnedOpen ? {pinned:true} : null;
       for(var oi=0; oi<order.length && !opener; oi++){
         var p = order[oi]; if(assigned[p.id]) continue;
         var ow = p.patternWindows.indexOf('530A-330P')>=0 ? '530A-330P'
@@ -27009,7 +27131,7 @@ function asBuildWeek(seed, _priorDepth){
       // both close→open flips AND 4+ nights stacked on one person, and keeps the
       // schedule steady rather than churning the late shift daily. The rotated-off
       // closer is handled by the mids step (never re-closed).
-      var closerDone = false;
+      var closerDone = _pinnedClose;   // v60.205: a pinned close IS the closer
       // v60.161: anchored closers first for the fresh-closer pick below (step 1
       // still continues yesterday's closer — continuity beats anchor there).
       var closeOrder = order.slice().sort(function(a,b){ return _asAnchorRank(a,'close')-_asAnchorRank(b,'close'); });
@@ -27358,7 +27480,15 @@ function asWeekBodyHtml(){
     var rowsHtml = ppl.map(function(p){
       return '<div class="as-row">' +
         '<span class="as-rl" style="background:'+_asRoleColor(p.role)+'22;color:'+_asRoleColor(p.role)+'">'+p.role+'</span>' +
-        '<span class="as-nm">'+p.nick+(p.proposed?'<span class="as-prop">◇ proposed</span>':'')+'</span>' +
+        '<span class="as-nm">'+p.nick+(function(){
+            if(!p.proposed) return '';
+            if(!isMgr) return '<span class="as-prop">◇ proposed</span>';
+            var _pid=String(p.name||'').replace(/\s/g,'_').replace(/'/g,'\\x27');
+            var _clk=' onclick="asTogglePin(\''+d.date+'\',\''+_pid+'\',\''+p.win+'\')"';
+            return p.pinned
+              ? '<span class="as-prop" style="cursor:pointer;color:var(--up,#FFCC00)" title="Pinned — held through Regenerate. Tap to unpin."'+_clk+'>📌 pinned</span>'
+              : '<span class="as-prop" style="cursor:pointer" title="Tap to pin this slot — it will survive ↻ Regenerate"'+_clk+'>◇ proposed</span>';
+          })()+'</span>' +
         '<span class="as-tm">'+_asHr(p.start)+'–'+_asHr(p.end)+'</span>' +
       '</div>';
     }).join('') || '<div class="as-note">No one scheduled.</div>';
@@ -27375,10 +27505,11 @@ function asWeekBodyHtml(){
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff);padding:9px 12px"'+(_asWeekOffset<=0?' disabled':'')+' onclick="_asWeekOffset=Math.max(0,_asWeekOffset-1);asRerender();">‹</button>' +
       '<button class="as-btn" style="background:var(--counter,#0A84FF);color:#fff;min-width:150px" title="Jump to this week" onclick="_asWeekOffset=0;asRerender();">'+_asWeekLabel()+'</button>' +
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff);padding:9px 12px"'+(_asWeekOffset>=AS_MAX_WEEKS-1?' disabled':'')+' onclick="_asWeekOffset=Math.min(AS_MAX_WEEKS-1,_asWeekOffset+1);asRerender();">›</button>' +
-      (_asWeekApplied()?'<span class="as-chip ok">✓ applied</span>':'<span class="as-chip">◇ draft</span>') +
+      (_asWeekApplied()?'<span class="as-chip ok">✓ applied</span>'+asDayforceChip():'<span class="as-chip">◇ draft</span>') +
+      (isMgr && asPinCount()?'<span class="as-chip" style="color:var(--up,#FFCC00);border:1px solid var(--up,#FFCC00)">📌 '+asPinCount()+' pinned</span>':'') +
       '<button class="as-btn pri" onclick="asApplyWeek()">'+((isMgr && _asPublishTier!=='brm')?'🔒 Publish · BRM PIN':('✓ Apply '+(isMgr?'managers':'CXRs')+' →'))+'</button>' +
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeeds[_asWeekOffset]=(_asSeeds[_asWeekOffset]||0)+1; asRerender();">↻ Regenerate</button>' +
-      '<span class="as-note">Planning <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> · <b>'+_asWeekRangeLabel()+'</b>. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇</b> = a slot the scheduler filled.':'Placed from their bids.')+' <b>Apply</b> writes only this group — the other stays as-is. Use ‹ › for other weeks.</span>' +
+      '<span class="as-note">Planning <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> · <b>'+_asWeekRangeLabel()+'</b>. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇</b> = a slot the scheduler filled — tap it to 📌 pin (pins hold through ↻ Regenerate, this device only).':'Placed from their bids.')+' <b>Apply</b> writes only this group — the other stays as-is. Use ‹ › for other weeks.</span>' +
     '</div>' +
     warnHtml +
     (isMgr ? '<div class="as-note" style="margin:2px 0 8px">Each day: <b style="color:var(--accent,#23C983)">Opener ✓</b> / <b style="color:var(--na,#FF453A)">no closer ⚠</b> flags a day missing someone to open or close.</div>'
