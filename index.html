@@ -20,6 +20,27 @@
    (SF Pro on iOS). This also removes the last CDN dependency, so the app is now
    fully offline-capable per the hard constraints. Font vars set in :root below. */
 
+
+
+/* v60.203 · buttons get a visible edge on washed-out monitors; cards get the
+   design-spec inset highlight so surfaces separate without relying on hue. */
+.btn { border:1px solid var(--bdr2) !important; font-weight:700; }
+.btn-g, .btn-p { border-color: transparent !important; }
+.seg, .seg-ctl .seg { border:1px solid var(--bdr) !important; }
+.card { box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 1px 2px rgba(0,0,0,.5), 0 10px 24px rgba(0,0,0,.42); }
+
+/* ── v60.203 · view-locked: change-controls vanish until Unlock ─────────── */
+body.view-locked #sched-auto-bar,          /* ⚡ Fill gaps + ▶ Guided fix */
+body.view-locked #pt-entry,                /* 📋 Plan today */
+body.view-locked #cov-action-bar,          /* undo/redo bar */
+body.view-locked .co-btn,                  /* call-off quick button */
+body.view-locked .vl-mgr,                  /* anything tagged manager-only */
+body.view-locked .mgmt-block-draggable { pointer-events:none; }
+body.view-locked #sched-auto-bar,
+body.view-locked #pt-entry,
+body.view-locked #cov-action-bar,
+body.view-locked .vl-mgr { display:none !important; }
+
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
   /* Theme palette — v53 brightened AGAIN per Matt: "still tooooo dark
@@ -29,9 +50,14 @@
   /* v60.41 — iOS-native reskin palette (Claude Design handoff). Same var names,
      new values, so all markup shifts at once. Page is true black with a radial
      brand glow on the shell; surfaces are iOS system greys. */
-  --bg:        #000000;   /* page background (radial brand glow on the shell) */
-  --bg2:       #1C1C1E;   /* card surface */
-  --bg3:       #2C2C2E;   /* elevated surface (inside cards/sheets) */
+  /* v60.203 · CONTRAST PASS for washed-out work monitors (design v2 "surface
+     & mood" §: cards and hairlines lifted a tier, secondary-text floor raised,
+     buttons get a real edge). Matt from the branch floor: "the desktop view is
+     still very washed out on the work computers, especially around the
+     buttons." Values follow the drop's spec. */
+  --bg:        #0A0A0D;   /* page background — lifted off true black */
+  --bg2:       #22242B;   /* card surface */
+  --bg3:       #2B2E36;   /* elevated (v60.203 lift) */   /* elevated surface (inside cards/sheets) */
   --border:    #38383A;   /* hairline separator */
   --border2:   #48484A;
   --text:      #ffffff;
@@ -76,9 +102,9 @@
   --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
   --font-hd:   -apple-system, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
   /* ── Aliases — both naming schemes work (v60.41: mapped to iOS palette) ── */
-  --txt:    #ffffff;  --txt2: rgba(235,235,245,.75);  --txt3: rgba(235,235,245,.5);
+  --txt:    #ffffff;  --txt2: rgba(235,235,245,.75);  --txt3:      rgba(235,235,245,.68);   /* v60.203 floor raised from ~.55 */
   --acc:    #0A84FF;  --acc2: #4DA3FF;   /* counter blue (bars/primary data use --acc) */
-  --bdr:    #38383A;  --bdr2: #48484A;
+  --bdr:       rgba(255,255,255,.15);   /* v60.203 +5pts */  --bdr2:      rgba(255,255,255,.20);   /* v60.203 +5pts */
   --green:  #23C983;  --green2:#06351f;  --green3:#30D158;
   --amber:  #FFCC00;  --amber2:#2a2100;  --amber3:#C99700;
   --red:    #FF453A;  --red2:  #2a0606;  --red3:  #D70015;
@@ -2453,7 +2479,7 @@ button { cursor: pointer; }
        Call-off first (the #1 "something just changed" action), then the
        have-vs-need staffing glance. Both open self-contained overlays. -->
   <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-    <button onclick="openCallOff()" title="Mark anyone off today — coverage adjusts instantly"
+    <button class="vl-mgr" onclick="openCallOff()" title="Mark anyone off today — coverage adjusts instantly"
       style="flex:1;min-width:150px;padding:12px 14px;border-radius:9px;border:1px solid var(--red,#FF453A);
         background:rgba(255,69,58,.10);color:var(--red,#FF453A);font-size:14px;font-weight:800;cursor:pointer">
       📞 Someone called off
@@ -2549,7 +2575,7 @@ button { cursor: pointer; }
         border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer">
       Unlock
     </button>
-    <button onclick="confirmToday()"
+    <button class="vl-mgr" onclick="confirmToday()"
       style="padding:5px 12px;border-radius:4px;font-size:11px;font-weight:700;
         border:1px solid var(--green);background:rgba(52,211,153,.1);
         color:var(--green);cursor:pointer">
@@ -14860,6 +14886,89 @@ var _syncTimer    = null;
 var _pollTimer    = null;
 var _lastRemoteAt = null;
 
+// ── v60.203 · SYNC DOCTOR ──────────────────────────────────────────────────
+// "the paste info and scheduling changes I made on the work computer aren't
+// showing on my laptop." Nobody can debug an invisible pipe. Tapping the sync
+// dot while SIGNED IN now runs a live check against the cloud row and says,
+// in words: who saved it last, when, whether this device has unpushed edits,
+// and whether it is behind. Signed out, the dot still opens sign-in.
+async function sbStatusSheet(){
+  var b='<div style="font-size:12.5px;color:var(--txt3);line-height:1.6">Checking the cloud…</div>';
+  openModal('🔄 Sync check', b);
+  var lines=[];
+  var signed = (typeof sbSignedIn==='function') && sbSignedIn();
+  lines.push((signed?'✅':'❌')+' This device is '+(signed?'signed in':'NOT signed in — nothing syncs from or to it'));
+  if(signed){
+    lines.push(((window._syncPending)?'📤 Local edits are waiting to push (saves ~2.5s after a change)':'✅ Nothing waiting to push'));
+    try{
+      var H=await _sbHeaders();
+      var r=await fetch(SB_URL+'/rest/v1/branch_state?id=eq.'+encodeURIComponent(SB_ROW)+'&select=saved_at,saved_by',{headers:H});
+      if(r.ok){
+        var rows=await r.json();
+        if(rows && rows.length){
+          var at=new Date(rows[0].saved_at);
+          var mins=Math.round((Date.now()-at.getTime())/60000);
+          lines.push('☁️ Cloud copy: saved by <b>'+String(rows[0].saved_by||'?')+'</b> '
+            +(mins<1?'just now':mins+' min ago')+' ('+at.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+')');
+          var localAt=window._lastRemoteAt?new Date(window._lastRemoteAt):null;
+          if(localAt && at.getTime()>localAt.getTime()+2000){
+            lines.push('⚠️ This device is BEHIND the cloud — pulling now…');
+            try{ await sbPull(true); lines.push('✅ Pulled. If the screen doesn\'t update, switch tabs once.'); }catch(e){}
+          } else {
+            lines.push('✅ This device has the latest (or is the latest).');
+          }
+        } else {
+          lines.push('☁️ The cloud row is EMPTY — no device has ever pushed. The first signed-in device to make a change fills it.');
+        }
+      } else {
+        lines.push('❌ Cloud read failed ('+r.status+') — token may have expired; try signing in again via the dot.');
+      }
+    }catch(e){ lines.push('❌ No connection to the cloud right now.'); }
+  }
+  lines.push('<span style="opacity:.75">Both machines must be signed in AND running the current version — on a stale one, hard-refresh (Ctrl+F5) first.</span>');
+  var body='<div style="font-size:12.5px;color:var(--txt2);line-height:1.8">'+lines.join('<br>')+'</div>'
+    +'<button onclick="closeModal()" style="width:100%;margin-top:12px;padding:11px;border-radius:8px;border:none;background:var(--accent);color:#04160e;font-weight:800;cursor:pointer">Done</button>';
+  openModal('🔄 Sync check', body);
+}
+
+// ── v60.203 · IN-APP UPDATER — stale phones fix themselves ─────────────────
+// "the one on my phone still has older look elements too." An installed PWA
+// caches its start page and never offers a refresh button; asking Matt to
+// clear caches per device per deploy doesn't scale. The app now knows its own
+// build stamp, checks the server's copy (cache-bypassed) shortly after load
+// and every 30 minutes, and when they differ shows one chip: "New version —
+// tap to update." Tapping re-fetches with no-store (repopulating the HTTP
+// cache) and reloads. No service worker involved.
+var APP_BUILD = 'v60.203'; // ← bump on EVERY deploy; the updater keys on it
+function updCheck(){
+  try{
+    fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
+      .then(function(r){ return r.ok ? r.text() : ''; })
+      .then(function(t){
+        var m = t.match(/APP_BUILD = '([^']+)'/);
+        if(m && m[1] && m[1] !== APP_BUILD) updOffer(m[1]);
+      }).catch(function(){});
+  }catch(e){}
+}
+function updOffer(v){
+  if(document.getElementById('upd-chip')) return;
+  var d=document.createElement('button');
+  d.id='upd-chip';
+  d.textContent='🔄 New version ('+v+') — tap to update';
+  d.style.cssText='position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:99999;'
+    +'padding:11px 18px;border-radius:999px;border:1px solid var(--accent);'
+    +'background:rgba(35,201,131,.15);color:var(--accent);font-size:13px;font-weight:800;'
+    +'cursor:pointer;backdrop-filter:blur(8px);box-shadow:0 6px 24px rgba(0,0,0,.5)';
+  d.onclick=function(){
+    d.textContent='Updating…';
+    fetch(location.pathname+'?u='+Date.now(), {cache:'reload'})
+      .finally(function(){ location.reload(); });
+  };
+  document.body.appendChild(d);
+}
+setTimeout(updCheck, 12000);
+setInterval(updCheck, 30*60*1000);
+
 function setSyncStatus(status, msg) {
   const el = document.getElementById('sync-indicator');
   const dot = document.getElementById('sync-dot');
@@ -14882,9 +14991,11 @@ function setSyncStatus(status, msg) {
   // the prompt once would strand a device on local-only with no visible route
   // to sharing again short of clearing site data.
   const needsSignIn = (typeof sbSignedIn === 'function') && !sbSignedIn();
-  el.style.cursor = needsSignIn ? 'pointer' : '';
-  el.title = needsSignIn ? 'Tap to sign in and sync with the other devices' : '';
-  el.onclick = needsSignIn ? function(){ sbPrompt(); } : null;
+  el.style.cursor = 'pointer';
+  el.title = needsSignIn ? 'Tap to sign in and sync with the other devices'
+                         : 'Tap for a live sync check — who saved last, and is this device current';
+  el.onclick = needsSignIn ? function(){ sbPrompt(); }
+                           : function(){ if(typeof sbStatusSheet==='function') sbStatusSheet(); };
 }
 
 async function cloudPush() {
@@ -17615,7 +17726,8 @@ function buildCoverageTimeline() {
       _tone = (_on===0 && _need>0) ? 'red' : 'grey';
       _label = `${_on} on · block needs ${_need}`;
       _detail = mgrAreas().filter(a=>(_mb[a.k]||0)>0).map(a=>`<span style="color:${a.color}">${a.label} ${_mb[a.k]}</span>`).join(' · ')
-        + ` <span style="color:var(--txt3)">· Assign areas ›</span>`;
+        + (window._managerMode || (typeof _managerMode!=='undefined'&&_managerMode)
+            ? ` <span style="color:var(--txt3)">· Assign areas ›</span>` : '');
     } else {
       // STATE 1 — FULL DATA: per-area chips in model order.
       _tone = _primaryBroken ? 'red' : (mgrAreas().some(a=>a.k!=='counter'&&(_mb[a.k]||0)>(_have[a.k]||0)) ? 'amber' : 'ok');
@@ -21665,6 +21777,12 @@ function applyModPin() {
 }
 
 function updateManagerModeUI() {
+  // v60.203 (Matt): "Only Managers should see the buttons to change things or
+  // auto distribute… When locked those controls should disappear and only
+  // surface when unlocked." A locked screen is for READING the day. The body
+  // class drives CSS that removes every mutating control; Unlock stays as the
+  // one door back.
+  try{ document.body.classList.toggle('view-locked', !_managerMode); }catch(e){}
   const bar = document.getElementById('mgr-mode-bar');
   const status = document.getElementById('mgr-mode-status');
   const btn    = document.getElementById('mgr-mode-btn');
