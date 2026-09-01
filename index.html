@@ -9406,6 +9406,10 @@ function getAutoManagers() {
   let earliestStart = 99;
   workingMgmt.forEach(p => {
     const key = p.name.replace(/\s/g,'_');
+    // v60.202: never name an opener/closer who is marked off or absent today —
+    // duty flags can lag; the override marks are authoritative.
+    const _ov=(STATE.todayOverrides||{})[key];
+    if(_ov==='off' || _ov==='callout') return;
     // v60.20: prefer the loaded shift WINDOW (STATE.shiftMod, set by
     // loadScheduleForToday from the imported schedule) over the static code.
     // Previously this read only shiftTimes/shiftCode, so an imported schedule —
@@ -15006,6 +15010,12 @@ function applyRemoteRecord(record, apply) {
   const _prevPub = (STATE.publishMeta && STATE.publishMeta.at) || '';
   mergeRemoteIntoState(STATE, remote);
   if(typeof ensureStateShape==='function') try{ ensureStateShape(STATE); }catch(e){}   // v60.201
+  // v60.202: the merge can import ANOTHER device's stale day-derived layers
+  // (staffDuty / shiftMod / derived 'off' marks pushed before midnight or by
+  // an app that never rolled over). Those layers are DERIVED data — the stored
+  // schedule is the truth — so re-derive them after every merge. force=false
+  // keeps genuine same-day manual edits.
+  try{ if(typeof loadScheduleForToday==='function') loadScheduleForToday(false); }catch(e){}
   // v60.191: a meeting created on another device rides in through this merge —
   // its specialBlocks projection has to be rebuilt here or the reminder fires
   // with no 🤝 on the floor view.
@@ -15203,6 +15213,30 @@ try{
     }catch(e){}
   });
 }catch(e){}  // test harness stubs window without addEventListener
+
+// ── v60.202 · DAY-ROLLOVER WATCHDOG ────────────────────────────────────────
+// Found live (Matt, Sep 1): "the app is showing Khala as opener right now"
+// while the stored day said Preston. Khala WAS yesterday's 5:30 opener — the
+// header reads staffDuty/shiftMod, which only refresh when
+// loadScheduleForToday runs, and that ran at BOOT. A counter iPad or a PWA
+// left open overnight crosses midnight still wearing yesterday's floor. This
+// re-derives the day the moment the date changes under a running app.
+var _rolloverDay=(typeof todayKey==='function')?todayKey():null;
+setInterval(function(){
+  try{
+    var tk=todayKey();
+    if(_rolloverDay && tk!==_rolloverDay){
+      _rolloverDay=tk;
+      if(typeof loadScheduleForToday==='function') loadScheduleForToday(false);
+      if(typeof meetingsSync==='function') meetingsSync();
+      if(typeof rotInvalidate==='function') rotInvalidate();
+      ['buildCoverageTimeline','renderNow','buildSwitchboard'].forEach(function(f){
+        if(typeof window[f]==='function') try{ window[f](); }catch(e){}
+      });
+      if(typeof toast==='function') toast('🌅 New day — schedule re-derived');
+    }
+  }catch(e){}
+}, 60000);
 
 // v60.191: keep today's meeting blocks projected — load + every remote sync
 // (a meeting made on another device must land here too).
