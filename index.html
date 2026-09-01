@@ -2202,26 +2202,24 @@ button { cursor: pointer; }
          so it visually aligns with them in the stack. The `id="pstep-5"`
          and `parseStep(5)` are preserved for backward compatibility with
          downstream parsers; only the DOM order and styling are unified. -->
-    <div class="pstep" id="pstep-5">
-      <div class="ps-hdr"><div class="ps-num" id="psn5">B</div><div><div class="ps-title">Brand Totals</div><div class="ps-hint">Agent Sales Summary → select all rows including headers → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(5)" style="margin-left:auto">Parse ✓</button></div>
+    <!-- ═══ v60.200 · THE PASTE WORKFLOW, BEAT BY BEAT (Matt) ═══════════════
+         "the 1st general paste, the res/ret total, then res/ret counter."
+         One beat on screen at a time, auto-advancing as each lands. The old
+         jump-anywhere behaviour survives in the beat bar — tap any beat. -->
+    <div id="paste-beat-bar" style="display:flex;gap:6px;margin-bottom:12px"></div>
+
+    <!-- BEAT ① — the general Game Plan paste (brands / totals) -->
+    <div id="pbeat-1">
+    <div class="pstep active" id="pstep-5">
+      <div class="ps-hdr"><div class="ps-num" id="psn5">①</div><div><div class="ps-title">Game Plan — general</div><div class="ps-hint">Agent Sales Summary → select all rows including headers → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(5)" style="margin-left:auto">Parse ✓</button></div>
       <textarea class="paste-area" id="pa5" oninput="autoParseOnPaste(5, this)" placeholder="Paste the Brands table (Alamo / Enterprise / National rows)..." rows="4"></textarea>
       <div class="parse-ok" id="pr5" style="display:none"></div>
     </div>
+    </div>
 
+    <!-- BEAT ② — res/ret hourly totals (the four exports) -->
+    <div id="pbeat-2" style="display:none">
     <div class="pstep active" id="pstep-1">
-      <!-- v60.199: flip this, paste the SAME grid filtered to counter, parse.
-           It records the counter demand curve and deliberately never touches
-           the board. -->
-      <button id="ctr-only-chip" onclick="window._pasteCounterOnly=!window._pasteCounterOnly;
-          var on=window._pasteCounterOnly;
-          this.style.borderColor=on?'var(--accent)':'var(--bdr2)';
-          this.style.color=on?'var(--accent)':'var(--txt3)';
-          this.style.background=on?'rgba(35,201,131,.10)':'var(--bg3)';
-          if(typeof toast==='function') toast(on?'Next res parse = COUNTER-ONLY curve (board untouched)':'Back to normal parsing');"
-        style="width:100%;margin-bottom:8px;padding:8px;border-radius:7px;border:1px solid var(--bdr2);
-          background:var(--bg3);color:var(--txt3);font-size:11px;font-weight:700;cursor:pointer;text-align:left">
-        🟦 Next paste is COUNTER-ONLY res (GL filtered to counter) — tap to arm
-      </button>
       <div class="ps-hdr"><div class="ps-num" id="psn1">1</div><div><div class="ps-title">Reservations — AM (12a–11a)</div><div class="ps-hint">Game Plan → Reservations → By Hour → AM → Select All → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(1)" style="margin-left:auto">Parse ✓</button></div>
       <textarea class="paste-area" id="pa1" oninput="autoParseOnPaste(1, this)" placeholder="Paste AM reservations here..." rows="4"></textarea>
       <div class="parse-ok" id="pr1" style="display:none"></div>
@@ -2244,9 +2242,40 @@ button { cursor: pointer; }
       <textarea class="paste-area" id="pa4" oninput="autoParseOnPaste(4, this)" placeholder="Paste PM returns here..." rows="4"></textarea>
       <div class="parse-ok" id="pr4" style="display:none"></div>
     </div>
-  </div>
+    </div>
 
-  <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:10px">
+    <!-- BEAT ③ — the same grids, filtered to COUNTER. Optional but the
+         payoff beat: the true desk curve + aisle→exit flow. Never touches
+         the board (see parseStep's counter path). -->
+    <div id="pbeat-3" style="display:none">
+    <div style="font-size:11.5px;color:var(--txt3);line-height:1.55;margin-bottom:10px">
+      Same By-Hour views, with GreenLight's <b>counter filter</b> on. This beat feeds the
+      <b>Counter Load</b> card and the exit-flow numbers — it never changes the Live Board.
+      Res is the valuable one; Returns-counter is welcome if you have it.
+    </div>
+    <div class="pstep active" id="pstep-c1">
+      <div class="ps-hdr"><div class="ps-num" id="psnc1">🟦</div><div><div class="ps-title">Counter Res — AM</div><div class="ps-hint">Reservations → By Hour → AM → filter: Counter → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(1,true)" style="margin-left:auto">Parse ✓</button></div>
+      <textarea class="paste-area" id="pac1" oninput="autoParseOnPaste(1, this, true)" placeholder="Paste COUNTER-filtered AM reservations..." rows="4"></textarea>
+      <div class="parse-ok" id="prc1" style="display:none"></div>
+    </div>
+    <div class="pstep" id="pstep-c2">
+      <div class="ps-hdr"><div class="ps-num" id="psnc2">🟦</div><div><div class="ps-title">Counter Res — PM</div><div class="ps-hint">Same, PM half → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(2,true)" style="margin-left:auto">Parse ✓</button></div>
+      <textarea class="paste-area" id="pac2" oninput="autoParseOnPaste(2, this, true)" placeholder="Paste COUNTER-filtered PM reservations..." rows="4"></textarea>
+      <div class="parse-ok" id="prc2" style="display:none"></div>
+    </div>
+    <div class="pstep" id="pstep-c3">
+      <div class="ps-hdr"><div class="ps-num" id="psnc3">↩</div><div><div class="ps-title">Counter Ret — AM <span style="opacity:.6;font-weight:400">(optional)</span></div><div class="ps-hint">Returns → By Hour → AM → filter: Counter → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(3,true)" style="margin-left:auto">Parse ✓</button></div>
+      <textarea class="paste-area" id="pac3" oninput="autoParseOnPaste(3, this, true)" placeholder="Paste COUNTER-filtered AM returns..." rows="4"></textarea>
+      <div class="parse-ok" id="prc3" style="display:none"></div>
+    </div>
+    <div class="pstep" id="pstep-c4">
+      <div class="ps-hdr"><div class="ps-num" id="psnc4">↩</div><div><div class="ps-title">Counter Ret — PM <span style="opacity:.6;font-weight:400">(optional)</span></div><div class="ps-hint">Same, PM half → Copy</div></div><button class="btn btn-g btn-sm" onclick="parseStep(4,true)" style="margin-left:auto">Parse ✓</button></div>
+      <textarea class="paste-area" id="pac4" oninput="autoParseOnPaste(4, this, true)" placeholder="Paste COUNTER-filtered PM returns..." rows="4"></textarea>
+      <div class="parse-ok" id="prc4" style="display:none"></div>
+    </div>
+    </div>
+
+    <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:10px">
 <div id="paste-overall-status" style="font-size:12px;color:var(--txt3)">0 of 4 completed (Brand Totals optional)</div>
     <div class="row">
       <button class="btn btn-gh btn-sm" onclick="confirmDestructive('Clear all pasted Game Plan data?', 'This will wipe all 4 pastes and the Live Board will go blank.', clearPaste)">🗑 Clear Pastes</button>
@@ -4766,6 +4795,10 @@ function showTab(id) {
 
   if (id === 'opening' && typeof renderNow === 'function') renderNow();  // v60.43
   if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); updateCancelFlag(); updateEventFlag(); }
+  if (id === 'paste' && typeof pasteBeatShow==='function'){   // v60.200: land on the first unfinished beat
+    var _pb=1; while(_pb<3 && pasteBeatDone(_pb)) _pb++;
+    pasteBeatShow(_pb);
+  }
   if (id === 'schedule')  {
     try {
       const hasRotations = window._lastRotations && Object.keys(window._lastRotations).length > 0;
@@ -4949,15 +4982,18 @@ function hourArrayToPeakStr(hourly, topN) {
   return top.map(x => hrLabel(x.h) + ':' + x.v).join('  ');
 }
 
-function parseStep(stepNum) {
+function parseStep(stepNum, ctr) {
   // v60.52: during the start-of-day flow, offer the "what's next" step once board
   // data lands (deferred so it runs after this parse commits, whatever path it takes).
   if (window._sodActive) setTimeout(function(){ if (typeof sodMaybeNext==='function') sodMaybeNext(); }, 400);
   const idMap  = {1:'pa1',  2:'pa2',  3:'pa3',  4:'pa4',  5:'pa5'};
   const keyMap = {1:'resAM',2:'resPM',3:'retAM',4:'retPM',5:'brands'};
   const key    = keyMap[stepNum];
-  const ta     = document.getElementById(idMap[stepNum]);
-  const pr     = document.getElementById('pr'+stepNum);
+  // v60.200: ctr===true reads the counter-filtered textareas (pac1..4) and
+  // routes to the counter series — an explicit parameter instead of the old
+  // armed-chip window flag, so a paste can never be mis-routed by stale state.
+  const ta     = document.getElementById((ctr?'pac':'pa')+stepNum) || document.getElementById(idMap[stepNum]);
+  const pr     = document.getElementById((ctr?'prc':'pr')+stepNum);
 
   if (!ta || !ta.value.trim()) { toast('Paste data first'); return; }
 
@@ -4980,6 +5016,7 @@ function parseStep(stepNum) {
       pr.style.color='var(--green)';pr.style.display='block';
     }
     if(ta){ta.style.borderColor='var(--green)';setTimeout(()=>{ta.style.borderColor='';},2000);}
+    if (typeof pasteBeatSync==='function') setTimeout(function(){ pasteBeatSync(true); }, 50);   // v60.200
     const step5=document.getElementById('pstep-5');const num5=document.getElementById('psn5');
     if(step5){step5.classList.add('done');step5.classList.remove('active');}
     if(num5)num5.textContent='✓';
@@ -5010,7 +5047,7 @@ function parseStep(stepNum) {
   // A counter-only paste must NEVER touch the board: it is a demand filter,
   // not availability — writing its groups would halve every count on the
   // Live Board. It writes ONLY the hourly curve, under its own series key.
-  var _ctrOnly = !!window._pasteCounterOnly && stepNum <= 2;
+  var _ctrOnly = (ctr===true) && stepNum <= 4;
   if (!STATE.pasteData) STATE.pasteData = {};
   if (!_ctrOnly) {
     STATE.pasteData[key] = result;
@@ -5054,7 +5091,8 @@ function parseStep(stepNum) {
   // Build hourly totals — spread code totals across hour slots
   // AM paste covers hours 0-11, PM paste covers hours 12-23
   if (!STATE.pasteHourly) STATE.pasteHourly = {};
-  const halfKey = _ctrOnly ? 'resCounter' : (key.startsWith('res') ? 'res' : 'ret');
+  const halfKey = _ctrOnly ? (key.startsWith('res') ? 'resCounter' : 'retCounter')
+                           : (key.startsWith('res') ? 'res' : 'ret');
   const isAM = result.halfDay === 'AM';
   const hourStart = isAM ? 0 : 12;
   const hourEnd   = isAM ? 12 : 24;
@@ -5121,14 +5159,15 @@ function parseStep(stepNum) {
   const total  = Object.values(result.codes).reduce((s,v)=>s+(v.remaining||0),0);
   const cCount = Object.keys(result.codes).length;
   if (_ctrOnly) {
-    var tot2=(STATE.pasteHourly.resCounter||[]).reduce(function(a,v){return a+(v||0);},0);
-    if (pr) { pr.textContent='✓ Counter-only res captured · '+tot2+' counter transactions across the day'; pr.style.color='var(--accent)'; pr.style.display='block'; }
-    if (ta) { ta.style.borderColor='var(--accent)'; setTimeout(function(){ ta.style.borderColor=''; },2000); ta.value=''; }
-    window._pasteCounterOnly=false;
-    var chip=document.getElementById('ctr-only-chip'); if(chip){ chip.style.borderColor='var(--bdr2)'; chip.style.color='var(--txt3)'; chip.style.background='var(--bg3)'; }
+    var tot2=(STATE.pasteHourly[halfKey]||[]).reduce(function(a,v){return a+(v||0);},0);
+    if (pr) { pr.textContent='✓ Counter-filtered '+(key.startsWith('res')?'res':'returns')+' captured · '+tot2+' across the day'; pr.style.color='var(--accent)'; pr.style.display='block'; }
+    if (ta) { ta.style.borderColor='var(--accent)'; setTimeout(function(){ ta.style.borderColor=''; },2000); }
+    var stc=document.getElementById('pstep-c'+stepNum);
+    if(stc){ stc.classList.add('done'); var nx=document.getElementById('pstep-c'+(stepNum+1)); if(nx) nx.classList.add('active'); }
     saveState();
-    if (typeof toast==='function') toast('🟦 Counter demand curve saved — the board was not touched');
+    if (typeof toast==='function') toast('🟦 Counter curve saved — the board was not touched');
     if (typeof buildCounterLoad==='function') try{ buildCounterLoad(); }catch(e){}
+    if (typeof pasteBeatSync==='function') pasteBeatSync(true);
     return;
   }
   if (pr) {
@@ -5150,6 +5189,7 @@ function parseStep(stepNum) {
 
   refreshDash();
   buildBoardFlow();
+  if (typeof pasteBeatSync==='function') pasteBeatSync(true);   // v60.200
   if(done>=4){if(!STATE.fields)STATE.fields={};STATE.fields.gameplanPasted='1';}
   toast('Step '+stepNum+' parsed ✓  ('+cCount+' codes · '+total.toLocaleString()+' remaining)');
   if (done === 4) {
@@ -5206,7 +5246,12 @@ function clearAllPaste() {
     document.getElementById('pstep-'+i).classList.remove('completed','active');
     document.getElementById('snum-'+i).textContent = i;
   }
-  document.getElementById('pstep-1').classList.add('active');
+  var _p1=document.getElementById('pstep-1'); if(_p1) _p1.classList.add('active');
+  if (typeof pasteBeatShow==='function'){
+    // open on the first UNFINISHED beat — a re-visit mid-morning lands where you left off
+    var _b=1; while(_b<3 && pasteBeatDone(_b)) _b++;
+    pasteBeatShow(_b);
+  }
   updatePasteStatus();
   toast('Paste data cleared');
 }
@@ -13054,7 +13099,61 @@ function initPreloadedSchedule() {
 // ═══════════════════════════════════════════════════════════════════════
 var _autoParsers = {};
 
-function autoParseOnPaste(n, el) {
+// ── v60.200 · PASTE BEATS — done-states derived from data, never from taps ──
+var _pasteBeat = 1;
+function pasteBeatDone(n){
+  try{
+    if(n===1) return !!(STATE.pasteData && STATE.pasteData.brands && Object.keys(STATE.pasteData.brands).length);
+    if(n===2) return ['resAM','resPM','retAM','retPM'].every(function(k){ return STATE.pasteData && STATE.pasteData[k]; });
+    if(n===3){ var ph=STATE.pasteHourly||{};
+      return !!(ph.resCounter && ph.resCounter.some(function(v){return v>0;})); }
+  }catch(e){}
+  return false;
+}
+function pasteBeatShow(n){
+  _pasteBeat=n;
+  [1,2,3].forEach(function(i){
+    var el=document.getElementById('pbeat-'+i);
+    if(el) el.style.display = (i===n)?'':'none';
+  });
+  pasteBeatBar();
+}
+function pasteBeatBar(){
+  var bar=document.getElementById('paste-beat-bar'); if(!bar) return;
+  var META=[[1,'① General','brands & totals'],[2,'② Res/Ret totals','the four hourly exports'],[3,'③ Counter filter','the desk\'s true curve']];
+  bar.innerHTML=META.map(function(m){
+    var n=m[0], done=pasteBeatDone(n), cur=(n===_pasteBeat);
+    return '<button onclick="pasteBeatShow('+n+')" style="flex:1;padding:8px 6px;border-radius:9px;cursor:pointer;'
+      +'border:1.5px solid '+(done?'var(--accent)':cur?'var(--txt2)':'var(--bdr2)')+';'
+      +'background:'+(done?'rgba(35,201,131,.10)':cur?'var(--bg3)':'var(--bg2)')+';'
+      +'color:'+(done?'var(--accent)':cur?'var(--txt)':'var(--txt3)')+';text-align:left">'
+      +'<div style="font-size:12px;font-weight:800">'+(done?'✓ ':'')+m[1]+'</div>'
+      +'<div style="font-size:9.5px;opacity:.75">'+m[2]+'</div></button>';
+  }).join('');
+  var st=document.getElementById('paste-overall-status');
+  if(st){
+    var done=[1,2,3].filter(pasteBeatDone).length;
+    st.textContent='Beat '+_pasteBeat+' of 3 · '+done+' complete'
+      +(pasteBeatDone(2)?' — Board ready':'')
+      +(pasteBeatDone(3)?' · counter curve in':'');
+    st.style.color=done===3?'var(--accent)':'var(--txt3)';
+  }
+}
+// called after every successful parse; advance=true steps forward when the
+// current beat just finished.
+function pasteBeatSync(advance){
+  if(advance && pasteBeatDone(_pasteBeat) && _pasteBeat<3){
+    var next=_pasteBeat+1;
+    if(typeof toast==='function'){
+      toast(_pasteBeat===1?'① done — now the four hourly exports':'② done — counter filter next (the payoff beat)');
+    }
+    pasteBeatShow(next);
+  } else {
+    pasteBeatBar();
+  }
+}
+
+function autoParseOnPaste(n, el, ctr) {
   const text = el.value.trim();
   if (text.length < 10) return;
   clearTimeout(_autoParsers[n]);
@@ -13066,7 +13165,7 @@ function autoParseOnPaste(n, el) {
       return CODE_MAP && CODE_MAP[first];
     });
     if (hasCode && lines.length > 2) {
-      parseStep(n);
+      parseStep(n, ctr===true);
     }
   }, 400);
 }
