@@ -1997,7 +1997,7 @@ button { cursor: pointer; }
        Desktop (>=900px) reflows this bar into a left sidebar (see @media below). -->
   <div id="nav-brand"><span class="nav-brand-tile"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><path d="M13 2 L4 13.5 h6 l-1.5 8.5 L18 10 h-6 l1-8z"/></svg></span><span class="nav-brand-txt">Daily Driver</span></div>
   <button class="nbtn on" id="tab-opening"  onclick="showTab('opening')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><path d="M13 2 L4 13.5 h6 l-1.5 8.5 L18 10 h-6 l1-8z"/></svg></span><span class="nbtn-lbl">Now</span></button>
-  <button class="nbtn"    id="tab-schedule" onclick="showTab('schedule')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="nbtn-lbl">Schedule</span></button>
+  <button class="nbtn"    id="tab-schedule" onclick="showTab('schedule')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="nbtn-lbl">Plan</span></button>
   <button class="nbtn"    id="tab-board"    onclick="showTab('board')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><path d="M5 11l1.4-4.2A2 2 0 018.3 5.4h7.4a2 2 0 011.9 1.4L19 11M5 11h14v4.6a1 1 0 01-1 1h-1.4a1 1 0 01-1-1V15H8.4v.6a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><circle cx="8.2" cy="13.6" r="1"/><circle cx="15.8" cy="13.6" r="1"/></svg></span><span class="nbtn-lbl">Board</span></button>
   <button class="nbtn"    id="tab-calendar" onclick="showTab('calendar')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><circle cx="8" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg></span><span class="nbtn-lbl">Calendar</span></button>
   <button class="nbtn"    id="tab-checklist" onclick="showTab('checklist')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M8 12.2l2.8 2.8L16.5 9"/></svg></span><span class="nbtn-lbl">Rituals</span></button>
@@ -2017,7 +2017,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="showTab('reference')"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openEmeraldGuide()"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">💚</span><span class="more-lbl">Emerald Club<span class="more-sub">LOS by tier · MOD codes · aisle rules</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('history')"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openMasterCalendar()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">📅</span><span class="more-lbl">Master Calendar</span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="showTab('schedule');setSchedDest('cal')"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">📅</span><span class="more-lbl">Master Calendar<span class="more-sub">Lives in Plan → 📆 Calendar</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openScheduleLog()"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="goToWeekPlanner()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">🤖</span><span class="more-lbl">Week Planner<span class="more-sub">Auto-draft &amp; publish the week — opens Schedule → Week</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openStationFairness()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">🔀</span><span class="more-lbl">Station Fairness<span class="more-sub">Who's stuck in Returns / never Emerald · beta</span></span><span class="more-ch">›</span></button>
@@ -2494,7 +2494,7 @@ button { cursor: pointer; }
        header, top right — the old full-width mode bar was pure clutter. Same
        ids, so updateManagerModeUI keeps driving it unchanged. -->
   <div style="display:flex;align-items:center;gap:8px;margin:2px 0 14px">
-    <h1 class="scr-title" style="margin:0;flex:1">Schedule</h1>
+    <h1 class="scr-title" style="margin:0;flex:1">Plan</h1>
     <div id="mgr-mode-bar" style="display:flex;align-items:center;gap:6px">
       <span id="mgr-mode-status" style="font-size:10px;font-weight:700;color:var(--txt3);white-space:nowrap">🔒 View Mode</span>
       <button id="mgr-mode-btn" onclick="toggleManagerModePrompt()"
@@ -2513,9 +2513,13 @@ button { cursor: pointer; }
   <!-- v60.145 (Design 1a): TWO DESTINATIONS. Today (the live board) vs Week (the
        planner) are a real two-mode split, so they read as destinations — not as a
        4th option hidden inside the View selector. -->
+  <!-- v60.210 (design v2 Planning): Schedule + Calendar merge into ONE Plan
+       surface — Today (live board) · Week (planner) · Calendar (long range).
+       The master calendar keeps its full-bleed layout; the pill is its door. -->
   <div class="seg-ctl" id="sched-dest" style="margin-bottom:12px">
     <button class="seg on" id="sdest-today" onclick="setSchedDest('today')">☀️ Today</button>
     <button class="seg"    id="sdest-week"  onclick="setSchedDest('week')">📅 Week</button>
+    <button class="seg"    id="sdest-cal"   onclick="setSchedDest('cal')">📆 Calendar</button>
   </div>
 
   <!-- ① WHO'S ON -->
@@ -4591,6 +4595,7 @@ function saveField(key, val) {
 window.onload = function() {
   startClock();
   restoreFields();
+  if (typeof _mgrCounterPurge === 'function') _mgrCounterPurge();  // v60.210: clear auto-stamped mgr Counter
   if (typeof applyDensity === 'function') applyDensity();  // v60.13: apply saved density pref
   if (typeof applyTheme === 'function') applyTheme();  // v60.32: apply saved bold/calm theme
   if (typeof applyContrast === 'function') applyContrast();  // v60.119: apply saved high-contrast pref
@@ -6203,9 +6208,12 @@ function applyParsedSchedule(parsed) {
         const mgr = ROSTER_MGMT.find(m => m.id === id);
         const cxr = ROSTER_CXR.find(m => m.id === id);
         if (mgr) {
-          STATE.staffStation[id] = data.status === 'closing' ? 'Closing Manager' :
-                          data.status === 'opening' ? 'Emerald Booth Manager' :
-                          mgr.defaultStation || 'Counter Manager';
+          // v60.210: no 'Counter Manager' fallback — a manager with no declared
+          // default stays stationless ('mgmt') rather than silently on Counter.
+          const _mst = data.status === 'closing' ? 'Closing Manager' :
+                       data.status === 'opening' ? 'Emerald Booth Manager' :
+                       mgr.defaultStation || null;
+          if (_mst) STATE.staffStation[id] = _mst;
         } else if (cxr) {
           STATE.staffStation[id] = cxr.pref === 'exit' ? 'Exit Booth' : 'Counter';
         }
@@ -8653,6 +8661,22 @@ function resetSchedDay() {
 
 function buildMorningBriefing() { buildSwitchboard(); }
 
+// v60.210 · one-time purge: years of the old default left 'Counter Manager'
+// auto-stamps on manager pids in the synced state. Clear them ONCE (flagged so
+// a manual Counter assignment made after today sticks forever).
+function _mgrCounterPurge(){
+  try{
+    if((STATE.flags||{}).mgrCounterPurged) return;
+    if(!STATE.flags) STATE.flags={};
+    var mgr={}; (ROSTER_MGMT||[]).forEach(function(m){ mgr[m.id]=1; if(m.name) mgr[m.name.replace(/\s/g,'_')]=1; });
+    var n=0;
+    Object.keys(STATE.staffStation||{}).forEach(function(pid){
+      if(mgr[pid] && STATE.staffStation[pid]==='Counter Manager'){ delete STATE.staffStation[pid]; n++; }
+    });
+    STATE.flags.mgrCounterPurged=true;
+    if(n && typeof saveState==='function') saveState();
+  }catch(e){}
+}
 function autoLoadFromExpected(expectedToday, dow) {
   if (!STATE.staffDuty)    STATE.staffDuty    = {};
   if (!STATE.staffStation) STATE.staffStation = {};
@@ -8668,16 +8692,16 @@ function autoLoadFromExpected(expectedToday, dow) {
     if(e.person.role==='EXIT') STATE.staffStation[pid]='Exit Booth';
     if(e.person.role==='RETURNS') STATE.staffStation[pid]='Returns'; // Returns agents stay at returns
   });
-  // Auto-assign managers: opener → Emerald Booth (show runner), others → Counter Manager
+  // v60.210 (Matt): managers are NEVER auto-placed on Counter — that is a
+  // manual assignment or a block drop, full stop. The old blanket default
+  // ("others → Counter Manager") stamped every stationless manager as counter,
+  // which then counted them into counter coverage everywhere. A manager with
+  // no station now stays stationless and reads as 'mgmt' (floating), which is
+  // the truth. The Emerald show-runner assignment below survives: EB1 = the
+  // opener is branch canon, and Emerald is not Counter.
   const mgmtOnShift = Object.entries(expectedToday)
     .filter(([,e])=>['ARM','BRM','ABRM','MT'].includes(e.person.role))
     .sort((a,b)=>(a[1].person.shiftStart||99)-(b[1].person.shiftStart||99));
-
-  mgmtOnShift.forEach(([pid,e])=>{
-    // Don't override manually set stations
-    if (STATE.staffStation[pid] && STATE.staffStation[pid] !== 'Counter Manager') return;
-    STATE.staffStation[pid] = 'Counter Manager';
-  });
 
   // Assign Emerald to the manager currently acting as show runner:
   // The manager with the earliest shift start who is still on shift right now
@@ -15175,7 +15199,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.209'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.210'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -17353,6 +17377,11 @@ function setSchedGroup(mode) {
 // existing week pattern (whose hide/restore wiring is untouched); Today returns to
 // whichever day-view render the manager last used.
 function setSchedDest(d) {
+  // v60.210: Calendar is the third destination of the Plan surface. It keeps
+  // its full-bleed month layout (an inline month grid on a phone would fight
+  // the coverage bars for width), so the pill opens it in place; closing it
+  // lands back on Plan exactly as you left it.
+  if (d === 'cal') { if (typeof openMasterCalendar==='function') openMasterCalendar(); return; }
   if (d === 'week') { setSchedPattern('week'); return; }
   const back = (STATE.schedPattern && STATE.schedPattern !== 'week') ? STATE.schedPattern
              : (STATE._schedDayPattern || 'timeline');
