@@ -2490,7 +2490,25 @@ button { cursor: pointer; }
      SCREEN: SCHEDULE
 ═══════════════════════════════════════════════════════════════ -->
 <div class="scr" id="screen-schedule">
-  <h1 class="scr-title">Schedule</h1>
+  <!-- v60.209 (Matt): the Unlock control shrinks to a small chip beside the
+       header, top right — the old full-width mode bar was pure clutter. Same
+       ids, so updateManagerModeUI keeps driving it unchanged. -->
+  <div style="display:flex;align-items:center;gap:8px;margin:2px 0 14px">
+    <h1 class="scr-title" style="margin:0;flex:1">Schedule</h1>
+    <div id="mgr-mode-bar" style="display:flex;align-items:center;gap:6px">
+      <span id="mgr-mode-status" style="font-size:10px;font-weight:700;color:var(--txt3);white-space:nowrap">🔒 View Mode</span>
+      <button id="mgr-mode-btn" onclick="toggleManagerModePrompt()"
+        style="padding:3px 11px;border-radius:999px;font-size:10.5px;font-weight:700;
+          border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer">
+        Unlock
+      </button>
+      <button class="vl-mgr" onclick="confirmToday()"
+        style="padding:3px 11px;border-radius:999px;font-size:10.5px;font-weight:700;
+          border:1px solid var(--green);background:rgba(52,211,153,.1);color:var(--green);cursor:pointer">
+        ✓ Confirm
+      </button>
+    </div>
+  </div>
 
   <!-- v60.145 (Design 1a): TWO DESTINATIONS. Today (the live board) vs Week (the
        planner) are a real two-mode split, so they read as destinations — not as a
@@ -2599,25 +2617,6 @@ button { cursor: pointer; }
 
   <!-- Station view container (hidden by default) -->
   <div id="sched-station-view" style="display:none;margin-bottom:10px"></div>
-  <div id="mgr-mode-bar" style="display:flex;align-items:center;gap:8px;
-    padding:8px 12px;background:var(--bg2);border:1px solid var(--bdr);
-    border-radius:8px;margin-bottom:10px">
-    <div id="mgr-mode-status" style="flex:1;font-size:11px;font-weight:700;color:var(--txt3)">
-      🔒 View Mode
-    </div>
-    <button id="mgr-mode-btn" onclick="toggleManagerModePrompt()"
-      style="padding:5px 12px;border-radius:4px;font-size:11px;font-weight:700;
-        border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer">
-      Unlock
-    </button>
-    <button class="vl-mgr" onclick="confirmToday()"
-      style="padding:5px 12px;border-radius:4px;font-size:11px;font-weight:700;
-        border:1px solid var(--green);background:rgba(52,211,153,.1);
-        color:var(--green);cursor:pointer">
-      ✅ Confirm
-    </button>
-  </div>
-
   <!-- ② WHERE ARE THE GAPS -->
   <div class="sp-step" id="sp-step-2">
     <span class="sp-n">②</span> Where are the gaps
@@ -15176,7 +15175,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.208'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.209'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15251,6 +15250,16 @@ async function cloudPush() {
   // SYNCHRONOUS (before any await) so an actively-editing device resumes
   // accepting remote pulls the moment it pushes. test_sync.js asserts this.
   window._syncPending = false;
+  // v60.209 · DIRTY CHECK — if the state is byte-identical to what this device
+  // last pushed, there is nothing to say. This is what stops the two-desk loop:
+  // pull → re-derive → save → push → the other desk pulls → re-derives → … The
+  // derivation is deterministic, so the cycle converges to identical state and
+  // dies right here instead of circling all day.
+  var _snap = null;
+  try{
+    _snap = JSON.stringify(STATE);
+    if (window._lastCloudState === _snap){ setSyncStatus('synced','In sync'); return; }
+  }catch(e){}
   setSyncStatus('syncing');
   const H = await _sbHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' });
   if (!H) { setSyncStatus('offline','Sign in to sync'); return; }
@@ -15268,6 +15277,7 @@ async function cloudPush() {
     if (res.ok) {
       const t = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
       setSyncStatus('synced', 'Saved '+t);
+      if (_snap) window._lastCloudState = _snap;   // v60.209: the clean-state mark
       _lastRemoteAt = payload.saved_at;
     } else if (res.status === 401 || res.status === 403) {
       setSyncStatus('offline','Sign in to sync');
@@ -17388,7 +17398,7 @@ function renderScheduleView() {
   if (_dw) _dw.className = 'seg' + (p==='week' ? ' on' : '');
   // id → its normal display value (so hide/restore keeps flex/grid layouts intact)
   // v60.145: the ② / ③ spine labels are day-view furniture — hidden in Week mode.
-  const _dayRestore = {'mgr-mode-bar':'flex','zone-map':'grid','solo-banner':'block','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block','sp-step-2':'flex','sp-step-3':'flex','cov-strip':'block'};
+  const _dayRestore = {'zone-map':'grid','solo-banner':'block','mgr-coverage':'block','sched-auto-bar':'flex','coverage-chart':'block','sched-today-card':'block','sp-step-2':'flex','sp-step-3':'flex','cov-strip':'block'};
   if (p === 'week') {
     Object.keys(_dayRestore).forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; });
     if (wkEl) wkEl.style.display = 'block';
@@ -23845,7 +23855,11 @@ function loadScheduleForToday(force) {
   if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
   if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
   refreshDash();
-  toast('Schedule loaded for ' + key + (force?' (forced)':''));
+  // v60.209 (Matt, from the work desktop): this toast fired on EVERY background
+  // re-derive — each sync merge and the rollover watchdog call this — so two
+  // open desks echoed "Schedule loaded" at each other every few seconds. A
+  // background load is not news; only a load someone ASKED for gets a toast.
+  if (force) toast('Schedule loaded for ' + key + ' (forced)');
   return true;
 }
 
@@ -26960,6 +26974,9 @@ var _asSeeds = {};
 // Deliberately session-local (not STATE): pins are a drafting hand, not data.
 var _asPins = {};
 function asTogglePin(date, pid, win){
+  if(document.body && document.body.classList.contains('view-locked')){
+    if(typeof toast==='function') toast('🔒 Unlock Manager Mode to pin slots'); return;
+  }
   if(!_asPins[date]) _asPins[date]={};
   if(_asPins[date][pid]){ delete _asPins[date][pid]; if(!Object.keys(_asPins[date]).length) delete _asPins[date]; }
   else _asPins[date][pid]=win;
@@ -26989,10 +27006,11 @@ function _asDayforceKey(){ return _asDateKey(_asWeekStart())+':'+_asPlanner; }
 function asDayforceChip(){
   var r=(STATE.dayforceKeyed||{})[_asDayforceKey()];
   return r
-    ? '<span class="as-chip ok" style="cursor:pointer" title="Marked keyed into Dayforce '+String(r.at||'').slice(0,10)+(r.by?' by '+r.by:'')+' — tap to unmark" onclick="asToggleDayforce()">⌨ Dayforce ✓</span>'
-    : '<span class="as-chip" style="cursor:pointer;color:var(--up,#FFCC00);border:1px solid var(--up,#FFCC00)" title="Published in the app — but has it been keyed into Dayforce yet? Tap once it has." onclick="asToggleDayforce()">⌨ Dayforce?</span>';
+    ? '<span class="as-chip ok vl-mgr" style="cursor:pointer" title="Marked keyed into Dayforce '+String(r.at||'').slice(0,10)+(r.by?' by '+r.by:'')+' — tap to unmark" onclick="asToggleDayforce()">⌨ Dayforce ✓</span>'
+    : '<span class="as-chip vl-mgr" style="cursor:pointer;color:var(--up,#FFCC00);border:1px solid var(--up,#FFCC00)" title="Published in the app — but has it been keyed into Dayforce yet? Tap once it has." onclick="asToggleDayforce()">⌨ Dayforce?</span>';
 }
 function asToggleDayforce(){
+  if(document.body && document.body.classList.contains('view-locked')) return;
   if(!STATE.dayforceKeyed) STATE.dayforceKeyed={};
   var k=_asDayforceKey();
   if(STATE.dayforceKeyed[k]) delete STATE.dayforceKeyed[k];
@@ -27804,8 +27822,8 @@ function asWeekBodyHtml(){
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff);padding:9px 12px"'+(_asWeekOffset>=AS_MAX_WEEKS-1?' disabled':'')+' onclick="_asWeekOffset=Math.min(AS_MAX_WEEKS-1,_asWeekOffset+1);asRerender();">›</button>' +
       (_asWeekApplied()?'<span class="as-chip ok">✓ applied</span>'+asDayforceChip():'<span class="as-chip">◇ draft</span>') +
       (isMgr && asPinCount()?'<span class="as-chip" style="color:var(--up,#FFCC00);border:1px solid var(--up,#FFCC00)">📌 '+asPinCount()+' pinned</span>':'') +
-      '<button class="as-btn pri" onclick="asApplyWeek()">'+((isMgr && _asPublishTier!=='brm')?'🔒 Publish · BRM PIN':('✓ Apply '+(isMgr?'managers':'CXRs')+' →'))+'</button>' +
-      '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeeds[_asWeekOffset]=(_asSeeds[_asWeekOffset]||0)+1; asRerender();">↻ Regenerate</button>' +
+      '<button class="as-btn pri vl-mgr" onclick="asApplyWeek()">'+((isMgr && _asPublishTier!=='brm')?'🔒 Publish · BRM PIN':('✓ Apply '+(isMgr?'managers':'CXRs')+' →'))+'</button>' +
+      '<button class="as-btn vl-mgr" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeeds[_asWeekOffset]=(_asSeeds[_asWeekOffset]||0)+1; asRerender();">↻ Regenerate</button>' +
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" title="Pull one body from each day and see what is left — run before publishing" onclick="asStressTest()">🧪 Stress test</button>' +
       '<span class="as-note">Planning <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> · <b>'+_asWeekRangeLabel()+'</b>. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇</b> = a slot the scheduler filled — tap it to 📌 pin (pins hold through ↻ Regenerate, this device only).':'Placed from their bids.')+' <b>Apply</b> writes only this group — the other stays as-is. Use ‹ › for other weeks.</span>' +
     '</div>' +
