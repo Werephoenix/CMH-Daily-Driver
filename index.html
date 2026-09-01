@@ -23990,51 +23990,10 @@ if (document.readyState === 'loading') {
 //     and adopts one standard. Keys used by the live wirings (sigCancel/Weather/
 //     Flights/Events, defaultSort, netBad) are unchanged.
 var BRANCH_INTERVIEW = [
-  { title:'Hours & peak', tunes:'coverage windows', qs:[
-    {k:'hoursOpen',  type:'short', q:'Open time',  ph:'6:00 AM', scope:'fact'},
-    {k:'hoursClose', type:'short', q:'Close time', ph:'12:30 AM', scope:'fact'},
-    {k:'peakFrom',   type:'short', q:'Busiest window — from', ph:'11:00 AM', scope:'fact'},
-    {k:'peakTo',     type:'short', q:'…to',                   ph:'3:00 PM', scope:'fact'},
-    {k:'lunchLen',   type:'number', q:'Lunch length (minutes)', scope:'fact'},
-  ]},
-  { title:'Coverage minimums', tunes:'Now alerts + scheduler', qs:[
-    {k:'minPeakCounter', type:'number', q:'Min at Counter — PEAK', scope:'fact'},
-    {k:'minPeakExit',    type:'number', q:'Min at Exit — PEAK', scope:'fact'},
-    {k:'minPeakReturns', type:'number', q:'Min at Returns — PEAK', scope:'fact'},
-    {k:'minOffCounter',  type:'number', q:'Min at Counter — SLOW', scope:'fact'},
-    {k:'minOffExit',     type:'number', q:'Min at Exit — SLOW', scope:'fact'},
-    {k:'minOffReturns',  type:'number', q:'Min at Returns — SLOW', scope:'fact'},
-  ]},
-  { title:'Manager shift windows', tunes:'the manager rotation',
-    // v60.182: the measured impact rides WITH the question. Asking someone to
-    // approve a new shift type without showing what it buys is asking them to
-    // guess. Numbers are from 24 simulated weeks (~1,114 manager shifts).
-    note:'Measured over 24 weeks: allowing 11a–9p takes the longest run of closing shifts from '
-        +'5 down to 3, means nobody is stuck on 4+ nights in a row (6 people are today), and drops '
-        +'the most nights on one person from 37 to 25 — with NO change to coverage at any hour. '
-        +'It gets used about twice a month, always for the same thing: stepping someone down off '
-        +'nights. A 9a shift was tested too and does nothing (9a after an 11:30p finish is 9.5h '
-        +'rest, still under the 11h minimum; 11a is 11.5h).',
-    qs:[
-    {k:'mgrLateWindow', type:'single', scope:'fact',
-     q:'Could a manager work 11a–9p? (Today the latest non-closing shift is 10a–8p.)',
-     opts:['No — keep the five we have','Yes — allow 11a–9p']},
-  ]},
-  { title:'Judgment calls', tunes:'scheduler + one-tap fix', view:true, qs:[
-    {k:'protectFirst', type:'single', q:'When short, protect which station first?', opts:['Counter','Exit','Returns'], scope:'view'},
-    {k:'rotation',     type:'single', q:'How do people move between stations?', opts:['Stay assigned','Rotate on a timer','Move by need'], scope:'view'},
-    {k:'fairExit',     type:'single', q:'Spread exit-booth time evenly across the team?', opts:['Yes','No'], scope:'view'},
-    {k:'seniority',    type:'single', q:'Does seniority affect shift choice?', opts:['No','Yes'], scope:'view'},
-    {k:'mgrOpenClose', type:'single', q:'Always schedule an opening + closing manager?', opts:['Yes','No'], scope:'view'},
-  ]},
-  { title:'Who can work where', tunes:'station suggestions', view:true, qs:[
-    {k:'eligCounter', type:'multi', q:'Who can work Counter? (tap all)',    opts:['CXR','MT','ABRM','BRM'], scope:'view'},
-    {k:'eligExit',    type:'multi', q:'Who can work Exit booth? (tap all)', opts:['CXR','MT','ABRM','BRM'], scope:'view'},
-    {k:'eligReturns', type:'multi', q:'Who can work Returns? (tap all)',    opts:['CXR','MT','ABRM','BRM'], scope:'view'},
-  ]},
-  // ── v60.146: THE FILL-RULES SECTION — these answers ARE the guarded-fill engine.
-  // Every question here changes what the app suggests when a hole opens. Ordered
-  // most-critical-first; each is one tap. Tap order = priority for the chains.
+  // v60.197 (Matt): "I want to be able to try to get them done in order of
+  // importance." The array IS the on-screen order, so it now runs most-
+  // valuable-first — the same ranking as the Fast Five, then the rest.
+
   { title:'⚡ Fill rules — what the app suggests when someone’s short',
     tunes:'the guarded fill engine (gfChainFor / gfClassify)', view:true, qs:[
     {k:'primaryAreas', type:'multi', scope:'view',
@@ -24068,6 +24027,51 @@ var BRANCH_INTERVIEW = [
     {k:'exitNoGo', type:'text', scope:'view',
      q:'11. Anyone who should never be put on Exit? NAMES ONLY — do not write a reason.'},
   ]},
+  { title:'Coverage minimums', tunes:'Now alerts + scheduler', qs:[
+    {k:'minPeakCounter', type:'number', q:'Min at Counter — PEAK', scope:'fact'},
+    {k:'minPeakExit',    type:'number', q:'Min at Exit — PEAK', scope:'fact'},
+    {k:'minPeakReturns', type:'number', q:'Min at Returns — PEAK', scope:'fact'},
+    {k:'minOffCounter',  type:'number', q:'Min at Counter — SLOW', scope:'fact'},
+    {k:'minOffExit',     type:'number', q:'Min at Exit — SLOW', scope:'fact'},
+    {k:'minOffReturns',  type:'number', q:'Min at Returns — SLOW', scope:'fact'},
+  ]},
+  { title:'Manager shift windows', tunes:'the manager rotation',
+    // v60.182: the measured impact rides WITH the question. Asking someone to
+    // approve a new shift type without showing what it buys is asking them to
+    // guess. Numbers are from 24 simulated weeks (~1,114 manager shifts).
+    note:'Measured over 24 weeks: allowing 11a–9p takes the longest run of closing shifts from '
+        +'5 down to 3, means nobody is stuck on 4+ nights in a row (6 people are today), and drops '
+        +'the most nights on one person from 37 to 25 — with NO change to coverage at any hour. '
+        +'It gets used about twice a month, always for the same thing: stepping someone down off '
+        +'nights. A 9a shift was tested too and does nothing (9a after an 11:30p finish is 9.5h '
+        +'rest, still under the 11h minimum; 11a is 11.5h).',
+    qs:[
+    {k:'mgrLateWindow', type:'single', scope:'fact',
+     q:'Could a manager work 11a–9p? (Today the latest non-closing shift is 10a–8p.)',
+     opts:['No — keep the five we have','Yes — allow 11a–9p']},
+  ]},
+  { title:'Hours & peak', tunes:'coverage windows', qs:[
+    {k:'hoursOpen',  type:'short', q:'Open time',  ph:'6:00 AM', scope:'fact'},
+    {k:'hoursClose', type:'short', q:'Close time', ph:'12:30 AM', scope:'fact'},
+    {k:'peakFrom',   type:'short', q:'Busiest window — from', ph:'11:00 AM', scope:'fact'},
+    {k:'peakTo',     type:'short', q:'…to',                   ph:'3:00 PM', scope:'fact'},
+    {k:'lunchLen',   type:'number', q:'Lunch length (minutes)', scope:'fact'},
+  ]},
+  { title:'Judgment calls', tunes:'scheduler + one-tap fix', view:true, qs:[
+    {k:'protectFirst', type:'single', q:'When short, protect which station first?', opts:['Counter','Exit','Returns'], scope:'view'},
+    {k:'rotation',     type:'single', q:'How do people move between stations?', opts:['Stay assigned','Rotate on a timer','Move by need'], scope:'view'},
+    {k:'fairExit',     type:'single', q:'Spread exit-booth time evenly across the team?', opts:['Yes','No'], scope:'view'},
+    {k:'seniority',    type:'single', q:'Does seniority affect shift choice?', opts:['No','Yes'], scope:'view'},
+    {k:'mgrOpenClose', type:'single', q:'Always schedule an opening + closing manager?', opts:['Yes','No'], scope:'view'},
+  ]},
+  { title:'Who can work where', tunes:'station suggestions', view:true, qs:[
+    {k:'eligCounter', type:'multi', q:'Who can work Counter? (tap all)',    opts:['CXR','MT','ABRM','BRM'], scope:'view'},
+    {k:'eligExit',    type:'multi', q:'Who can work Exit booth? (tap all)', opts:['CXR','MT','ABRM','BRM'], scope:'view'},
+    {k:'eligReturns', type:'multi', q:'Who can work Returns? (tap all)',    opts:['CXR','MT','ABRM','BRM'], scope:'view'},
+  ]},
+  // ── v60.146: THE FILL-RULES SECTION — these answers ARE the guarded-fill engine.
+  // Every question here changes what the app suggests when a hole opens. Ordered
+  // most-critical-first; each is one tap. Tap order = priority for the chains.
   { title:'Board & signals', tunes:'board + Now', view:true, opt:true, qs:[
     {k:'defaultSort',    type:'single', q:'Default board order', opts:['Problems first','Core then non-core','A–Z'], scope:'view'},
     {k:'statProminence', type:'single', q:'The four totals — glanced constantly, or reference?', opts:['Constantly','Sometimes','Reference-only'], scope:'view'},
@@ -24088,6 +24092,7 @@ var BRANCH_INTERVIEW = [
     {k:'notes',     type:'text', q:'Anything else we should know?', scope:'view'},
   ]},
 ];
+
 var _biStyled = false;
 function biInjectStyle(){
   if(_biStyled) return; _biStyled = true;
@@ -24743,6 +24748,13 @@ function biFast5Html(){
   return h;
 }
 
+function biCarsSectionHtml(){
+  var h='';
+  h+='<div class="bi-sec"><div class="bi-sec-hd">🚗 Car groups &amp; codes <span class="bi-scope fact">branch fact</span>'
+    +'<span class="bi-tunes">→ the board</span></div><div id="bi-fleet">'+biFleetHtml()+'</div></div>';
+  return h;
+}
+
 function biRender(){
   if(typeof mgrMigrateEmerald==='function') try{ mgrMigrateEmerald(); }catch(e){}
   var o=document.getElementById('bi-overlay'); if(!o) return;
@@ -24760,7 +24772,15 @@ function biRender(){
     +'<div class="bi-respbar"><span class="bi-resplbl">Answering as</span>'+chips+'</div>'
     +'<div class="bi-progwrap"><div class="bi-track"><i id="bi-progbar"></i></div><div class="bi-prog" id="bi-prog"></div></div>'
     +'<div class="bi-body">'+((typeof biFast5Html==='function')?biFast5Html():'')+'<p class="bi-intro"><b style="color:#4DA3FF">Branch facts</b> are pre-filled from the app — confirm or fix. <b style="color:#AF9CFF">Your view</b> questions each manager answers separately; where you differ, reconcile to one standard at the bottom. Saves as you go.</p>';
+  // v60.197: stations & logic first (①), then car codes get slotted after
+  // the shift-windows section by importance — see the Fast Five ranking.
+  h+='<div class="bi-sec"><div class="bi-sec-hd">🧭 Manager stations <span class="bi-scope fact">branch fact</span>'
+    +'<span class="bi-tunes">→ minimums, coverage flag, the draft</span></div>'
+    +'<div id="bi-mgrstations">'+biMgrStationsHtml()+'</div></div>';
+
   BRANCH_INTERVIEW.forEach(function(sec){
+    // v60.197: car codes rank ⑤ — right after the shift-windows decision.
+    if(sec.title==='Hours & peak' && typeof biCarsSectionHtml==='function'){ h+=biCarsSectionHtml(); }
     var isView=!!sec.view;
     h+='<div class="bi-sec'+(isView?' view':'')+'"><div class="bi-sec-hd">'+biEsc(sec.title)
       +(isView?' <span class="bi-scope view">your view</span>':' <span class="bi-scope fact">branch fact</span>')
@@ -24778,11 +24798,8 @@ function biRender(){
     });
     h+='</div>';
   });
-  h+='<div class="bi-sec"><div class="bi-sec-hd">🧭 Manager stations <span class="bi-scope fact">branch fact</span>'
-    +'<span class="bi-tunes">→ minimums, coverage flag, the draft</span></div>'
-    +'<div id="bi-mgrstations">'+biMgrStationsHtml()+'</div></div>';
-  h+='<div class="bi-sec"><div class="bi-sec-hd">🚗 Car groups &amp; codes <span class="bi-scope fact">branch fact</span>'
-    +'<span class="bi-tunes">→ the board</span></div><div id="bi-fleet">'+biFleetHtml()+'</div></div>';
+
+
   h+='<div class="bi-sec"><div class="bi-sec-hd">⚡ Engine readiness <span class="bi-tunes">→ what’s still blocking auto-suggestions</span></div><div id="bi-engine-ready">'+biEngineReadyHtml()+'</div></div>';
   h+='<div class="bi-sec"><div class="bi-sec-hd">🤝 Consistency <span class="bi-tunes">→ one branch standard</span></div><div id="bi-consistency">'+biConsistencyHtml()+'</div></div>';
   h+='</div><div class="bi-foot"><button class="bi-btn gh" onclick="biExportWith()">⤓ Export</button><button class="bi-btn" onclick="biApply()">Save &amp; close</button></div>';
@@ -25086,9 +25103,23 @@ function openAutoSchedulerForWeekOf(key){
 function openDayInScheduleEditor(key){
   if(typeof closeMasterCalendar==='function') closeMasterCalendar();
   var run = function(){
+    // v60.197: openAdminSection('edit') navigated to the Admin screen and set
+    // the mode — but never switched the visible SECTION, so after the PIN the
+    // user landed on whatever Admin last showed (Paste Data in the repro;
+    // Matt read it as "just popped to the board"). A PIN prompt that ends
+    // somewhere unrelated reads as "did nothing." Both calls now, explicitly.
     if(typeof openAdminSection==='function') openAdminSection('edit');
+    if(typeof showAdminSection==='function') try{ showAdminSection('edit'); }catch(e){}
     var dEl=document.getElementById('sched-edit-date'); if(dEl){ dEl.value=key; }
     if(typeof buildScheduleEditor==='function') buildScheduleEditor();
+    // v60.197 (the real fix): the editor WAS opening — 1,116px below the fold,
+    // behind the cockpit's Today's-controls (whose walk-up segments look exactly
+    // like the Board). Matt read it as "entered a PIN and nothing happened."
+    // Scroll the editor to the top of the viewport so the PIN visibly paid off.
+    setTimeout(function(){
+      var e=document.getElementById('adm-edit');
+      if(e) e.scrollIntoView({behavior:'smooth', block:'start'});
+    }, 250);
     if(typeof toast==='function'){ try{ var d=new Date(key+'T12:00:00'); toast('Editing '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '+_MC_MON[d.getMonth()].slice(0,3)+' '+d.getDate()); }catch(e){} }
   };
   if(typeof setupEdit==='function') setupEdit(run); else run();
