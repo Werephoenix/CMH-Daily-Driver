@@ -15260,7 +15260,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.211'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.212'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -20793,8 +20793,15 @@ function ptEval(n){
   }
   if(n===5){
     var gaps=[]; try{ gaps=gfxGaps(); }catch(e){}
-    if(!gaps.length) return {status:'done', detail:'No coverage gaps from this hour on — re-checked after lunches and flips.'};
-    return {status:st.steps[5]||'open', detail:gaps.length+' gap'+(gaps.length===1?'':'s')+' open', gaps:gaps.length};
+    if(!gaps.length) return {status:'done', detail:'No coverage gaps from this hour on — exit/counter is as good as the CXRs can make it.'};
+    return {status:st.steps[5]||'open', detail:gaps.length+' gap'+(gaps.length===1?'':'s')+' open — get exit/counter as good as it can get with the CXR moves, then Accept to CONFIRM before the manager step.', gaps:gaps.length};
+  }
+  if(n===6){
+    var items=ptMgrFillEval(exp);
+    var real=items.filter(function(x){ return !x.none; });
+    if(!items.length) return {status:'done', detail:'Nothing left for managers to cover.'};
+    if(!real.length) return {status:st.steps[6]||'open', detail:items.length+' gap'+(items.length===1?'':'s')+' and no manager on shift is free and cleared for them — a true shortage. Accept to note it and move on.', items:items};
+    return {status:st.steps[6]||'open', detail:real.length+' manager fill'+(real.length===1?'':'s')+' suggested — juniors first (MT → ABRM → BRM → ARM/AM), exit and returns before counter. Each tap drops a block; nothing is automatic.', items:items};
   }
   return {status:'open', detail:''};
 }
@@ -20851,6 +20858,64 @@ function ptApplyFlip(pid, dir){
   try{ buildCoverageTimeline(); }catch(e){}
   ptRender();
 }
+// ── v60.212 · STEP ⑥ MANAGER FILL (Matt): "CXR rotation should be confirmed
+// before they move on to Mgr assignments. After the exit/counter is as good
+// as it can get for coverage and confirmed, THEN it should suggest
+// MT → ABRM → BRM → ARM/AM to fill those spots at exit and returns and then
+// counter." The wizard's gate structure IS the confirmation (a step opens
+// only when every earlier step is done or accepted); this evaluator then
+// works the leftovers: gaps ordered exit → returns → counter, candidates
+// ordered junior-first, floating managers before someone holding a post.
+// Every fill is a TAP (block drop via coApplyFill) — never automatic, per
+// the v60.210 rule that managers are only ever placed by hand.
+var PT_MGR_ORDER={MT:0, ABRM:1, BRM:2, ARM:3, AM:3};
+var PT_AREA_ORDER={exit:0, returns:1, counter:2, eb1:3, emerald:3, eb2:4};
+function ptMgrFillEval(exp){
+  var gaps=[]; try{ gaps=gfxGaps(); }catch(e){}
+  gaps=gaps.slice().sort(function(a,b){
+    var ra=(PT_AREA_ORDER[a.area]!=null?PT_AREA_ORDER[a.area]:9),
+        rb=(PT_AREA_ORDER[b.area]!=null?PT_AREA_ORDER[b.area]:9);
+    return (ra-rb) || (a.hour-b.hour);
+  });
+  var items=[], used={};
+  gaps.forEach(function(g){
+    var cands=Object.keys(exp).filter(function(pid){
+      var e=exp[pid]; if(!e||!e.person) return false;
+      if(!(e.person.role in PT_MGR_ORDER)) return false;
+      if(used[pid]) return false;
+      if(typeof gfOnShiftAt==='function' && !gfOnShiftAt(pid,e,g.hour)) return false;
+      var a=null; try{ a=gfAreaAt(pid,e,g.hour); }catch(err){}
+      if(a===g.area) return false;
+      if(g.area==='exit' && typeof exitAccommodated==='function' && exitAccommodated(pid)) return false;
+      if(typeof trainWeight==='function' && !(trainWeight(pid,g.area)>0)) return false;
+      return true;
+    }).sort(function(p1,p2){
+      var e1=exp[p1], e2=exp[p2];
+      var r=(PT_MGR_ORDER[e1.person.role]!=null?PT_MGR_ORDER[e1.person.role]:9)
+           -(PT_MGR_ORDER[e2.person.role]!=null?PT_MGR_ORDER[e2.person.role]:9);
+      if(r) return r;
+      var a1, a2;
+      try{ a1=gfAreaAt(p1,e1,g.hour)?1:0; }catch(e){ a1=0; }
+      try{ a2=gfAreaAt(p2,e2,g.hour)?1:0; }catch(e){ a2=0; }
+      return a1-a2;                                  // floating first
+    });
+    if(cands.length){
+      var pid=cands[0]; used[pid]=true;
+      items.push({pid:pid, role:exp[pid].person.role, area:g.area, hour:g.hour,
+        nick:(typeof dispName==='function')?dispName(exp[pid].person):(exp[pid].person.nick||pid)});
+    } else {
+      items.push({area:g.area, hour:g.hour, none:true});
+    }
+  });
+  return items;
+}
+function ptMgrFill(pid, area, hour){
+  try{ coApplyFill(area, hour, pid); }catch(e){}
+  if(typeof rotInvalidate==='function') rotInvalidate();
+  try{ buildCoverageTimeline(); renderCovStrip(); }catch(e){}
+  if(typeof toast==='function') toast('👔 '+((typeof dispName==='function')?dispName(pid):pid)+' → '+area+' (block drop)');
+  ptRender();
+}
 function ptAccept(n){
   var st=_ptS(); st.steps[n]='accepted';
   if(typeof saveState==='function') saveState();
@@ -20871,14 +20936,14 @@ function ptPublish(){
 
 // ── render ─────────────────────────────────────────────────────────────────
 function ptFirstOpen(){
-  for(var n=1;n<=5;n++){ if(ptEval(n).status==='open') return n; }
-  return 6;
+  for(var n=1;n<=6;n++){ if(ptEval(n).status==='open') return n; }
+  return 7;
 }
 function ptRender(){
   var st=_ptS(); var cur=ptFirstOpen();
   var dots='';
-  for(var n=1;n<=6;n++){
-    var s2 = n===6 ? (st.publishedAt&&st.pubHash===_ptHash()?'done':'open') : ptEval(n).status;
+  for(var n=1;n<=7;n++){
+    var s2 = n===7 ? (st.publishedAt&&st.pubHash===_ptHash()?'done':'open') : ptEval(n).status;
     var col = s2==='done'?'var(--accent)': s2==='accepted'?'var(--amber)': n===cur?'var(--txt)':'var(--txt3)';
     dots+='<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;'
       +'border-radius:50%;font-size:10px;font-weight:800;margin-right:4px;'
@@ -20886,9 +20951,9 @@ function ptRender(){
       +(n===cur?'background:rgba(255,255,255,.06);':'')+'">'
       +(s2==='done'?'✓': s2==='accepted'?'~': n)+'</span>';
   }
-  var NAMES=['','Schedule in','Floor targets','Lunches','Rotation','Coverage gaps','Publish'];
+  var NAMES=['','Schedule in','Floor targets','Lunches','CXR rotation','CXR coverage','Manager fill','Publish'];
   var b='<div style="margin-bottom:12px">'+dots
-    +'<span style="font-size:11px;color:var(--txt3);margin-left:6px">step '+cur+' of 6 · '+NAMES[cur]+'</span></div>';
+    +'<span style="font-size:11px;color:var(--txt3);margin-left:6px">step '+cur+' of 7 · '+NAMES[cur]+'</span></div>';
   // completed/accepted steps as one-liners
   for(var m=1;m<cur;m++){
     var ev=ptEval(m);
@@ -20897,7 +20962,7 @@ function ptRender(){
       +(ev.status==='accepted'?' <span style="color:var(--amber)">(accepted as-is)</span>':'')+'</div>';
   }
   // the current step card
-  if(cur<=5){
+  if(cur<=6){
     var e=ptEval(cur);
     b+='<div style="margin-top:10px;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bdr2)">'
       +'<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:6px">'+NAMES[cur]+'</div>'
@@ -20931,6 +20996,19 @@ function ptRender(){
         +'background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:8px">'
         +'▶ Fix with Guided fix ('+e.gaps+')</button>';
     }
+    if(cur===6 && e.items){
+      var _lblA={exit:'🟩 Exit',returns:'↩ Returns',counter:'🟦 Counter',eb1:'🌟 EB1',emerald:'🌟 Emerald'};
+      e.items.slice(0,6).forEach(function(it){
+        b+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--bdr)">'
+          +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+(_lblA[it.area]||it.area)+' at '+_ptFmt(it.hour)
+          +(it.none?'<div style="font-size:10.5px;color:var(--txt3)">no manager free + cleared</div>':'')+'</span>'
+          +(it.none?'' : '<button onclick="ptMgrFill(\''+it.pid+'\',\''+it.area+'\','+it.hour+')" '
+             +'style="padding:6px 11px;border-radius:7px;border:1px solid var(--eb,#AF9CFF);background:rgba(175,156,255,.10);'
+             +'color:var(--eb,#AF9CFF);font-size:11.5px;font-weight:800;cursor:pointer">'
+             +it.role+' '+it.nick+' →</button>')
+          +'</div>';
+      });
+    }
     b+='<div style="display:flex;gap:8px;margin-top:10px">'
       +'<button class="btn btn-gh" style="flex:1" onclick="ptAccept('+cur+')">Accept as-is → next</button>'
       +'<button class="btn btn-gh" onclick="closeModal()">Close</button></div></div>';
@@ -20961,7 +21039,7 @@ function ptEntryRefresh(){
   var stale=st.publishedAt && st.pubHash!==_ptHash();
   el.innerHTML = published ? '📋 Day planned ✓'
     : stale ? '📋 Plan today · ↻ republish'
-    : '📋 Plan today · step '+cur+'/6';
+    : '📋 Plan today · step '+cur+'/7';
   el.style.borderColor = published?'var(--accent)': stale?'var(--amber)':'var(--bdr2)';
   el.style.color = published?'var(--accent)': stale?'var(--amber)':'var(--txt)';
 }
