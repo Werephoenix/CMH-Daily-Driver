@@ -12461,11 +12461,21 @@ function renderChecklist(mode) {
         '</div>';
     }
     htm += '<div class="cl-group">';   // v60.89: Design grouped inset list card
+    // v60.215 (design Sweep Round 2 · 2b): done items ROLL UP to one line per
+    // section — "✓ N done · tap to review" — so the list always reads as
+    // "what's left", not "what happened". Undone rows render first, full size.
+    var _xKey = mode+'|'+String(sec.s||'');
+    if(!window._clExpand) window._clExpand={};
+    var _visIts=(sec.items||[]).filter(function(it){ return !it.days||it.days.includes(dow); });
+    var _isDoneOf=function(it){ return cl[it.t]===true || (it.autoKey&&checkAutoComplete(it.autoKey)); };
+    var _doneIts=_visIts.filter(_isDoneOf);
+    var _rollUp=_doneIts.length>1 && !window._clExpand[_xKey];
     (sec.items||[]).forEach(function(it) {
       if (it.days && !it.days.includes(dow)) return;
       var done = cl[it.t] === true;
       var auto = it.autoKey ? checkAutoComplete(it.autoKey) : false;
       var isDone = done || auto;
+      if (_rollUp && isDone) return;   // v60.215: collapsed into the roll-up row
       var reqBadge = (typeof isImportantCL==='function' && isImportantCL(mode, it.t) && !isDone)
         ? ' <span class="req-badge">REQ</span>' : '';
       var fields = it.fields || (it.field ? [{key:it.field, label:it.fieldLabel||'', type:it.fieldType||'text', ph:it.fieldPlaceholder||''}] : []);
@@ -12480,6 +12490,14 @@ function renderChecklist(mode) {
         (it.p ? '<div class="ci-photo">📷</div>' : '') +
         '</div>';
     });
+    if(_rollUp){
+      htm += '<div class="ci done" style="opacity:.75" onclick="window._clExpand[\''+_xKey.replace(/'/g,'\\x27')+'\']=true;renderChecklist(\''+mode+'\')">'
+        +'<div class="cbox">✓</div><div style="flex:1"><div class="ci-txt" style="color:var(--txt3)">'
+        +_doneIts.length+' done · tap to review</div></div></div>';
+    } else if(_doneIts.length>1 && window._clExpand[_xKey]){
+      htm += '<div class="ci" style="opacity:.6" onclick="delete window._clExpand[\''+_xKey.replace(/'/g,'\\x27')+'\'];renderChecklist(\''+mode+'\')">'
+        +'<div class="cbox">▴</div><div style="flex:1"><div class="ci-txt" style="color:var(--txt3)">collapse done items</div></div></div>';
+    }
     htm += '</div>';
   });
 
@@ -15282,7 +15300,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.214'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.215'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -20592,6 +20610,34 @@ function gfxPlanApply(k){
   if(typeof toast==='function') toast('✓ '+k+' move'+(k===1?'':'s')+' applied · '+(left? left+' gap'+(left===1?'':'s')+' left':'board clean'), 6000);
 }
 
+// v60.215 · the bench: rostered, NOT working today, not called-off/PTO,
+// cleared for the station. Capped at 3 so one person is never the answer
+// to every gap at once.
+function gfxBench(area, hour){
+  var exp2={}; try{ exp2=buildExpectedToday(); }catch(e){ return []; }
+  var roster=(typeof getEffectiveRoster==='function')?getEffectiveRoster():[];
+  var tk=(typeof todayKey==='function')?todayKey():'';
+  return roster.filter(function(p){
+    if(['CXR','EXIT','RETURNS'].indexOf(p.role)<0) return false;
+    var pid=String(p.name||'').replace(/\s/g,'_');
+    if(exp2[pid]) return false;                                       // already on
+    if((STATE.todayOverrides||{})[pid]==='callout') return false;     // called off — don't call them
+    if(((STATE.pto||{})[tk]||{})[pid]) return false;                  // approved time off
+    if(typeof trainWeight==='function' && !(trainWeight(pid,area)>0)) return false;
+    if(area==='exit' && typeof exitAccommodated==='function' && exitAccommodated(pid)) return false;
+    return true;
+  }).slice(0,3);
+}
+function gfxTextBench(nick, area, hour){
+  var lbl={exit:'the exit booth',counter:'the counter',returns:'returns',eb1:'the Emerald booth'}[area]||area;
+  var msg='Hey '+nick+' — any chance you could come in today around '+_gfxFmtH(hour)
+    +' to help cover '+lbl+'? No pressure at all, reply either way. 🙏';
+  try{
+    if(navigator.share){ navigator.share({text:msg}); return; }
+  }catch(e){}
+  try{ navigator.clipboard.writeText(msg); if(typeof toast==='function') toast('💬 Text copied — paste it to '+nick+' in Messages'); }
+  catch(e){ prompt('Copy this text for '+nick+':', msg); }
+}
 function gfxStart(){
   _gfx={queue:gfxGaps(), idx:0, applied:[],
         snapshot:{staffStation:JSON.stringify(STATE.staffStation||{}),
@@ -20628,6 +20674,20 @@ function gfxRender(){
     b+='<div style="padding:10px;border-radius:8px;background:var(--bg3);font-size:12.5px;color:var(--txt2);margin-bottom:10px">'
      +'Nobody free or flexible — everyone else is holding a station at its minimum. '
      +'A true shortage: leave it open or make a call the app shouldn’t make for you.</div>';
+    // v60.215 (design §Phone, Fill card): the bench — off today AND cleared.
+    var bench=gfxBench(g.area, g.hour);
+    if(bench.length){
+      b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin-bottom:5px">'
+        +'📱 Off today &amp; cleared — texting asks, it does not schedule</div>'
+        +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">'
+        +bench.map(function(p){
+           var nm=(p.nick||String(p.name||'').split(' ')[0]).replace(/'/g,'\\x27');
+           return '<button onclick="gfxTextBench(\''+nm+'\',\''+g.area+'\','+g.hour+')" '
+            +'style="padding:7px 11px;border-radius:8px;border:1px dashed var(--bdr2);background:var(--bg2);'
+            +'color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">💬 '+(p.nick||p.name)+'</button>';
+         }).join('')+'</div>'
+        +'<div style="font-size:10px;color:var(--txt3);margin-bottom:10px">They still have to say yes. No numbers are stored — the app writes the text, you pick the person in Messages.</div>';
+    }
   }
   if(free.length>1){
     b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin-bottom:5px">Or pick someone else</div>'
