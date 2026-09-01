@@ -2378,7 +2378,7 @@ button { cursor: pointer; }
        (v60.81) had buried it inside #board-controls behind the Walk-ups pill. -->
 
   <!-- v60.66 (Design §3.5): walk-up + 24hr as iOS segmented controls; 4-state + color preserved -->
-  <div class="card" style="padding:12px 14px;margin-bottom:10px">
+  <div class="card vl-mgr" style="padding:12px 14px;margin-bottom:10px">
     <div class="board-ctl-lbl">🚦 Walk-ups · Emerald caps at Standard SUV</div>
     <div class="seg-ctl" style="margin-bottom:0">
       <button class="seg" id="wu-open-b"    onclick="setWU('open')">All Open</button>
@@ -2517,6 +2517,8 @@ button { cursor: pointer; }
         background:rgba(255,69,58,.10);color:var(--red,#FF453A);font-size:14px;font-weight:800;cursor:pointer">
       📞 Someone called off
     </button>
+    <button onclick="openTrainingMap()" title="Who is cleared for what — and the depth per station"
+      class="btn btn-sm" style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">🎓 Training map</button>
     <button onclick="openStaffingNeeds()" title="Do I have the people I need today?"
       style="flex:1;min-width:150px;padding:12px 14px;border-radius:9px;border:1px solid var(--bdr2);
         background:var(--bg3);color:var(--txt);font-size:14px;font-weight:800;cursor:pointer">
@@ -2645,6 +2647,10 @@ button { cursor: pointer; }
     <button class="btn btn-sm" onclick="gfxStart()" title="One gap at a time — apply or skip, with the reasoning shown"
       style="border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-weight:800">
       ▶ Guided fix<span id="gfx-count" style="opacity:.85"></span>
+    </button>
+    <button class="btn btn-sm vl-mgr" onclick="gfxPlanView()" title="The full repair plan, cheapest first — pick Make 3 / 2 / 1 moves"
+      style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">
+      🧮 Whole plan
     </button>
     <span id="auto-why" style="font-size:9px;color:var(--txt3)">
       Fills today's exit gaps using available CXRs · respects manager overrides
@@ -15170,7 +15176,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.207'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.208'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -20370,6 +20376,92 @@ function gfxGaps(){
     return (b.short||1)-(a.short||1);
   });
 }
+// ── v60.208 · THE WHOLE PLAN, PREFIXES SIDE BY SIDE (design v2 Planner §What
+// to move) — build the full repair plan cheapest-first by SIMULATING guided-fix
+// apply steps, snapshot-restore the world, then offer "Make N / N-1 / 1 moves"
+// with what each prefix actually closes. Apply commits that prefix for real
+// through the same coApplyFill primitive, so there is one mover in the app.
+function gfxPlanBuild(){
+  var snap={staffStation:JSON.stringify(STATE.staffStation||{}),
+            altSchedule:JSON.stringify(STATE.altSchedule||{}),
+            mgmtBlocks:JSON.stringify(STATE.mgmtBlocks||{})};
+  var moves=[], guard=0, startGaps=gfxGaps().length;
+  try{
+    while(guard++<10){
+      var gaps=gfxGaps(); if(!gaps.length) break;
+      var g=gaps[0], exp={};
+      try{ exp=buildExpectedToday(); }catch(e){}
+      var free=(gfRankCandidates(g,exp)||[]).filter(function(c){ return c.tier!=='protected'; });
+      if(!free.length) break;                       // a true shortage ends the plan
+      try{ coApplyFill(g.area, g.hour, free[0].pid); }catch(e){ break; }
+      if(typeof rotInvalidate==='function') rotInvalidate();
+      moves.push({pid:free[0].pid, nick:free[0].nick, area:g.area, hour:g.hour,
+                  tier:free[0].tier, why:free[0].why||'', left:gfxGaps().length});
+    }
+  }finally{
+    try{
+      STATE.staffStation=JSON.parse(snap.staffStation);
+      STATE.altSchedule=JSON.parse(snap.altSchedule);
+      STATE.mgmtBlocks=JSON.parse(snap.mgmtBlocks);
+      if(typeof rotInvalidate==='function') rotInvalidate();
+    }catch(e){}
+  }
+  return {startGaps:startGaps, moves:moves};
+}
+function gfxPlanView(){
+  var plan=gfxPlanBuild();
+  if(!plan.moves.length){
+    openModal('🧮 The whole plan', '<div style="font-size:13px;color:var(--txt2);line-height:1.55">'
+      +(plan.startGaps? 'Nobody free or flexible — every remaining gap is a true shortage. ▶ Guided fix will show you each one.'
+                      : '✓ No coverage gaps from this hour on — nothing to plan.')+'</div>'
+      +'<button class="btn btn-gh" style="width:100%;margin-top:10px" onclick="closeModal()">Close</button>');
+    return;
+  }
+  var lbl={exit:'Exit',counter:'Counter',returns:'Returns',eb1:'EB1',emerald:'Emerald'};
+  var n=plan.moves.length;
+  var b='<div style="font-size:12px;color:var(--txt3);line-height:1.5;margin-bottom:10px">'
+   +plan.startGaps+' gap'+(plan.startGaps===1?'':'s')+' from this hour on. The full plan, cheapest first — '
+   +'pick how much of it to do. Ranked by disruption: free bodies move first, minimums are never raided.</div>';
+  for(var k=n; k>=1; k--){
+    var closes = plan.startGaps - plan.moves[k-1].left;
+    var full = (plan.moves[k-1].left===0);
+    b+='<div style="padding:10px 12px;border-radius:10px;border:1px solid '+(full?'var(--accent)':'var(--bdr2)')+';'
+     +'background:'+(full?'rgba(35,201,131,.08)':'var(--bg3)')+';margin-bottom:8px">'
+     +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'
+     +'<b style="font-size:13.5px;color:var(--txt)">Make '+k+' move'+(k===1?'':'s')+'</b>'
+     +'<span style="font-size:11px;color:'+(full?'var(--accent)':'var(--txt3)')+'">'
+     +(full?'closes every gap':'closes '+closes+' of '+plan.startGaps)+'</span>'
+     +'<button onclick="gfxPlanApply('+k+')" style="margin-left:auto;padding:7px 13px;border-radius:8px;border:none;'
+     +'background:'+(full?'var(--accent)':'var(--bg2)')+';color:'+(full?'#04160e':'var(--txt2)')+';'
+     +'font-size:12px;font-weight:800;cursor:pointer;border:1px solid var(--bdr2)">Apply</button></div>'
+     + plan.moves.slice(0,k).map(function(m){
+        return '<div style="font-size:11.5px;color:var(--txt2);padding:1.5px 0">'
+          +m.nick+' → '+(lbl[m.area]||m.area)+' at '+_gfxFmtH(m.hour)
+          +(m.tier==='free'?' <span style="color:var(--accent);opacity:.8">· free</span>'
+                           :' <span style="color:var(--up,#FFCC00);opacity:.8">· flexible</span>')+'</div>';
+       }).join('')
+     +'</div>';
+  }
+  b+='<div style="font-size:10.5px;color:var(--txt3);line-height:1.45;margin-top:2px">Planned by simulating the moves and putting everything back — nothing has changed yet. Every Apply is undoable with ↩ Undo-all in Guided fix.</div>'
+   +'<button class="btn btn-gh" style="width:100%;margin-top:8px" onclick="closeModal()">Cancel</button>';
+  openModal('🧮 The whole plan · make '+n+' move'+(n===1?'':'s'), b);
+  window._gfxPlan=plan;
+}
+function gfxPlanApply(k){
+  var plan=window._gfxPlan; if(!plan) return closeModal();
+  _gfx.snapshot=_gfx.snapshot||{staffStation:JSON.stringify(STATE.staffStation||{}),
+    altSchedule:JSON.stringify(STATE.altSchedule||{}), mgmtBlocks:JSON.stringify(STATE.mgmtBlocks||{})};
+  _gfx.applied=_gfx.applied||[];
+  plan.moves.slice(0,k).forEach(function(m){
+    try{ coApplyFill(m.area, m.hour, m.pid); _gfx.applied.push(m); }catch(e){}
+  });
+  if(typeof rotInvalidate==='function') rotInvalidate();
+  try{ buildCoverageTimeline(); renderCovStrip(); }catch(e){}
+  closeModal();
+  var left=gfxGaps().length;
+  if(typeof toast==='function') toast('✓ '+k+' move'+(k===1?'':'s')+' applied · '+(left? left+' gap'+(left===1?'':'s')+' left':'board clean'), 6000);
+}
+
 function gfxStart(){
   _gfx={queue:gfxGaps(), idx:0, applied:[],
         snapshot:{staffStation:JSON.stringify(STATE.staffStation||{}),
@@ -21485,9 +21577,60 @@ function setTrainStatus(pid, area, k){
   if(!STATE.training) STATE.training={};
   if(!STATE.training[pid]) STATE.training[pid]={};
   STATE.training[pid][area]=k;
+  // v60.208 (Patterns spec: "both names and the date stay on the card"):
+  // stamp who recorded the change and when. History, not judgement.
+  if(!STATE.trainingLog) STATE.trainingLog={};
+  if(!STATE.trainingLog[pid]) STATE.trainingLog[pid]={};
+  STATE.trainingLog[pid][area]={k:k, at:new Date().toISOString().slice(0,10),
+    by:(STATE.fields&&STATE.fields.openMgr)||''};
   if(typeof rotInvalidate==='function') rotInvalidate();
   if(typeof saveState==='function') saveState();
   try{ buildCoverageTimeline(); }catch(e){}
+}
+// ── v60.208 · BRANCH TRAINING MAP (Patterns spec) — one grid: who the engine
+// is allowed to put where, and a DEPTH row per station: trained bodies beyond
+// the peak minimum = what survives a call-off. Derived, never configured.
+function openTrainingMap(){
+  var roster=(typeof getEffectiveRoster==='function')?getEffectiveRoster():[];
+  var floor=roster.filter(function(p){ return ['CXR','EXIT','RETURNS'].indexOf(p.role)>=0; });
+  var dow=new Date().getDay();
+  var need={}; try{ need=gfNeedsAt(13,dow)||{}; }catch(e){}
+  var lv={trained:{g:'✓',c:'var(--accent)'}, training:{g:'◐',c:'var(--up,#FFCC00)'},
+          shadow:{g:'○',c:'var(--txt3)'}, none:{g:'—',c:'var(--txt3)'}};
+  var counts={};
+  var b='<div style="font-size:11.5px;color:var(--txt3);line-height:1.5;margin-bottom:10px">'
+   +'Who the engine is allowed to put where. Tap a name for their card (statuses change there). '
+   +'<b style="color:var(--txt2)">Depth</b> = trained bodies beyond the peak minimum — what survives a call-off.</div>'
+   +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+   +'<tr><th style="text-align:left;padding:4px 6px;color:var(--txt3);font-size:10px;text-transform:uppercase">Person</th>'
+   +TRAIN_AREAS.map(function(a){ return '<th style="padding:4px 6px;color:var(--txt3);font-size:10px;text-transform:uppercase">'+a.lbl+'</th>'; }).join('')+'</tr>';
+  floor.forEach(function(p){
+    var pid=p.name.replace(/\s/g,'_');
+    b+='<tr style="border-top:1px solid var(--bdr)">'
+     +'<td style="padding:5px 6px"><a href="#" onclick="closeModal();openPersonPanel(\''+pid.replace(/'/g,"\\x27")+'\');return false" '
+     +'style="color:var(--txt);text-decoration:none;font-weight:600">'+(p.nick||p.name)+'</a> '
+     +'<span style="font-size:9.5px;color:var(--txt3)">'+p.role+'</span></td>';
+    TRAIN_AREAS.forEach(function(a){
+      var st=trainStatus(pid,a.k), x=lv[st]||lv.none;
+      if(st==='trained') counts[a.k]=(counts[a.k]||0)+1;
+      var log=((STATE.trainingLog||{})[pid]||{})[a.k];
+      b+='<td style="text-align:center;padding:5px 6px;color:'+x.c+';font-weight:800" title="'
+        +(st||'trained')+(log?' · set '+log.at+(log.by?' by '+log.by:''):' · role default')+'">'+x.g+'</td>';
+    });
+    b+='</tr>';
+  });
+  b+='<tr style="border-top:2px solid var(--bdr2)"><td style="padding:6px;font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3)">Depth</td>';
+  TRAIN_AREAS.forEach(function(a){
+    var have=counts[a.k]||0, min=need[a.k==='eb1'?'eb1':a.k]||0, depth=have-min;
+    var c= depth>=2?'var(--accent)': depth>=1?'var(--up,#FFCC00)':'var(--na,#FF453A)';
+    b+='<td style="text-align:center;padding:6px;font-weight:800;color:'+c+'" title="'+have+' trained vs peak minimum '+min+'">'+(depth>=0?'+':'')+depth+'</td>';
+  });
+  b+='</tr></table></div>'
+   +'<div style="font-size:10.5px;color:var(--txt3);margin-top:8px;line-height:1.45">'
+   +'✓ trained · ◐ in training (counts '+(function(){var w=parseFloat((STATE.branchConfig||{}).inTrainingWeight);return isNaN(w)?0.5:w;})()+') · ○ shadowing (0) · — not trained. '
+   +'A red depth means one call-off leaves nobody spare who is cleared there — the training gap to close first.</div>'
+   +'<button class="btn btn-gh" style="width:100%;margin-top:10px" onclick="closeModal()">Close</button>';
+  openModal('🎓 Branch training map', b);
 }
 // WEIGHTED counts — the decision engines' view of the floor. Same shape as
 // gfCountsAt so it drops in; values may be fractional and are NEVER rounded
@@ -27625,6 +27768,30 @@ function asWeekBodyHtml(){
     return '<div class="as-day"><h3>'+d.label+' <span style="font-weight:600;color:var(--txt3,rgba(235,235,245,.55))">'+d.dateLabel+'</span> <span class="as-note">· '+ppl.length+(isMgr?' mgrs':' staff')+'</span></h3>' +
       '<div class="as-cov">'+covHtml+extras+'</div>' + rowsHtml + '</div>';
   }).join('');
+  // v60.208: weekly hours per person from the draft (raw shift spans).
+  var _hrs={};
+  wk.days.forEach(function(d){
+    d.people.forEach(function(p){
+      if(pr.indexOf(p.role)<0 || p.start==null || p.end==null) return;
+      var span=p.end-p.start; if(span<0) span+=24;
+      _hrs[p.nick]=Math.round(((_hrs[p.nick]||0)+span)*10)/10;
+    });
+  });
+  var _hrsHtml='';
+  var _hrKeys=Object.keys(_hrs).sort(function(a,b){ return _hrs[b]-_hrs[a]; });
+  if(_hrKeys.length){
+    _hrsHtml='<div style="background:var(--bg2,#22242B);border:1px solid var(--bdr,rgba(255,255,255,.15));border-radius:9px;padding:8px 10px;margin:0 0 8px">'
+     +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3,rgba(235,235,245,.68))">Hours as scheduled · this draft</span>'
+     +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">'
+     +_hrKeys.map(function(nm){
+        var h=_hrs[nm];
+        var c= h>40?'var(--na,#FF453A)': h<30?'var(--up,#FFCC00)':'var(--txt2,rgba(235,235,245,.75))';
+        var t= h>40?'over 40 — needs an OT decision': h<30?'under 30 — light week':'';
+        return '<span title="'+t+'" style="font-size:11px;font-weight:700;color:'+c+';background:var(--bg3,#2B2E36);'
+          +'border:1px solid var(--bdr,rgba(255,255,255,.15));border-radius:999px;padding:3px 9px">'+nm+' '+h+'h</span>';
+      }).join('')+'</div>'
+     +'<div style="font-size:9.5px;color:var(--txt3,rgba(235,235,245,.68));margin-top:5px">Raw shift spans before lunch. <b style="color:var(--up,#FFCC00)">Amber</b> under 30 · <b style="color:var(--na,#FF453A)">red</b> over 40 (an OT call to make, not an error).</div></div>';
+  }
   var _pill = function(on){ return on?'background:var(--eb,#AF9CFF);color:#1a0f33':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)'; };
   return ''+
     '<div class="as-tools" style="margin-bottom:6px">' +
@@ -27639,13 +27806,45 @@ function asWeekBodyHtml(){
       (isMgr && asPinCount()?'<span class="as-chip" style="color:var(--up,#FFCC00);border:1px solid var(--up,#FFCC00)">📌 '+asPinCount()+' pinned</span>':'') +
       '<button class="as-btn pri" onclick="asApplyWeek()">'+((isMgr && _asPublishTier!=='brm')?'🔒 Publish · BRM PIN':('✓ Apply '+(isMgr?'managers':'CXRs')+' →'))+'</button>' +
       '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" onclick="_asSeeds[_asWeekOffset]=(_asSeeds[_asWeekOffset]||0)+1; asRerender();">↻ Regenerate</button>' +
+      '<button class="as-btn" style="background:var(--bg3,#2C2C2E);color:var(--txt,#fff)" title="Pull one body from each day and see what is left — run before publishing" onclick="asStressTest()">🧪 Stress test</button>' +
       '<span class="as-note">Planning <b>'+(isMgr?'Manager open/close':'CXR rotation + lunch')+'</b> · <b>'+_asWeekRangeLabel()+'</b>. '+(isMgr?'<b style="color:var(--up,#FFCC00)">◇</b> = a slot the scheduler filled — tap it to 📌 pin (pins hold through ↻ Regenerate, this device only).':'Placed from their bids.')+' <b>Apply</b> writes only this group — the other stays as-is. Use ‹ › for other weeks.</span>' +
     '</div>' +
-    warnHtml +
+    warnHtml + _hrsHtml +
     (isMgr ? '<div class="as-note" style="margin:2px 0 8px">Each day: <b style="color:var(--accent,#23C983)">Opener ✓</b> / <b style="color:var(--na,#FF453A)">no closer ⚠</b> flags a day missing someone to open or close.</div>'
            : '<div class="as-note" style="margin:2px 0 8px">Day chips = coverage per time block: <b style="color:var(--accent,#23C983)">✓</b> ok, <b style="color:var(--na,#FF453A)">⚠</b> short. Most ⚠ are <b>returns</b> (few returns agents — usually fine); watch for <b>exit</b> / <b>floor</b> gaps.</div>') +
     '<div class="as-grid">' + daysHtml + '</div>' +
     '<p class="as-note" style="margin-top:14px">'+(isMgr?'Opener/Closer chips flag days missing a manager to open or close.':'Coverage chips read against the branch floor targets (E = exit, C = counter, R = returns) per block.')+' This is a draft — the real week still runs through the schedule editor.</p>';
+}
+function asStressTest(){
+  var sun=_asWeekStart(), rows='', ok=0, judged=0;
+  for(var i=0;i<7;i++){
+    var dt=new Date(sun); dt.setDate(sun.getDate()+i);
+    var key=_asDateKey(dt), lbl=AS_DOW[dt.getDay()]+' '+(dt.getMonth()+1)+'/'+dt.getDate();
+    var cap=null; try{ cap=(typeof ptoCapacity==='function')?ptoCapacity(key):null; }catch(e){}
+    var verdict, tone, note;
+    if(!cap){ verdict='no schedule'; tone='var(--txt3)'; note='nothing saved for this day yet'; }
+    else{
+      judged++;
+      if(cap.deficit<0){ verdict='✗ already short'; tone='var(--na,#FF453A)'; note=cap.deficit+' at peak before anyone calls off'; }
+      else if(cap.safe>=1){ verdict='✓ survives'; tone='var(--accent,#23C983)'; ok++; note='absorbs a call-off · slack: '+(cap.slack.join(' · ')||'—'); }
+      else if(cap.possible>0){ verdict='⚠ depends who'; tone='var(--up,#FFCC00)'; note='only '+cap.possible+' spare — the wrong call-off breaks it'; }
+      else { verdict='⚠ at the bone'; tone='var(--up,#FFCC00)'; note='meets minimum exactly — any call-off goes short'; }
+    }
+    rows+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bdr);font-size:12.5px">'
+     +'<span style="width:72px;color:var(--txt3);font-weight:700">'+lbl+'</span>'
+     +'<b style="width:120px;color:'+tone+'">'+verdict+'</b>'
+     +'<span style="flex:1;color:var(--txt3);font-size:11px">'+note+'</span></div>';
+  }
+  var head = judged
+    ? '<div style="font-size:15px;font-weight:800;color:'+(ok===judged?'var(--accent)':'var(--txt)')+';margin-bottom:4px">'
+      +ok+' of '+judged+' day'+(judged===1?'':'s')+' survive'+(ok===1?'s':'')+' a call-off intact</div>'
+    : '<div style="font-size:13px;color:var(--txt3);margin-bottom:4px">No saved schedule in this week to stress.</div>';
+  openModal('🧪 Stress test · '+_asWeekRangeLabel(),
+    head
+    +'<div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-bottom:8px">One body pulled from each day at peak — run this before you publish, not after someone calls off. Same math as the 🌴 chips, so the two can never disagree.</div>'
+    +rows
+    +'<div style="font-size:10.5px;color:var(--txt3);margin-top:8px;line-height:1.45">The ceiling is <i>which</i> people, not just how many — a ⚠ day can still be fine if the trained ones show. 🧪 on any employee card rehearses a specific person.</div>'
+    +'<button class="btn btn-gh" style="width:100%;margin-top:10px" onclick="closeModal()">Close</button>');
 }
 function openAutoScheduler(){
   asInjectStyle();
@@ -27714,6 +27913,28 @@ function asApplyWeek(){
   var endSat = new Date(sunday); endSat.setDate(sunday.getDate()+6);
   var totalAssign = wk.days.reduce(function(n,d){return n + d.people.filter(function(p){return pr.indexOf(p.role)>=0;}).length;},0);
   var range = _asDateKey(sunday) + ' → ' + _asDateKey(endSat);
+  // v60.208 (design v2 Planner §Review): publishing states its problems IN
+  // WORDS first — coverage and the two manager roles are the only things that
+  // speak up; nothing else holds the week hostage. Named, then your call:
+  // the branch must always be ABLE to publish an imperfect week.
+  var _holds=[];
+  try{
+    if(_asPlanner==='mgr'){
+      wk.days.forEach(function(d){
+        var mg=d.people.filter(function(p){ return AS_MGR_ROLES.indexOf(p.role)>=0; });
+        if(!mg.length) return;                                   // branch closed / no mgrs that day
+        if(!mg.some(function(p){ return p.start<=6; })) _holds.push('no opener '+d.label);
+        if(!mg.some(function(p){ return p.end>=22; })) _holds.push('no closer '+d.label);
+      });
+    } else {
+      var _short=0;
+      wk.days.forEach(function(d){ (d.cov||[]).forEach(function(c){ if(c.gap && !c.closed && (c.floorGap||c.exitGap)) _short++; }); });
+      if(_short) _holds.push(_short+' floor/exit block'+(_short===1?'':'s')+' under minimum');
+    }
+  }catch(e){}
+  if(_holds.length){
+    if(!confirm('⚠ This week publishes with:\n\n· '+_holds.join('\n· ')+'\n\nOnly coverage and opener/closer speak up here — nothing else holds a week. Publish anyway?')) return;
+  }
   if(!confirm('Apply the '+plannerLbl+' draft to the week '+range+'?\n\n'+totalAssign+' shift assignments will be written. This publishes ONLY the '+plannerLbl+' schedule — the other planner is untouched. Existing people keep their base shift unless this draft changes it; no one is force-marked OFF. Undo any day in Setup → Edit Schedule.')){ return; }
   if(!STATE.scheduleOverrides) STATE.scheduleOverrides = {};
   var touchedToday = false;
