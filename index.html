@@ -1999,7 +1999,6 @@ button { cursor: pointer; }
   <button class="nbtn on" id="tab-opening"  onclick="showTab('opening')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><path d="M13 2 L4 13.5 h6 l-1.5 8.5 L18 10 h-6 l1-8z"/></svg></span><span class="nbtn-lbl">Now</span></button>
   <button class="nbtn"    id="tab-schedule" onclick="showTab('schedule')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="nbtn-lbl">Plan</span></button>
   <button class="nbtn"    id="tab-board"    onclick="showTab('board')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><path d="M5 11l1.4-4.2A2 2 0 018.3 5.4h7.4a2 2 0 011.9 1.4L19 11M5 11h14v4.6a1 1 0 01-1 1h-1.4a1 1 0 01-1-1V15H8.4v.6a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><circle cx="8.2" cy="13.6" r="1"/><circle cx="15.8" cy="13.6" r="1"/></svg></span><span class="nbtn-lbl">Board</span></button>
-  <button class="nbtn"    id="tab-calendar" onclick="showTab('calendar')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/><circle cx="8" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.2" fill="currentColor" stroke="none"/><circle cx="16" cy="14" r="1.2" fill="currentColor" stroke="none"/></svg></span><span class="nbtn-lbl">Calendar</span></button>
   <button class="nbtn"    id="tab-checklist" onclick="showTab('checklist')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M8 12.2l2.8 2.8L16.5 9"/></svg></span><span class="nbtn-lbl">Rituals</span></button>
   <button class="nbtn"    id="tab-more"     onclick="showTab('more')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg></span><span class="nbtn-lbl">More</span></button>
   <div id="nav-calm"><span class="nav-calm-lbl">Calm Mode</span><button id="nav-calm-toggle" class="nav-calm-sw" onclick="toggleTheme()" aria-label="Toggle Calm Mode"><span class="nav-calm-knob"></span></button></div>
@@ -2522,6 +2521,57 @@ button { cursor: pointer; }
     <button class="seg"    id="sdest-cal"   onclick="setSchedDest('cal')">📆 Calendar</button>
   </div>
 
+  <!-- v60.214 (Matt: "it should cascade down the page… think about the flow") —
+       THE CASCADE: act → see → inspect → fix → tools. This band is ACT: the
+       two things a manager reaches for the moment something changes — a
+       call-off, and the guided plan. Everything below follows the ①②③ spine,
+       with every toggle sitting DIRECTLY above the thing it controls. -->
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <button class="vl-mgr" onclick="openCallOff()" title="Mark anyone off today — coverage adjusts instantly"
+      style="flex:1;min-width:150px;padding:12px 14px;border-radius:9px;border:1px solid var(--red,#FF453A);
+        background:rgba(255,69,58,.10);color:var(--red,#FF453A);font-size:14px;font-weight:800;cursor:pointer">
+      📞 Someone called off
+    </button>
+    <button id="pt-entry" onclick="openPlanToday()" title="Seven steps, in order — schedule, targets, lunches, rotation, coverage, manager fill, publish"
+      style="flex:1;min-width:150px;padding:11px 14px;border-radius:9px;border:1px solid var(--bdr2);
+        background:var(--bg3);color:var(--txt);font-size:13px;font-weight:800;cursor:pointer">
+      📋 Plan today
+    </button>
+  </div>
+
+  <!-- ① WHO'S ON -->
+  <div class="sp-step" id="sp-step-1">
+    <span class="sp-n">①</span> Who's on
+  </div>
+
+  <!-- v60.153: solo-coverage summary — pinned when someone is on their own -->
+  <div id="solo-banner" style="display:none;margin-bottom:10px"></div>
+
+  <!-- v60.44: view-pattern segmented control (same data, 3 renders).
+       v60.140: labeled "View:" to pair clearly with the "Group by:" row below. -->
+  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:4px">View</div>
+  <div class="seg-ctl" id="sched-seg">
+    <button class="seg on" id="spat-timeline" onclick="setSchedPattern('timeline')">Timeline</button>
+    <button class="seg"    id="spat-roster"   onclick="setSchedPattern('roster')">Roster</button>
+    <button class="seg"    id="spat-coverage" onclick="setSchedPattern('coverage')">Coverage</button>
+    <!-- v60.145: "📅 Week" removed — it's a top-level destination now (#sched-dest),
+         not a 4th render mode hiding inside the View selector. -->
+  </div>
+
+  <!-- Grouping selector (v60.37: single unified schedule view — the mode only
+       changes how rows are PLACED/grouped; bars, coverage chart & adjuster are
+       identical across all modes) -->
+  <div id="sched-groupby-row" style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
+    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">Group by:</span>
+    <button id="sgrp-station" class="btn btn-g btn-sm" onclick="setSchedGroup('station')">🗂 Station</button>
+    <button id="sgrp-type" class="btn btn-gh btn-sm" onclick="setSchedGroup('type')">👥 Type</button>
+    <button id="sgrp-start" class="btn btn-gh btn-sm" onclick="setSchedGroup('start')">⏱ Start</button>
+    <button id="sgrp-end" class="btn btn-gh btn-sm" onclick="setSchedGroup('end')">🌙 End</button>
+    <button id="sgrp-name" class="btn btn-gh btn-sm" onclick="setSchedGroup('name')">🔤 Name</button>
+  </div>
+
+  <!-- Station view container (hidden by default) -->
+  <div id="sched-station-view" style="display:none;margin-bottom:10px"></div>
   <!-- v60.211 (Matt): "Today's coverage and Coverage Distribution today should
        be merged into one info block" — the distribution strip (signed +/−
        numbers per hour) now LEADS the same card that holds the coverage bars
@@ -2547,40 +2597,64 @@ button { cursor: pointer; }
     </div>
   </div>
 
-  <!-- ① WHO'S ON -->
-  <div class="sp-step" id="sp-step-1">
-    <span class="sp-n">①</span> Who's on
+  <!-- ② WHERE ARE THE GAPS -->
+  <div class="sp-step" id="sp-step-2">
+    <span class="sp-n">②</span> Where are the gaps
   </div>
 
-  <!-- v60.153: solo-coverage summary — pinned when someone is on their own -->
-  <div id="solo-banner" style="display:none;margin-bottom:10px"></div>
+  <div id="counter-load"></div>
+  <!-- Zone map — right now -->
+  <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
+    gap:6px;margin-bottom:10px"></div>
+  <!-- v60.142: manager-minimum coverage flag (this block: on-now vs mgr minimums) -->
+  <div id="mgr-coverage" style="margin-bottom:10px"></div>
 
-  <!-- v60.139: primary quick-actions — reachable BEFORE any planning.
-       Call-off first (the #1 "something just changed" action), then the
-       have-vs-need staffing glance. Both open self-contained overlays. -->
-  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-    <button class="vl-mgr" onclick="openCallOff()" title="Mark anyone off today — coverage adjusts instantly"
-      style="flex:1;min-width:150px;padding:12px 14px;border-radius:9px;border:1px solid var(--red,#FF453A);
-        background:rgba(255,69,58,.10);color:var(--red,#FF453A);font-size:14px;font-weight:800;cursor:pointer">
-      📞 Someone called off
-    </button>
-    <button onclick="openTrainingMap()" title="Who is cleared for what — and the depth per station"
-      class="btn btn-sm" style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">🎓 Training map</button>
+  <!-- Auto Schedule button — always visible (the rotation engine is the core value of this tab).
+       v60.140: renamed to "Fill today's gaps" (today-scoped) so it no longer reads like the
+       whole-week "📅 Week" planner; removed the duplicate Print button (top Print… has it). -->
+  <div style="margin-bottom:10px">
     <button onclick="openStaffingNeeds()" title="Do I have the people I need today?"
-      style="flex:1;min-width:150px;padding:12px 14px;border-radius:9px;border:1px solid var(--bdr2);
+      style="width:100%;padding:11px 14px;border-radius:9px;border:1px solid var(--bdr2);
         background:var(--bg3);color:var(--txt);font-size:14px;font-weight:800;cursor:pointer">
       📊 Who I need today
     </button>
-    <button id="pt-entry" onclick="openPlanToday()" title="Six steps, in order — schedule, targets, lunches, rotation, gaps, publish"
-      style="flex-basis:100%;padding:11px 14px;border-radius:9px;border:1px solid var(--bdr2);
-        background:var(--bg3);color:var(--txt);font-size:13px;font-weight:800;cursor:pointer">
-      📋 Plan today
-    </button>
   </div>
 
+  <!-- ③ FIX IT -->
+  <div class="sp-step" id="sp-step-3">
+    <span class="sp-n">③</span> Fix it
+  </div>
+
+  <div id="sched-auto-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Auto-distribute Exit & Counter rotations for TODAY based on coverage rules">
+      ⚡ Fill today's gaps
+    </button>
+    <button class="btn btn-sm" onclick="gfxStart()" title="One gap at a time — apply or skip, with the reasoning shown"
+      style="border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-weight:800">
+      ▶ Guided fix<span id="gfx-count" style="opacity:.85"></span>
+    </button>
+    <button class="btn btn-sm vl-mgr" onclick="gfxPlanView()" title="The full repair plan, cheapest first — pick Make 3 / 2 / 1 moves"
+      style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">
+      🧮 Whole plan
+    </button>
+    <span id="auto-why" style="font-size:9px;color:var(--txt3)">
+      Fills today's exit gaps using available CXRs · respects manager overrides
+    </span>
+  </div>
+
+  <!-- Coverage action bar (manager mode — undo/redo only) -->
+  <div id="cov-action-bar" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <button class="btn btn-gh btn-sm" onclick="undoCoverage()" title="Undo">↩ Undo</button>
+    <button class="btn btn-gh btn-sm" onclick="redoCoverage()" title="Redo">↪ Redo</button>
+    
+  </div>
+
+  <!-- v60.214: end-of-flow tools — printing, sends and the training map are
+       reference actions, not part of running the day; they close the cascade. -->
+  <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;margin-top:2px">
   <!-- Print buttons — v60.140: tucked into a disclosure so they don't dominate
        the top of the tab. Printing is an end-of-flow action, not a starting one. -->
-  <details style="margin-bottom:10px">
+  <details style="margin-bottom:0">
     <summary style="list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
       padding:6px 12px;border-radius:6px;border:1px solid var(--bdr2);background:var(--bg3);
       color:var(--txt3);font-size:11px;font-weight:700;user-select:none">🖨 Print…</summary>
@@ -2621,73 +2695,8 @@ button { cursor: pointer; }
     </div>
   </details>
 
-  <!-- v60.44: view-pattern segmented control (same data, 3 renders).
-       v60.140: labeled "View:" to pair clearly with the "Group by:" row below. -->
-  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin-bottom:4px">View</div>
-  <div class="seg-ctl" id="sched-seg">
-    <button class="seg on" id="spat-timeline" onclick="setSchedPattern('timeline')">Timeline</button>
-    <button class="seg"    id="spat-roster"   onclick="setSchedPattern('roster')">Roster</button>
-    <button class="seg"    id="spat-coverage" onclick="setSchedPattern('coverage')">Coverage</button>
-    <!-- v60.145: "📅 Week" removed — it's a top-level destination now (#sched-dest),
-         not a 4th render mode hiding inside the View selector. -->
-  </div>
-
-  <!-- Grouping selector (v60.37: single unified schedule view — the mode only
-       changes how rows are PLACED/grouped; bars, coverage chart & adjuster are
-       identical across all modes) -->
-  <div id="sched-groupby-row" style="display:flex;gap:6px;margin-bottom:10px;align-items:center;flex-wrap:wrap">
-    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">Group by:</span>
-    <button id="sgrp-station" class="btn btn-g btn-sm" onclick="setSchedGroup('station')">🗂 Station</button>
-    <button id="sgrp-type" class="btn btn-gh btn-sm" onclick="setSchedGroup('type')">👥 Type</button>
-    <button id="sgrp-start" class="btn btn-gh btn-sm" onclick="setSchedGroup('start')">⏱ Start</button>
-    <button id="sgrp-end" class="btn btn-gh btn-sm" onclick="setSchedGroup('end')">🌙 End</button>
-    <button id="sgrp-name" class="btn btn-gh btn-sm" onclick="setSchedGroup('name')">🔤 Name</button>
-  </div>
-
-  <!-- Station view container (hidden by default) -->
-  <div id="sched-station-view" style="display:none;margin-bottom:10px"></div>
-  <!-- ② WHERE ARE THE GAPS -->
-  <div class="sp-step" id="sp-step-2">
-    <span class="sp-n">②</span> Where are the gaps
-  </div>
-
-  <div id="counter-load"></div>
-  <!-- Zone map — right now -->
-  <div id="zone-map" style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;
-    gap:6px;margin-bottom:10px"></div>
-  <!-- v60.142: manager-minimum coverage flag (this block: on-now vs mgr minimums) -->
-  <div id="mgr-coverage" style="margin-bottom:10px"></div>
-
-  <!-- Auto Schedule button — always visible (the rotation engine is the core value of this tab).
-       v60.140: renamed to "Fill today's gaps" (today-scoped) so it no longer reads like the
-       whole-week "📅 Week" planner; removed the duplicate Print button (top Print… has it). -->
-  <!-- ③ FIX IT -->
-  <div class="sp-step" id="sp-step-3">
-    <span class="sp-n">③</span> Fix it
-  </div>
-
-  <div id="sched-auto-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Auto-distribute Exit & Counter rotations for TODAY based on coverage rules">
-      ⚡ Fill today's gaps
-    </button>
-    <button class="btn btn-sm" onclick="gfxStart()" title="One gap at a time — apply or skip, with the reasoning shown"
-      style="border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-weight:800">
-      ▶ Guided fix<span id="gfx-count" style="opacity:.85"></span>
-    </button>
-    <button class="btn btn-sm vl-mgr" onclick="gfxPlanView()" title="The full repair plan, cheapest first — pick Make 3 / 2 / 1 moves"
-      style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">
-      🧮 Whole plan
-    </button>
-    <span id="auto-why" style="font-size:9px;color:var(--txt3)">
-      Fills today's exit gaps using available CXRs · respects manager overrides
-    </span>
-  </div>
-
-  <!-- Coverage action bar (manager mode — undo/redo only) -->
-  <div id="cov-action-bar" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-    <button class="btn btn-gh btn-sm" onclick="undoCoverage()" title="Undo">↩ Undo</button>
-    <button class="btn btn-gh btn-sm" onclick="redoCoverage()" title="Redo">↪ Redo</button>
-    
+    <button onclick="openTrainingMap()" title="Who is cleared for what — and the depth per station"
+      class="btn btn-sm" style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">🎓 Training map</button>
   </div>
 
   <!-- v60.127: Week draft pattern — the Auto-Scheduler rendered inline here (sibling of the day-view card) -->
@@ -4929,9 +4938,10 @@ function showTab(id) {
   // (the Master Calendar). Open it ON TOP of the current screen and light its nav
   // button; the underlying screen stays so closing the overlay returns to it.
   if (id === 'calendar') {
-    document.querySelectorAll('.nbtn').forEach(b => b.classList.remove('on'));
-    const cb = document.getElementById('tab-calendar'); if (cb) cb.classList.add('on');
-    if (typeof openMasterCalendar === 'function') openMasterCalendar();
+    // v60.214 (Matt): the Calendar tab is gone — fully absorbed into Plan.
+    // Any old caller lands on Plan with the calendar open, same one door.
+    showTab('schedule');
+    if (typeof setSchedDest === 'function') setSchedDest('cal');
     return;
   }
 
@@ -15272,7 +15282,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.213'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.214'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
