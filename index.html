@@ -2274,6 +2274,10 @@ button { cursor: pointer; }
       <div class="parse-ok" id="prc4" style="display:none"></div>
     </div>
     </div>
+    <!-- v60.201: the missing closer. v60.200's beat restructure dropped ONE
+         </div> here, which nested EVERY screen after screen-paste inside the
+         hidden paste div — the "everything except Now is blank" bug. -->
+    </div>
 
     <div class="row" style="justify-content:space-between;flex-wrap:wrap;gap:8px;margin-top:10px">
 <div id="paste-overall-status" style="font-size:12px;color:var(--txt3)">0 of 4 completed (Brand Totals optional)</div>
@@ -4242,6 +4246,65 @@ function stationClass(s) {
 const TODAY_KEY = new Date().toISOString().slice(0,10);
 const LS_KEY = `cmh-daily-${TODAY_KEY}`;
 
+// ── v60.201 · ONE SHAPE GUARD, EVERY DOOR ──────────────────────────────────
+// These guards lived inline in loadState, so they ran at PAGE LOAD ONLY.
+// A remote sync merge (applyRemoteRecord → mergeRemoteIntoState) could hand
+// STATE a shape from an older app version — and the first renderer to touch a
+// missing field threw, leaving every tab except Now BLANK. That is exactly
+// what hit Matt's work computer on its first sign-in: the pull merged an
+// older-version state and the guards never re-ran.
+function ensureStateShape(s){
+  if(!s || typeof s!=='object') return s;
+  // Ensure all required fields exist (migration safe)
+  s.fields        = s.fields        || {};
+  s.walkUpPolicy  = s.walkUpPolicy  || 'open';
+  s.pasteData     = s.pasteData     || {};
+  s.groupOverrides= s.groupOverrides|| {};
+  s.checklist     = s.checklist     || {};
+  s.staffDuty     = s.staffDuty     || {};
+  s.staffStation  = s.staffStation  || {};
+  s.shiftTimes    = s.shiftTimes    || {};
+  s.todayOverrides= s.todayOverrides|| {};
+  s.physInventory = s.physInventory || {};
+  s.altSchedule  = s.altSchedule  || {};
+  s.pasteHourly  = s.pasteHourly  || {};
+  s.stationPref  = s.stationPref  || {};
+  s.shiftMod     = s.shiftMod     || {};
+  s.customSplits = s.customSplits || {};
+  s.adminRoster  = s.adminRoster  || [];
+  s.adminCodes   = s.adminCodes   || [];
+  s.specialBlocks = s.specialBlocks || {};
+  s.meetings      = s.meetings      || [];
+  s.mgmtBlocks   = s.mgmtBlocks   || {}; // {pid: [{from, to, station}]} — manager multi-station time blocks
+  s.closeFields  = s.closeFields  || {};
+  s.coverageThresholds = s.coverageThresholds || null;
+  s.pendingCoverage = s.pendingCoverage || null; // { staffStation, altSchedule, shiftMod, customSplits, specialBlocks } — buffer of edits before Confirm
+  s.confirmedCoverage = s.confirmedCoverage || null; // snapshot of last Confirm
+  s.closingExtension = s.closingExtension || null; // {until: hour, reason: 'unfulfilled res'}
+  // v57+ migrations — keep all newer fields here so loading old localStorage
+  // dumps doesn't leave them undefined and cause downstream crashes.
+  s.customLunch  = s.customLunch  || {};  // v57: {pid: lunch_start_hour} manual lunch override
+  s.scheduleOverrides = s.scheduleOverrides || {}; // v54: {YYYY-MM-DD: {pid: [s,e]|'OFF'}}
+  s.announcements = Array.isArray(s.announcements) ? s.announcements : [];  // v59
+  s.celebrations  = Array.isArray(s.celebrations)  ? s.celebrations  : [];  // v59
+  s.carPhotos     = (s.carPhotos && typeof s.carPhotos === 'object') ? s.carPhotos : {}; // v59
+  s.policyLog     = Array.isArray(s.policyLog)     ? s.policyLog     : [];  // v60
+  s.dnr           = Array.isArray(s.dnr)           ? s.dnr           : [];  // v60.7: fraud / Do-Not-Rent list (now synced)
+  s.dnq           = Array.isArray(s.dnq)           ? s.dnq           : [];  // v60.7: Did-Not-Qualify list (now synced, 48h auto-expire)
+  s.clReasons     = (s.clReasons && typeof s.clReasons === 'object') ? s.clReasons : {};  // v60.8: {cl-mode: {itemText: reason}} for incomplete-item email validation
+  s.uiDensity     = (s.uiDensity === 'compact') ? 'compact' : 'comfortable';  // v60.13: card spacing preference
+  s.uiTheme       = (s.uiTheme === 'calm') ? 'calm' : 'bold';  // v60.32: dashboard look (bold default, calm opt-out)
+  s.uiContrast    = (s.uiContrast === 'high') ? 'high' : 'normal';  // v60.119: high-contrast mode for old monitors
+  s.nameAliases   = (s.nameAliases && typeof s.nameAliases === 'object') ? s.nameAliases : {};  // v60.23: confirmed name→roster mappings for schedule import
+  s.mgrStationLog         = (s.mgrStationLog && typeof s.mgrStationLog === 'object') ? s.mgrStationLog : {};                 // v60.111: {pid:{station:hours}} station-fairness tally
+  s.mgrStationLoggedDates = (s.mgrStationLoggedDates && typeof s.mgrStationLoggedDates === 'object') ? s.mgrStationLoggedDates : {}; // v60.111: {date:true} double-log guard
+  s.mgrStationDeclared    = (s.mgrStationDeclared && typeof s.mgrStationDeclared === 'object') ? s.mgrStationDeclared : {};  // v60.111: {pid:station} declared usual station
+  s.branchResponses       = (s.branchResponses && typeof s.branchResponses === 'object') ? s.branchResponses : {};  // v60.117: {mgrName:{answers,notes,ts}} per-manager interview viewpoints
+  s.pto                   = (s.pto && typeof s.pto === 'object') ? s.pto : {};  // v60.120: {YYYY-MM-DD:{pid:true}} time-off (read by scheduler + calendar + station suggest)
+
+  return s;
+}
+
 function loadState() {
   const TODAY = new Date().toISOString().slice(0,10);
   const LS_KEY = 'cmh-v2-' + TODAY;
@@ -4249,52 +4312,7 @@ function loadState() {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) {
       const s = JSON.parse(raw);
-      // Ensure all required fields exist (migration safe)
-      s.fields        = s.fields        || {};
-      s.walkUpPolicy  = s.walkUpPolicy  || 'open';
-      s.pasteData     = s.pasteData     || {};
-      s.groupOverrides= s.groupOverrides|| {};
-      s.checklist     = s.checklist     || {};
-      s.staffDuty     = s.staffDuty     || {};
-      s.staffStation  = s.staffStation  || {};
-      s.shiftTimes    = s.shiftTimes    || {};
-      s.todayOverrides= s.todayOverrides|| {};
-      s.physInventory = s.physInventory || {};
-      s.altSchedule  = s.altSchedule  || {};
-      s.pasteHourly  = s.pasteHourly  || {};
-      s.stationPref  = s.stationPref  || {};
-      s.shiftMod     = s.shiftMod     || {};
-      s.customSplits = s.customSplits || {};
-      s.adminRoster  = s.adminRoster  || [];
-      s.adminCodes   = s.adminCodes   || [];
-      s.specialBlocks = s.specialBlocks || {};
-      s.meetings      = s.meetings      || [];
-      s.mgmtBlocks   = s.mgmtBlocks   || {}; // {pid: [{from, to, station}]} — manager multi-station time blocks
-      s.closeFields  = s.closeFields  || {};
-      s.coverageThresholds = s.coverageThresholds || null;
-      s.pendingCoverage = s.pendingCoverage || null; // { staffStation, altSchedule, shiftMod, customSplits, specialBlocks } — buffer of edits before Confirm
-      s.confirmedCoverage = s.confirmedCoverage || null; // snapshot of last Confirm
-      s.closingExtension = s.closingExtension || null; // {until: hour, reason: 'unfulfilled res'}
-      // v57+ migrations — keep all newer fields here so loading old localStorage
-      // dumps doesn't leave them undefined and cause downstream crashes.
-      s.customLunch  = s.customLunch  || {};  // v57: {pid: lunch_start_hour} manual lunch override
-      s.scheduleOverrides = s.scheduleOverrides || {}; // v54: {YYYY-MM-DD: {pid: [s,e]|'OFF'}}
-      s.announcements = Array.isArray(s.announcements) ? s.announcements : [];  // v59
-      s.celebrations  = Array.isArray(s.celebrations)  ? s.celebrations  : [];  // v59
-      s.carPhotos     = (s.carPhotos && typeof s.carPhotos === 'object') ? s.carPhotos : {}; // v59
-      s.policyLog     = Array.isArray(s.policyLog)     ? s.policyLog     : [];  // v60
-      s.dnr           = Array.isArray(s.dnr)           ? s.dnr           : [];  // v60.7: fraud / Do-Not-Rent list (now synced)
-      s.dnq           = Array.isArray(s.dnq)           ? s.dnq           : [];  // v60.7: Did-Not-Qualify list (now synced, 48h auto-expire)
-      s.clReasons     = (s.clReasons && typeof s.clReasons === 'object') ? s.clReasons : {};  // v60.8: {cl-mode: {itemText: reason}} for incomplete-item email validation
-      s.uiDensity     = (s.uiDensity === 'compact') ? 'compact' : 'comfortable';  // v60.13: card spacing preference
-      s.uiTheme       = (s.uiTheme === 'calm') ? 'calm' : 'bold';  // v60.32: dashboard look (bold default, calm opt-out)
-      s.uiContrast    = (s.uiContrast === 'high') ? 'high' : 'normal';  // v60.119: high-contrast mode for old monitors
-      s.nameAliases   = (s.nameAliases && typeof s.nameAliases === 'object') ? s.nameAliases : {};  // v60.23: confirmed name→roster mappings for schedule import
-      s.mgrStationLog         = (s.mgrStationLog && typeof s.mgrStationLog === 'object') ? s.mgrStationLog : {};                 // v60.111: {pid:{station:hours}} station-fairness tally
-      s.mgrStationLoggedDates = (s.mgrStationLoggedDates && typeof s.mgrStationLoggedDates === 'object') ? s.mgrStationLoggedDates : {}; // v60.111: {date:true} double-log guard
-      s.mgrStationDeclared    = (s.mgrStationDeclared && typeof s.mgrStationDeclared === 'object') ? s.mgrStationDeclared : {};  // v60.111: {pid:station} declared usual station
-      s.branchResponses       = (s.branchResponses && typeof s.branchResponses === 'object') ? s.branchResponses : {};  // v60.117: {mgrName:{answers,notes,ts}} per-manager interview viewpoints
-      s.pto                   = (s.pto && typeof s.pto === 'object') ? s.pto : {};  // v60.120: {YYYY-MM-DD:{pid:true}} time-off (read by scheduler + calendar + station suggest)
+      ensureStateShape(s);
       return s;
     }
   } catch(e) {}
@@ -4793,8 +4811,17 @@ function showTab(id) {
   if (scr) scr.classList.add('on');
   if (btn) btn.classList.add('on');
 
-  if (id === 'opening' && typeof renderNow === 'function') renderNow();  // v60.43
-  if (id === 'board')     { calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); updateCancelFlag(); updateEventFlag(); }
+  // v60.201: EVERY per-tab renderer below runs inside its own guard. The
+  // screen div is already visible at this point; an exception in a renderer
+  // used to leave the tab BLANK with no error the user could see — the exact
+  // "everything except Now is blank" symptom from the work computer. A tab
+  // that renders stale content and toasts beats a tab that renders nothing.
+  var _safe=function(fn){ try{ fn(); }catch(e){
+    try{ console.error('tab render failed:', id, e); }catch(x){}
+    if(typeof toast==='function') toast('⚠ '+id+' had a display problem — data is safe, try again or reload');
+  } };
+  if (id === 'opening' && typeof renderNow === 'function') _safe(renderNow);  // v60.43
+  if (id === 'board')     _safe(function(){ calcBoard(); updateBoardHeader(); updateWUBtns(); buildBoardFlow(); updateCancelFlag(); updateEventFlag(); });
   if (id === 'paste' && typeof pasteBeatShow==='function'){   // v60.200: land on the first unfinished beat
     var _pb=1; while(_pb<3 && pasteBeatDone(_pb)) _pb++;
     pasteBeatShow(_pb);
@@ -4808,14 +4835,14 @@ function showTab(id) {
         autoSchedule();
       }
     } catch (e) { /* never block tab entry on rotation errors */ }
-    setSchedView(typeof _schedView !== 'undefined' ? _schedView : 'timeline');
-    updateManagerModeUI();
+    _safe(function(){ setSchedView(typeof _schedView !== 'undefined' ? _schedView : 'timeline'); });
+    _safe(updateManagerModeUI);
   }
-  if (id === 'checklist') { renderChecklist(window._curCLMode || 'opening'); }
-  if (id === 'closing')   { restoreClosingFields(); genTeamText(); buildDaySummary(); }
-  if (id === 'reference') { buildCodeCompendium(); }
-  if (id === 'inventory') { buildInventoryScreen(); }
-  if (id === 'history')   { autoSaveHistory(); buildHistoryScreen(); }
+  if (id === 'checklist') _safe(function(){ renderChecklist(window._curCLMode || 'opening'); });
+  if (id === 'closing')   _safe(function(){ restoreClosingFields(); genTeamText(); buildDaySummary(); });
+  if (id === 'reference') _safe(function(){ buildCodeCompendium(); });
+  if (id === 'inventory') _safe(function(){ buildInventoryScreen(); });
+  if (id === 'history')   _safe(function(){ autoSaveHistory(); buildHistoryScreen(); });
 }
 
 
@@ -14978,6 +15005,7 @@ function applyRemoteRecord(record, apply) {
   // v60.144: detect an incoming management publish BEFORE merging (compare stamps)
   const _prevPub = (STATE.publishMeta && STATE.publishMeta.at) || '';
   mergeRemoteIntoState(STATE, remote);
+  if(typeof ensureStateShape==='function') try{ ensureStateShape(STATE); }catch(e){}   // v60.201
   // v60.191: a meeting created on another device rides in through this merge —
   // its specialBlocks projection has to be rebuilt here or the reminder fires
   // with no 🤝 on the floor view.
@@ -15152,6 +15180,7 @@ async function sbMigrateIfNeeded(){
     const d = await r.json();
     const rec = d.record || d;
     if (rec && rec.state) mergeRemoteIntoState(STATE, rec.state);
+    if(rec && rec.state && typeof ensureStateShape==='function') try{ ensureStateShape(STATE); }catch(e){}   // v60.201
     if (typeof saveState === 'function') saveState();
     await cloudPush();
     try { localStorage.setItem('cmh-sb-migrated','1'); } catch(e){}
@@ -17590,7 +17619,11 @@ function buildCoverageTimeline() {
   const NH = H_END - H_START; // number of hour columns (used for % math)
   const exitCts=HOURS.map(h=>people.filter(([pid,e])=>getZone(pid,e.person,h)==='exit').length);
   const ctrCts =HOURS.map(h=>people.filter(([pid,e])=>{const z=getZone(pid,e.person,h);return z==='counter'||z==='mgmt';}).length);
-  const maxC=Math.max(...exitCts,...ctrCts,4);
+  // v60.201 (Matt): "the scheduler needs to list the returns as a bar graph for
+  // coverage just like exit/counter." Returns opens at 3:30a and runs solo all
+  // evening — it was the one primary station the chart couldn't show.
+  const retCts =HOURS.map(h=>people.filter(([pid,e])=>getZone(pid,e.person,h)==='returns').length);
+  const maxC=Math.max(...exitCts,...ctrCts,...retCts,4);
   const chEl=document.getElementById('coverage-chart');
   if(chEl){
     const barH=30;
@@ -17616,6 +17649,16 @@ function buildCoverageTimeline() {
       const pct=Math.min(100,ct/maxC*100);
       const col=ct===0?'transparent':ct<r.counterMin?'var(--amber)':'var(--acc)';
       c+=`<div style="flex:1;min-width:0;padding:0 1px;${gl}"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0;opacity:.85"></div></div>`;
+    });
+    c+=`</div>`;
+    // Returns coverage row (v60.201)
+    c+=`<div style="display:flex;align-items:flex-end;height:${barH}px;margin-top:2px"><div style="width:${LABEL_W}px;flex-shrink:0;align-self:center;font-size:9px;font-weight:700;color:var(--returns,#64D2FF);text-align:right;padding-right:5px">Ret</div>`;
+    HOURS.forEach((h,i)=>{
+      const ct=retCts[i],r=typeof COVERAGE_BY_HOUR==='function'?COVERAGE_BY_HOUR(h%24,dow,exitAgentCount):{returnsMin:1};
+      const min=(r&&r.returnsMin)||0;
+      const pct=Math.min(100,ct/maxC*100);
+      const col=(min>0&&ct===0)?'var(--red)':(min>0&&ct<min)?'var(--amber)':ct===0?'transparent':'var(--returns,#64D2FF)';
+      c+=`<div style="flex:1;min-width:0;padding:0 1px;${gl}"><div style="height:${Math.max(2,pct/100*barH)}px;background:${col};border-radius:2px 2px 0 0" title="Returns ${h%24}:00 — ${ct} on${min?' / min '+min:''}"></div></div>`;
     });
     c+=`</div></div>`;
     chEl.innerHTML=c;
@@ -19774,7 +19817,7 @@ function covStripHtml(){
   var exp; try{ exp=buildExpectedToday(); }catch(e){ return ''; }
   if(!Object.keys(exp).length) return '';
   var dow=new Date().getDay(), nowH=new Date().getHours();
-  var rows=[['exit','Exit'],['counter','Ctr']];
+  var rows=[['exit','Exit'],['counter','Ctr'],['returns','Ret']];   // v60.201: Returns joins
   var h='<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:9px;padding:8px 10px;margin-bottom:10px">'
    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
    +'<span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3)">Coverage distribution · today</span>'
