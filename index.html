@@ -15170,7 +15170,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.206'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.207'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -27406,7 +27406,13 @@ function asBuildWeek(seed, _priorDepth){
     // sort people by start time for readability
     people.sort(function(a,b){return a.start-b.start;});
     var offCount = Object.keys(offSet).length;
-    days.push({dow:dow, label:AS_DOW[dow], date:dateKey, dateLabel:dateLabel, offCount:offCount, people:people, cov:cov});
+    // v60.207: keep the NAMES too, so the planner can show who is off, not
+    // just how many — PTO stops being invisible in the drafting view.
+    var offNames = Object.keys(offSet).map(function(opid){
+      try{ return (typeof dispName==='function')?dispName(opid):String(opid).replace(/_/g,' '); }
+      catch(e){ return String(opid).replace(/_/g,' '); }
+    });
+    days.push({dow:dow, label:AS_DOW[dow], date:dateKey, dateLabel:dateLabel, offCount:offCount, offNames:offNames, people:people, cov:cov});
   }
   return {days:days, seed:seed, weekStart:_asDateKeyOf(weekStart)};
 }
@@ -27579,6 +27585,28 @@ function asWeekBodyHtml(){
         return '<span class="as-chip '+cls+'" title="'+detail+'">'+c.lbl+' '+(c.gap?('⚠'+(why?' '+why:'')):'✓')+'</span>';
       }).join('');
     }
+    // v60.207 · PTO BARS ACROSS THE HORIZON: every planner day (any of the 8
+    // weeks) carries the derived could-be-off capacity + who is already off.
+    // Same math as the calendar's 7-day strip (ptoCapacity), so the two views
+    // can never disagree; days with no real schedule stay silent, never guess.
+    var extras='';
+    try{
+      var cap=(typeof ptoCapacity==='function')?ptoCapacity(d.date):null;
+      if(cap){
+        var _pt,_pc;
+        if(cap.deficit<0){ _pt=cap.deficit+' short'; _pc='var(--na,#FF453A)'; }
+        else if(cap.possible===0){ _pt='0 could be off'; _pc='var(--up,#FFCC00)'; }
+        else { _pt=cap.safe+' of '+cap.possible+' could be off'; _pc=cap.safe>0?'var(--accent,#23C983)':'var(--up,#FFCC00)'; }
+        extras+='<span class="as-chip" style="color:'+_pc+'" title="'
+          +(cap.slack.length?'Slack: '+cap.slack.join(' · '):'No slack')
+          +(cap.none.length?' · none from '+cap.none.join(', '):'')
+          +' — derived from this day\u2019s schedule; safe still absorbs a call-off after">🌴 '+_pt+'</span>';
+      }
+    }catch(e){}
+    if(d.offNames && d.offNames.length){
+      extras+='<span class="as-chip" title="Marked OFF / PTO / VACA on this day">🏖 '
+        +d.offNames.slice(0,3).join(', ')+(d.offNames.length>3?' +'+(d.offNames.length-3):'')+'</span>';
+    }
     var rowsHtml = ppl.map(function(p){
       return '<div class="as-row">' +
         '<span class="as-rl" style="background:'+_asRoleColor(p.role)+'22;color:'+_asRoleColor(p.role)+'">'+p.role+'</span>' +
@@ -27595,7 +27623,7 @@ function asWeekBodyHtml(){
       '</div>';
     }).join('') || '<div class="as-note">No one scheduled.</div>';
     return '<div class="as-day"><h3>'+d.label+' <span style="font-weight:600;color:var(--txt3,rgba(235,235,245,.55))">'+d.dateLabel+'</span> <span class="as-note">· '+ppl.length+(isMgr?' mgrs':' staff')+'</span></h3>' +
-      '<div class="as-cov">'+covHtml+'</div>' + rowsHtml + '</div>';
+      '<div class="as-cov">'+covHtml+extras+'</div>' + rowsHtml + '</div>';
   }).join('');
   var _pill = function(on){ return on?'background:var(--eb,#AF9CFF);color:#1a0f33':'background:var(--bg3,#2C2C2E);color:var(--txt,#fff)'; };
   return ''+
