@@ -7395,7 +7395,8 @@ function buildSmartRotation() {
       }
       // v60.187: the opener rule. `normal` starts at Counter, so lunch must not
       // land before 10:00 or the counter block comes up short.
-      const _startsAt = (startStation === 'exit') ? 'exit' : 'counter';
+      // v60.213: an explicit Counter-1st outranks the exit-list start station.
+      const _startsAt = altPos==='counter-first' ? 'counter' : (startStation === 'exit') ? 'exit' : 'counter';
       const _want = openerLunchStart(shift.start, shift.end, _startsAt, shift.start + block1H);
       if (_want !== shift.start + block1H) {
         block1H = _want - shift.start;
@@ -7407,7 +7408,10 @@ function buildSmartRotation() {
     const lunchEnd   = noLunch ? lunchStart : lunchStart + ROTATION.lunchHours;
     const shiftEnd   = shift.end;
 
-    const b1Station = startStation || 'counter';
+    // v60.213 (Matt, Guenther's card): 'counter-first' is an explicit human
+    // choice — it outranks the exit-list startStation that used to win here,
+    // which is exactly why tapping Counter 1st "didn't work".
+    const b1Station = altPos==='counter-first' ? 'counter' : (startStation || 'counter');
     // CMH rule: default rotation is balanced or exit-heavy. Counter→Exit
     // is the standard pattern (counter first half, exit second half) — this
     // gives every CXR ~half their time at exit and matches what
@@ -14070,8 +14074,16 @@ function getAltPosition(pid) {
 function setAltPosition(pid, posKey) {
   saveCoverageSnapshot();
   if (!STATE.altSchedule) STATE.altSchedule = {};
-  if (posKey === 'normal') delete STATE.altSchedule[pid];
-  else STATE.altSchedule[pid] = posKey;
+  // v60.213 (Matt: "Counter 1st doesn't work" on Guenther's card). Root cause:
+  // "Counter 1st" mapped to 'normal', which just DELETED the override — i.e.
+  // "no preference" — and the auto-distributor was then free to flip the
+  // person straight back to exit-first on the next rebuild. The tap looked
+  // applied and did nothing. Counter 1st is now the explicit 'counter-first'
+  // value, and every human choice made here is PINNED (STATE.altPinned) so
+  // the distributor treats it exactly like All-Counter/All-Exit: untouchable.
+  // 'normal' remains the true "engine decides" reset (tap the lit button).
+  if (posKey === 'normal'){ delete STATE.altSchedule[pid]; if(STATE.altPinned) delete STATE.altPinned[pid]; }
+  else { STATE.altSchedule[pid] = posKey; if(!STATE.altPinned) STATE.altPinned={}; STATE.altPinned[pid]=true; }
   // Clear any previously-set specialBlocks lunch for this person — the
   // rotation engine generates rot.lunch fresh based on the new altPosition,
   // so stale specialBlocks lunches just create double-stamps and confuse
@@ -14255,7 +14267,7 @@ function showShiftModModal(pid, personName) {
   const _rotBtn = (key,label) => `<button onclick="setRotationFromModal('${pid}','${_escNm}','${key}')" style="flex:1;min-width:62px;padding:7px 6px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid ${_altPos===key?'var(--acc)':'var(--bdr2)'};background:${_altPos===key?'rgba(37,99,235,.14)':'var(--bg2)'};color:${_altPos===key?'var(--acc)':'var(--txt2)'}">${label}</button>`;
   const rotationHtml = _isCXR ? `<div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;padding:12px;margin-bottom:14px">
       <div style="font-size:12px;font-weight:800;color:var(--txt);margin-bottom:10px">🔀 Rotation today</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${_rotBtn('normal','🟦 Counter 1st')}${_rotBtn('full-counter','🟦 All Counter')}${_rotBtn('full-exit','🟩 All Exit')}${_rotBtn('exit-first','🟩 Exit 1st')}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${_rotBtn('counter-first','🟦 Counter 1st')}${_rotBtn('full-counter','🟦 All Counter')}${_rotBtn('full-exit','🟩 All Exit')}${_rotBtn('exit-first','🟩 Exit 1st')}</div>
     </div>` : '';
   const whatifHtml = `<button class="btn btn-gh btn-sm" style="width:100%;margin-bottom:14px" onclick="showWhatif('${pid}','${_escNm}')">🔮 What If…? — coverage scenarios</button>`;
   // v60.51: tabbed sheet (Hours & Lunch / Rotation / What-If) so it's not a long scroll.
@@ -14415,7 +14427,7 @@ function setRotationFromModal(pid, personName, key) {
     if (typeof window[fn] === 'function') { try { window[fn](); } catch(e) {} }
   });
   if (typeof toast === 'function') {
-    const lbl = key==='full-counter'?'All Counter':key==='full-exit'?'All Exit':key==='exit-first'?'Exit First':'Normal rotation';
+    const lbl = key==='full-counter'?'All Counter':key==='full-exit'?'All Exit':key==='exit-first'?'Exit First':key==='counter-first'?'Counter First':'Engine decides';
     toast('Set: ' + lbl);
   }
   if (typeof showShiftModModal === 'function') showShiftModModal(pid, personName);
@@ -15260,7 +15272,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.212'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.213'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -20830,11 +20842,11 @@ function ptFlipDirection(pid, ss, se, exp){
     if((need.exit||0)>(have.exit||0)) exitShort++;
     if((need.counter||0)>(have.counter||0)) ctrShort++;
   }
-  if(exitShort>ctrShort) return {dir:'normal',
+  if(exitShort>ctrShort) return {dir:'counter-first',
     why:'exit short '+exitShort+'h after '+_ptFmt(mid)+' → Counter 1st, Exit after'};
   if(ctrShort>exitShort) return {dir:'exit-first',
     why:'counter short '+ctrShort+'h after '+_ptFmt(mid)+' → Exit 1st, Counter after'};
-  return {dir:'normal', why:'second half is balanced — either direction works'};
+  return {dir:'counter-first', why:'second half is balanced — either direction works'};
 }
 
 // ── actions ────────────────────────────────────────────────────────────────
@@ -22282,10 +22294,13 @@ function autoDistributeExit(exp) {
 
   if (!STATE.altSchedule) STATE.altSchedule = {};
 
-  // Preserve explicit manager overrides
+  // Preserve explicit manager overrides — v60.213: 'counter-first' and ANY
+  // pinned human choice (STATE.altPinned, stamped by setAltPosition) count,
+  // not just the two full-shift values. The distributor's own exit-first
+  // writes are unpinned, so they stay clearable by the next run.
   const managerSet = new Set(
     Object.entries(STATE.altSchedule)
-      .filter(([,v]) => ['full-counter','full-exit'].includes(v))
+      .filter(([k,v]) => ['full-counter','full-exit','counter-first'].includes(v) || (STATE.altPinned||{})[k])
       .map(([k]) => k)
   );
 
@@ -22336,6 +22351,7 @@ function autoDistributeExit(exp) {
         !assigned.has(c.pid) &&
         !managerSet.has(c.pid) &&
         STATE.altSchedule[c.pid] !== 'full-counter' &&
+        STATE.altSchedule[c.pid] !== 'counter-first' &&
         gapH >= c.ss && gapH < c.se &&
         // v60.146 GUARD: never auto-pull the last body off a station that's already
         // at its minimum (or off a primary touchpoint) just to plug exit. Managers
@@ -22700,10 +22716,10 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
       </div>`;
     } else if(_canRotate){
       h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">`;
-      [['normal','Counter 1st','var(--acc)'],['exit-first','Exit 1st','var(--green)'],
+      [['counter-first','Counter 1st','var(--acc)'],['exit-first','Exit 1st','var(--green)'],
        ['full-counter','All Counter','var(--acc)'],['full-exit','All Exit','var(--green)']].forEach(([key,lbl,col])=>{
         const on=altPos===key;
-        h+=`<button onclick="setAltPosition('${pid}','${key}');openPersonPanel('${pid}')"
+        h+=`<button title="${on?'Tap again to clear — engine decides':''}" onclick="setAltPosition('${pid}','${on?'normal':key}');openPersonPanel('${pid}')"
           style="padding:12px 6px;border-radius:9px;border:1.5px solid;font-size:13.5px;font-weight:800;cursor:pointer;
             background:${on?col+'22':'var(--bg3)'};border-color:${on?col:'var(--bdr2)'};color:${on?col:'var(--txt2)'}">${lbl}</button>`;
       });
