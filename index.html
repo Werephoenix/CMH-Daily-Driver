@@ -5583,9 +5583,22 @@ function buildBoardGrid() {
   if (!grid) return;
   // v60.65: Live Board "· Updated HH:MM" — reflects the last GreenLight paste.
   const bu = document.getElementById('board-updated');
-  if (bu) bu.textContent = STATE.boardUpdatedAt
-    ? ' · Updated ' + new Date(STATE.boardUpdatedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})
-    : '';
+  // v60.204: the STALENESS SIGNAL (design v2 — "Board photo 2h stale at peak").
+  // A board nobody has re-pasted since breakfast quietly stops being true; at
+  // peak that's a manager promising cars off a photo of the morning. Over 2h
+  // old during open hours it goes amber and says its age in words.
+  if (bu){
+    if (STATE.boardUpdatedAt){
+      var _ageMin=Math.round((Date.now()-STATE.boardUpdatedAt)/60000);
+      var _hr=new Date().getHours();
+      var _staleWarn = _ageMin>120 && _hr>=7 && _hr<=21;
+      bu.textContent = _staleWarn
+        ? ' · ⚠ pasted '+(_ageMin>=60? Math.floor(_ageMin/60)+'h '+(_ageMin%60)+'m' : _ageMin+'m')+' ago — re-paste for a true board'
+        : ' · Updated ' + new Date(STATE.boardUpdatedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+      bu.style.color = _staleWarn ? 'var(--amber)' : '';
+      bu.style.fontWeight = _staleWarn ? '800' : '';
+    } else bu.textContent='';
+  }
   buildBoardOverrides();   // v60.66: keep the per-group switch grid in sync with tiles
   const data = getGroupNetData();
   let html = '';
@@ -6595,10 +6608,75 @@ function autoSaveHistory() {
   } catch(e){}
 }
 
+// ── v60.204 · WINS & SCORES (design v2) — CS/HoT vs the corp line ──────────
+// Raw counts only: the corporate score formula is proprietary, so this is an
+// UNOFFICIAL pace clue, and the card says so. Bars render for however many
+// days exist — a 9-day chart labelled "9 days" beats a padded fake month.
+function winsScoresHtml(){
+  var hist=[]; try{ hist=(loadHistory()||[]).slice(); }catch(e){}
+  hist.sort(function(a,b){ return String(a.date).localeCompare(String(b.date)); });
+  var days=hist.slice(-28).map(function(h){ return {d:h.date, cs:(h.cs!=null?+h.cs:null), hot:(h.hot!=null?+h.hot:null)}; });
+  try{ var f=STATE.fields||{}; if(f.cs!=null||f.hot!=null){
+    days.push({d:todayKey(), cs:(f.cs!=null?+f.cs:null), hot:(f.hot!=null?+f.hot:null), live:true}); } }catch(e){}
+  days=days.slice(-28);
+  var have=days.filter(function(x){ return x.cs!=null||x.hot!=null; });
+  if(!have.length) return '';
+  var corp=(STATE.corpAvg!=null)? +STATE.corpAvg : null;
+  var maxCs=Math.max.apply(null, days.map(function(x){return x.cs||0;}).concat([corp||0,5]));
+  var bar=function(v,color,dim){
+    var h=v==null?2:Math.max(2,Math.round(v/maxCs*46));
+    return '<div style="flex:1;display:flex;align-items:flex-end"><div style="width:100%;height:'+h+'px;'
+      +'background:'+color+';opacity:'+(v==null?0.15:dim?0.32:0.95)+';border-radius:2px 2px 0 0"></div></div>';
+  };
+  var atOr=days.filter(function(x){ return corp!=null&&x.cs!=null&&x.cs>=corp; }).length;
+  var withCs=days.filter(function(x){return x.cs!=null;}).length;
+  var maxHot=Math.max.apply(null, days.map(function(x){return x.hot||0;}).concat([4]));
+  var hotUnder=days.filter(function(x){ return x.hot!=null&&x.hot<3; }).length;
+  var withHot=days.filter(function(x){return x.hot!=null;}).length;
+  var corpLinePct = corp!=null? Math.round(corp/maxCs*46) : null;
+  var wk=days.slice(-7);
+  var wkCs=wk.reduce(function(a,x){return a+(x.cs||0);},0), wkHot=wk.reduce(function(a,x){return a+(x.hot||0);},0);
+  var pace = corp==null? null : (withCs>0 && atOr/withCs>=0.5);
+  var h='<div class="card" style="margin-bottom:12px">'
+   +'<div class="ch">★ Wins &amp; Scores <span class="sub">'+have.length+' day'+(have.length===1?'':'s')+' · unofficial pace clue — corporate\'s formula is theirs</span></div>';
+  if(pace!=null){
+    h+='<div style="padding:8px 11px;border-radius:8px;margin-bottom:10px;font-size:12px;font-weight:700;'
+     +(pace?'background:rgba(48,209,88,.12);color:var(--green,#30D158)':'background:rgba(255,159,10,.12);color:var(--amber)')+'">'
+     +(pace?'On pace — hold this and the checkpoint clears.':'Trending under the corp line — worth a word at the huddle.')+'</div>';
+  }
+  h+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:3px">Completely Satisfied · daily</div>'
+   +'<div style="position:relative;height:48px">'
+   +(corpLinePct!=null?'<div style="position:absolute;left:0;right:0;bottom:'+corpLinePct+'px;border-top:1.5px dashed #FFD60A;z-index:2"></div>'
+     +'<span style="position:absolute;right:2px;bottom:'+(corpLinePct+2)+'px;font-size:8.5px;font-weight:800;color:#FFD60A;z-index:2">CORP '+corp+'</span>':'')
+   +'<div style="display:flex;gap:2px;height:48px;align-items:flex-end">'
+   +days.map(function(x){ return bar(x.cs,'#30D158', corp!=null&&x.cs!=null&&x.cs<corp); }).join('')
+   +'</div></div>'
+   +'<div style="font-size:10.5px;color:var(--txt3);margin:4px 0 12px">'
+   +(corp!=null? atOr+' of '+withCs+' days at/above the corp line' : withCs+' days recorded — set the corp average below to see pace')+'</div>';
+  h+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:3px">Hot Alerts · daily</div>'
+   +'<div style="display:flex;gap:2px;height:30px;align-items:flex-end">'
+   +days.map(function(x){
+      var v=x.hot; var hh=v==null?2:Math.max(2,Math.round(v/maxHot*28));
+      return '<div style="flex:1;display:flex;align-items:flex-end"><div style="width:100%;height:'+hh+'px;'
+        +'background:#FF453A;opacity:'+(v==null?0.12:(v>=3?0.95:0.38))+';border-radius:2px 2px 0 0"></div></div>';
+    }).join('')+'</div>'
+   +'<div style="font-size:10.5px;color:var(--txt3);margin:4px 0 12px">'+hotUnder+' of '+withHot+' days under 3 HoTs</div>';
+  h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+   +'<span style="font-size:11.5px;color:var(--txt2)">Wk: CS <b>'+wkCs+'</b> · HoT <b>'+wkHot+'</b></span>'
+   +'<span style="margin-left:auto;font-size:10.5px;color:var(--txt3)">Corp average</span>'
+   +'<button class="btn btn-gh btn-sm" onclick="STATE.corpAvg=Math.max(0,(+STATE.corpAvg||0)-1);saveState();buildHistoryScreen()">−</button>'
+   +'<b style="font-size:14px;color:var(--txt)">'+(corp!=null?corp:'—')+'</b>'
+   +'<button class="btn btn-gh btn-sm" onclick="STATE.corpAvg=(+STATE.corpAvg||0)+1;saveState();buildHistoryScreen()">+</button>'
+   +'</div>'
+   +'<div style="font-size:10px;color:var(--txt3);margin-top:6px">Enter the corp average when it posts (weekly checkpoint). Raw counts only — never shown as an official score.</div>'
+   +'</div>';
+  return h;
+}
+
 function buildHistoryScreen() {
   const wrapper = document.getElementById('hist-content');
   if (!wrapper) return;
-  wrapper.innerHTML = '<div id="history-list"></div>';
+  wrapper.innerHTML = ((typeof winsScoresHtml==='function')? winsScoresHtml():'') + '<div id="history-list"></div>';   // v60.204: ★ Wins & Scores leads
   const hist = loadHistory();
   const el = document.getElementById('history-list');
   if (!el) return;
@@ -7751,7 +7829,8 @@ function parseSection(section) {
       ${rows}
     </div>`;
   }
-  let ph = `<div style="padding:8px 12px;font-size:11px;color:var(--txt2);
+  let ph = ((typeof schedDiffHtml==='function')? schedDiffHtml(sched):'')
+   + `<div style="padding:8px 12px;font-size:11px;color:var(--txt2);
     border-bottom:1px solid var(--bdr)">
     <b style="color:var(--txt)">${Object.keys(sched.people).length} staff</b> ·
     <b>${dateKeys.length} days</b> · ${sched.startDate||'?'} → ${sched.endDate||'?'}
@@ -7788,6 +7867,56 @@ function parseSection(section) {
   if (sb) sb.style.display = 'inline-flex';
 
   toast(`Parsed: ${Object.keys(sched.people).length} ${section === 'mgmt' ? 'managers' : 'CXR/Exit staff'} × ${dateKeys.length} days`);
+}
+
+// ── v60.204 · IMPORT DIFF — "14 unchanged, 3 changed, 1 not in the roster" ─
+// (Design planner drop, flagged designed-but-not-built.) This week proved the
+// need: a schedule mismatch was only caught when a manager noticed the wrong
+// opener ON THE FLOOR. Now every import states what it's about to do to the
+// days you already have, BEFORE Save — cell-level, oldest truth vs pasted.
+function _sdNorm(v){
+  if(v==null) return '';
+  if(Array.isArray(v)&&v.length===2){
+    var f=function(h){var hh=Math.floor(h),m=Math.round((h-hh)*60),d=hh%12||12;
+      return d+(m?':'+String(m).padStart(2,'0'):'')+(hh>=12?'P':'A');};
+    return (f(v[0])+'-'+f(v[1])).toUpperCase();
+  }
+  return String(v).trim().toUpperCase().replace(/\s+/g,'');
+}
+function schedDiffHtml(sched){
+  var changed=[], unchanged=0, added=0;
+  try{
+    Object.keys(sched.grid||{}).forEach(function(dk){
+      var cur=null; try{ cur=getScheduleForDate(dk); }catch(e){}
+      var day=sched.grid[dk]||{};
+      Object.keys(day).forEach(function(pid){
+        var neu=_sdNorm(day[pid]);
+        var old=cur? _sdNorm(cur[pid]) : '';
+        if(!old && neu){ added++; return; }
+        if(old===neu){ unchanged++; return; }
+        changed.push({pid:pid, dk:dk, old:old||'—', neu:neu||'—'});
+      });
+    });
+  }catch(e){ return ''; }
+  var tone = changed.length? 'var(--amber)':'var(--accent)';
+  var h='<div style="padding:8px 12px;font-size:11.5px;border-bottom:1px solid var(--bdr);color:var(--txt2)">'
+   +'<b style="color:'+tone+'">Δ vs what the app has now:</b> '
+   +unchanged+' unchanged · <b style="color:'+(changed.length?'var(--amber)':'var(--txt2)')+'">'
+   +changed.length+' changed</b>'+(added?' · '+added+' filled-in':'')
+   +(changed.length? ' <a href="#" onclick="event.preventDefault();var d=document.getElementById(\'sd-diff\');d.style.display=d.style.display===\'none\'?\'\':\'none\'" style="color:var(--acc)">show</a>':'');
+  if(changed.length){
+    h+='<div id="sd-diff" style="display:none;margin-top:6px;max-height:160px;overflow-y:auto">';
+    changed.slice(0,60).forEach(function(c){
+      h+='<div style="padding:2px 0;font-size:10.5px;color:var(--txt3)">'
+        +'<b style="color:var(--txt2)">'+String(c.pid).replace(/_/g,' ')+'</b> '+c.dk.slice(5)
+        +' · <span style="text-decoration:line-through;opacity:.7">'+c.old+'</span> → '
+        +'<b style="color:var(--amber)">'+c.neu+'</b></div>';
+    });
+    if(changed.length>60) h+='<div style="font-size:10px;color:var(--txt3)">…and '+(changed.length-60)+' more</div>';
+    h+='</div>';
+  }
+  h+='</div>';
+  return h;
 }
 
 function saveSection(section) {
@@ -14939,7 +15068,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.203'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.204'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15523,6 +15652,55 @@ function applyAdminMode(switchSection){
   }
 }
 // Today's controls — the handful of things a manager actually flips on a shift.
+// ── v60.204 · MESSAGE TEAM — the share-sheet blast (design v2 Admin) ───────
+// The safe version of the text blast: NO phone numbers stored in-app, NOTHING
+// sends automatically, zero SMS cost. The app composes; the share sheet (or
+// clipboard) hands it to Messages with the human still holding the send key.
+var _mtGroup='Everyone';
+function mtCompose(kind){
+  var f=STATE.fields||{};
+  if(kind==='schedule') return 'CMH: tomorrow\'s schedule is posted — check the app before you head in.';
+  if(kind==='reminder') return 'CMH: reminder for tomorrow\'s openers — doors at 5:30a, game plan on the app.';
+  return '';
+}
+function mtSend(){
+  var ta=document.getElementById('mt-text');
+  var txt=(ta&&ta.value.trim())||'';
+  if(!txt){ if(typeof toast==='function') toast('Write the message first'); return; }
+  var full='['+_mtGroup+'] '+txt;
+  if(navigator.share){
+    navigator.share({text:full}).then(function(){
+      if(typeof toast==='function') toast('Handed to the share sheet — pick the group thread and send');
+    }).catch(function(){});
+  } else {
+    try{
+      navigator.clipboard.writeText(full);
+      if(typeof toast==='function') toast('Copied — paste into the ['+_mtGroup+'] thread in Messages');
+    }catch(e){ if(typeof toast==='function') toast('Select & copy the text manually'); }
+  }
+}
+function mtCardHtml(){
+  var groups=['Everyone','On duty now','Managers','MTs','CXRs'];
+  return '<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:11px 13px;margin-top:10px">'
+   +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:7px">💬 Message team · share sheet</div>'
+   +'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">'
+   + groups.map(function(g){
+      var on=g===_mtGroup;
+      return '<button onclick="_mtGroup=\''+g+'\';renderAdminToday()" style="padding:5px 10px;border-radius:999px;'
+       +'font-size:11px;font-weight:700;cursor:pointer;border:1px solid '+(on?'var(--accent)':'var(--bdr2)')+';'
+       +'background:'+(on?'rgba(35,201,131,.12)':'var(--bg3)')+';color:'+(on?'var(--accent)':'var(--txt3)')+'">'+g+'</button>';
+    }).join('')+'</div>'
+   +'<textarea id="mt-text" rows="2" placeholder="Type it once — the share sheet hands it to the right Messages thread…" '
+   +'style="width:100%;padding:9px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:7px;color:var(--txt);font-size:13px;box-sizing:border-box"></textarea>'
+   +'<div style="display:flex;gap:6px;margin-top:7px;flex-wrap:wrap">'
+   +'<button class="btn btn-gh btn-sm" onclick="document.getElementById(\'mt-text\').value=mtCompose(\'schedule\')">📅 Schedule posted</button>'
+   +'<button class="btn btn-gh btn-sm" onclick="document.getElementById(\'mt-text\').value=mtCompose(\'reminder\')">⏰ Opener reminder</button>'
+   +'<button onclick="mtSend()" style="margin-left:auto;padding:8px 16px;border-radius:8px;border:none;'
+   +'background:var(--accent);color:#04160e;font-size:12.5px;font-weight:800;cursor:pointer">Send via share sheet →</button></div>'
+   +'<div style="font-size:9.5px;color:var(--txt3);margin-top:6px">No phone numbers live in this app and nothing sends by itself — you pick the thread, you press send.</div>'
+   +'</div>';
+}
+
 function renderAdminToday(){
   var el=document.getElementById('adm-today'); if(!el) return;
   var wu=STATE.walkUpPolicy||'open';
@@ -15541,6 +15719,7 @@ function renderAdminToday(){
     + seg([['open','Open'],['restricted','Restricted'],['emerald-only','Emerald'],['closed','Closed']], b24, 'set24hr')
     +'<button class="admt-push'+(up?' on':'')+'" onclick="toggleUpgradePush();renderAdminToday()">'
     +'⇧ Upgrade push '+(up?'ON — showing on every board bar':'off')+'</button>'
+    +((typeof mtCardHtml==='function')?mtCardHtml():'')
     +'</div>';
 }
 var _admtStyled=false;
@@ -25557,12 +25736,32 @@ function mcRailHtml(key){
              : {c:'#23C983', t:'Covered — schedule holds', sub: cov?('Peak coverage '+cov.have+'/'+cov.need):(staff+' scheduled')});
     var h='<div class="mc-rail-hd">'+wd+' '+_MC_MON[d.getMonth()].slice(0,3)+' '+d.getDate()+' · Readiness</div>';
     h+='<div class="mc-rail-card" style="border-color:'+head.c+'66"><div style="color:'+head.c+';font-weight:800;font-size:15px">'+head.t+'</div><div class="mc-none" style="margin-top:3px">'+head.sub+'</div></div>';
+    if(typeof ptoCapacityStripHtml==='function'){ try{ h+=ptoCapacityStripHtml(); }catch(e){} }
     h+='<div class="mc-rail-sec">On this day</div>';
     var any=false;
     evs.forEach(function(e){ any=true; h+='<div class="mc-rail-row"><span class="mc-dot" style="background:'+(e.level==='heavy'?'#FF453A':'#FFCC00')+'"></span> '+biEsc(e.name)+' <span class="mc-none">'+biEsc(e.level||'')+'</span></div>'; });
     cels.forEach(function(c){ any=true; h+='<div class="mc-rail-row">🎂 '+biEsc(c.name)+' <span class="mc-none">'+biEsc(c.type||'')+'</span></div>'; });
     h+='<div class="mc-rail-row">👥 '+staff+' scheduled'+(staff===0?' <span class="mc-none">(no schedule yet)</span>':'')+'</div>';
     if(off.length) h+='<div class="mc-rail-row">🌴 '+off.length+' off · '+biEsc(off.map(function(x){return x.name;}).join(', '))+'</div>';
+    // v60.204 · DEMAND HISTORY HINT (deepening spec #9): what this weekday
+    // usually runs, shown only when the baseline has earned the right (3+
+    // samples) — a hint from thin data is a guess wearing a badge.
+    try{
+      var _dhd=new Date(key+'T12:00:00');
+      var _dhb=(typeof demandBaseline==='function')?demandBaseline(_dhd.getDay()):null;
+      if(_dhb && _dhb.ok){
+        var _pk=null;
+        Object.keys(_dhb.avg||{}).forEach(function(k2){
+          (_dhb.avg[k2]||[]).forEach(function(v,hh){ if(v!=null&&(!_pk||v>_pk.v)) _pk={s:k2,h:hh,v:Math.round(v)}; });
+        });
+        if(_pk){
+          h+='<div class="mc-rail-row" style="color:var(--txt3)">📈 A typical '
+            +['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][_dhd.getDay()]
+            +' peaks ~'+_pk.v+' '+_pk.s+' at '+(_pk.h%12||12)+(_pk.h>=12?'p':'a')
+            +' <span class="mc-none">('+_dhb.samples+' days)</span></div>';
+        }
+      }
+    }catch(e){}
     h+='<div class="mc-rail-card" style="border-style:dashed;border-color:rgba(255,255,255,.18);margin-top:12px"><div style="font-weight:700">🌴 Time off (PTO)</div><div class="mc-none" style="margin-top:2px">Mark someone off or plan the week from the full day view — it becomes a hard constraint for the auto-scheduler.</div></div>';
     h+='<button class="mc-addbtn" style="width:100%;background:#23C983;color:#00301c;margin-top:4px" onclick="mcDay(\''+key+'\')">Open full day →</button>';
     h+='<button class="mc-addbtn" style="width:100%;background:#0A84FF;color:#fff;margin-top:6px" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day →</button>';
@@ -25635,6 +25834,68 @@ function openDayInScheduleEditor(key){
   if(typeof setupEdit==='function') setupEdit(run); else run();
 }
 // v60.120: PTO / time-off entry, writing the STATE.pto store everything reads.
+// ── v60.204 · HOW MANY COULD BE OFF — derived, never configured ────────────
+// (Planner drop.) For each of the next 7 days: per-station slack at the peak
+// block from the stored schedule vs the needs. "Safe" = the day still absorbs
+// a call-off afterwards; "possible" = it only just meets minimum. A day
+// already short shows a signed deficit in red — "no slack" and "already
+// broken" are different problems. The card states its own limit: the ceiling
+// is WHICH people, not just how many.
+function ptoCapacity(dateKey){
+  var d=new Date(dateKey+'T12:00:00'); if(isNaN(d)) return null;
+  var dow=d.getDay();
+  var sched=null; try{ sched=getScheduleForDate(dateKey); }catch(e){}
+  if(!sched) return null;
+  var mgrIds={}; try{ (ROSTER_MGMT||[]).forEach(function(p){ mgrIds[p.name.replace(/\s/g,'_')]=1; }); }catch(e){}
+  var roleOf={}; try{ [].concat(ROSTER_CXR||[],ROSTER_MGMT||[],typeof ROSTER_EXIT!=='undefined'?ROSTER_EXIT:[],typeof ROSTER_RETURNS!=='undefined'?ROSTER_RETURNS:[])
+    .forEach(function(p){ if(p&&p.name) roleOf[p.name.replace(/\s/g,'_')]=p.role; }); }catch(e){}
+  var peak=13;
+  var need={}; try{ need=gfNeedsAt(peak,dow)||{}; }catch(e){}
+  var have={};
+  Object.keys(sched).forEach(function(pid){
+    var st=(typeof _asStartOfStoredShift==='function')?_asStartOfStoredShift(sched[pid]):null;
+    var en=(typeof _asEndOfStoredShift==='function')?_asEndOfStoredShift(sched[pid]):null;
+    if(st==null||en==null) return; if(en<st) en+=24;
+    if(!(st<=peak&&en>peak)) return;
+    var r=roleOf[pid]||'CXR';
+    var area = r==='EXIT'?'exit' : r==='RETURNS'?'returns' : mgrIds[pid]?null : 'counter';
+    if(area) have[area]=(have[area]||0)+1;
+  });
+  var safe=0, possible=0, deficit=0, slackBy=[], noneBy=[];
+  ['counter','exit','returns'].forEach(function(a){
+    var sl=(have[a]||0)-(need[a]||0);
+    if(sl>0){ possible+=sl; safe+=Math.max(0,sl-1); slackBy.push(a.charAt(0).toUpperCase()+a.slice(1)+' '+sl); }
+    else if(sl<0){ deficit+=sl; }
+    else noneBy.push(a);
+  });
+  return {safe:safe, possible:possible, deficit:deficit, slack:slackBy, none:noneBy};
+}
+function ptoCapacityStripHtml(){
+  var h='<div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;margin-bottom:10px">'
+   +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:7px">🌴 How many could be off — next 7 days <span style="font-weight:400;opacity:.8">(derived from the schedule, not a setting)</span></div>'
+   +'<div style="display:flex;gap:5px">';
+  var today=new Date();
+  for(var i=0;i<7;i++){
+    var d=new Date(today); d.setDate(today.getDate()+i);
+    var key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    var cap=ptoCapacity(key);
+    var lbl=['Su','Mo','Tu','We','Th','Fr','Sa'][d.getDay()];
+    var body, tone;
+    if(!cap){ body='—'; tone='var(--txt3)'; }
+    else if(cap.deficit<0){ body=cap.deficit+' short'; tone='var(--red)'; }
+    else if(cap.possible===0){ body='0'; tone='var(--amber)'; }
+    else { body=cap.safe+' of '+cap.possible; tone= cap.safe>0?'var(--accent)':'var(--amber)'; }
+    h+='<div title="'+(cap? (cap.slack.length?'Slack: '+cap.slack.join(' · '):'No slack')
+        +(cap.none.length?' · none from '+cap.none.join(', '):'') : 'no schedule')+'" '
+     +'style="flex:1;text-align:center;padding:7px 2px;border-radius:8px;background:var(--bg3);border:1px solid var(--bdr)">'
+     +'<div style="font-size:9px;color:var(--txt3)">'+lbl+' '+(d.getMonth()+1)+'/'+d.getDate()+'</div>'
+     +'<div style="font-size:13px;font-weight:800;color:'+tone+'">'+body+'</div></div>';
+  }
+  h+='</div><div style="font-size:9.5px;color:var(--txt3);margin-top:6px;line-height:1.45">'
+   +'<b style="color:var(--accent)">safe</b> still absorbs a call-off · the second number only meets minimum · '
+   +'<b style="color:var(--red)">red</b> = already short before any request. The real ceiling is <i>which</i> people, not just how many — hover a day for where the slack is.</div></div>';
+  return h;
+}
 function mcPtoStore(){ if(!STATE.pto) STATE.pto={}; return STATE.pto; }
 function mcPtoPidsOn(key){ var d=mcPtoStore()[key]; return d? Object.keys(d).filter(function(p){return d[p];}) : []; }
 function mcTogglePtoForm(key){ var f=document.getElementById('mc-pto-form'); if(f) f.style.display = (f.style.display==='none'?'block':'none'); }
