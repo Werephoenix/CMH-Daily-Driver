@@ -122,6 +122,34 @@ body.view-locked .vl-mgr { display:none !important; }
   --ff-hd:  -apple-system, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
 
 }
+/* ── v60.206 · DAYLIGHT THEME (design v2 §Light mode) ──────────────────────
+   Same system, daylight tokens: iOS grouped-light surfaces, labels flip,
+   brand & status hues HOLD but deepen ~1 step for AA contrast on white —
+   the only values that change beyond the surface/label flip. Toggled per
+   DEVICE in More → Appearance (dark stays the branch default). */
+html.daylight {
+  --bg:#F2F2F7; --bg2:#FFFFFF; --bg3:#E9E9EF;
+  --border:#D1D1D6; --border2:#C7C7CC;
+  --text:#000000; --text2:rgba(60,60,67,.85); --text3:rgba(60,60,67,.68);
+  --txt:#000000;  --txt2:rgba(60,60,67,.85);  --txt3:rgba(60,60,67,.68);
+  --bdr:rgba(0,0,0,.14); --bdr2:rgba(0,0,0,.22);
+  --accent:#12A866; --accent2:#0B8A53;
+  --wu:#12A866; --wu-bg:#E2F7EC; --wu-border:#12A866;
+  --up:#A87900; --up-bg:#FFF6DB; --up-border:#C99700;
+  --na:#D70015; --na-bg:#FFE9E7; --na-border:#D70015;
+  --counter:#0066D6; --exit:#12A866; --eb:#6E56CF; --returns:#0C7FA6; --off:#6C6C70;
+  --green:#12A866; --green2:#E2F7EC; --green3:#0E8C57;
+  --amber:#A87900; --amber2:#FFF6DB; --amber3:#8F6700;
+  --red:#D70015; --red2:#FFE9E7; --red3:#B00012;
+  --acc:#0066D6; --acc2:#0A84FF;
+  --purple:#6E56CF; --orange:#C87400; --teal:#0C7FA6;
+  --tab-dashboard:#0066D6; --tab-paste:#A87900; --tab-board:#12A866;
+  --tab-coverage:#6E56CF; --tab-checklist:#C87400;
+  --tab-reference:rgba(60,60,67,.6); --tab-history:#0C7FA6; --tab-admin:#D70015;
+  background-image:none; background-color:#F2F2F7;
+}
+html.daylight .card { box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 16px rgba(0,0,0,.06); }
+html.daylight #nav { background: rgba(249,249,251,.88); }
 /* ── CANONICAL SCREEN + NAV RULES ─────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2012,6 +2040,11 @@ button { cursor: pointer; }
         <span class="more-ic tile" style="background:rgba(255,255,255,.16)">◑</span>
         <span class="more-lbl">High Contrast<span class="more-sub">Bolder text &amp; borders for older / washed-out monitors.</span></span>
         <span class="nav-calm-sw more-calm-sw" id="more-hc-toggle" aria-hidden="true"><span class="nav-calm-knob"></span></span>
+      </button>
+      <button class="more-row" onclick="dayModeCycle()">
+        <span class="more-ic tile" style="background:rgba(255,214,77,.16)">☀️</span>
+        <span class="more-lbl">Daylight theme<span class="more-sub" id="daymode-sub">Dark — the branch default</span></span>
+        <span class="more-ch">⇄</span>
       </button>
       <button class="more-row" onclick="toggleDensity()">
         <span class="more-ic tile" style="background:rgba(142,142,147,.16)">⊟</span>
@@ -4416,7 +4449,72 @@ function toggleContrast() {
   STATE.uiContrast = (STATE.uiContrast === 'high') ? 'normal' : 'high';
   if (typeof saveState === 'function') saveState();
   applyContrast();
+  applyWash(true);
   if (typeof toast === 'function') toast(STATE.uiContrast === 'high' ? '◑ High contrast on' : 'High contrast off');
+}
+
+// ── v60.206 · DAYLIGHT THEME ────────────────────────────────────────────────
+// Per-DEVICE on purpose (localStorage, not synced STATE): the dim back-office
+// monitor and a phone read outdoors want different answers, and a synced theme
+// would flip screens nobody is looking at. Dark stays the default everywhere.
+function dayModeGet(){ try{ return localStorage.getItem('cmh-daymode')||'dark'; }catch(e){ return 'dark'; } }
+function dayModeApply(){
+  var m=dayModeGet();
+  var light = m==='light' || (m==='auto' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
+  if(document.documentElement) document.documentElement.classList.toggle('daylight', !!light);
+  var sub=document.getElementById('daymode-sub');
+  if(sub) sub.textContent = m==='dark' ? 'Dark — the branch default'
+    : (m==='light' ? 'Light — bright-room palette' : 'Auto — follows this device\u2019s setting');
+  if(typeof applyWash==='function') applyWash(true);
+}
+function dayModeCycle(){
+  var order=['dark','light','auto'], nx=order[(order.indexOf(dayModeGet())+1)%order.length];
+  try{ localStorage.setItem('cmh-daymode',nx); }catch(e){}
+  dayModeApply();
+  if(typeof toast==='function') toast(nx==='dark'?'🌑 Dark theme':nx==='light'?'☀️ Light theme — this device only':'🌗 Auto — follows this device');
+}
+try{ if(window.matchMedia){ matchMedia('(prefers-color-scheme: light)').addEventListener('change', function(){ if(dayModeGet()==='auto') dayModeApply(); }); } }catch(e){}
+
+// ── v60.206 · SURFACE & MOOD WASH (design v2 §Surface) ─────────────────────
+// The page background is informative, never plain black: a time-of-day base
+// tone, a walk-up-status glow, a subtle seasonal corner — and a safety
+// override that outranks everything (unchecked solo alerts tint the whole
+// page). Rule held from the spec: the background may say "tight", never
+// "41" — no numbers, no words, just light. Deliberately STATIC (no drift
+// loop): Calm-Mode and reduced-motion users get the same picture and old
+// monitors get zero repaint churn. HC mode and Daylight skip the wash.
+function washVals(){
+  var now=new Date(), h=now.getHours()+now.getMinutes()/60;
+  try{ // 6) safety first — it outranks everything
+    var solos=(typeof soloCoverage==='function')?(soloCoverage(h)||[]):[];
+    var un=solos.filter(function(x){ return (x.tier||0)>=2 && !x.fresh; }).length;
+    if(un>=2) return {base:'#160B0A', glow:'radial-gradient(90% 42% at 50% 0%, rgba(255,69,58,.20) 0%, rgba(0,0,0,0) 70%)'};
+    if(un===1) return {base:'#140F09', glow:'radial-gradient(90% 42% at 50% 0%, rgba(255,159,10,.16) 0%, rgba(0,0,0,0) 70%)'};
+  }catch(e){}
+  // 1) time of day: blue-black pre-open → neutral midday → warm evening → blue at close
+  var base = h<5.5 ? '#090A10' : h<10 ? '#0A0B0F' : h<16 ? '#0A0A0D' : h<20.5 ? '#0C0B09' : '#090A10';
+  // 2) walk-up status glow (branch vocabulary: open/core/noncore/closed)
+  var pol=(typeof STATE!=='undefined'&&STATE&&STATE.walkUpPolicy)||'open';
+  var g = pol==='open' ? 'rgba(48,209,88,.10)' : pol==='closed' ? 'rgba(255,69,58,.10)'
+        : pol==='core' ? 'rgba(10,132,255,.10)' : 'rgba(255,204,0,.10)';
+  // 4) season, as a corner tint only — icons and words belong in cards
+  var mo=now.getMonth();
+  var seas=(mo===11||mo<=1)?'rgba(100,210,255,.05)':mo<=4?'rgba(48,209,88,.05)':mo<=7?'rgba(255,204,0,.05)':'rgba(255,159,10,.06)';
+  return {base:base,
+    glow:'radial-gradient(85% 38% at 50% -4%, '+g+' 0%, rgba(0,0,0,0) 65%), '
+        +'radial-gradient(40% 30% at 100% 100%, '+seas+' 0%, rgba(0,0,0,0) 70%)'};
+}
+var _washLast=0;
+function applyWash(force){
+  try{
+    var el=document.documentElement; if(!el) return;
+    if(el.classList.contains('daylight')){ el.style.backgroundImage='none'; el.style.backgroundColor='#F2F2F7'; return; }
+    if(document.body && document.body.classList.contains('hc')){ el.style.backgroundImage='none'; el.style.backgroundColor='#000'; return; }
+    var t=Date.now(); if(!force && t-_washLast<60000) return; _washLast=t;
+    var w=washVals();
+    el.style.backgroundColor=w.base;
+    el.style.backgroundImage=w.glow;
+  }catch(e){}
 }
 
 // v60.7: one-time migration of legacy DNR/DNQ fraud lists into synced STATE.
@@ -4491,6 +4589,8 @@ window.onload = function() {
   if (typeof applyDensity === 'function') applyDensity();  // v60.13: apply saved density pref
   if (typeof applyTheme === 'function') applyTheme();  // v60.32: apply saved bold/calm theme
   if (typeof applyContrast === 'function') applyContrast();  // v60.119: apply saved high-contrast pref
+  if (typeof dayModeApply === 'function') dayModeApply();     // v60.206: saved daylight pref (per device)
+  if (typeof applyWash === 'function') applyWash(true);       // v60.206: first paint of the mood wash
   // v54: rebuild live rosters from stored admin overrides BEFORE any UI
   // builders run. Without this, admin add/edit/remove changes from prior
   // sessions wouldn't take effect until a save action triggered the rebuild.
@@ -4962,6 +5062,7 @@ function setWalkUp(val) {
   updateWalkUpButtons();
   updateSummary();
   buildBoardGrid();
+  if (typeof applyWash === 'function') applyWash(true);   // v60.206: glow follows the call
 }
 
 function updateWalkUpButtons() {
@@ -5816,6 +5917,7 @@ function updateBoardTotals() {
 }
 
 function updateBoardHeader() {
+  if (typeof applyWash === 'function') applyWash();   // v60.206: 60s-throttled inside
   // v60.194: demoted 24hr control — keep the collapsed label truthful and
   // auto-expand + amber when a restriction is live (worst-case must not hide).
   try{
@@ -15068,7 +15170,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.205'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.206'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
