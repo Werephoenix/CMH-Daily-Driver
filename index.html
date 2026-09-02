@@ -3689,8 +3689,8 @@ var ROSTER_EXIT = [
   {id:'shawnee', name:'Shawnee', nick:'Shawnee', role:'EXIT',
    daysOn:[3,4], shiftStart:6.75, shiftEnd:16,
    shiftCode:'645A-4P',
-   active:true, _new:true,
-   notes:'Exit agent. ADDED 2026-08-29 from the September 2026 grid — was working but absent from the roster. Covers Thu/Fri 6:45a-4p (the days Fatuma is off). Last name TBD.'},
+   active:false, departedDate:'2026-09-01', departedReason:'No longer with the branch',
+   notes:'ARCHIVED 2026-09-01 (Matt: "Shawnee does NOT work at CMH any longer") — data kept. Was Thu/Fri 6:45a-4p exit; still named in the shipped September grid, which getScheduleForDate now filters.'},
 
   // v60.99/101: current exit agents = Zina + Fatuma (set shifts) + Duria (still here, shift TBD).
   // Lisa quit → archived, data kept (Matt 2026-08-20).
@@ -15349,7 +15349,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.217'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.218'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -24245,8 +24245,36 @@ function getScheduleForDate(dateStr) {
     || MAY_SCHEDULE[dateStr] || null;
   const overrides = (STATE && STATE.scheduleOverrides) ? STATE.scheduleOverrides[dateStr] : null;
   if (!base && !overrides) return null;
-  if (!overrides) return base;
-  return Object.assign({}, base || {}, overrides);
+  // v60.218 (Matt: "Shawnee does NOT work at CMH any longer, but is showing on
+  // the schedule"): a stored or shipped grid can still name someone who has
+  // since been ARCHIVED. This is the one function every schedule reader goes
+  // through — board, calendar, planner, capacity, diff — so departed people
+  // are dropped HERE, once, on every date. Their history stays in the grid
+  // data; they just stop being placed anywhere.
+  const merged = (!overrides) ? base : Object.assign({}, base || {}, overrides);
+  return _schedDropArchived(merged);
+}
+var _schedArchivedPids=null, _schedArchivedStamp=null;
+function _schedDropArchived(sched){
+  if(!sched) return sched;
+  try{
+    var stamp=JSON.stringify((typeof STATE!=='undefined' && STATE && STATE.adminRoster)||[]);
+    if(!_schedArchivedPids || stamp!==_schedArchivedStamp){
+      _schedArchivedStamp=stamp; _schedArchivedPids={};
+      _buildMergedRoster().forEach(function(p){
+        if(p && (p.active===false || p._deleted===true)){
+          _schedArchivedPids[String(p.name||'').replace(/\s/g,'_')]=1;
+          if(p.nick) _schedArchivedPids[String(p.nick).replace(/\s/g,'_')]=1;
+          if(p.id)   _schedArchivedPids[p.id]=1;
+        }
+      });
+    }
+    var keys=Object.keys(sched), hit=false;
+    for(var i=0;i<keys.length;i++){ if(_schedArchivedPids[keys[i]]){ hit=true; break; } }
+    if(!hit) return sched;
+    var out={}; keys.forEach(function(k){ if(!_schedArchivedPids[k]) out[k]=sched[k]; });
+    return out;
+  }catch(e){ return sched; }
 }
 
 // v60.172: remove every schedule-DERIVED 'off' override, leaving manager
