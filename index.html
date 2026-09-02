@@ -2715,7 +2715,12 @@ button { cursor: pointer; }
       <button onclick="closePersonPanel()"
         style="font-size:22px;color:var(--txt3);background:none;border:none;cursor:pointer;line-height:1">×</button>
     </div>
-    <!-- Assignment summary (always visible) -->
+    <!-- v60.217 (Matt): the UNIVERSAL CONTROL CARD — one hub, four spokes.
+         The nav chips are the "link back to Overview" AND the drill-anywhere
+         doors, visible from every view. -->
+    <div id="pp-nav" style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px"></div>
+    <div id="pp-view"></div>
+    <!-- Assignment summary (Overview view) -->
     <div id="pp-summary" style="margin-bottom:12px"></div>
     <!-- Exit fairness (always visible) -->
     <div id="pp-fairness" style="margin-bottom:12px"></div>
@@ -14439,6 +14444,9 @@ function applyCustomShiftMod(pid) {
   if (ev <= sv) ev += 24;  // crosses midnight → overnight hours
   if (!STATE.shiftMod) STATE.shiftMod = {};
   STATE.shiftMod[pid] = { start: sv, end: ev, reason: 'custom', display: smFmtH(sv) + '–' + smFmtH(ev) + ' (set)' };
+  // v60.217: mark it deliberate, so sync re-derives don't erase it (see loadScheduleForToday)
+  if(!STATE.dayMarks) STATE.dayMarks={};
+  STATE.dayMarks[pid]={t:'manual', start:sv, end:ev, date:(typeof todayKey==='function')?todayKey():''};
   saveState();
   if (typeof closeModal === 'function') closeModal();
   if (typeof buildStaffGrid === 'function') buildStaffGrid();
@@ -15341,7 +15349,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.216'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.217'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -22628,7 +22636,137 @@ function personByPid(pid){
   return null;
 }
 
-function openPersonPanel(pid) {
+// ═══ v60.217 · UNIVERSAL CARD SPOKES ═══════════════════════════════════════
+// Overview = the sim's three 44px quick actions (Called off / Running late /
+// Left early, active one reads Undo) + at-a-glance chips + the fun stuff.
+// Every fact shown is derived from data the app already holds — nothing new
+// is collected about anyone.
+function _ppMark(pid){ var m=(STATE.dayMarks||{})[pid]; return (m&&m.date===((typeof todayKey==='function')?todayKey():''))?m:null; }
+function ppQuick(pid, kind){
+  if(!STATE.dayMarks) STATE.dayMarks={};
+  if(!STATE.shiftMod) STATE.shiftMod={};
+  var tk=todayKey(), mk=_ppMark(pid);
+  if(kind==='calledoff'){
+    if((STATE.todayOverrides||{})[pid]==='callout') clearAbsence(pid);
+    else setAbsence(pid,'calledoff');
+  } else if(kind==='late'){
+    if(mk && mk.t==='late'){ delete STATE.dayMarks[pid]; delete STATE.shiftMod[pid]; loadScheduleForToday(false); }
+    else{
+      var m=parseInt(prompt('How many minutes late? (15 / 30 / 60…)','30')||'0',10);
+      if(!m||m<1) return;
+      var rp=personByPid(pid), ov=STATE.shiftMod[pid]||{};
+      var base=(ov.start!=null)?ov.start:(rp?rp.shiftStart:null);
+      if(base==null){ toast('No shift start to push'); return; }
+      STATE.dayMarks[pid]={t:'late', m:m, date:tk};
+      STATE.shiftMod[pid]=Object.assign({},ov,{start:base+m/60});
+    }
+  } else if(kind==='leftearly'){
+    if(mk && mk.t==='leftearly'){ delete STATE.dayMarks[pid]; delete STATE.shiftMod[pid]; loadScheduleForToday(false); }
+    else{
+      var now=Math.round((new Date().getHours()+new Date().getMinutes()/60)*4)/4;
+      var ov2=STATE.shiftMod[pid]||{};
+      STATE.dayMarks[pid]={t:'leftearly', at:now, date:tk};
+      STATE.shiftMod[pid]=Object.assign({},ov2,{end:now});
+    }
+  }
+  if(typeof rotInvalidate==='function') rotInvalidate();
+  if(typeof saveState==='function') saveState();
+  try{ buildCoverageTimeline(); renderCovStrip(); }catch(e){}
+  openPersonPanel(pid,'overview');
+}
+function ppStreak(pid){
+  try{
+    var n=0;
+    for(var i=0;i<14;i++){
+      var d=new Date(); d.setDate(d.getDate()-i);
+      var k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+      var sc=getScheduleForDate(k); if(!sc) break;
+      var v=sc[pid];
+      if(Array.isArray(v)) n++; else break;
+    }
+    return n;
+  }catch(e){ return 0; }
+}
+function ppOverviewHtml(pid,p,ss,se,fmtH,entry){
+  var tk=todayKey(), mk=_ppMark(pid);
+  var out=(STATE.todayOverrides||{})[pid]==='callout';
+  var btn=function(kind,icon,lbl,active,col){
+    return '<button class="vl-mgr" onclick="ppQuick(\''+pid.replace(/'/g,'\\x27')+'\',\''+kind+'\')" '
+      +'style="flex:1;min-width:96px;min-height:44px;padding:8px 6px;border-radius:10px;font-size:12px;font-weight:800;cursor:pointer;'
+      +'border:1.5px solid '+(active?col:'var(--bdr2)')+';'
+      +'background:'+(active?col.replace(')',',.12)').replace('var(--','rgba(255,255,255,.0);--x:var(--'):'var(--bg3)')+';'
+      +'color:'+(active?col:'var(--txt2)')+'">'
+      +(active?'↩ Undo — ':'')+icon+' '+lbl+'</button>';
+  };
+  var h='';
+  if(entry && entry.notWorkingToday){
+    h+='<div style="padding:8px 10px;border-radius:8px;background:var(--bg3);font-size:11.5px;color:var(--txt3);margin-bottom:8px">Not on today\u2019s schedule — controls that need a live shift are on their day.</div>';
+  } else {
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+     + btn('calledoff','📞', out?'Called off':'Called off', out,'var(--na)')
+     + btn('late','⏰', (mk&&mk.t==='late')?('Late +'+mk.m+'m'):'Running late', !!(mk&&mk.t==='late'),'var(--up)')
+     + btn('leftearly','🏃', (mk&&mk.t==='leftearly')?('Left '+fmtH(mk.at)):'Left early', !!(mk&&mk.t==='leftearly'),'var(--up)')
+     +'</div>';
+  }
+  // at-a-glance chip row: clearances · usual lunch · exit hours this week · streak
+  var chips=[];
+  try{
+    var glyph={trained:'✓',training:'◐',shadow:'○',none:'—'};
+    var q=['counter','exit','returns'].map(function(a){ return a.charAt(0).toUpperCase()+glyph[trainStatus(pid,a)]; }).join(' ');
+    chips.push('🎓 '+q);
+  }catch(e){}
+  try{ var u=(typeof usualLunch==='function')?usualLunch(pid):null;
+    if(u) chips.push('🍽 usually '+fmtH(u.t)); }catch(e){}
+  try{ var xh=(typeof getExitHoursWeek==='function')?getExitHoursWeek(pid):0;
+    if(xh) chips.push('🟩 '+(Math.round(xh*10)/10)+'h exit this wk'); }catch(e){}
+  var st=ppStreak(pid); if(st>=2) chips.push('🔥 day '+st+' in a row');
+  try{ var mt=(STATE.meetings||[]).filter(function(m){ return m.date>=tk && (m.people||[]).indexOf(pid)>=0; })
+      .sort(function(a,b){ return a.date===b.date? a.from-b.from : (a.date<b.date?-1:1); })[0];
+    if(mt) chips.push('🤝 '+(mt.date===tk?'today ':'')+((typeof _sFmt==='function')?_sFmt(mt.from):mt.from)); }catch(e){}
+  try{ if(typeof exitAccommodated==='function' && exitAccommodated(pid)) chips.push('🛡 no-exit accommodation'); }catch(e){}
+  if(chips.length){
+    h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px">'
+     + chips.map(function(c){ return '<span style="font-size:10.5px;font-weight:700;color:var(--txt3);background:var(--bg3);border:1px solid var(--bdr);border-radius:999px;padding:4px 9px">'+c+'</span>'; }).join('')
+     +'</div>';
+  }
+  return h;
+}
+function ppTrainingHtml(pid,p){
+  var h=(typeof trainMapHtml==='function')?trainMapHtml(pid):'';
+  var log=(STATE.trainingLog||{})[pid]||{};
+  var rows=Object.keys(log).map(function(a){ var r=log[a];
+    return '<div style="font-size:11px;color:var(--txt3);padding:2px 0">'+a+' → <b style="color:var(--txt2)">'+r.k+'</b> · '+r.at+(r.by?' by '+r.by:'')+'</div>'; }).join('');
+  if(rows) h+='<div style="margin-top:8px"><div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin-bottom:3px">Changes on record</div>'+rows+'</div>';
+  h+='<div style="font-size:10px;color:var(--txt3);margin-top:8px">Advancement is trainer-signs, manager-confirms — both names and the date stay on the card.</div>';
+  return h;
+}
+function ppStatsHtml(pid,p,ss,se,fmtH){
+  var h='', tk=todayKey();
+  var row=function(l,v){ return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:12px"><span style="color:var(--txt3)">'+l+'</span><b style="color:var(--txt)">'+v+'</b></div>'; };
+  try{ var xh=(typeof getExitHoursWeek==='function')?(getExitHoursWeek(pid)||0):0;
+    h+=row('🟩 Exit hours this week', (Math.round(xh*10)/10)+'h'); }catch(e){}
+  try{ var pat=(STATE.patterns||{})[pid];
+    if(pat && (pat.counter||pat.exit)) h+=row('🔀 Station starts (counter · exit)', (pat.counter||0)+' · '+(pat.exit||0)); }catch(e){}
+  try{ var u=(typeof usualLunch==='function')?usualLunch(pid):null;
+    if(u) h+=row('🍽 Usual lunch', fmtH(u.t)+(u.src==='learned'?' (their pattern, '+u.days+' days)':' (set)')); }catch(e){}
+  var st=ppStreak(pid); if(st) h+=row('🔥 Days in a row (scheduled)', String(st));
+  try{ var mts=(STATE.meetings||[]).filter(function(m){ return m.date>=tk && (m.people||[]).indexOf(pid)>=0; });
+    if(mts.length) h+=row('🤝 Upcoming meetings', String(mts.length)); }catch(e){}
+  try{ var t=(typeof absenceTypeOf==='function')?absenceTypeOf(pid):null;
+    if(t) h+=row('Today', t); }catch(e){}
+  if(p && p.role) h+=row('Role', p.role);
+  if(!h) h='<div style="font-size:12px;color:var(--txt3)">Nothing recorded yet — stats fill in as days are published.</div>';
+  return '<div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:9px;padding:8px 12px;margin-bottom:6px">'+h+'</div>'
+    +'<div style="font-size:10px;color:var(--txt3)">Derived from schedules and publishes the app already holds — nothing new is collected. No reasons, no scores.</div>';
+}
+function openPersonPanel(pid, view) {
+  // v60.217 · THE UNIVERSAL CARD: hub (Overview) + spokes (Controls / Training
+  // / Stats). Every view keeps the same nav chips, so from anywhere you can
+  // drill back to Overview and out again in any direction. The view is
+  // remembered per person for the session, so reopening lands where you were.
+  window._ppViews = window._ppViews || {};
+  view = view || window._ppViews[pid] || 'overview';
+  window._ppViews[pid] = view;
   const exp = typeof buildExpectedToday==='function'?buildExpectedToday():{};
   let entry = exp[pid];
   // v60.173: a name is a door into the card EVERYWHERE it appears — including
@@ -22745,6 +22883,35 @@ function openPersonPanel(pid) {
           Unlock →
         </button>
       </div>`;
+    }
+  }
+
+  // ── v60.217 · hub-and-spoke wiring ────────────────────────────────────────
+  // Nav chips render on EVERY view; the active one is lit. Overview keeps the
+  // familiar summary/fairness/what-if; each spoke swaps them for its content.
+  {
+    const navEl=document.getElementById('pp-nav');
+    const viewEl=document.getElementById('pp-view');
+    const VIEWS=[['overview','🏠 Overview'],['controls','🎛 Controls'],['training','🎓 Training'],['stats','📊 Stats']];
+    if(navEl){
+      navEl.innerHTML=VIEWS.map(([k,l])=>{
+        const on=view===k;
+        return `<button onclick="openPersonPanel('${pid}','${k}')"
+          style="flex:1;min-width:78px;padding:7px 4px;border-radius:999px;font-size:11px;font-weight:800;cursor:pointer;
+            border:1.5px solid ${on?'var(--accent)':'var(--bdr2)'};
+            background:${on?'rgba(35,201,131,.12)':'var(--bg3)'};
+            color:${on?'var(--accent)':'var(--txt3)'}">${l}</button>`;
+      }).join('');
+    }
+    const _show=(id,on)=>{const e=document.getElementById(id); if(e) e.style.display=on?'':'none';};
+    const isOv = view==='overview';
+    _show('pp-summary',isOv); _show('pp-fairness',isOv); _show('pp-whatif-section',isOv);
+    if(mgrEl) mgrEl.style.display = (view==='controls') ? 'block' : 'none';
+    if(viewEl){
+      if(view==='overview')      viewEl.innerHTML=ppOverviewHtml(pid,p,ss,se,fmtH,entry);
+      else if(view==='training') viewEl.innerHTML=ppTrainingHtml(pid,p);
+      else if(view==='stats')    viewEl.innerHTML=ppStatsHtml(pid,p,ss,se,fmtH);
+      else viewEl.innerHTML='';
     }
   }
 
@@ -24180,6 +24347,32 @@ function loadScheduleForToday(force) {
     }
   });
 
+  // v60.217 · SAME-DAY HUMAN ADJUSTMENTS SURVIVE THE RE-DERIVE. The v60.202
+  // rule is "schedule wins, always overwrite shiftMod" — correct for stale
+  // cross-day residue, but it also erased a deliberate "running late +30" the
+  // moment any sync merge re-derived the day. STATE.dayMarks is the record
+  // that today differs ON PURPOSE; re-apply it after every derive. Marks from
+  // any other day self-purge here.
+  try{
+    if(STATE.dayMarks){
+      Object.keys(STATE.dayMarks).forEach(function(mpid){
+        var mk=STATE.dayMarks[mpid];
+        if(!mk || mk.date!==key){ delete STATE.dayMarks[mpid]; return; }
+        var ov=STATE.shiftMod[mpid]||{};
+        var rp=(typeof personByPid==='function')?personByPid(mpid):null;
+        if(mk.t==='late' && mk.m){
+          var b=(ov.start!=null)?ov.start:(rp?rp.shiftStart:null);
+          if(b!=null){ ov.start=b+mk.m/60; STATE.shiftMod[mpid]=ov; }
+        } else if(mk.t==='leftearly' && mk.at!=null){
+          ov.end=mk.at; STATE.shiftMod[mpid]=ov;
+        } else if(mk.t==='manual'){
+          if(mk.start!=null) ov.start=mk.start;
+          if(mk.end!=null) ov.end=mk.end;
+          STATE.shiftMod[mpid]=ov;
+        }
+      });
+    }
+  }catch(e){}
   saveState();
   if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
   if (typeof buildDashSchedMini === 'function') buildDashSchedMini();
