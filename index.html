@@ -4335,9 +4335,11 @@ function openerLunchStart(shiftStart, shiftEnd, startStation, proposed){
   return want;
 }
 
+var LUNCH_MIN_HOURS = 6;   // v60.219: below this effective length, no lunch is planned
 var ROTATION = {
   blockHours:    4.0,   // target block length at each station
   lunchHours:    0.5,   // lunch break
+  // v60.219: shifts shorter than this get NO lunch block automatically
   maxExitHours:  4.0,   // never exceed this at exit for CXRs
   bumpMinutes:   30,    // ±30min flex allowed to cover gaps
   shiftLength:   8.5,   // total shift including lunch
@@ -7364,7 +7366,12 @@ function buildSmartRotation() {
     // someone adds one.
     if (typeof exitAccommodated === 'function' && exitAccommodated(pid)) altPos = 'full-counter';
     const custSplit  = (STATE.customSplits || {})[pid];
-    const noLunch    = (STATE.altSchedule || {})[pid + '_nolunch'] === true;
+    // v60.219 (Matt): "should automatically assume no lunch if a short shift."
+    // Under LUNCH_MIN_HOURS of effective shift (after any shortening) there is
+    // no lunch block, full stop — the explicit toggle still works either way.
+    const _effDur    = (shift.end - shift.start);
+    const noLunch    = (STATE.altSchedule || {})[pid + '_nolunch'] === true
+                    || (_effDur < (typeof LUNCH_MIN_HOURS!=='undefined'?LUNCH_MIN_HOURS:6));
     const totalWork  = (shift.end - shift.start) - (noLunch ? 0 : ROTATION.lunchHours);
     const shiftDur   = shift.end - shift.start;
 
@@ -7491,7 +7498,9 @@ function buildSmartRotation() {
       shiftStart: shift.start,
       shiftEnd:   shift.end,
       b1: { station: b1Station, from: shift.start, to: lunchStart, hours: block1H },
-      lunch: { from: lunchStart, to: lunchEnd },
+      // v60.219: no lunch = NO lunch object. A zero-length {from,to} read as
+      // truthy everywhere (getZone painted the containing hour as lunch).
+      lunch: noLunch ? null : { from: lunchStart, to: lunchEnd },
       b2: { station: b2Station, from: lunchEnd, to: shiftEnd, hours: block2H },
       warnExceedsLimit,
       bumpNeeded,
@@ -14386,8 +14395,10 @@ function applyShiftMod(pid, presetIdx) {
     {reason:'Early arrival −1hr',  start:bs?bs-1:null,   end:be, label:'Early Start −1hr'},
   ];
   const p = presets[presetIdx] || presets[0];
+  if (!STATE.dayMarks) STATE.dayMarks = {};
   if (p.reason === 'normal') {
     delete STATE.shiftMod[pid];
+    delete STATE.dayMarks[pid];
   } else {
     STATE.shiftMod[pid] = {
       start:   p.start,
@@ -14395,7 +14406,10 @@ function applyShiftMod(pid, presetIdx) {
       reason:  p.reason,
       display: p.label || p.reason,
     };
+    // v60.219: deliberate — survives sync re-derives (see loadScheduleForToday)
+    STATE.dayMarks[pid] = { t:'manual', start:p.start, end:p.end, date:(typeof todayKey==='function')?todayKey():'' };
   }
+  _shiftEditRebuild();   // v60.219: the rotation must follow the new hours
   saveState();
   closeModal();
   buildStaffGrid();
@@ -14437,6 +14451,21 @@ function smOnText(which) {
   const r = document.getElementById('sm-' + which + '-range');
   if (r) r.value = v;
 }
+// v60.219 (Matt: CeCe "only here until 10 am and it doesn't adjust visually,
+// not sure if it adjusts coverage wise"). It adjusted NEITHER: the shift-edit
+// paths wrote shiftMod but never rebuilt the rotation cache, so the timeline
+// bars AND the coverage counts kept yesterday's blocks (her old 2:30p end).
+// One rebuild, called from every shift-edit path.
+function _shiftEditRebuild(){
+  try{
+    if(typeof rotInvalidate==='function') rotInvalidate();
+    const _rot = buildSmartRotation();
+    window._lastRotations = {};
+    if (_rot && _rot.rotations) _rot.rotations.forEach(r => { window._lastRotations[r.pid] = r; });
+  }catch(e){}
+  try{ if(typeof buildCoverageTimeline==='function') buildCoverageTimeline(); }catch(e){}
+  try{ if(typeof renderCovStrip==='function') renderCovStrip(); }catch(e){}
+}
 function applyCustomShiftMod(pid) {
   const rs = document.getElementById('sm-start-range'), re = document.getElementById('sm-end-range');
   if (!rs || !re) return;
@@ -14447,6 +14476,7 @@ function applyCustomShiftMod(pid) {
   // v60.217: mark it deliberate, so sync re-derives don't erase it (see loadScheduleForToday)
   if(!STATE.dayMarks) STATE.dayMarks={};
   STATE.dayMarks[pid]={t:'manual', start:sv, end:ev, date:(typeof todayKey==='function')?todayKey():''};
+  _shiftEditRebuild();   // v60.219: the rotation must follow the new hours
   saveState();
   if (typeof closeModal === 'function') closeModal();
   if (typeof buildStaffGrid === 'function') buildStaffGrid();
@@ -15349,7 +15379,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.218'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.219'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -22724,6 +22754,16 @@ function ppOverviewHtml(pid,p,ss,se,fmtH,entry){
       .sort(function(a,b){ return a.date===b.date? a.from-b.from : (a.date<b.date?-1:1); })[0];
     if(mt) chips.push('🤝 '+(mt.date===tk?'today ':'')+((typeof _sFmt==='function')?_sFmt(mt.from):mt.from)); }catch(e){}
   try{ if(typeof exitAccommodated==='function' && exitAccommodated(pid)) chips.push('🛡 no-exit accommodation'); }catch(e){}
+  // v60.219: lunch state is a one-tap toggle on the hub — "no lunch taken"
+  // is a same-day fact managers record constantly. Short shifts say so.
+  try{
+    var _nl=(STATE.altSchedule||{})[pid+'_nolunch']===true;
+    var _dur=(ss!=null&&se!=null)?(se-ss):null;
+    var _short=(_dur!=null && _dur<(typeof LUNCH_MIN_HOURS!=='undefined'?LUNCH_MIN_HOURS:6));
+    var _lbl=_nl?'🍽 No lunch today ✓':(_short?'🍽 short shift · no lunch (auto)':'🍽 Lunch planned');
+    chips.push('<button class="vl-mgr" onclick="toggleNoLunch(\''+pid.replace(/'/g,'\\x27')+'\');openPersonPanel(\''+pid.replace(/'/g,'\\x27')+'\',\'overview\')" '
+      +'title="Tap to toggle no-lunch for today" style="all:unset;cursor:pointer;color:'+(_nl?'var(--amber)':'inherit')+'">'+_lbl+'</button>');
+  }catch(e){}
   if(chips.length){
     h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px">'
      + chips.map(function(c){ return '<span style="font-size:10.5px;font-weight:700;color:var(--txt3);background:var(--bg3);border:1px solid var(--bdr);border-radius:999px;padding:4px 9px">'+c+'</span>'; }).join('')
