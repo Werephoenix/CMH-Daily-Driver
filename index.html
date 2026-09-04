@@ -4378,7 +4378,6 @@ function stationClass(s) {
 // yesterday's duty flags greeted the opener. One clock now: local.
 function _localDayKey(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 const TODAY_KEY = _localDayKey(new Date());
-const LS_KEY = `cmh-daily-${TODAY_KEY}`;
 
 // ── v60.201 · ONE SHAPE GUARD, EVERY DOOR ──────────────────────────────────
 // These guards lived inline in loadState, so they ran at PAGE LOAD ONLY.
@@ -4632,6 +4631,7 @@ function saveState() {
   try {
     const TODAY = _localDayKey(new Date());
     const LS_KEY = 'cmh-v2-' + TODAY;
+    if (typeof todayKey === 'function') STATE.dayOf = todayKey();   // v60.227 (Z1): every save says which day it belongs to
     localStorage.setItem(LS_KEY, JSON.stringify(STATE));
     window._saveStateOk = true;
   } catch(e) {
@@ -4667,6 +4667,7 @@ window.onload = function() {
   restoreFields();
   if (typeof _mgrCounterPurge === 'function') _mgrCounterPurge();  // v60.210: clear auto-stamped mgr Counter
   if (typeof _stalePidPurge === 'function') _stalePidPurge();      // v60.225: drop ghost pids (e.g. Toney_Returns)
+  if (typeof _retireDayLayers === 'function') _retireDayLayers();  // v60.227: yesterday's call-offs do not greet the opener
   if (typeof checklistRolloverIfNeeded === 'function') checklistRolloverIfNeeded();  // v60.211: rituals reset with the branch day
   if (typeof applyDensity === 'function') applyDensity();  // v60.13: apply saved density pref
   if (typeof applyTheme === 'function') applyTheme();  // v60.32: apply saved bold/calm theme
@@ -8776,6 +8777,27 @@ function btn(label, onclick, color) {
 // binary call-off writers; every surface now records an explicit absence type
 // via setAbsence(), so a person who phoned in can never read as a no-show.
 
+// v60.227 (Inspector Z1): a call-off made today was a call-off TOMORROW —
+// in-memory state and the single cloud row are day-agnostic, and nothing
+// retired the manager-set layers by date. Now every save stamps
+// STATE.dayOf; when the stamp is not today, the same-day layers are retired
+// in ONE place, reached from boot, the midnight watchdog and every merge.
+// Retired = the app's own "Day reset" set + the layers added since it was
+// written (manager decisions, rotation choices, blocks, lunches, marks).
+function _retireDayLayers(){
+  try{
+    var tk=(typeof todayKey==='function')?todayKey():null; if(!tk) return false;
+    if(!STATE.dayOf){ STATE.dayOf=tk; return false; }          // first stamp — nothing to retire
+    if(STATE.dayOf===tk) return false;
+    ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
+     'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','confirmedCoverage','pendingCoverage']
+      .forEach(function(k){ if(k in STATE) STATE[k] = (Array.isArray(STATE[k]) ? [] : (STATE[k]===null? null : {})); });
+    STATE.dayOf=tk;
+    if(typeof rotInvalidate==='function') rotInvalidate();
+    if(typeof meetingsSync==='function') try{ meetingsSync(); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
 function resetSchedDay() {
   STATE.staffDuty = {}; STATE.staffStation = {};
   STATE.altSchedule = {}; STATE.shiftMod = {};
@@ -15432,7 +15454,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.226'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.227'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15623,6 +15645,19 @@ function applyRemoteRecord(record, apply) {
   if (!apply) return 'noted';
   // v60.144: detect an incoming management publish BEFORE merging (compare stamps)
   const _prevPub = (STATE.publishMeta && STATE.publishMeta.at) || '';
+  // v60.227 (Inspector Z1, merge door): a record that belongs to an EARLIER
+  // day (its dayOf, else the local day of its saved_at) must not bring that
+  // day's call-offs, marks, blocks or rotation choices into today. Scrubbed
+  // BEFORE the union merge — the merge does not carry dayOf, so an after-
+  // merge check could never see it.
+  try{
+    var _rDay = remote.dayOf || (remoteAt ? _localDayKey(new Date(remoteAt)) : null);
+    if(_rDay && typeof todayKey==='function' && _rDay !== todayKey()){
+      ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
+       'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','confirmedCoverage','pendingCoverage','dayOf']
+        .forEach(function(k){ if(k in remote) delete remote[k]; });
+    }
+  }catch(e){}
   mergeRemoteIntoState(STATE, remote);
   if(typeof ensureStateShape==='function') try{ ensureStateShape(STATE); }catch(e){}   // v60.201
   // v60.202: the merge can import ANOTHER device's stale day-derived layers
@@ -15635,6 +15670,9 @@ function applyRemoteRecord(record, apply) {
   // its specialBlocks projection has to be rebuilt here or the reminder fires
   // with no 🤝 on the floor view.
   try{ if(typeof meetingsSync==='function') meetingsSync(); }catch(e){}
+  // v60.227 (Z1): a device that last saved YESTERDAY pushes yesterday's
+  // call-offs; its dayOf rides in the merge and retires them here.
+  if(typeof _retireDayLayers==='function' && _retireDayLayers()){ try{ loadScheduleForToday(false); }catch(e){} }
   rebuildAfterSync();
   const _newPub = STATE.publishMeta;
   if (_newPub && _newPub.at && _newPub.at !== _prevPub) {
@@ -15852,6 +15890,7 @@ setInterval(function(){
     var tk=todayKey();
     if(_rolloverDay && tk!==_rolloverDay){
       _rolloverDay=tk;
+      if(typeof _retireDayLayers==='function') _retireDayLayers();   // v60.227 (Z1): the open desk tab crosses midnight
       if(typeof loadScheduleForToday==='function') loadScheduleForToday(false);
       if(typeof meetingsSync==='function') meetingsSync();
       if(typeof rotInvalidate==='function') rotInvalidate();
@@ -30091,7 +30130,7 @@ function coRender(){
   // v60.226 (Inspector Y2): sheet-away people are not on the board at all now,
   // so they never reached this sheet — say who is away per the sheet, untappable.
   var _away=[]; try{ var _sh=getScheduleForDate(todayKey())||{};
-    Object.keys(_sh).forEach(function(p){ if(isOffCode(_sh[p]) && personByPid(p)) _away.push((typeof dispName==='function')?dispName(p):p.replace(/_/g,' ')); }); }catch(e){}
+    Object.keys(_sh).forEach(function(p){ if(personByPid(p) && (isOffCode(_sh[p]) || (STATE.todayOverrides||{})[p]==='off')) _away.push((typeof dispName==='function')?dispName(p):p.replace(/_/g,' ')); }); }catch(e){}   // v60.227 (Z3): derive result, so an unrecognised cell (MT 1 -99) is listed too
   h+=(_away.length?'<div style="font-size:11px;color:var(--txt3);margin:0 0 6px">🗓 Away per the sheet ('+_away.length+'): '+_away.sort().join(', ')+'</div>':'');
   h+='<div class="co-impact">'+workingCt+' working · '+d.off.length+' called off'+
      '<small>Marking someone off shows you exactly which blocks it breaks, and who can cover.</small></div>';
