@@ -4031,6 +4031,9 @@ var SPECIAL_ASSIGNMENTS = [
   // v60.191: meetings project into specialBlocks (see meetingsSync) so every
   // renderer that already understands specials shows them with zero new code.
   { key:'meeting',   label:'Meeting',       icon:'🤝',  color:'#AF9CFF' },
+  // v60.221 (Matt, scenario #1): a split shift = one span + a GAP they are gone.
+  // The gap reads as off everywhere (zone, counts, lunch math); nothing else changes.
+  { key:'split',     label:'Split-shift gap', icon:'✂️', color:'#8E8E93' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -7370,8 +7373,12 @@ function buildSmartRotation() {
     // Under LUNCH_MIN_HOURS of effective shift (after any shortening) there is
     // no lunch block, full stop — the explicit toggle still works either way.
     const _effDur    = (shift.end - shift.start);
+    // v60.221: a split shift is judged by its LONGEST segment — two short
+    // halves around a gap don't earn a lunch block either.
+    const _gap = ((STATE.specialBlocks||{})[pid]||[]).filter(function(b){ return b.key==='split'; })[0];
+    const _segMax = _gap ? Math.max(_gap.from - shift.start, shift.end - _gap.to) : _effDur;
     const noLunch    = (STATE.altSchedule || {})[pid + '_nolunch'] === true
-                    || (_effDur < (typeof LUNCH_MIN_HOURS!=='undefined'?LUNCH_MIN_HOURS:6));
+                    || (_segMax < (typeof LUNCH_MIN_HOURS!=='undefined'?LUNCH_MIN_HOURS:6));
     const totalWork  = (shift.end - shift.start) - (noLunch ? 0 : ROTATION.lunchHours);
     const shiftDur   = shift.end - shift.start;
 
@@ -10767,6 +10774,7 @@ function soloCoverage(atHour){
       minsAlone:Math.max(0, Math.round((h-since)*60)),
       minsClamped:!!sinceRes.clamped,
       checkAge:soloCheckAge(z.k,who),
+      trainee: (typeof trainStatus==='function' && ['training','shadow'].indexOf(trainStatus(who,z.k))>=0),   // v60.221
       checked: !!((STATE.soloChecked||{})[_soloKey(z.k,who)])
     };
     rec.tier=soloTierOf(rec);
@@ -10825,6 +10833,7 @@ function soloCardHtml(){
     var t3=(s.tier===3);
     var head = t3 ? '⚠ Alone '+dur+' at '+s.zoneLbl
                   : (s.planned ? '🫱 On their own at '+s.zoneLbl : '⚠ Alone at '+s.zoneLbl);
+    if(s.trainee) head+=' · 🎓 trainee';   // v60.221 (Matt, scenario #5): say so out loud
     var copy = t3
       ? 'Go now or send someone. Nobody should hold a station this long without a break.'
       : (s.planned
@@ -15379,7 +15388,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.219'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.221'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -16354,6 +16363,16 @@ function showEditStaffModal(id) {
 
   const body = `
     <div style="display:grid;gap:10px">
+      <!-- v60.221 (Matt): staff borrowed from another branch for a day / part-day
+           (manager vaca, retreat, training). They auto-archive after the last day. -->
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:8px 10px;border-radius:8px;background:var(--bg3);border:1px dashed var(--bdr2)">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt2);font-weight:700;cursor:pointer">
+          <input type="checkbox" id="es-borrowed" ${person&&person.borrowed?'checked':''}> 🔁 Borrowed from another branch</label>
+        <input id="es-branch" value="${person&&person.fromBranch?String(person.fromBranch).replace(/"/g,'&quot;'):''}" placeholder="which branch"
+          style="flex:1;min-width:110px;padding:6px 8px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:6px;color:var(--txt);font-size:12px">
+        <label style="font-size:10px;color:var(--txt3)">through <input type="date" id="es-until" value="${person&&person.borrowedUntil?person.borrowedUntil:''}"
+          style="padding:5px 6px;background:var(--bg2);border:1px solid var(--bdr2);border-radius:6px;color:var(--txt);font-size:12px"></label>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div>
           <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Full Name (legal)</label>
@@ -16444,14 +16463,21 @@ function saveStaff(id) {
   if (id) {
     // Update existing
     const idx = STATE.adminRoster.findIndex(o=>o.id===id);
-    const update = { id, name, nick:nick||name.split(' ')[0], preferredName, role, shiftCode:shift, shiftStart, shiftEnd, daysOn, notes };
+    const borrowed=!!((document.getElementById('es-borrowed')||{}).checked);
+    const fromBranch=((document.getElementById('es-branch')||{}).value||'').trim();
+    const borrowedUntil=((document.getElementById('es-until')||{}).value||'').trim();
+    const update = { id, name, nick:nick||name.split(' ')[0], preferredName, role, shiftCode:shift, shiftStart, shiftEnd, daysOn, notes,
+                     borrowed, fromBranch: borrowed?fromBranch:'', borrowedUntil: borrowed?borrowedUntil:'' };
     if (idx>=0) STATE.adminRoster[idx] = Object.assign(STATE.adminRoster[idx], update);
     else STATE.adminRoster.push(update);
   } else {
     // Add new
     const newId = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'') + '-' + Date.now().toString(36);
     STATE.adminRoster.push({ id:newId, name, nick:nick||name.split(' ')[0], preferredName, role, shiftCode:shift,
-      shiftStart, shiftEnd, daysOn, notes, pref:'none', _new:true });
+      shiftStart, shiftEnd, daysOn, notes, pref:'none', _new:true,
+      borrowed: !!((document.getElementById('es-borrowed')||{}).checked),
+      fromBranch: ((document.getElementById('es-branch')||{}).value||'').trim(),
+      borrowedUntil: ((document.getElementById('es-until')||{}).value||'').trim() });
   }
 
   saveState();
@@ -17976,7 +18002,7 @@ function buildCoverageTimeline() {
 
   function getZone(pid,person,h) {
     const specs=(STATE.specialBlocks||{})[pid]||[];
-    for(const b of specs){if(h>=b.from&&h<b.to)return b.key;}
+    for(const b of specs){if(h>=b.from&&h<b.to)return b.key==='split'?'off':b.key;}   // v60.221: gap = off
     const mods=STATE.shiftMod||{},ov=mods[pid]||{};
     const ss=ov.start!=null?ov.start:person.shiftStart;
     const se=ov.end!=null?ov.end:person.shiftEnd;
@@ -20302,6 +20328,7 @@ function meetingsCheckReminders(){
   var now=new Date(); var h=now.getHours()+now.getMinutes()/60;
   (STATE.meetings||[]).forEach(function(m){
     if(m.date!==tk) return;
+    if((m.people||[]).length && (m.people||[]).every(_isArchivedPid)) return;   // v60.221
     var lead=m.from-h;
     if(lead>0 && lead<=(10/60) && !_mtgReminded[m.id]){
       _mtgReminded[m.id]=true;
@@ -20404,7 +20431,7 @@ function _mtgRender(){
    +'<button onclick="mtgCommit()" style="flex:1;padding:12px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer">✓ Put it on the schedule</button>'
    +'<button class="btn btn-gh" onclick="closeModal();_mtgDraft=null">Cancel</button></div>';
   // upcoming list
-  var up=(STATE.meetings||[]).filter(function(m){ return m.date>=tk; })
+  var up=(STATE.meetings||[]).filter(function(m){ return m.date>=tk && !((m.people||[]).length && (m.people||[]).every(_isArchivedPid)); })   // v60.221: archived-only meetings drop
     .sort(function(a,b2){ return a.date===b2.date ? a.from-b2.from : String(a.date).localeCompare(String(b2.date)); });
   if(up.length){
     b+='<div style="font-size:10px;font-weight:800;color:var(--txt3);text-transform:uppercase;margin:14px 0 5px">Coming up</div>';
@@ -21847,7 +21874,7 @@ function gfAreaAt(pid, e, h){
   // Scoped to key==='meeting' only — break/training keep their existing math.
   var _sp=(STATE.specialBlocks||{})[pid]||[];
   for(var _i=0;_i<_sp.length;_i++){
-    if(_sp[_i].key==='meeting' && h>=_sp[_i].from && h<_sp[_i].to) return null;
+    if((_sp[_i].key==='meeting'||_sp[_i].key==='split') && h>=_sp[_i].from && h<_sp[_i].to) return null;   // v60.221: split gap counts nowhere
   }
   var blocks=(STATE.mgmtBlocks||{})[pid]||[];
   if(blocks.length){
@@ -22754,6 +22781,16 @@ function ppOverviewHtml(pid,p,ss,se,fmtH,entry){
       .sort(function(a,b){ return a.date===b.date? a.from-b.from : (a.date<b.date?-1:1); })[0];
     if(mt) chips.push('🤝 '+(mt.date===tk?'today ':'')+((typeof _sFmt==='function')?_sFmt(mt.from):mt.from)); }catch(e){}
   try{ if(typeof exitAccommodated==='function' && exitAccommodated(pid)) chips.push('🛡 no-exit accommodation'); }catch(e){}
+  // v60.221 (scenarios #3 / #7): a late mark says what it means right now.
+  try{
+    if(mk && mk.t==='late'){
+      if(out) chips.push('⏰ late +'+mk.m+'m held — applies if reinstated');
+      else { var _ns=(STATE.shiftMod[pid]||{}).start, _nowH=new Date().getHours()+new Date().getMinutes()/60;
+             if(_ns!=null && _nowH<_ns) chips.push('⏰ expected '+fmtH(_ns)); }
+    }
+  }catch(e){}
+  // v60.221 (scenario #6): borrowed staff wear it on the card
+  try{ if(p.borrowed) chips.push('🔁 borrowed'+(p.fromBranch?' from '+String(p.fromBranch).replace(/</g,'&lt;'):'')+(p.borrowedUntil?' · through '+p.borrowedUntil:'')); }catch(e){}
   // v60.219: lunch state is a one-tap toggle on the hub — "no lunch taken"
   // is a same-day fact managers record constantly. Short shifts say so.
   try{
@@ -22765,11 +22802,128 @@ function ppOverviewHtml(pid,p,ss,se,fmtH,entry){
       +'title="Tap to toggle no-lunch for today" style="all:unset;cursor:pointer;color:'+(_nl?'var(--amber)':'inherit')+'">'+_lbl+'</button>');
   }catch(e){}
   if(chips.length){
-    h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:4px">'
+    h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">'
      + chips.map(function(c){ return '<span style="font-size:10.5px;font-weight:700;color:var(--txt3);background:var(--bg3);border:1px solid var(--bdr);border-radius:999px;padding:4px 9px">'+c+'</span>'; }).join('')
      +'</div>';
   }
+  // v60.220: every action for THIS person, one row — no trip to Admin.
+  var _e=pid.replace(/'/g,'\\x27');
+  var act=function(icon,lbl,js,cls){ return '<button class="'+(cls||'')+'" onclick="'+js+'" style="flex:1;min-width:88px;padding:8px 6px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer">'+icon+' '+lbl+'</button>'; };
+  h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px">'
+   + act('📅','Week',"openPersonPanel('"+_e+"','week')")
+   + act('👤','Profile',"openPersonPanel('"+_e+"','profile')")
+   + act('🤝','Book 1:1',"ppBook11('"+_e+"')",'vl-mgr')
+   + act('💬','Text',"ppText('"+_e+"')")
+   +'</div>';
   return h;
+}
+// ── v60.220 · WEEK SPOKE — their next 7 days, editable in place ─────────────
+function ppWeekHtml(pid,p){
+  var h='', tk=(typeof todayKey==='function')?todayKey():'';
+  var _e=pid.replace(/'/g,'\\x27');
+  h+='<div style="font-size:10.5px;color:var(--txt3);margin-bottom:6px">Tap a day to change it — "530A-2P", "OFF", or blank to revert to the base schedule. Today\u2019s edits reach the floor immediately.</div>';
+  for(var i=0;i<7;i++){
+    var d=new Date(); d.setDate(d.getDate()+i);
+    var key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    var sc=null; try{ sc=getScheduleForDate(key)||{}; }catch(e){ sc={}; }
+    var v=sc[pid];
+    var ov=!!(((STATE.scheduleOverrides||{})[key]||{})[pid]!==undefined);
+    var pto=!!(((STATE.pto||{})[key]||{})[pid]);
+    var lbl = v==null ? '<span style="color:var(--txt3)">— not on the sheet</span>'
+            : (typeof mcFmtShift==='function' ? mcFmtShift(v) : (Array.isArray(v)?v.join('–'):String(v)));
+    var isOff = v!=null && /OFF|VACA|PTO/i.test(String(v));
+    h+='<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bdr)">'
+     +'<span style="width:58px;font-size:11px;font-weight:800;color:'+(key===tk?'var(--accent)':'var(--txt3)')+'">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]+' '+(d.getMonth()+1)+'/'+d.getDate()+'</span>'
+     +'<span style="flex:1;font-size:12.5px;color:'+(isOff?'var(--txt3)':'var(--txt)')+'">'+lbl+(ov?' <span style="font-size:9px;color:var(--up)">edited</span>':'')+(pto?' <span style="font-size:9px;color:var(--up)">PTO</span>':'')+'</span>'
+     +'<button class="vl-mgr" onclick="ppEditDay(\''+_e+'\',\''+key+'\')" style="padding:5px 9px;border-radius:6px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:10.5px;font-weight:700;cursor:pointer">✏️</button>'
+     +'<button class="vl-mgr" onclick="ppTogglePto(\''+_e+'\',\''+key+'\')" title="Toggle PTO on this day" style="padding:5px 8px;border-radius:6px;border:1px solid '+(pto?'var(--up)':'var(--bdr2)')+';background:'+(pto?'rgba(255,204,0,.12)':'var(--bg3)')+';color:'+(pto?'var(--up)':'var(--txt3)')+';font-size:10.5px;font-weight:700;cursor:pointer">🌴</button>'
+     +'</div>';
+  }
+  h+='<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">'
+   +'<button onclick="closePersonPanel();goToWeekPlanner(0)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer">🤖 Week planner</button>'
+   +'<button onclick="closePersonPanel();mcOpenTo(\''+tk+'\')" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer">📆 Calendar</button>'
+   +'</div>';
+  return h;
+}
+function ppEditDay(pid,key){
+  var sc={}; try{ sc=getScheduleForDate(key)||{}; }catch(e){}
+  var cur=sc[pid]; var curTxt = cur==null?'' : (typeof mcFmtShift==='function'?mcFmtShift(cur):String(cur));
+  var raw=prompt('Shift for '+key+' — e.g. "530A-2P" or "OFF". Leave blank to revert to the base schedule.', curTxt);
+  if(raw===null) return;
+  var parsed=null;
+  if(raw.trim()!==''){ parsed=(typeof _parseShiftString==='function')?_parseShiftString(raw):null;
+    if(parsed===null){ if(typeof toast==='function') toast('Try "530A-200P" or "OFF"'); return; } }
+  if(!STATE.scheduleOverrides) STATE.scheduleOverrides={};
+  if(!STATE.scheduleOverrides[key]) STATE.scheduleOverrides[key]={};
+  if(parsed===null) delete STATE.scheduleOverrides[key][pid]; else STATE.scheduleOverrides[key][pid]=parsed;
+  if(typeof saveState==='function') saveState();
+  if(key===todayKey()){ try{ loadScheduleForToday(false); _shiftEditRebuild(); }catch(e){} }
+  openPersonPanel(pid,'week');
+}
+function ppTogglePto(pid,key){
+  if(!STATE.pto) STATE.pto={};
+  if(!STATE.pto[key]) STATE.pto[key]={};
+  if(STATE.pto[key][pid]) delete STATE.pto[key][pid]; else STATE.pto[key][pid]=true;
+  if(!Object.keys(STATE.pto[key]).length) delete STATE.pto[key];
+  if(typeof saveState==='function') saveState();
+  if(key===todayKey()){ try{ loadScheduleForToday(false); _shiftEditRebuild(); }catch(e){} }
+  openPersonPanel(pid,'week');
+}
+// ── v60.220 · PROFILE SPOKE — Admin's per-person actions, on the card ───────
+function ppProfileHtml(pid,p){
+  var _e=pid.replace(/'/g,'\\x27'); var id=p.id||'';
+  var idE=String(id).replace(/'/g,'\\x27');
+  var days=(p.daysOn||[]).map(function(i){ return ['Su','Mo','Tu','We','Th','Fr','Sa'][i]; }).join(' ')||'—';
+  var acc=null; try{ acc=(STATE.exitAccommodation||{})[pid]||null; }catch(e){}
+  var archived=(p.active===false);
+  var row=function(l,v){ return '<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px solid var(--bdr);font-size:12px"><span style="color:var(--txt3)">'+l+'</span><b style="color:var(--txt);text-align:right">'+v+'</b></div>'; };
+  var h='<div style="background:var(--bg3);border:1px solid var(--bdr2);border-radius:9px;padding:6px 12px;margin-bottom:8px">'
+   + row('Role', p.role||'—')
+   + row('Base shift', (p.shiftCode||'—'))
+   + row('Days on', days)
+   + (p.preferredName?row('Goes by', p.preferredName):'')
+   + (p.borrowed?row('🔁 Borrowed', (p.fromBranch?'from '+String(p.fromBranch).replace(/</g,'&lt;'):'yes')+(p.borrowedUntil?' · through '+p.borrowedUntil:' · open-ended')):'')
+   + (acc?row('🛡 Exit accommodation', acc.start+(acc.end?' → '+acc.end:' → open')):'')
+   + (archived?row('Status', (p.onLeave?'On leave':'Left')+(p.departedDate?' · '+p.departedDate:'')):'')
+   +'</div>';
+  if(p.notes) h+='<div style="font-size:11px;color:var(--txt3);line-height:1.45;margin-bottom:8px">'+String(p.notes).replace(/</g,'&lt;')+'</div>';
+  var btn=function(icon,lbl,js,tone){ return '<button class="vl-mgr" onclick="'+js+'" style="flex:1;min-width:120px;padding:10px 6px;border-radius:8px;border:1px solid '+(tone||'var(--bdr2)')+';background:var(--bg3);color:'+(tone||'var(--txt2)')+';font-size:11.5px;font-weight:800;cursor:pointer">'+icon+' '+lbl+'</button>'; };
+  h+='<div style="display:flex;gap:6px;flex-wrap:wrap">'
+   + btn('✏️','Edit profile',"closePersonPanel();showEditStaffModal('"+idE+"')")
+   + btn('🛡','Exit accommodation',"closePersonPanel();openExitAccommodation('"+_e+"','"+String(p.nick||p.name||'').replace(/'/g,'\\x27')+"')")
+   + (archived ? btn('↩','Reinstate',"reinstateStaff('"+idE+"');openPersonPanel('"+_e+"','profile')",'var(--accent)')
+               : btn('🏖','Leave / Archive',"archiveStaff('"+idE+"');closePersonPanel()",'var(--na)'))
+   +'</div>'
+   +'<div style="font-size:10px;color:var(--txt3);margin-top:8px;line-height:1.45">Edit profile opens the same form Setup uses — name, role, days, base shift. Leave/Archive keeps their data and takes them off every schedule read; Reinstate brings it all back.</div>';
+  return h;
+}
+// v60.221 · split shift: one tap sets or clears the gap (a 'split' special block)
+function ppSplit(pid){
+  var cur=((STATE.specialBlocks||{})[pid]||[]).filter(function(b){ return b.key==='split'; })[0];
+  if(cur){
+    if(confirm('Remove the split-shift gap '+rotFmtClock(cur.from)+'–'+rotFmtClock(cur.to)+'?')){
+      STATE.specialBlocks[pid]=STATE.specialBlocks[pid].filter(function(b){ return b.key!=='split'; });
+      if(typeof saveState==='function') saveState(); _shiftEditRebuild(); openPersonPanel(pid,'controls');
+    }
+    return;
+  }
+  var raw=prompt('Split shift — the hours they are GONE in the middle, e.g. "10a-3p"','');
+  if(!raw) return;
+  var m=raw.split(/[-–]/); if(m.length!==2){ if(typeof toast==='function') toast('Try "10a-3p"'); return; }
+  var f=rotParseClock(m[0].trim()), t=rotParseClock(m[1].trim());
+  if(f==null||t==null||t<=f){ if(typeof toast==='function') toast('Try "10a-3p"'); return; }
+  addSpecialBlock(pid,'split',f,t); _shiftEditRebuild(); openPersonPanel(pid,'controls');
+}
+function ppBook11(pid){
+  try{ window._mtgDraft={type:'1on1', date:todayKey(), from:null, people:[pid], title:''}; }catch(e){}
+  closePersonPanel(); openMeetings();
+}
+function ppText(pid){
+  var rp=personByPid(pid); var nick=rp?(rp.nick||String(rp.name||'').split(' ')[0]):String(pid).replace(/_/g,' ');
+  var msg=prompt('Text to '+nick+' (the app composes; you send it from Messages):','Hey '+nick+' — ');
+  if(!msg) return;
+  try{ if(navigator.share){ navigator.share({text:msg}); return; } }catch(e){}
+  try{ navigator.clipboard.writeText(msg); if(typeof toast==='function') toast('💬 Copied — paste it to '+nick+' in Messages'); }catch(e){ prompt('Copy this:', msg); }
 }
 function ppTrainingHtml(pid,p){
   var h=(typeof trainMapHtml==='function')?trainMapHtml(pid):'';
@@ -22816,7 +22970,21 @@ function openPersonPanel(pid, view) {
   // the controls that need a shift degrade rather than disappear.
   if(!entry){
     const rp = personByPid(pid);
-    if(!rp) return;
+    if(!rp){
+      // v60.220: a schedule name with NO roster record used to be a dead tap.
+      // Now it opens a stub card whose one action is to add them properly.
+      const _pn=document.getElementById('person-panel'); if(!_pn) return;
+      _pn.style.display='block';
+      const nm=String(pid).replace(/_/g,' ');
+      const nameEl0=document.getElementById('pp-name'); if(nameEl0) nameEl0.textContent=nm;
+      const shEl0=document.getElementById('pp-shift'); if(shEl0) shEl0.textContent='not in the roster';
+      ['pp-nav','pp-summary','pp-fairness','pp-whatif-section','pp-mgr-controls'].forEach(id=>{const e=document.getElementById(id); if(e) e.innerHTML='';});
+      const v0=document.getElementById('pp-view');
+      if(v0) v0.innerHTML='<div style="padding:10px 12px;border-radius:9px;background:var(--bg3);border:1px solid var(--bdr2);font-size:12.5px;color:var(--txt2);line-height:1.5;margin-bottom:10px">'
+        +'This name is on a schedule but has no roster record, so the app can\u2019t place, count or rotate them.</div>'
+        +'<button class="vl-mgr" onclick="closePersonPanel();showAddStaffModal()" style="width:100%;padding:12px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer">➕ Add '+nm+' to the roster</button>';
+      return;
+    }
     entry = { person: rp, shift: rp.shiftCode || '—', source: 'roster-notworking',
               notWorkingToday: true };
   }
@@ -22932,7 +23100,7 @@ function openPersonPanel(pid, view) {
   {
     const navEl=document.getElementById('pp-nav');
     const viewEl=document.getElementById('pp-view');
-    const VIEWS=[['overview','🏠 Overview'],['controls','🎛 Controls'],['training','🎓 Training'],['stats','📊 Stats']];
+    const VIEWS=[['overview','🏠 Overview'],['controls','🎛 Controls'],['week','📅 Week'],['profile','👤 Profile'],['training','🎓 Training'],['stats','📊 Stats']];
     if(navEl){
       navEl.innerHTML=VIEWS.map(([k,l])=>{
         const on=view===k;
@@ -22951,6 +23119,8 @@ function openPersonPanel(pid, view) {
       if(view==='overview')      viewEl.innerHTML=ppOverviewHtml(pid,p,ss,se,fmtH,entry);
       else if(view==='training') viewEl.innerHTML=ppTrainingHtml(pid,p);
       else if(view==='stats')    viewEl.innerHTML=ppStatsHtml(pid,p,ss,se,fmtH);
+      else if(view==='week')     viewEl.innerHTML=ppWeekHtml(pid,p);
+      else if(view==='profile')  viewEl.innerHTML=ppProfileHtml(pid,p);
       else viewEl.innerHTML='';
     }
   }
@@ -23280,6 +23450,13 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
         border-color:${noLunch?'var(--amber)':'var(--bdr2)'};
         color:${noLunch?'var(--amber)':'var(--txt3)'}">
       🍽 ${noLunch?'No Lunch ✓':'Lunch?'}
+    </button>
+    <button onclick="ppSplit('${pid}')" title="Split shift — mark the hours they are gone in the middle"
+      style="padding:6px 10px;border-radius:4px;border:1px solid;font-size:10px;font-weight:600;cursor:pointer;
+        background:${(((STATE.specialBlocks||{})[pid]||[]).some(b=>b.key==='split'))?'rgba(142,142,147,.18)':'var(--bg3)'};
+        border-color:${(((STATE.specialBlocks||{})[pid]||[]).some(b=>b.key==='split'))?'var(--txt2)':'var(--bdr2)'};
+        color:var(--txt3)">
+      ✂️ ${(((STATE.specialBlocks||{})[pid]||[]).some(b=>b.key==='split'))?'Split ✓':'Split'}
     </button>
   </div>`;
 
@@ -24295,6 +24472,7 @@ function getScheduleForDate(dateStr) {
   return _schedDropArchived(merged);
 }
 var _schedArchivedPids=null, _schedArchivedStamp=null;
+function _isArchivedPid(pid){ try{ _schedDropArchived({}); return !!(_schedArchivedPids && _schedArchivedPids[pid]); }catch(e){ return false; } }
 function _schedDropArchived(sched){
   if(!sched) return sched;
   try{
@@ -24415,6 +24593,18 @@ function loadScheduleForToday(force) {
     }
   });
 
+  // v60.221 · BORROWED STAFF EXPIRE THEMSELVES: past their last day they are
+  // archived automatically (data kept), so a one-day loaner never lingers on
+  // the roster, the bench, or a schedule read.
+  try{
+    var _chg=false;
+    (STATE.adminRoster||[]).forEach(function(o){
+      if(o && o.borrowed && o.borrowedUntil && o.borrowedUntil < key && o.active!==false){
+        o.active=false; o.departedDate=key; o.departedReason='Borrowed — returned to '+(o.fromBranch||'home branch'); _chg=true;
+      }
+    });
+    if(_chg && typeof rebuildRosters==='function') rebuildRosters();
+  }catch(e){}
   // v60.217 · SAME-DAY HUMAN ADJUSTMENTS SURVIVE THE RE-DERIVE. The v60.202
   // rule is "schedule wins, always overwrite shiftMod" — correct for stale
   // cross-day residue, but it also erased a deliberate "running late +30" the
@@ -26711,6 +26901,7 @@ function mcTimeOffOn(key){
     if(Array.isArray(pto)) pto.forEach(function(p){ out[p]='PTO'; });
     else if(pto&&typeof pto==='object') Object.keys(pto).forEach(function(p){ if(pto[p]) out[p]='PTO'; });
   }catch(e){}
+  out=_schedDropArchived(out)||out;   // v60.221: archived people leave the time-off list too
   return Object.keys(out).map(function(p){ return {name:p.replace(/_/g,' '), kind:out[p]}; }).sort(function(a,b){return a.name<b.name?-1:1;});
 }
 // Open the Auto-Scheduler focused on the week that contains `key`.
@@ -26820,7 +27011,7 @@ function ptoCapacityStripHtml(){
   return h;
 }
 function mcPtoStore(){ if(!STATE.pto) STATE.pto={}; return STATE.pto; }
-function mcPtoPidsOn(key){ var d=mcPtoStore()[key]; return d? Object.keys(d).filter(function(p){return d[p];}) : []; }
+function mcPtoPidsOn(key){ var d=mcPtoStore()[key]; return d? Object.keys(d).filter(function(p){return d[p] && !_isArchivedPid(p);}) : []; }
 function mcTogglePtoForm(key){ var f=document.getElementById('mc-pto-form'); if(f) f.style.display = (f.style.display==='none'?'block':'none'); }
 // v60.124 (Design deepening #7): PTO conflict guard. On a day that already has
 // time off AND is short at the peak block (per the real schedule vs floor need),
