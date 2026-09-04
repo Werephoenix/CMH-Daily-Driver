@@ -15395,7 +15395,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.223'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.224'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -17677,7 +17677,7 @@ function _fairnessSuggestHtml(exp){
   try{
     var cxrs = Object.keys(exp||{}).filter(function(pid){
       var p=(exp[pid]||{}).person; if(!p) return false;
-      return p.role==='CXR' && !p.fairnessExempt && (STATE.todayOverrides||{})[pid]!=='callout'
+      return p.role==='CXR' && !p.fairnessExempt && !isOffToday(pid)   // v60.224 (R4)
         && !(typeof exitAccommodated==='function' && exitAccommodated(pid)); // v60.142: exempt while accommodated
     }).map(function(pid){ return {pid:pid, person:exp[pid].person, h:(typeof getExitHoursWeek==='function'?getExitHoursWeek(pid):0)}; });
     if(cxrs.length<2) return '';
@@ -17819,7 +17819,7 @@ function buildStationView() {
 
   const people = Object.entries(exp).map(([pid, entry]) => {
     const { person, shift } = entry;
-    const isCallout = (STATE.todayOverrides || {})[pid] === 'callout';
+    const isCallout = isOffToday(pid);   // v60.224 (R4): roster list reads every "out" flavor
     const mod = (STATE.shiftMod || {})[pid];
     const startH = mod ? mod.start : person.shiftStart;
     const endH   = mod ? mod.end   : person.shiftEnd;
@@ -18020,7 +18020,7 @@ function buildCoverageTimeline() {
     const se=ov.end!=null?ov.end:person.shiftEnd;
     const seZ=(se!=null&&ss!=null&&se<ss)?se+24:se;   // v60.222 (Inspector ⑥): overnight end lives on the +24 side
     if(ss==null||h<ss||h>=seZ)return'off';
-    if((STATE.todayOverrides||{})[pid]==='callout')return'off';
+    if(isOffToday(pid))return'off';   // v60.224 (Inspector R1): the timeline drew a vacationer working
     // v58: Manually-set assignment blocks (STATE.mgmtBlocks) ALWAYS win
     // over the auto rotation for that person. Was previously only honored
     // for managers; now any role with manual blocks gets them honored.
@@ -18195,7 +18195,7 @@ function buildCoverageTimeline() {
       const ss=ov.start!=null?ov.start:e.person.shiftStart;
       const se=ov.end!=null?ov.end:e.person.shiftEnd;
       const onShift=ss!=null&&nowFloor>=ss&&nowFloor<se;
-      if(onShift&&(STATE.todayOverrides||{})[pid]!=='callout'){
+      if(onShift&&!isOffToday(pid)){   // v60.224 (R4)
         zones.returns.push(pidChip(pid, e.person.nick||e.person.name.split(' ')[0]));
       }
       return;
@@ -18426,7 +18426,7 @@ function buildCoverageTimeline() {
     for(const role of fillOrder){
       const candidate=people.find(([pid,e])=>{
         if(e.person.role!==role)return false;
-        if((STATE.todayOverrides||{})[pid]==='callout')return false;
+        if(isOffToday(pid))return false;   // v60.224 (R4)
         const st=(STATE.staffStation||{})[pid];
         if(st==='Exit Booth')return false; // already at exit
         // Must be currently ON shift (not just scheduled — actually working now)
@@ -18505,7 +18505,7 @@ function buildCoverageTimeline() {
   grp.items.forEach(([pid,entry])=>{
     const p=entry.person,nick=(typeof dispName==='function'?dispName(p):(p.nick||p.name.split(' ')[0]));
     const isMgmt=['ARM','BRM','ABRM','MT'].includes(p.role);
-    const isOff=(STATE.todayOverrides||{})[pid]==='callout';
+    const isOff=isOffToday(pid);   // v60.224 (R1)
     // Called-off people are hidden from the timeline entirely (the
     // CALLED OFF (n) badge at the top is the single place they appear).
     // Without this, called-off folks whose shift starts within 2 hours
@@ -19680,7 +19680,7 @@ function sendOpenEmail(){
   var f=(STATE.fields)||{}, now=new Date();
   var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
   var onFloor=Object.keys(exp).filter(function(p){
-    return (STATE.todayOverrides||{})[p]!=='callout'; }).length;
+    return !isOffToday(p); }).length;   // v60.224 (R4)
   var offs=Object.keys(STATE.todayOverrides||{}).filter(function(p){
     return STATE.todayOverrides[p]==='callout'; }).length;
   var wu=STATE.walkUpPolicy||'—';
@@ -20751,6 +20751,7 @@ function gfxBench(area, hour){
     var pid=String(p.name||'').replace(/\s/g,'_');
     if(exp2[pid]) return false;                                       // already on
     if((STATE.todayOverrides||{})[pid]==='callout') return false;     // called off — don't call them
+    if((STATE.absenceType||{})[pid]) return false;                     // v60.224 (Inspector R2): VACA/PTO is away, not bench
     if(((STATE.pto||{})[tk]||{})[pid]) return false;                  // approved time off
     if(typeof trainWeight==='function' && !(trainWeight(pid,area)>0)) return false;
     if(area==='exit' && typeof exitAccommodated==='function' && exitAccommodated(pid)) return false;
@@ -21494,7 +21495,7 @@ function printScheduleMap() {
     // Without this, a called-off person prints with their bar visible —
     // managers would think they're working.
     const peeps = Object.entries(exp).filter(([pid, e]) =>
-      sec.filter(e) && (STATE.todayOverrides||{})[pid] !== 'callout'
+      sec.filter(e) && !isOffToday(pid)   // v60.224 (R1): printed map
     );
     if (!peeps.length) return;
     rowsHtml += `<div class="section-header" style="margin-left:${NAME_PX + 4}px">— ${sec.label} —</div>`;
@@ -21505,7 +21506,7 @@ function printScheduleMap() {
       const ov = (STATE.shiftMod||{})[pid] || {};
       const ss = ov.start != null ? ov.start : p.shiftStart;
       const se = ov.end != null ? ov.end : p.shiftEnd;
-      const isCallout = (STATE.todayOverrides||{})[pid] === 'callout';
+      const isCallout = isOffToday(pid);   // v60.224 (R1): printed map
       if (ss == null || se == null) return;
 
       const segs = segmentsFor(pid, e);
@@ -22466,7 +22467,7 @@ function autoDistributeExit(exp) {
     // Count dedicated EXIT agents currently on shift at hour h
     let count = Object.entries(exp).filter(([pid,e]) => {
       if (e.person.role !== 'EXIT') return false;
-      if ((STATE.todayOverrides||{})[pid] === 'callout') return false;
+      if (isOffToday(pid)) return false;   // v60.224 (R4): the coverage engine itself
       const ov = (STATE.shiftMod||{})[pid]||{};
       const ss = ov.start ?? e.person.shiftStart;
       const se = ov.end   ?? e.person.shiftEnd;
@@ -22483,7 +22484,7 @@ function autoDistributeExit(exp) {
     const mb = STATE.mgmtBlocks || {};
     Object.entries(mb).forEach(([pid, blocks]) => {
       const e = exp[pid]; if (!e) return;
-      if ((STATE.todayOverrides||{})[pid] === 'callout') return;
+      if (isOffToday(pid)) return;   // v60.224 (R4)
       // Skip dedicated EXIT agents — already counted in the loop above.
       if (e.person.role === 'EXIT') return;
       if ((blocks||[]).some(b => b.station === 'Exit Booth' && h >= b.from && h < b.to)) {
@@ -22496,7 +22497,7 @@ function autoDistributeExit(exp) {
   const cxrList = Object.entries(exp)
     .filter(([pid,e]) => {
       if (e.person.role !== 'CXR') return false;
-      if ((STATE.todayOverrides||{})[pid] === 'callout') return false;
+      if (isOffToday(pid)) return false;   // v60.224 (R4): the coverage engine itself
       const ov = (STATE.shiftMod||{})[pid]||{};
       const ss = ov.start ?? e.person.shiftStart;
       const se = ov.end   ?? e.person.shiftEnd;
@@ -24627,6 +24628,11 @@ function loadScheduleForToday(force) {
     if (shift === 'OFF' || shift === 'VACA' || /\b(VACA|PTO)\b/i.test(_sTxt)) {
       STATE.staffDuty[pid]      = false;
       STATE.todayOverrides[pid] = 'off';
+      // v60.224 (Inspector R1/N2 leftover): a lunch placed before they went OFF
+      // kept drawing a 🍽 on their row — drop it with the shift.
+      try{ if(STATE.specialBlocks && STATE.specialBlocks[pid]){
+        STATE.specialBlocks[pid]=STATE.specialBlocks[pid].filter(function(b){ return b.key!=='lunch'; });
+        if(!STATE.specialBlocks[pid].length) delete STATE.specialBlocks[pid]; } }catch(e){}
       // v60.194 (Matt): "pto, etc should be auto input once known." The stored
       // schedule already SAYS vacation/PTO — asking a manager to tap it again
       // on the morning card is data entry the app owns. Stamped here, cleared
@@ -24641,7 +24647,9 @@ function loadScheduleForToday(force) {
       // appear on the wrong shift.
       delete STATE.shiftMod[pid];
     } else if (Array.isArray(shift) && shift.length === 2) {
-      STATE.staffDuty[pid] = true;
+      // v60.224 (Inspector R3): never flip a called-off person back on-duty —
+      // the boot writer got this guard in v60.223, this one had not.
+      STATE.staffDuty[pid] = ((STATE.todayOverrides||{})[pid]==='callout') ? false : true;
       // Clear any prior 'off' override from a previous day, otherwise
       // a stale 'off' value could mark an active person as called off.
       if (STATE.todayOverrides[pid] === 'off') delete STATE.todayOverrides[pid];
@@ -29241,7 +29249,7 @@ function _coCollect(){
     var sm=(STATE.shiftMod||{})[pid];
     var shift=sm?sm.display:(e.shift||p.shiftCode||'');
     var row={pid:pid,nick:nick,role:p.role||'',shift:shift};
-    if(ov[pid]==='callout'){ off.push(row); return; }
+    if(isOffToday(pid)){ off.push(row); return; }   // v60.224 (R4)
     var g=['ARM','BRM','ABRM','MT'].indexOf(p.role)>=0?'Managers'
         :p.role==='EXIT'?'Exit':p.role==='RETURNS'?'Returns':'CXR';
     groups[g].push(row);
