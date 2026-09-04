@@ -4372,7 +4372,12 @@ function stationClass(s) {
 }
 
 // ── STATE / LOCALSTORAGE ────────────────────────────────────────────────────
-const TODAY_KEY = new Date().toISOString().slice(0,10);
+// v60.226 (Inspector Y1c): the app had TWO clocks — the day-file and a dozen
+// "today" keys used UTC (toISOString) while todayKey() and every schedule
+// read use LOCAL. From 8 pm EDT every save landed in TOMORROW's file, so
+// yesterday's duty flags greeted the opener. One clock now: local.
+function _localDayKey(d){ d=d||new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+const TODAY_KEY = _localDayKey(new Date());
 const LS_KEY = `cmh-daily-${TODAY_KEY}`;
 
 // ── v60.201 · ONE SHAPE GUARD, EVERY DOOR ──────────────────────────────────
@@ -4435,10 +4440,14 @@ function ensureStateShape(s){
 }
 
 function loadState() {
-  const TODAY = new Date().toISOString().slice(0,10);
+  const TODAY = _localDayKey(new Date());
   const LS_KEY = 'cmh-v2-' + TODAY;
   try {
-    const raw = localStorage.getItem(LS_KEY);
+    let raw = localStorage.getItem(LS_KEY);
+    if (!raw) {   // v60.226: migration — pre-226 evenings saved under the UTC date
+      const _utc = 'cmh-v2-' + new Date().toISOString().slice(0,10);
+      if (_utc !== LS_KEY) raw = localStorage.getItem(_utc);
+    }
     if (raw) {
       const s = JSON.parse(raw);
       ensureStateShape(s);
@@ -4621,7 +4630,7 @@ function saveState() {
   // data was being saved when it wasn't. Now logs to console (one warning
   // per session, no toast spam) and emits a custom event consumers can hook.
   try {
-    const TODAY = new Date().toISOString().slice(0,10);
+    const TODAY = _localDayKey(new Date());
     const LS_KEY = 'cmh-v2-' + TODAY;
     localStorage.setItem(LS_KEY, JSON.stringify(STATE));
     window._saveStateOk = true;
@@ -4758,7 +4767,7 @@ function autoRouteByTime() {
 // ── v60.52: START-OF-DAY GUIDED FLOW ─────────────────────────────────────────
 // First open of the day → show yesterday's EOD recap → paste GreenLight data →
 // offer "Fix Schedule" (recommended) or "Live Board".
-function _sodTodayKey(){ return new Date().toISOString().slice(0,10); }
+function _sodTodayKey(){ return _localDayKey(new Date()); }
 function maybeStartOfDay() {
   // v60.186: the start-of-day sheet must not ambush a demo. It is triggered by
   // "first open today", and entering a demo looks exactly like that — so it
@@ -6715,7 +6724,7 @@ function loadHistory() {
 function saveDayToHistory() {
   recordDayPattern();
   const hist = loadHistory();
-  const today = new Date().toISOString().slice(0,10);
+  const today = _localDayKey(new Date());
   // Remove existing entry for today if present
   const filtered = hist.filter(h => h.date !== today);
   const entry = {
@@ -6802,13 +6811,13 @@ function saveDayToHistory() {
 function autoSaveHistory() {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yk = `cmh-v2-${yesterday.toISOString().slice(0,10)}`;
+  const yk = `cmh-v2-${_localDayKey(yesterday)}`;
   try {
     const yData = localStorage.getItem(yk);
     if (yData) {
       // There's yesterday's data — make sure it's in history
       const hist = loadHistory();
-      const yDate = yesterday.toISOString().slice(0,10);
+      const yDate = _localDayKey(yesterday);
       if (!hist.find(h => h.date === yDate)) {
         const ys = JSON.parse(yData);
         const auto = { open: null, close: null };
@@ -7078,7 +7087,7 @@ window.go = function(id) {
 function check4amSave() {
   const now = new Date();
   const h = now.getHours();
-  const today = now.toISOString().slice(0,10);
+  const today = _localDayKey(now);
   const lastSaveKey = 'cmh-last-save-date';
   const lastSave = localStorage.getItem(lastSaveKey);
   // Between 4am and 5am, save if not already saved today
@@ -13309,7 +13318,7 @@ function getWeekKey() {
   const day = d.getDay();
   const monday = new Date(d);
   monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  return monday.toISOString().slice(0,10);
+  return _localDayKey(monday);
 }
 
 // v60.29: record per-DAY (idempotent) so re-rendering the panel can no longer
@@ -13317,7 +13326,7 @@ function getWeekKey() {
 function recordExitTime(personId, hours) {
   const weekKey = 'cmh-exit-fairness-' + getWeekKey();
   const data = getExitFairnessData();
-  const dk = (typeof todayKey === 'function') ? todayKey() : new Date().toISOString().slice(0,10);
+  const dk = (typeof todayKey === 'function') ? todayKey() : _localDayKey(new Date());
   if (typeof data[personId] !== 'object' || data[personId] === null) data[personId] = {};
   data[personId][dk] = hours;  // overwrite today's entry — no double-counting
   try { localStorage.setItem(weekKey, JSON.stringify(data)); } catch(e) {}
@@ -13578,7 +13587,7 @@ function updateWUBtns() {
 function initPreloadedSchedule() {
   const existing = getStoredSection('mgmt');
   // Re-seed if: empty, or older than current PRELOADED endDate, or missing today's data
-  const today = new Date().toISOString().slice(0,10);
+  const today = _localDayKey(new Date());
   const needsReseed = !existing
     || !existing.grid
     || Object.keys(existing.grid).length === 0
@@ -14633,7 +14642,7 @@ function autoSuggestRotation() {
 // ═══════════════════════════════════════════════════════════════════════
 
 function recordDayPattern() {
-  const today = new Date().toISOString().slice(0,10);
+  const today = _localDayKey(new Date());
   const PATTERN_KEY = 'cmh-station-patterns-v1';
   let patterns = {};
   try { patterns = JSON.parse(localStorage.getItem(PATTERN_KEY)||'{}'); } catch(e) {}
@@ -14662,7 +14671,7 @@ function recordStationOverride(pid, station) {
   if(!station||!pid)return;
   const KEY='cmh-station-patterns-v1';let p={};try{p=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){}
   if(!p[pid])p[pid]={counter:0,exit:0,days:[],overrides:[],suggestedPref:null};
-  const today=new Date().toISOString().slice(0,10);
+  const today=_localDayKey(new Date());
   p[pid].overrides=p[pid].overrides||[];p[pid].overrides.push({date:today,station});
   if(p[pid].overrides.length>60)p[pid].overrides.shift();
   const recent=p[pid].overrides.slice(-20);
@@ -15423,7 +15432,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.225'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.226'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -16555,7 +16564,7 @@ function archiveStaff(id) {
                         onLeave ? 'On leave — returning' : '');
   if (reason === null) return; // cancelled
   if (!STATE.adminRoster) STATE.adminRoster = [];
-  const today = new Date().toISOString().slice(0,10);
+  const today = _localDayKey(new Date());
   const patch = { active:false, onLeave:!!onLeave, departedDate:today, departedReason:(reason||'').trim() };
   const idx = STATE.adminRoster.findIndex(o=>o.id===id);
   if (idx>=0) STATE.adminRoster[idx] = Object.assign(STATE.adminRoster[idx], patch);
@@ -18912,7 +18921,7 @@ function psDateLabel(d){ return d.toLocaleDateString('en-US',{weekday:'long',mon
 function psTrailing(field, weeks){
   try{
     var hist=(typeof loadHistory==='function')?loadHistory():[];
-    var today=new Date(), dow=today.getDay(), tk=today.toISOString().slice(0,10);
+    var today=new Date(), dow=today.getDay(), tk=_localDayKey(today);
     var vals=hist.filter(function(h){
         if(!h||!h.date||h.date===tk) return false;
         var d=new Date(h.date+'T12:00:00');
@@ -18947,7 +18956,7 @@ function psBand(cells){
 function psCloseReport(){
   var f=(STATE.fields)||{}, now=new Date();
   var hist=(typeof loadHistory==='function')?loadHistory():[];
-  var today=hist.filter(function(h){return h.date===now.toISOString().slice(0,10);})[0]||{};
+  var today=hist.filter(function(h){return h.date===_localDayKey(now);})[0]||{};
   var res=f.res!=null?f.res:today.tmrwRes, ret=f.ret!=null?f.ret:today.tmrwRet;
   var cs=f.cs!=null?f.cs:today.cs, hot=f.hot!=null?f.hot:today.hot;
   var oos=f.oosFinal||f.oos||today.oos;
@@ -22027,7 +22036,7 @@ function setTrainStatus(pid, area, k){
   // stamp who recorded the change and when. History, not judgement.
   if(!STATE.trainingLog) STATE.trainingLog={};
   if(!STATE.trainingLog[pid]) STATE.trainingLog[pid]={};
-  STATE.trainingLog[pid][area]={k:k, at:new Date().toISOString().slice(0,10),
+  STATE.trainingLog[pid][area]={k:k, at:_localDayKey(new Date()),
     by:(STATE.fields&&STATE.fields.openMgr)||''};
   if(typeof rotInvalidate==='function') rotInvalidate();
   if(typeof saveState==='function') saveState();
@@ -24653,6 +24662,20 @@ function loadScheduleForToday(force) {
 
   Object.entries(sched).forEach(([pid, shift]) => {
     var _sTxt = (typeof shift==='string') ? shift : '';
+    // v60.226 (Inspector Y1a): a marker string (BRM RETREAT, MQI, MT 1 -99…)
+    // used to hit NEITHER branch — nothing written, yesterday's duty stood.
+    // Now: an away-marker is OUT; a shift-with-a-note that parses is a SHIFT;
+    // an unknown string is treated as away — a marker is not a shift.
+    if (typeof shift === 'string' && !/^(OFF|VACA)$/i.test(shift) && !/\b(VACA|PTO)\b/i.test(shift)) {
+      if (isOffCode(shift)) { shift = 'OFF'; }
+      else {
+        // a shift with a note — "8A-12P(HALFDAY)" — is still a shift: strip the note, parse the times
+        var _core = String(shift).replace(/\s*\(.*?\)\s*/g,'').trim();
+        var _pr = (typeof _parseShiftString==='function') ? _parseShiftString(_core) : null;
+        shift = (Array.isArray(_pr) && _pr.length===2) ? _pr : 'OFF';
+      }
+      _sTxt = (typeof shift==='string') ? shift : '';
+    }
     if (shift === 'OFF' || shift === 'VACA' || /\b(VACA|PTO)\b/i.test(_sTxt)) {
       STATE.staffDuty[pid]      = false;
       STATE.todayOverrides[pid] = 'off';
@@ -24967,7 +24990,7 @@ function printAllChecklists(blank) {
 
 function printScheduleGrid() {
   const sched = (typeof getStoredSchedule==='function') ? getStoredSchedule() : null;
-  const today = (typeof todayKey==='function') ? todayKey() : new Date().toISOString().slice(0,10);
+  const today = (typeof todayKey==='function') ? todayKey() : _localDayKey(new Date());
   const dateLabel = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   if (!sched || !sched.grid || !Object.keys(sched.grid).length) {
     if(typeof toast==='function') toast('No schedule loaded — paste schedule in Admin first');
@@ -30065,7 +30088,12 @@ function coRender(){
   h+='<div class="qa-lead">Tap anyone to mark them <b>called off</b> today. Coverage &amp; the ⚠ flags update the second you do — nothing else to save. Tap an off person to put them back.</div>';
   // impact line
   var workingCt=0; Object.keys(d.groups).forEach(function(g){workingCt+=d.groups[g].length;});
-  h+='<div class="co-impact">'+workingCt+' working · '+d.off.length+' off'+
+  // v60.226 (Inspector Y2): sheet-away people are not on the board at all now,
+  // so they never reached this sheet — say who is away per the sheet, untappable.
+  var _away=[]; try{ var _sh=getScheduleForDate(todayKey())||{};
+    Object.keys(_sh).forEach(function(p){ if(isOffCode(_sh[p]) && personByPid(p)) _away.push((typeof dispName==='function')?dispName(p):p.replace(/_/g,' ')); }); }catch(e){}
+  h+=(_away.length?'<div style="font-size:11px;color:var(--txt3);margin:0 0 6px">🗓 Away per the sheet ('+_away.length+'): '+_away.sort().join(', ')+'</div>':'');
+  h+='<div class="co-impact">'+workingCt+' working · '+d.off.length+' called off'+
      '<small>Marking someone off shows you exactly which blocks it breaks, and who can cover.</small></div>';
   h+=_coImpactHtml();   // v60.147: "what this opens up" + guarded suggestions
   if(d.off.length){
