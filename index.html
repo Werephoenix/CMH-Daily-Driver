@@ -7266,9 +7266,8 @@ function buildSmartRotation() {
     const duty  = STATE.staffDuty ? STATE.staffDuty[pid] : undefined;
     const inExpected = expToday[pid] != null;
     // Include if explicitly on duty OR scheduled today (and not explicitly off)
-    if (duty === false) return;
+    if (isOffToday(pid)) return;                       // v60.223: off / VACA / callout — none rotate
     if (!inExpected && duty !== true) return;
-    if ((STATE.todayOverrides||{})[pid] === 'callout') return;
 
     let shift = getPersonShiftToday(person);
     if (!shift) return;
@@ -8803,7 +8802,13 @@ function autoLoadFromExpected(expectedToday, dow) {
   if (!STATE.shiftTimes)   STATE.shiftTimes   = {};
   if (!STATE.altSchedule)  STATE.altSchedule  = {};
   if (!STATE.stationPref)  STATE.stationPref  = {};
-  Object.entries(expectedToday).forEach(([pid,e])=>{ STATE.staffDuty[pid]=true; STATE.shiftTimes[pid]=e.shift; });
+  Object.entries(expectedToday).forEach(([pid,e])=>{
+    // v60.223 (Inspector N1): never set on-duty over an 'off'/'callout' override —
+    // a vacationer was rotating for ~40s after every reload until the next sync.
+    var _o=(STATE.todayOverrides||{})[pid];
+    STATE.staffDuty[pid] = (_o==='off' || _o==='callout') ? false : true;   // one truth, all readers agree
+    STATE.shiftTimes[pid]=e.shift;
+  });
   // Clear CXR stations from previous state before fresh distribution
   Object.entries(expectedToday).forEach(([pid,e])=>{
     if(e.person.role==='CXR') delete STATE.staffStation[pid];
@@ -10050,7 +10055,7 @@ function _nowZone(pid, p, h) {
   const ss = ov.start!=null ? ov.start : p.shiftStart;
   const se = ov.end!=null ? ov.end : p.shiftEnd;
   if (ss==null || h<ss || h>=se) return 'off';
-  if ((STATE.todayOverrides||{})[pid]==='callout') return 'off';
+  if (isOffToday(pid)) return 'off';   // v60.223
   if (p.role==='RETURNS') return 'returns';
   const rot = (window._lastRotations||{})[pid];
   if (rot) {
@@ -10240,7 +10245,7 @@ function buildFloorSheet() {
   const h = Math.floor(new Date().getHours() + new Date().getMinutes()/60);
   // on-shift, non-callout people, sorted by role then name
   const people = Object.entries(exp).filter(([pid,e]) => {
-    if ((STATE.todayOverrides||{})[pid]==='callout') return false;
+    if (isOffToday(pid)) return false;   // v60.223
     const z = _nowZone(pid, e.person, h);
     return z !== 'off';
   }).sort((a,b)=>{
@@ -15390,7 +15395,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.222'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.223'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -16512,7 +16517,12 @@ function archiveStaff(id) {
   const p = getEffectiveRoster().find(x=>x.id===id);
   const nm = p ? (p.nick || (p.name||'').split(' ')[0]) : 'this person';
   // v60.101: distinguish a temporary LEAVE (returning) from a permanent departure.
-  const onLeave = confirm('Is '+nm+' on TEMPORARY leave (coming back)?\n\n  OK  = On leave (returning)\n  Cancel = Left the branch');
+  // v60.223 (Inspector ⑫a): the old confirm() made Cancel mean "left the branch".
+  // Now Cancel means cancel.
+  const _ans = prompt(nm+' — type  L  if on temporary LEAVE (coming back), or  X  if they LEFT the branch.\nCancel = do nothing.', 'L');
+  if (_ans === null) return;
+  if (!/^[lx]/i.test(_ans.trim())) { toast('Type L or X'); return; }
+  const onLeave = /^l/i.test(_ans.trim());
   const reason = prompt((onLeave?'On leave':'Left the branch')+' — '+nm+'. Reason (optional, kept for your records):',
                         onLeave ? 'On leave — returning' : '');
   if (reason === null) return; // cancelled
@@ -18231,7 +18241,7 @@ function buildCoverageTimeline() {
     const _on=people.filter(pr=>{
       const e=pr[1],pid=pr[0]; if(!e||!e.person) return false;
       if(['ARM','BRM','ABRM','MT'].indexOf(e.person.role)<0) return false;
-      if((STATE.todayOverrides||{})[pid]==='callout') return false;
+      if(isOffToday(pid)) return false;   // v60.223
       if((e.person.defaultStation||'')==='Off Site') return false;
       const sm=(STATE.shiftMod||{})[pid]||{};
       let ss=sm.start!=null?sm.start:e.person.shiftStart;
@@ -18253,7 +18263,7 @@ function buildCoverageTimeline() {
     people.forEach(pr=>{
       const pid=pr[0], e=pr[1]; if(!e||!e.person) return;
       if(['ARM','BRM','ABRM','MT'].indexOf(e.person.role)<0) return;
-      if((STATE.todayOverrides||{})[pid]==='callout') return;
+      if(isOffToday(pid)) return;   // v60.223
       const blocks=(STATE.mgmtBlocks||{})[pid]||[];
       let area=null;
       if(blocks.length){ _haveData=true;
@@ -20647,7 +20657,9 @@ function gfxGaps(){
 function gfxPlanBuild(){
   var snap={staffStation:JSON.stringify(STATE.staffStation||{}),
             altSchedule:JSON.stringify(STATE.altSchedule||{}),
-            mgmtBlocks:JSON.stringify(STATE.mgmtBlocks||{})};
+            mgmtBlocks:JSON.stringify(STATE.mgmtBlocks||{}),
+            altPinned:JSON.stringify(STATE.altPinned||{}),             // v60.223 (N5)
+            specialBlocks:JSON.stringify(STATE.specialBlocks||{})};
   var moves=[], guard=0, startGaps=gfxGaps().length;
   try{
     while(guard++<10){
@@ -20666,6 +20678,8 @@ function gfxPlanBuild(){
       STATE.staffStation=JSON.parse(snap.staffStation);
       STATE.altSchedule=JSON.parse(snap.altSchedule);
       STATE.mgmtBlocks=JSON.parse(snap.mgmtBlocks);
+      STATE.altPinned=JSON.parse(snap.altPinned);
+      STATE.specialBlocks=JSON.parse(snap.specialBlocks);
       if(typeof rotInvalidate==='function') rotInvalidate();
     }catch(e){}
   }
@@ -20757,7 +20771,9 @@ function gfxStart(){
   _gfx={queue:gfxGaps(), idx:0, applied:[],
         snapshot:{staffStation:JSON.stringify(STATE.staffStation||{}),
                   altSchedule:JSON.stringify(STATE.altSchedule||{}),
-                  mgmtBlocks:JSON.stringify(STATE.mgmtBlocks||{})}};
+                  mgmtBlocks:JSON.stringify(STATE.mgmtBlocks||{}),
+                  altPinned:JSON.stringify(STATE.altPinned||{}),        // v60.223 (Inspector N5)
+                  specialBlocks:JSON.stringify(STATE.specialBlocks||{})}};
   if(!_gfx.queue.length){ if(typeof toast==='function') toast('✓ No coverage gaps from this hour on'); return; }
   gfxRender();
 }
@@ -20848,6 +20864,8 @@ function gfxUndoAll(){
     STATE.staffStation=JSON.parse(s.staffStation);
     STATE.altSchedule=JSON.parse(s.altSchedule);
     STATE.mgmtBlocks=JSON.parse(s.mgmtBlocks);
+    if(s.altPinned) STATE.altPinned=JSON.parse(s.altPinned);           // v60.223 (N5)
+    if(s.specialBlocks) STATE.specialBlocks=JSON.parse(s.specialBlocks);
     if(typeof rotInvalidate==='function') rotInvalidate();
     if(typeof saveState==='function') saveState();
     buildCoverageTimeline(); renderCovStrip();
@@ -20939,7 +20957,7 @@ function ptEval(n){
   var people=Object.keys(exp).length;
   if(n===1){
     var stored=null; try{ stored=getScheduleForDate(todayKey()); }catch(e){}
-    if(stored && people) return {status:'done', detail:people+' people in from the stored schedule'};
+    if(stored && people) return {status:'done', detail:people+' people in — today\u2019s stored schedule, roster patterns for anyone it doesn\u2019t name'};
     if(people) return {status:st.steps[1]||'open', detail:people+' people from roster patterns — no stored day. Paste the Game Plan, or accept the roster fallback.'};
     return {status:'open', detail:'No schedule at all — import one first (Admin → Schedule).'};
   }
@@ -20956,7 +20974,7 @@ function ptEval(n){
       var ss=(STATE.shiftMod||{})[pid]&&(STATE.shiftMod[pid].start!=null)?STATE.shiftMod[pid].start:p.shiftStart;
       var se=(STATE.shiftMod||{})[pid]&&(STATE.shiftMod[pid].end!=null)?STATE.shiftMod[pid].end:p.shiftEnd;
       if(ss==null||se==null||(se-ss)<6) return;
-      if((STATE.todayOverrides||{})[pid]==='callout') return;
+      if(isOffToday(pid)) return;   // v60.223
       if((STATE.altSchedule||{})[pid+'_nolunch']===true) return;
       // v60.222 (Inspector ⑩): same rule as the engine — a split shift's
       // longest segment decides, and short shifts never needed one.
@@ -20979,7 +20997,7 @@ function ptEval(n){
     var flips=[];
     Object.keys(exp).forEach(function(pid){
       var e=exp[pid], p=e.person; if(p.role!=='CXR') return;
-      if((STATE.todayOverrides||{})[pid]==='callout') return;
+      if(isOffToday(pid)) return;   // v60.223
       if(typeof exitAccommodated==='function' && exitAccommodated(pid)) return;   // never suggest exit for them
       if(((STATE.mgmtBlocks||{})[pid]||[]).length) return;                        // custom times = manager decided
       var ss=p.shiftStart, se=p.shiftEnd; if(ss==null||se==null||(se-ss)<7.5) return;
@@ -21298,7 +21316,7 @@ function rhythmRecord(){
   if(!STATE.startHist) STATE.startHist={};
   var exp={}; try{ exp=buildExpectedToday(); }catch(e){ return; }
   Object.keys(exp).forEach(function(pid){
-    if((STATE.todayOverrides||{})[pid]==='callout') return;
+    if(isOffToday(pid)) return;   // v60.223
     var t=null;
     if((STATE.customLunch||{})[pid]!=null) t=STATE.customLunch[pid];
     else { var r=(window._lastRotations||{})[pid]; if(r&&r.lunch) t=r.lunch.from; }
@@ -21863,11 +21881,20 @@ function gfAreaOf(station){
   return null;
 }
 // Is this person on shift at hour h (honors shiftMod + overnight)?
+// v60.223 · ONE ANSWER TO "IS THIS PERSON OUT TODAY?" (Inspector round 2, N1/N2/N6).
+// Called-off, sheet-OFF/VACA (derived 'off'), and staffDuty false are all "out".
+// Every reader below uses this — the rotation pool, lunch placer, solo scan,
+// manager coverage, the wizard, the on-shift test. A prose rule with nine
+// readers had nine chances to drift; a predicate has one.
+function isOffToday(pid){
+  var o=(STATE.todayOverrides||{})[pid];
+  if(o==='callout'||o==='off') return true;
+  if((STATE.staffDuty||{})[pid]===false) return true;
+  return false;
+}
 function gfOnShiftAt(pid, e, h){
   if(!e || !e.person) return false;
-  var _ovr=(STATE.todayOverrides||{})[pid];
-  if(_ovr==='callout' || _ovr==='off') return false;            // v60.222 (Inspector ②): sheet-OFF/VACA counted before
-  if((STATE.staffDuty||{})[pid]===false) return false;
+  if(isOffToday(pid)) return false;
   var ov=(STATE.shiftMod||{})[pid]||{};
   var ss=(ov.start!=null)?ov.start:e.person.shiftStart;
   var se=(ov.end  !=null)?ov.end  :e.person.shiftEnd;
@@ -22327,7 +22354,7 @@ function suggestLunches(){
   // Build worker list with targets
   const workers=Object.entries(exp)
     .filter(([pid,e])=>true // include everyone — managers get lunches too
-      &&(STATE.todayOverrides||{})[pid]!=='callout')
+      &&!isOffToday(pid))   // v60.223 (Inspector N2): a vacationer was eating a 9:30 slot
     .map(([pid,e])=>{
       const p=e.person,mods=STATE.shiftMod||{},ov=mods[pid]||{};
       const ss=ov.start!=null?ov.start:p.shiftStart;
@@ -22787,7 +22814,7 @@ function ppOverviewHtml(pid,p,ss,se,fmtH,entry){
   } else {
     h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">'
      + btn('calledoff','📞', out?'Called off':'Called off', out,'var(--na)')
-     + btn('late','⏰', (mk&&mk.t==='late')?('Late +'+mk.m+'m'):'Running late', !!(mk&&mk.t==='late'),'var(--up)')
+     + btn('late','⏰', (mk&&mk.late)?('Late +'+mk.late+'m'):'Running late', !!(mk&&mk.late),'var(--up)')
      + btn('leftearly','🏃', (mk&&mk.t==='leftearly')?('Left '+fmtH(mk.at)):'Left early', !!(mk&&mk.t==='leftearly'),'var(--up)')
      +'</div>';
   }
@@ -22824,8 +22851,9 @@ function ppOverviewHtml(pid,p,ss,se,fmtH,entry){
     var _dur=(ss!=null&&se!=null)?(se-ss):null;
     var _short=(_dur!=null && _dur<(typeof LUNCH_MIN_HOURS!=='undefined'?LUNCH_MIN_HOURS:6));
     var _lbl=_nl?'🍽 No lunch today ✓':(_short?'🍽 short shift · no lunch (auto)':'🍽 Lunch planned');
-    chips.push('<button class="vl-mgr" onclick="toggleNoLunch(\''+pid.replace(/'/g,'\\x27')+'\');openPersonPanel(\''+pid.replace(/'/g,'\\x27')+'\',\'overview\')" '
-      +'title="Tap to toggle no-lunch for today" style="all:unset;cursor:pointer;color:'+(_nl?'var(--amber)':'inherit')+'">'+_lbl+'</button>');
+    chips.push('<span style="color:'+(_nl?'var(--amber)':'inherit')+'">'+_lbl+'</span>'
+      +'<button class="vl-mgr" onclick="toggleNoLunch(\''+pid.replace(/'/g,'\\x27')+'\');openPersonPanel(\''+pid.replace(/'/g,'\\x27')+'\',\'overview\')" '
+      +'title="Toggle no-lunch for today" style="all:unset;cursor:pointer;margin-left:5px;color:var(--txt3)">⇄</button>');   // v60.223 (N4): info stays, only the tap hides under lock
   }catch(e){}
   if(chips.length){
     h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">'
@@ -23095,7 +23123,7 @@ function openPersonPanel(pid, view) {
     const pendingBadge = (typeof hasPendingChanges==='function' && hasPendingChanges())
       ? `<span style="font-size:9px;color:var(--amber);margin-left:6px;background:rgba(245,158,11,.12);padding:2px 6px;border-radius:3px;border:1px solid var(--amber)">⏳ unsaved</span>`
       : '';
-    wiEl.innerHTML=`<button onclick="openWhatifFor('${pid}')"
+    wiEl.innerHTML=`<button onclick="openWhatifFor('${String(pid).replace(/'/g,"\\x27")}')"
       style="width:100%;padding:10px;border-radius:8px;
         border:1px solid var(--bdr2);background:var(--bg3);
         color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;
@@ -24539,6 +24567,7 @@ function _clearDerivedOff(){
   Object.keys(ov).forEach(function(pid){
     if (ov[pid] === 'off'){
       delete ov[pid];
+      if (STATE.staffDuty) delete STATE.staffDuty[pid];   // v60.223 (Inspector N6): the flag written with it
       // v60.194: a type riding a DERIVED 'off' can only have come from the
       // schedule (manager-set types ride 'callout') — clear it with its off.
       if (STATE.absenceType) delete STATE.absenceType[pid];
