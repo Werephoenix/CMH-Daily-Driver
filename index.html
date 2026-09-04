@@ -14686,6 +14686,7 @@ function buildExpectedToday() {
   if (mgmtSched && mgmtSched.grid && mgmtSched.grid[today]) {
     Object.entries(mgmtSched.grid[today]).forEach(([pid, shift]) => {
       if (isOffCode(shift)) return;   // v60.160: canonical off-test
+      if (typeof _isArchivedPid==='function' && _isArchivedPid(pid)) return;   // v60.222 (Inspector ⑦)
       // Find person: try all pid variants of each roster name
       const person = allRoster.find(p => namePidVariants(p.name).includes(pid) ||
         namePidVariants(p.name).some(v => pid.startsWith(v.slice(0,8)) || v.startsWith(pid.slice(0,8))));
@@ -14704,6 +14705,7 @@ function buildExpectedToday() {
   if (cxrSched && cxrSched.grid && cxrSched.grid[today]) {
     Object.entries(cxrSched.grid[today]).forEach(([pid, shift]) => {
       if (isOffCode(shift)) return;   // v60.160: canonical off-test
+      if (typeof _isArchivedPid==='function' && _isArchivedPid(pid)) return;   // v60.222 (Inspector ⑦)
       const person = allRoster.find(p => normPid(p.name) === pid);
       if (person) expected[normPid(person.name)] = { person, shift, source:'schedule' };
     });
@@ -15388,7 +15390,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.221'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.222'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -16530,7 +16532,7 @@ function archiveStaff(id) {
 }
 function reinstateStaff(id) {
   if (!STATE.adminRoster) STATE.adminRoster = [];
-  const patch = { active:true, onLeave:false, departedDate:null, departedReason:null };
+  const patch = { active:true, onLeave:false, departedDate:null, departedReason:null, borrowedUntil:'' };   // v60.222 (Inspector ⑧): clear the auto-expiry
   const idx = STATE.adminRoster.findIndex(o=>o.id===id);
   if (idx>=0) STATE.adminRoster[idx] = Object.assign(STATE.adminRoster[idx], patch);
   else STATE.adminRoster.push(Object.assign({ id }, patch));
@@ -18006,7 +18008,8 @@ function buildCoverageTimeline() {
     const mods=STATE.shiftMod||{},ov=mods[pid]||{};
     const ss=ov.start!=null?ov.start:person.shiftStart;
     const se=ov.end!=null?ov.end:person.shiftEnd;
-    if(ss==null||h<ss||h>=se)return'off';
+    const seZ=(se!=null&&ss!=null&&se<ss)?se+24:se;   // v60.222 (Inspector ⑥): overnight end lives on the +24 side
+    if(ss==null||h<ss||h>=seZ)return'off';
     if((STATE.todayOverrides||{})[pid]==='callout')return'off';
     // v58: Manually-set assignment blocks (STATE.mgmtBlocks) ALWAYS win
     // over the auto rotation for that person. Was previously only honored
@@ -20955,6 +20958,11 @@ function ptEval(n){
       if(ss==null||se==null||(se-ss)<6) return;
       if((STATE.todayOverrides||{})[pid]==='callout') return;
       if((STATE.altSchedule||{})[pid+'_nolunch']===true) return;
+      // v60.222 (Inspector ⑩): same rule as the engine — a split shift's
+      // longest segment decides, and short shifts never needed one.
+      var _g=((STATE.specialBlocks||{})[pid]||[]).filter(function(b){ return b.key==='split'; })[0];
+      var _seg=_g?Math.max(_g.from-ss, se-_g.to):(se-ss);
+      if(_seg < (typeof LUNCH_MIN_HOURS!=='undefined'?LUNCH_MIN_HOURS:6)) return;
       var has=false;
       if((STATE.customLunch||{})[pid]!=null) has=true;
       var r=(window._lastRotations||{})[pid]; if(r&&r.lunch) has=true;
@@ -21857,7 +21865,9 @@ function gfAreaOf(station){
 // Is this person on shift at hour h (honors shiftMod + overnight)?
 function gfOnShiftAt(pid, e, h){
   if(!e || !e.person) return false;
-  if((STATE.todayOverrides||{})[pid]==='callout') return false;
+  var _ovr=(STATE.todayOverrides||{})[pid];
+  if(_ovr==='callout' || _ovr==='off') return false;            // v60.222 (Inspector ②): sheet-OFF/VACA counted before
+  if((STATE.staffDuty||{})[pid]===false) return false;
   var ov=(STATE.shiftMod||{})[pid]||{};
   var ss=(ov.start!=null)?ov.start:e.person.shiftStart;
   var se=(ov.end  !=null)?ov.end  :e.person.shiftEnd;
@@ -22707,28 +22717,44 @@ function ppQuick(pid, kind){
     if((STATE.todayOverrides||{})[pid]==='callout') clearAbsence(pid);
     else setAbsence(pid,'calledoff');
   } else if(kind==='late'){
-    if(mk && mk.t==='late'){ delete STATE.dayMarks[pid]; delete STATE.shiftMod[pid]; loadScheduleForToday(false); }
-    else{
+    // v60.222 (Inspector ④⑤): the mark stores the BASE start it pushes from
+    // (no compounding on re-derive) and MERGES with a manual Adjust mark
+    // instead of overwriting it.
+    if(mk && mk.late){
+      delete mk.late; delete mk.lateBase;
+      if(mk.t==='late'){ delete STATE.dayMarks[pid]; delete STATE.shiftMod[pid]; }
+      loadScheduleForToday(false);
+    } else {
       var m=parseInt(prompt('How many minutes late? (15 / 30 / 60…)','30')||'0',10);
       if(!m||m<1) return;
       var rp=personByPid(pid), ov=STATE.shiftMod[pid]||{};
       var base=(ov.start!=null)?ov.start:(rp?rp.shiftStart:null);
       if(base==null){ toast('No shift start to push'); return; }
-      STATE.dayMarks[pid]={t:'late', m:m, date:tk};
+      if(mk && mk.t==='manual'){ mk.late=m; mk.lateBase=base; }
+      else STATE.dayMarks[pid]={t:'late', m:m, late:m, lateBase:base, date:tk};
       STATE.shiftMod[pid]=Object.assign({},ov,{start:base+m/60});
     }
   } else if(kind==='leftearly'){
     if(mk && mk.t==='leftearly'){ delete STATE.dayMarks[pid]; delete STATE.shiftMod[pid]; loadScheduleForToday(false); }
     else{
+      // v60.222 (Inspector ⑥): refuse before the shift starts; after midnight
+      // on an overnight, "now" lives on the +24 side of the shift.
+      var rp2=personByPid(pid), ov2=STATE.shiftMod[pid]||{};
+      var s0=(ov2.start!=null)?ov2.start:(rp2?rp2.shiftStart:null);
+      var e0=(ov2.end!=null)?ov2.end:(rp2?rp2.shiftEnd:null);
       var now=Math.round((new Date().getHours()+new Date().getMinutes()/60)*4)/4;
-      var ov2=STATE.shiftMod[pid]||{};
+      // Overnight (end past 24): "now" is on the +24 side ONLY in the small
+      // hours after midnight — i.e. before the shift's real end-of-night.
+      // (First cut added 24 whenever now<start, which let a 3:15p tap on a
+      // 4:30p–1a shift through as 39:15 — the exact case to refuse.)
+      if(s0!=null && e0!=null && e0>24 && now < (e0-24)) now+=24;
+      if(s0!=null && now<s0){ toast('Shift hasn\u2019t started — use Called off instead'); return; }
       STATE.dayMarks[pid]={t:'leftearly', at:now, date:tk};
       STATE.shiftMod[pid]=Object.assign({},ov2,{end:now});
     }
   }
-  if(typeof rotInvalidate==='function') rotInvalidate();
   if(typeof saveState==='function') saveState();
-  try{ buildCoverageTimeline(); renderCovStrip(); }catch(e){}
+  _shiftEditRebuild();   // v60.222 (Inspector ⑫): the one rebuild path, not a lazy refill
   openPersonPanel(pid,'overview');
 }
 function ppStreak(pid){
@@ -22861,12 +22887,18 @@ function ppEditDay(pid,key){
   openPersonPanel(pid,'week');
 }
 function ppTogglePto(pid,key){
+  // v60.222 (Inspector ③): TODAY's PTO goes through the absence path, which
+  // writes both stores (todayOverrides + pto) and takes them off the floor.
+  if(key===todayKey()){
+    if(((STATE.pto||{})[key]||{})[pid] || (typeof absenceTypeOf==='function' && absenceTypeOf(pid)==='pto')) clearAbsence(pid);
+    else setAbsence(pid,'pto');
+    _shiftEditRebuild(); openPersonPanel(pid,'week'); return;
+  }
   if(!STATE.pto) STATE.pto={};
   if(!STATE.pto[key]) STATE.pto[key]={};
   if(STATE.pto[key][pid]) delete STATE.pto[key][pid]; else STATE.pto[key][pid]=true;
   if(!Object.keys(STATE.pto[key]).length) delete STATE.pto[key];
   if(typeof saveState==='function') saveState();
-  if(key===todayKey()){ try{ loadScheduleForToday(false); _shiftEditRebuild(); }catch(e){} }
   openPersonPanel(pid,'week');
 }
 // ── v60.220 · PROFILE SPOKE — Admin's per-person actions, on the card ───────
@@ -23130,6 +23162,10 @@ function openPersonPanel(pid, view) {
 
 function buildManagerControls(pid,person,ss,se,fmtH) {
   if (typeof qaInjectStyle === 'function') qaInjectStyle();   // v60.152: .pc-more lives in the shared sheet
+  // v60.222 (Inspector ①): `nick` was only declared in openPersonPanel; the
+  // usual-lunch button referenced it here → ReferenceError → the card never
+  // opened for ANY CXR/EXIT/RETURNS once Manager Mode was unlocked.
+  const nick = (person && (person.nick || String(person.name||'').split(' ')[0])) || String(pid).replace(/_/g,' ');
   const altPos=(STATE.altSchedule||{})[pid]||'normal';
   const noLunch=(STATE.altSchedule||{})[pid+'_nolunch']===true;
   const station=(STATE.staffStation||{})[pid]||'';
@@ -24618,16 +24654,21 @@ function loadScheduleForToday(force) {
         if(!mk || mk.date!==key){ delete STATE.dayMarks[mpid]; return; }
         var ov=STATE.shiftMod[mpid]||{};
         var rp=(typeof personByPid==='function')?personByPid(mpid):null;
-        if(mk.t==='late' && mk.m){
-          var b=(ov.start!=null)?ov.start:(rp?rp.shiftStart:null);
-          if(b!=null){ ov.start=b+mk.m/60; STATE.shiftMod[mpid]=ov; }
-        } else if(mk.t==='leftearly' && mk.at!=null){
-          ov.end=mk.at; STATE.shiftMod[mpid]=ov;
-        } else if(mk.t==='manual'){
+        // v60.222: manual first (start/end), then a late push FROM ITS BASE —
+        // never from the already-pushed start (Inspector ④: +30 became +60, +90…)
+        if(mk.t==='manual'){
           if(mk.start!=null) ov.start=mk.start;
           if(mk.end!=null) ov.end=mk.end;
-          STATE.shiftMod[mpid]=ov;
         }
+        if(mk.late){
+          var b=(mk.lateBase!=null)?mk.lateBase:((mk.t==='manual'&&mk.start!=null)?mk.start:(rp?rp.shiftStart:ov.start));
+          if(b!=null) ov.start=b+mk.late/60;
+        } else if(mk.t==='late' && mk.m){
+          var b2=(mk.lateBase!=null)?mk.lateBase:(rp?rp.shiftStart:null);
+          if(b2!=null) ov.start=b2+mk.m/60;
+        }
+        if(mk.t==='leftearly' && mk.at!=null) ov.end=mk.at;
+        STATE.shiftMod[mpid]=ov;
       });
     }
   }catch(e){}
@@ -26891,7 +26932,7 @@ function mcEventsOn(key){
 function mcNormMD(s){ if(!s) return ''; var m=String(s).match(/(\d{1,2})[\/\-](\d{1,2})/); if(!m) return ''; return String(parseInt(m[1])).padStart(2,'0')+'-'+String(parseInt(m[2])).padStart(2,'0'); }
 function mcCelebsOn(key){ var md=key.slice(5); return (STATE.celebrations||[]).filter(function(c){ return mcNormMD(c.date)===md; }); }
 function mcScheduleObj(key){ try{ return (typeof getScheduleForDate==='function' ? getScheduleForDate(key) : null) || {}; }catch(e){ return {}; } }
-function mcStaffCount(key){ var s=mcScheduleObj(key); return Object.keys(s).filter(function(p){ return !isOffCode(s[p]); }).length; }
+function mcStaffCount(key){ var s=mcScheduleObj(key); var pto=(STATE.pto||{})[key]||{}; return Object.keys(s).filter(function(p){ return !isOffCode(s[p]) && !pto[p]; }).length; }   // v60.222 (Inspector ⑨)
 // v60.115: time-off layer — who's OFF/VACA/PTO on a date (schedule markers +
 // the optional PTO store), for the calendar's 🌴 marker + day detail.
 function mcTimeOffOn(key){
