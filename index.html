@@ -4631,7 +4631,7 @@ function saveState() {
   try {
     const TODAY = _localDayKey(new Date());
     const LS_KEY = 'cmh-v2-' + TODAY;
-    if (typeof todayKey === 'function') STATE.dayOf = todayKey();   // v60.227 (Z1): every save says which day it belongs to
+    if (typeof _bizDayKey === 'function') STATE.dayOf = _bizDayKey();   // v60.227/228: every save says which BUSINESS day it belongs to
     localStorage.setItem(LS_KEY, JSON.stringify(STATE));
     window._saveStateOk = true;
   } catch(e) {
@@ -6825,11 +6825,13 @@ function autoSaveHistory() {
         const entry = {
           date: yDate,
           dateLabel: yesterday.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}),
-          cs: ys.f?.cs||null, hot: ys.f?.hot||null, oos: ys.f?.oosFinal||ys.f?.oos||null,
-          openMgr: ys.f?.openMgr||null, closeMgr: ys.f?.closeMgr||null,
-          salesLeader: ys.f?.salesLeader||null, walkUpPolicy: ys.wu||'open',
-          closeNotes: ys.f?.closeNotes||null, lateStaff: ys.f?.lateStaff||null,
-          xxar: ys.f?.xxar||null, fullSummary: '(auto-saved from previous session)',
+          // v60.228 (Inspector item 5): read the CURRENT state shape (fields / walkUpPolicy);
+          // the pre-fields shape (f / wu) stays as a fallback for very old files.
+          cs: (ys.fields||ys.f||{}).cs||null, hot: (ys.fields||ys.f||{}).hot||null, oos: (ys.fields||ys.f||{}).oosFinal||(ys.fields||ys.f||{}).oos||null,
+          openMgr: (ys.fields||ys.f||{}).openMgr||null, closeMgr: (ys.fields||ys.f||{}).closeMgr||null,
+          salesLeader: (ys.fields||ys.f||{}).salesLeader||null, walkUpPolicy: ys.walkUpPolicy||ys.wu||'open',
+          closeNotes: (ys.fields||ys.f||{}).closeNotes||null, lateStaff: (ys.fields||ys.f||{}).lateStaff||null,
+          xxar: (ys.fields||ys.f||{}).xxar||null, fullSummary: '(auto-saved from previous session)',
           clOpening:{done:0,total:0},clMid:{done:0,total:0},clClosing:{done:0,total:0},
         };
         hist.unshift(entry);
@@ -8784,14 +8786,24 @@ function btn(label, onclick, color) {
 // in ONE place, reached from boot, the midnight watchdog and every merge.
 // Retired = the app's own "Day reset" set + the layers added since it was
 // written (manager decisions, rotation choices, blocks, lunches, marks).
+// v60.228 (Inspector round 7, item 4): the retire boundary is the BUSINESS day —
+// the branch runs to 1:30a, so a closer's 11 pm call-off must survive midnight.
+// DAY_START_HOUR (3.5) is the seam: nobody is on property between close and it.
+function _bizDayKey(d){ d=d||new Date(); var b=new Date(d.getTime()-(typeof DAY_START_HOUR!=='undefined'?DAY_START_HOUR:3.5)*3600e3); return _localDayKey(b); }
+// v60.228 (item 1): today's numbers, names and "done today" flags live in
+// STATE.fields; book24hr is the one standing policy in there.
+var DAY_FIELD_KEEP = {book24hr:1};
+function _retireDayFields(obj){ var f=obj&&obj.fields; if(!f) return; Object.keys(f).forEach(function(k){ if(!DAY_FIELD_KEEP[k]) delete f[k]; }); }
 function _retireDayLayers(){
   try{
-    var tk=(typeof todayKey==='function')?todayKey():null; if(!tk) return false;
+    var tk=_bizDayKey(); if(!tk) return false;
     if(!STATE.dayOf){ STATE.dayOf=tk; return false; }          // first stamp — nothing to retire
     if(STATE.dayOf===tk) return false;
     ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
-     'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','confirmedCoverage','pendingCoverage']
-      .forEach(function(k){ if(k in STATE) STATE[k] = (Array.isArray(STATE[k]) ? [] : (STATE[k]===null? null : {})); });
+     'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks']
+      .forEach(function(k){ if(k in STATE) STATE[k] = (Array.isArray(STATE[k]) ? [] : {}); });
+    STATE.confirmedCoverage=null; STATE.pendingCoverage=null;   // v60.228 (item 2): null, not {} — hasPendingChanges keys on it
+    _retireDayFields(STATE);
     STATE.dayOf=tk;
     if(typeof rotInvalidate==='function') rotInvalidate();
     if(typeof meetingsSync==='function') try{ meetingsSync(); }catch(e){}
@@ -15454,7 +15466,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.227'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.228'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15651,11 +15663,12 @@ function applyRemoteRecord(record, apply) {
   // BEFORE the union merge — the merge does not carry dayOf, so an after-
   // merge check could never see it.
   try{
-    var _rDay = remote.dayOf || (remoteAt ? _localDayKey(new Date(remoteAt)) : null);
-    if(_rDay && typeof todayKey==='function' && _rDay !== todayKey()){
+    var _rDay = remote.dayOf || (remoteAt ? _bizDayKey(new Date(remoteAt)) : null);   // v60.228: business day (a 00:30 save belongs to the night before)
+    if(_rDay && _rDay !== _bizDayKey()){
       ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
        'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','confirmedCoverage','pendingCoverage','dayOf']
         .forEach(function(k){ if(k in remote) delete remote[k]; });
+      _retireDayFields(remote);   // v60.228 (item 1): yesterday's opener name / counts / done-flags stay yesterday's
     }
   }catch(e){}
   mergeRemoteIntoState(STATE, remote);
