@@ -4624,6 +4624,14 @@ function saveState() {
   // memory; blocking the write here means a crash or a closed tab mid-demo also
   // leaves the saved data untouched.
   if (typeof demoIsOn === 'function' && demoIsOn()) return;
+  // v60.229 (Inspector round 8, item 1b): never stamp yesterday's state as
+  // today's — retire first if the business day has turned. Re-entrancy guard:
+  // the retire's own re-derive saves again.
+  if (typeof _retireDayLayers === 'function' && !window._retiring) {
+    window._retiring = true;
+    try { if (_retireDayLayers()) { try { loadScheduleForToday(false); } catch(e){} } }
+    finally { window._retiring = false; }
+  }
   // Local save always immediate. v59.2: previously silently swallowed all
   // failures — if localStorage was full or disabled, Matt would think his
   // data was being saved when it wasn't. Now logs to console (one warning
@@ -4768,7 +4776,7 @@ function autoRouteByTime() {
 // ── v60.52: START-OF-DAY GUIDED FLOW ─────────────────────────────────────────
 // First open of the day → show yesterday's EOD recap → paste GreenLight data →
 // offer "Fix Schedule" (recommended) or "Live Board".
-function _sodTodayKey(){ return _localDayKey(new Date()); }
+function _sodTodayKey(){ return (typeof _bizDayKey==='function') ? _bizDayKey() : _localDayKey(new Date()); }   // v60.229 (item 5): no "good morning" for a closer reloading at 00:30
 function maybeStartOfDay() {
   // v60.186: the start-of-day sheet must not ambush a demo. It is triggered by
   // "first open today", and entering a demo looks exactly like that — so it
@@ -6722,10 +6730,10 @@ function loadHistory() {
   catch(e) { return []; }
 }
 
-function saveDayToHistory() {
+function saveDayToHistory(forDate) {   // v60.229: forDate = the business day being closed (retire passes STATE.dayOf)
   recordDayPattern();
   const hist = loadHistory();
-  const today = _localDayKey(new Date());
+  const today = forDate || _localDayKey(new Date());
   // Remove existing entry for today if present
   const filtered = hist.filter(h => h.date !== today);
   const entry = {
@@ -7099,7 +7107,9 @@ function check4amSave() {
     localStorage.setItem(lastSaveKey, today);
   }
 }
-setInterval(check4amSave, 60000); // check every minute
+// v60.229: check4amSave retired — the business-day retire archives the closing
+// day under its own date at 3:30a (or at the next boot/merge). Running this at
+// 4am would snapshot the already-cleared day. Function kept for reference.
 
 
 
@@ -8799,6 +8809,10 @@ function _retireDayLayers(){
     var tk=_bizDayKey(); if(!tk) return false;
     if(!STATE.dayOf){ STATE.dayOf=tk; return false; }          // first stamp — nothing to retire
     if(STATE.dayOf===tk) return false;
+    // v60.229 (item 3): archive the day that is ending, under its own date,
+    // BEFORE its layers are cleared — a close finished after midnight used to
+    // file under tomorrow and then lose its only copy to this retire.
+    try{ if(typeof saveDayToHistory==='function') saveDayToHistory(STATE.dayOf); }catch(e){}
     ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
      'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks']
       .forEach(function(k){ if(k in STATE) STATE[k] = (Array.isArray(STATE[k]) ? [] : {}); });
@@ -15466,7 +15480,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.228'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.229'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15668,7 +15682,14 @@ function applyRemoteRecord(record, apply) {
       ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
        'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','confirmedCoverage','pendingCoverage','dayOf']
         .forEach(function(k){ if(k in remote) delete remote[k]; });
-      _retireDayFields(remote);   // v60.228 (item 1): yesterday's opener name / counts / done-flags stay yesterday's
+      // v60.229 (round 8, item 2): the union merge is a shallow assign — leaving
+      // remote.fields={book24hr} would REPLACE today's typed header. Keep the
+      // standing keys onto ours, then drop the remote object entirely.
+      if(remote.fields && typeof remote.fields==='object'){
+        STATE.fields = STATE.fields || {};
+        Object.keys(DAY_FIELD_KEEP).forEach(function(k){ if(k in remote.fields) STATE.fields[k]=remote.fields[k]; });
+        delete remote.fields;
+      }
     }
   }catch(e){}
   mergeRemoteIntoState(STATE, remote);
@@ -15900,10 +15921,21 @@ setInterval(function(){
     // minute here, so a merge that resurrects yesterday's checks is cleaned
     // within 60s too.
     if(typeof checklistRolloverIfNeeded==='function') checklistRolloverIfNeeded();
+    // v60.229 (Inspector round 8, item 1): the business day turns at 3:30a, not
+    // midnight — so the retire must be checked EVERY tick, not only inside the
+    // calendar-flip branch (which fires once at 00:00, when there is nothing to
+    // retire yet). An open desk tab otherwise never retired, and its first save
+    // after 3:30 stamped last night's call-offs as today's — for every device.
+    if(typeof _retireDayLayers==='function' && _retireDayLayers()){
+      if(typeof loadScheduleForToday==='function') loadScheduleForToday(false);
+      ['buildCoverageTimeline','renderNow','buildSwitchboard'].forEach(function(f){
+        if(typeof window[f]==='function') try{ window[f](); }catch(e){}
+      });
+      if(typeof toast==='function') toast('🌅 New business day — last night\u2019s call-offs and marks cleared');
+    }
     var tk=todayKey();
     if(_rolloverDay && tk!==_rolloverDay){
       _rolloverDay=tk;
-      if(typeof _retireDayLayers==='function') _retireDayLayers();   // v60.227 (Z1): the open desk tab crosses midnight
       if(typeof loadScheduleForToday==='function') loadScheduleForToday(false);
       if(typeof meetingsSync==='function') meetingsSync();
       if(typeof rotInvalidate==='function') rotInvalidate();
