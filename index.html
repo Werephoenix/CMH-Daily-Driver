@@ -6721,6 +6721,15 @@ function clearAllDuty() {
 // is possible future work, like DNR/DNQ in v60.7.)
 var HIST_KEY = 'cmh-history-v2';
 
+// v60.233 (Inspector round 12, #1): "guard the store, not the writer you were
+// shown." The history store had THREE writers and one guard; More -> Shift
+// History during a demo still replaced the branch's real days. This is now
+// the ONLY place the history store is written (a smoke test counts the
+// writers), and it is where a demo is refused.
+function writeHistory(arr){
+  if (typeof demoIsOn === 'function' && demoIsOn()) return false;
+  try { localStorage.setItem(HIST_KEY, JSON.stringify((arr||[]).slice(0, 60))); return true; } catch(e){ return false; }
+}
 function loadHistory() {
   // v60.186: history is a SEPARATE localStorage store, so clearing STATE does
   // not touch it — a demo would otherwise read the branch's real 60 days of
@@ -6848,40 +6857,29 @@ function saveDayToHistory(forDate, srcState) {
   filtered.unshift(merged); // newest first
   // Keep only 60 days
   const trimmed = filtered.slice(0, 60);
-  try { localStorage.setItem(HIST_KEY, JSON.stringify(trimmed)); } catch(e){}
+  writeHistory(trimmed);   // v60.233: the one write path
   if (own) toast('Day saved to history ✓');
 }
 
 // Auto-save at page load (captures yesterday if browser was left open)
 function autoSaveHistory() {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yk = `cmh-v2-${_localDayKey(yesterday)}`;
+  // v60.233 (Inspector round 12, #1): routed through the one archive path --
+  // yesterday's file is archived like a door record (its own fields, call-offs,
+  // absences, context, hourly), only when no entry for that day exists yet, so
+  // an own-archived entry is never touched. Refused in a demo by the store.
   try {
-    const yData = localStorage.getItem(yk);
-    if (yData) {
-      // There's yesterday's data — make sure it's in history
-      const hist = loadHistory();
-      const yDate = _localDayKey(yesterday);
-      if (!hist.find(h => h.date === yDate)) {
-        const ys = JSON.parse(yData);
-        const auto = { open: null, close: null };
-        const entry = {
-          date: yDate,
-          dateLabel: yesterday.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}),
-          // v60.228 (Inspector item 5): read the CURRENT state shape (fields / walkUpPolicy);
-          // the pre-fields shape (f / wu) stays as a fallback for very old files.
-          cs: (ys.fields||ys.f||{}).cs||null, hot: (ys.fields||ys.f||{}).hot||null, oos: (ys.fields||ys.f||{}).oosFinal||(ys.fields||ys.f||{}).oos||null,
-          openMgr: (ys.fields||ys.f||{}).openMgr||null, closeMgr: (ys.fields||ys.f||{}).closeMgr||null,
-          salesLeader: (ys.fields||ys.f||{}).salesLeader||null, walkUpPolicy: ys.walkUpPolicy||ys.wu||'open',
-          closeNotes: (ys.fields||ys.f||{}).closeNotes||null, lateStaff: (ys.fields||ys.f||{}).lateStaff||null,
-          xxar: (ys.fields||ys.f||{}).xxar||null, fullSummary: '(auto-saved from previous session)',
-          clOpening:{done:0,total:0},clMid:{done:0,total:0},clClosing:{done:0,total:0},
-        };
-        hist.unshift(entry);
-        localStorage.setItem(HIST_KEY, JSON.stringify(hist.slice(0,60)));
-      }
-    }
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const yDate = _localDayKey(yesterday);
+    const yData = localStorage.getItem(`cmh-v2-${yDate}`);
+    if (!yData) return;
+    if (loadHistory().find(h => h.date === yDate)) return;
+    const ys = JSON.parse(yData);
+    if (!ys || typeof ys !== 'object') return;
+    if (!ys.fields && ys.f) ys.fields = ys.f;                       // pre-fields shape
+    if (!ys.walkUpPolicy && ys.wu) ys.walkUpPolicy = ys.wu;
+    saveDayToHistory(yDate, ys);
+    const e = loadHistory().find(h => h.date === yDate);
+    if (e && !e.fullSummary) { e.fullSummary = '(auto-saved from previous session)'; writeHistory(loadHistory().map(h => h.date===yDate ? e : h)); }
   } catch(e){}
 }
 
@@ -7032,7 +7030,7 @@ function clearOldHistory() {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 30);
   const recent = hist.filter(d => new Date(d.date) >= cutoff);
-  localStorage.setItem(HIST_KEY, JSON.stringify(recent));
+  if (!writeHistory(recent)) { if (typeof toast==='function') toast('Not while a demo is running'); return; }   // v60.233
   buildHistoryScreen();
   toast(`Cleared ${hist.length - recent.length} old entries`);
 }
@@ -8839,6 +8837,11 @@ function _bizDayKey(d){ d=d||new Date(); var b=new Date(d.getTime()-(typeof DAY_
 // v60.228 (item 1): today's numbers, names and "done today" flags live in
 // STATE.fields; book24hr is the one standing policy in there.
 var DAY_FIELD_KEEP = {book24hr:1};
+// v60.233 (Inspector round 12, #2): the retire and the merge door were two
+// hand-copies of one list, and they drifted (outCancel). One list, two doors.
+var DAY_LAYER_KEYS = ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
+                      'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks'];
+var DAY_LAYER_EXTRA = ['confirmedCoverage','pendingCoverage','outCancel','dayOf'];   // scalars the door must drop too
 function _retireDayFields(obj){ var f=obj&&obj.fields; if(!f) return; Object.keys(f).forEach(function(k){ if(!DAY_FIELD_KEEP[k]) delete f[k]; }); }
 function _retireDayLayers(){
   try{
@@ -8849,9 +8852,7 @@ function _retireDayLayers(){
     // BEFORE its layers are cleared — a close finished after midnight used to
     // file under tomorrow and then lose its only copy to this retire.
     try{ if(typeof saveDayToHistory==='function') saveDayToHistory(STATE.dayOf); }catch(e){}
-    ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
-     'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks']
-      .forEach(function(k){ if(k in STATE) STATE[k] = (Array.isArray(STATE[k]) ? [] : {}); });
+    DAY_LAYER_KEYS.forEach(function(k){ if(k in STATE) STATE[k] = (Array.isArray(STATE[k]) ? [] : {}); });   // v60.233: one list
     STATE.confirmedCoverage=null; STATE.pendingCoverage=null;   // v60.228 (item 2): null, not {} — hasPendingChanges keys on it
     STATE.outCancel=0;   // v60.232 (round 11, #3): a day count, not a standing number
     _retireDayFields(STATE);
@@ -15517,7 +15518,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.232'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.233'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15729,9 +15730,7 @@ function applyRemoteRecord(record, apply) {
       // under its own date — the closer's after-midnight notes and numbers now
       // reach an opener device that slept through the night. Merges non-null.
       try{ if(typeof saveDayToHistory==='function') saveDayToHistory(_rDay, remote); }catch(e){}
-      ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
-       'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','confirmedCoverage','pendingCoverage','dayOf']
-        .forEach(function(k){ if(k in remote) delete remote[k]; });
+      DAY_LAYER_KEYS.concat(DAY_LAYER_EXTRA).forEach(function(k){ if(k in remote) delete remote[k]; });   // v60.233: one list
       // v60.229 (round 8, item 2): the union merge is a shallow assign — leaving
       // remote.fields={book24hr} would REPLACE today's typed header. Keep the
       // standing keys onto ours, then drop the remote object entirely.
