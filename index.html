@@ -6661,12 +6661,13 @@ function buildEmailData(type) {
   return { typeLabel:'Email', to:'', subject:'', body:'' };
 }
 
-function buildFullSummaryText() {
+function buildFullSummaryText(forDateKey) {   // v60.231 (B3): header = the day being archived, not the wall clock
   const f = STATE.fields;
   const auto = getAutoManagers();
   const omgr = f.openMgr || auto.open || '—';
   const cmgr = f.closeMgr || auto.close || '—';
-  const today = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const _hd = forDateKey ? new Date(forDateKey + 'T12:00:00') : new Date();
+  const today = _hd.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   const data = (typeof getGroupData === 'function' ? getGroupData() : getGroupNetData());
   let wuC=0,upC=0,naC=0;
   GROUP_META.forEach(g=>{const d=data[g.n]||data[g.name];if(d&&d.has){const s=(typeof getStatus === 'function' ? getStatus(g.n,d.net) : getGroupStatus(g.n,d.net));if(s==='wu')wuC++;else if(s==='up')upC++;else naC++;}});
@@ -6749,8 +6750,8 @@ function saveDayToHistory(forDate, srcState) {
     cs: S.fields.cs || null,
     hot: S.fields.hot || null,
     oos: S.fields.oosFinal || S.fields.oos || null,
-    openMgr: S.fields.openMgr || getAutoManagers().open || null,
-    closeMgr: S.fields.closeMgr || getAutoManagers().close || null,
+    openMgr: S.fields.openMgr || (own ? getAutoManagers().open : null) || null,    // v60.231 (B2): live fallbacks only for our own day
+    closeMgr: S.fields.closeMgr || (own ? getAutoManagers().close : null) || null,
     salesLeader: S.fields.salesLeader || null,
     walkUpPolicy: S.walkUpPolicy,
     closeNotes: S.fields.closeNotes || null,
@@ -6814,17 +6815,25 @@ function saveDayToHistory(forDate, srcState) {
     clOpening: own ? countCLDone('opening') : null,
     clMid:     own ? countCLDone('mid') : null,
     clClosing: own ? countCLDone('closing') : null,
-    fullSummary: own ? buildFullSummaryText() : null,
+    fullSummary: own ? buildFullSummaryText(today) : null,
   };
   // v60.230 (item 5): merge into an existing entry for that date — a non-null
   // value wins, an empty one never overwrites (the 03:30 archive of an empty
   // state must not blank the closer's own entry).
   const existing = hist.find(h => h.date === today);
   let merged = entry;
+  // v60.231 (Inspector B1): keys DERIVED from state — who was called off, why,
+  // the day's context, checklist counts, the summary — are the owner's truth
+  // for its own day and REPLACE (so a reversed call-off leaves history: a
+  // merge that can never go empty cannot record a reversal). Typed facts
+  // (numbers, names, notes) keep non-null-wins so an empty archive never
+  // blanks them. A door archive (another device's day) stays non-null-wins.
+  const DERIVED = { callouts:1, absences:1, context:1, clOpening:1, clMid:1, clClosing:1, fullSummary:1, hourly:1 };
   if (existing) {
     merged = Object.assign({}, existing);
     Object.keys(entry).forEach(k => {
       const v = entry[k];
+      if (own && DERIVED[k]) { merged[k] = v; return; }
       const empty = (v == null) || (Array.isArray(v) && !v.length) || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v||{}).length);
       if (!empty) merged[k] = v;
     });
@@ -15500,7 +15509,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.230'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.231'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
