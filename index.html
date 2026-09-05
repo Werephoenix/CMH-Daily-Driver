@@ -6736,6 +6736,11 @@ function saveDayToHistory(forDate, srcState) {
   // day, so a 00:45 close email files under the night it belongs to). srcState =
   // archive another device's closing day (the merge door hands the stale record
   // here before scrubbing it) — labels, dow and fields all come from THAT day.
+  // v60.232 (Inspector round 11, #1): a demo mutates STATE freely but must not
+  // persist — saveState already refuses in demo; the archive did not, and
+  // loadHistory() returns [] in demo, so one archive REPLACED the branch's real
+  // day history with a single demo row. Same guard, same reason.
+  if (typeof demoIsOn === 'function' && demoIsOn()) return;
   const S = srcState || STATE;
   const own = !srcState;
   if (own) recordDayPattern();
@@ -6803,7 +6808,7 @@ function saveDayToHistory(forDate, srcState) {
       try{
         var ov=S.todayOverrides||{}, out={};
         Object.keys(ov).forEach(function(k){
-          if(ov[k]==='callout') out[k]=(typeof absenceTypeOf==='function')?absenceTypeOf(k):'calledoff';
+          if(ov[k]==='callout') out[k]=((S.absenceType||{})[k])||'calledoff';   // v60.232 (#2): from the archived state, not local
         });
         return Object.keys(out).length? out : null;
       }catch(e){ return null; }
@@ -6829,11 +6834,13 @@ function saveDayToHistory(forDate, srcState) {
   // (numbers, names, notes) keep non-null-wins so an empty archive never
   // blanks them. A door archive (another device's day) stays non-null-wins.
   const DERIVED = { callouts:1, absences:1, context:1, clOpening:1, clMid:1, clClosing:1, fullSummary:1, hourly:1 };
+  if (own) entry.ownArchived = true;   // v60.232 (#2): the owner's derived lists are FINAL for this day
   if (existing) {
     merged = Object.assign({}, existing);
     Object.keys(entry).forEach(k => {
       const v = entry[k];
       if (own && DERIVED[k]) { merged[k] = v; return; }
+      if (!own && DERIVED[k] && existing.ownArchived) return;   // v60.232 (#2): a stale device cannot re-add a reversed call-off
       const empty = (v == null) || (Array.isArray(v) && !v.length) || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v||{}).length);
       if (!empty) merged[k] = v;
     });
@@ -8846,6 +8853,7 @@ function _retireDayLayers(){
      'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks']
       .forEach(function(k){ if(k in STATE) STATE[k] = (Array.isArray(STATE[k]) ? [] : {}); });
     STATE.confirmedCoverage=null; STATE.pendingCoverage=null;   // v60.228 (item 2): null, not {} — hasPendingChanges keys on it
+    STATE.outCancel=0;   // v60.232 (round 11, #3): a day count, not a standing number
     _retireDayFields(STATE);
     STATE.dayOf=tk;
     if(typeof rotInvalidate==='function') rotInvalidate();
@@ -15509,7 +15517,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.231'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.232'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
