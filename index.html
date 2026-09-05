@@ -6726,6 +6726,11 @@ var HIST_KEY = 'cmh-history-v2';
 // History during a demo still replaced the branch's real days. This is now
 // the ONLY place the history store is written (a smoke test counts the
 // writers), and it is where a demo is refused.
+// v60.234 (Inspector round 13, #1): ONE rule for "which day does a saved record
+// belong to" -- its own business-day stamp, else the caller's fallback. Both
+// doors (boot archive of yesterday's file, merge door) ask this, so a 00:45
+// closer save keyed under the 09-03 file can no longer become a ghost 09-03 row.
+function _recordDay(rec, fallback){ return (rec && rec.dayOf) || fallback || null; }
 function writeHistory(arr){
   if (typeof demoIsOn === 'function' && demoIsOn()) return false;
   try { localStorage.setItem(HIST_KEY, JSON.stringify((arr||[]).slice(0, 60))); return true; } catch(e){ return false; }
@@ -6843,7 +6848,8 @@ function saveDayToHistory(forDate, srcState) {
   // (numbers, names, notes) keep non-null-wins so an empty archive never
   // blanks them. A door archive (another device's day) stays non-null-wins.
   const DERIVED = { callouts:1, absences:1, context:1, clOpening:1, clMid:1, clClosing:1, fullSummary:1, hourly:1 };
-  if (own) entry.ownArchived = true;   // v60.232 (#2): the owner's derived lists are FINAL for this day
+  if (own) entry.ownArchived = true;
+  if (S.staffStation && Object.keys(S.staffStation).length) entry.staffStation = Object.assign({}, S.staffStation);   // v60.234: continuity signal for tomorrow's exit pick   // v60.232 (#2): the owner's derived lists are FINAL for this day
   if (existing) {
     merged = Object.assign({}, existing);
     Object.keys(entry).forEach(k => {
@@ -6872,14 +6878,15 @@ function autoSaveHistory() {
     const yDate = _localDayKey(yesterday);
     const yData = localStorage.getItem(`cmh-v2-${yDate}`);
     if (!yData) return;
-    if (loadHistory().find(h => h.date === yDate)) return;
     const ys = JSON.parse(yData);
     if (!ys || typeof ys !== 'object') return;
+    const d = _recordDay(ys, yDate);                                // v60.234: the record's own day, not the file's
+    if (loadHistory().find(h => h.date === d)) return;
     if (!ys.fields && ys.f) ys.fields = ys.f;                       // pre-fields shape
     if (!ys.walkUpPolicy && ys.wu) ys.walkUpPolicy = ys.wu;
-    saveDayToHistory(yDate, ys);
-    const e = loadHistory().find(h => h.date === yDate);
-    if (e && !e.fullSummary) { e.fullSummary = '(auto-saved from previous session)'; writeHistory(loadHistory().map(h => h.date===yDate ? e : h)); }
+    saveDayToHistory(d, ys);
+    const e = loadHistory().find(h => h.date === d);
+    if (e && !e.fullSummary) { e.fullSummary = '(auto-saved from previous session)'; writeHistory(loadHistory().map(h => h.date===d ? e : h)); }
   } catch(e){}
 }
 
@@ -7030,7 +7037,7 @@ function clearOldHistory() {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 30);
   const recent = hist.filter(d => new Date(d.date) >= cutoff);
-  if (!writeHistory(recent)) { if (typeof toast==='function') toast('Not while a demo is running'); return; }   // v60.233
+  if (!writeHistory(recent)) { if (typeof toast==='function') toast((typeof demoIsOn==='function' && demoIsOn()) ? 'Not while a demo is running' : 'Could not save history'); return; }   // v60.233/v60.234
   buildHistoryScreen();
   toast(`Cleared ${hist.length - recent.length} old entries`);
 }
@@ -8862,16 +8869,7 @@ function _retireDayLayers(){
     return true;
   }catch(e){ return false; }
 }
-function resetSchedDay() {
-  STATE.staffDuty = {}; STATE.staffStation = {};
-  STATE.altSchedule = {}; STATE.shiftMod = {};
-  STATE.todayOverrides = {}; STATE.customSplits = {};
-  _adjustPid = null;
-  const panel = document.getElementById('adjust-panel');
-  if (panel) panel.style.display = 'none';
-  saveState(); buildSwitchboard();
-  toast('Day reset');
-}
+// v60.234 (Inspector round 13, #4): resetSchedDay (no callers) carried a third hand-copied day-layer list; removed -- _retireDayLayers() is the one reset.
 
 
 function buildMorningBriefing() { buildSwitchboard(); }
@@ -8982,7 +8980,8 @@ function autoLoadFromExpected(expectedToday, dow) {
     ? Math.max(cxrExitNeeded, Math.min(5, Math.round(cxrTotal*0.4)))
     : Math.max(cxrExitNeeded, exitAgentCount>=peakExitMin ? 0 : 1);
   // yesterday's stations (continuity signal) + learned station patterns
-  let lastSt={};try{const h=JSON.parse(localStorage.getItem('cmh-history-v2')||'{}');const dk=Object.keys(h).sort().slice(-1)[0];if(dk&&h[dk]&&h[dk].staffStation)lastSt=h[dk].staffStation;}catch(e){}
+  // v60.234 (Inspector round 13, #2): the old raw reader parsed the history ARRAY as a date-keyed object -- it never fired. Read the newest archived day the proper (demo-guarded) way.
+  let lastSt={};try{const h0=loadHistory()[0];if(h0&&h0.staffStation)lastSt=h0.staffStation;}catch(e){}
   let pats={};try{pats=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');}catch(err){}
   // v60.53: COST-SCORED "who → Exit". One explainable score per CXR; the
   // lowest-cost people fill the exit need. Blends the soft constraints:
@@ -12882,7 +12881,7 @@ var FEATURE_AUDIT = [
   {cat:'📧 Emails & History', feature:'Opening email', excel:'Not in Excel (manual)', app:'✅ Built — Emails tab, pre-filled opening email'},
   {cat:'📧 Emails & History', feature:'Closing/EON email', excel:'Not in Excel (manual)', app:'✅ Built — Emails tab, closing email template'},
   {cat:'📧 Emails & History', feature:'Day summary / log email', excel:'Not in Excel', app:'✅ Built — Day Summary email for history log'},
-  {cat:'📧 Emails & History', feature:'4am auto-save to history', excel:'VERSION_HISTORY (manual)', app:'✅ Built — check4amSave() runs every minute'},
+  {cat:'📧 Emails & History', feature:'4am auto-save to history', excel:'VERSION_HISTORY (manual)', app:'✅ Built — the 3:30a business-day retire archives the closing day (v60.229)'},
   {cat:'📧 Emails & History', feature:'30-day history browser', excel:'Not in Excel', app:'✅ Built — History tab, 60-day storage'},
   {cat:'📧 Emails & History', feature:'Per-day summary expand/copy', excel:'Not in Excel', app:'✅ Built — tap to expand, copy or email any day'},
 
@@ -15518,7 +15517,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.233'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.234'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15724,7 +15723,7 @@ function applyRemoteRecord(record, apply) {
   // BEFORE the union merge — the merge does not carry dayOf, so an after-
   // merge check could never see it.
   try{
-    var _rDay = remote.dayOf || (remoteAt ? _bizDayKey(new Date(remoteAt)) : null);   // v60.228: business day (a 00:30 save belongs to the night before)
+    var _rDay = _recordDay(remote, remoteAt ? _bizDayKey(new Date(remoteAt)) : null);   // v60.228/v60.234: business day, one rule (a 00:30 save belongs to the night before)
     if(_rDay && _rDay !== _bizDayKey()){
       // v60.230 (item 3): before scrubbing a stale-day record, ARCHIVE its day
       // under its own date — the closer's after-midnight notes and numbers now
@@ -24790,7 +24789,7 @@ function loadScheduleForToday(force) {
   // dropping them off the floor entirely. Found 2026-08-30 when Matt (CXR,
   // Sun–Thu 5:30a–2p) wasn't listed on a Sunday he was working.
   // 'callout' and 'confirmed' are MANAGER decisions and are deliberately left
-  // untouched here — clearing those is resetSchedDay()'s job, not this one.
+  // untouched here — clearing those is _retireDayLayers()'s job, not this one.
   _clearDerivedOff();
 
   Object.entries(sched).forEach(([pid, shift]) => {
