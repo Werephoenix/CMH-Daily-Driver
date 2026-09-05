@@ -6730,25 +6730,32 @@ function loadHistory() {
   catch(e) { return []; }
 }
 
-function saveDayToHistory(forDate) {   // v60.229: forDate = the business day being closed (retire passes STATE.dayOf)
-  recordDayPattern();
+function saveDayToHistory(forDate, srcState) {
+  // v60.229/230: forDate = the BUSINESS day being closed (default: now's business
+  // day, so a 00:45 close email files under the night it belongs to). srcState =
+  // archive another device's closing day (the merge door hands the stale record
+  // here before scrubbing it) — labels, dow and fields all come from THAT day.
+  const S = srcState || STATE;
+  const own = !srcState;
+  if (own) recordDayPattern();
   const hist = loadHistory();
-  const today = forDate || _localDayKey(new Date());
+  const today = forDate || ((typeof _bizDayKey==='function') ? _bizDayKey() : _localDayKey(new Date()));
+  const _dayDate = new Date(today + 'T12:00:00');
   // Remove existing entry for today if present
   const filtered = hist.filter(h => h.date !== today);
   const entry = {
     date: today,
-    dateLabel: new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}),
-    cs: STATE.fields.cs || null,
-    hot: STATE.fields.hot || null,
-    oos: STATE.fields.oosFinal || STATE.fields.oos || null,
-    openMgr: STATE.fields.openMgr || getAutoManagers().open || null,
-    closeMgr: STATE.fields.closeMgr || getAutoManagers().close || null,
-    salesLeader: STATE.fields.salesLeader || null,
-    walkUpPolicy: STATE.walkUpPolicy,
-    closeNotes: STATE.fields.closeNotes || null,
-    lateStaff: STATE.fields.lateStaff || null,
-    xxar: STATE.fields.xxar || null,
+    dateLabel: _dayDate.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'}),   // v60.230: the day being closed, not the wall clock
+    cs: S.fields.cs || null,
+    hot: S.fields.hot || null,
+    oos: S.fields.oosFinal || S.fields.oos || null,
+    openMgr: S.fields.openMgr || getAutoManagers().open || null,
+    closeMgr: S.fields.closeMgr || getAutoManagers().close || null,
+    salesLeader: S.fields.salesLeader || null,
+    walkUpPolicy: S.walkUpPolicy,
+    closeNotes: S.fields.closeNotes || null,
+    lateStaff: S.fields.lateStaff || null,
+    xxar: S.fields.xxar || null,
     // v60.149: carry the closer's captured numbers into history so they survive
     // to the morning. "Tomorrow's Res/Ret" written at close IS today's expected
     // volume — the single most useful number for an opener, and it was being
@@ -6763,7 +6770,7 @@ function saveDayToHistory(forDate) {   // v60.229: forDate = the business day be
     // curve without its context can't be separated from a one-off.
     hourly: (function(){
       try{
-        var ph=STATE.pasteHourly||{}, out={};
+        var ph=S.pasteHourly||{}, out={};
         Object.keys(ph).forEach(function(k){
           if(Array.isArray(ph[k]) && ph[k].some(function(v){return v>0;})) out[k]=ph[k].slice();
         });
@@ -6772,19 +6779,19 @@ function saveDayToHistory(forDate) {   // v60.229: forDate = the business day be
     })(),
     context: (function(){
       try{
-        var d=new Date();
+        var d=_dayDate;
         return {
-          dow: d.getDay(),
-          weather: (STATE.weather && (STATE.weather.summary||STATE.weather.cond)) || null,
-          outCancel: STATE.outCancel || 0,
-          events: Array.isArray(STATE.cityEvents) ? STATE.cityEvents.length : 0,
-          walkUp: STATE.walkUpPolicy || null
+          dow: d.getDay(),   // v60.230: dow of the day being closed
+          weather: (S.weather && (S.weather.summary||S.weather.cond)) || null,
+          outCancel: S.outCancel || 0,
+          events: Array.isArray(S.cityEvents) ? S.cityEvents.length : 0,
+          walkUp: S.walkUpPolicy || null
         };
       }catch(e){ return null; }
     })(),
     callouts: (function(){
       try{
-        var ov=STATE.todayOverrides||{};
+        var ov=S.todayOverrides||{};
         return Object.keys(ov).filter(function(k){ return ov[k]==='callout'; });
       }catch(e){ return []; }
     })(),
@@ -6793,27 +6800,40 @@ function saveDayToHistory(forDate) {   // v60.229: forDate = the business day be
     // thing. Categories only — never a reason.
     absences: (function(){
       try{
-        var ov=STATE.todayOverrides||{}, out={};
+        var ov=S.todayOverrides||{}, out={};
         Object.keys(ov).forEach(function(k){
           if(ov[k]==='callout') out[k]=(typeof absenceTypeOf==='function')?absenceTypeOf(k):'calledoff';
         });
         return Object.keys(out).length? out : null;
       }catch(e){ return null; }
     })(),
-    tmrwRes: STATE.fields.closeTmrwRes || null,
-    tmrwRet: STATE.fields.closeTmrwRet || null,
-    fboCount: STATE.fields.fboCount || null,
-    fboDetail: STATE.fields.fboDetail || null,
-    clOpening: countCLDone('opening'),
-    clMid:     countCLDone('mid'),
-    clClosing: countCLDone('closing'),
-    fullSummary: buildFullSummaryText(),
+    tmrwRes: S.fields.closeTmrwRes || null,
+    tmrwRet: S.fields.closeTmrwRet || null,
+    fboCount: S.fields.fboCount || null,
+    fboDetail: S.fields.fboDetail || null,
+    clOpening: own ? countCLDone('opening') : null,
+    clMid:     own ? countCLDone('mid') : null,
+    clClosing: own ? countCLDone('closing') : null,
+    fullSummary: own ? buildFullSummaryText() : null,
   };
-  filtered.unshift(entry); // newest first
+  // v60.230 (item 5): merge into an existing entry for that date — a non-null
+  // value wins, an empty one never overwrites (the 03:30 archive of an empty
+  // state must not blank the closer's own entry).
+  const existing = hist.find(h => h.date === today);
+  let merged = entry;
+  if (existing) {
+    merged = Object.assign({}, existing);
+    Object.keys(entry).forEach(k => {
+      const v = entry[k];
+      const empty = (v == null) || (Array.isArray(v) && !v.length) || (typeof v === 'object' && !Array.isArray(v) && !Object.keys(v||{}).length);
+      if (!empty) merged[k] = v;
+    });
+  }
+  filtered.unshift(merged); // newest first
   // Keep only 60 days
   const trimmed = filtered.slice(0, 60);
   try { localStorage.setItem(HIST_KEY, JSON.stringify(trimmed)); } catch(e){}
-  toast('Day saved to history ✓');
+  if (own) toast('Day saved to history ✓');
 }
 
 // Auto-save at page load (captures yesterday if browser was left open)
@@ -15480,7 +15500,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.229'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.230'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15669,6 +15689,15 @@ function applyRemoteRecord(record, apply) {
   if (apply && syncPushPending()) { setSyncStatus('syncing', 'Local edit pending…'); return 'deferred'; }
   _lastRemoteAt = remoteAt;
   if (!apply) return 'noted';
+  // v60.230 (Inspector round 9, item 1): a same-day record arriving on a tab
+  // that has NOT retired yet (woken by focus before its 60-s tick) would assign
+  // today's dayOf through the shallow merge and that device would never retire
+  // or archive. Retire first, then merge.
+  if (typeof _retireDayLayers === 'function' && !window._retiring) {
+    window._retiring = true;
+    try { if (_retireDayLayers()) { try { loadScheduleForToday(false); } catch(e){} } }
+    finally { window._retiring = false; }
+  }
   // v60.144: detect an incoming management publish BEFORE merging (compare stamps)
   const _prevPub = (STATE.publishMeta && STATE.publishMeta.at) || '';
   // v60.227 (Inspector Z1, merge door): a record that belongs to an EARLIER
@@ -15679,6 +15708,10 @@ function applyRemoteRecord(record, apply) {
   try{
     var _rDay = remote.dayOf || (remoteAt ? _bizDayKey(new Date(remoteAt)) : null);   // v60.228: business day (a 00:30 save belongs to the night before)
     if(_rDay && _rDay !== _bizDayKey()){
+      // v60.230 (item 3): before scrubbing a stale-day record, ARCHIVE its day
+      // under its own date — the closer's after-midnight notes and numbers now
+      // reach an opener device that slept through the night. Merges non-null.
+      try{ if(typeof saveDayToHistory==='function') saveDayToHistory(_rDay, remote); }catch(e){}
       ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
        'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','confirmedCoverage','pendingCoverage','dayOf']
         .forEach(function(k){ if(k in remote) delete remote[k]; });
