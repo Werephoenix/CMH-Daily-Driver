@@ -6848,8 +6848,7 @@ function saveDayToHistory(forDate, srcState) {
   // (numbers, names, notes) keep non-null-wins so an empty archive never
   // blanks them. A door archive (another device's day) stays non-null-wins.
   const DERIVED = { callouts:1, absences:1, context:1, clOpening:1, clMid:1, clClosing:1, fullSummary:1, hourly:1 };
-  if (own) entry.ownArchived = true;
-  if (S.staffStation && Object.keys(S.staffStation).length) entry.staffStation = Object.assign({}, S.staffStation);   // v60.234: continuity signal for tomorrow's exit pick   // v60.232 (#2): the owner's derived lists are FINAL for this day
+  if (own) entry.ownArchived = true;   // v60.232 (#2): the owner's derived lists are FINAL for this day
   if (existing) {
     merged = Object.assign({}, existing);
     Object.keys(entry).forEach(k => {
@@ -8980,8 +8979,9 @@ function autoLoadFromExpected(expectedToday, dow) {
     ? Math.max(cxrExitNeeded, Math.min(5, Math.round(cxrTotal*0.4)))
     : Math.max(cxrExitNeeded, exitAgentCount>=peakExitMin ? 0 : 1);
   // yesterday's stations (continuity signal) + learned station patterns
-  // v60.234 (Inspector round 13, #2): the old raw reader parsed the history ARRAY as a date-keyed object -- it never fired. Read the newest archived day the proper (demo-guarded) way.
-  let lastSt={};try{const h0=loadHistory()[0];if(h0&&h0.staffStation)lastSt=h0.staffStation;}catch(e){}
+  // v60.235 (Inspector round 14): the "yesterday's stations" continuity signal never had a consumer
+  // (its reader was dead since it was written). Removed rather than faked; wiring it (rotate vs
+  // continuity, which sign) is Matt's design call -- see the Handoff Log, round 14.
   let pats={};try{pats=JSON.parse(localStorage.getItem('cmh-station-patterns-v1')||'{}');}catch(err){}
   // v60.53: COST-SCORED "who → Exit". One explainable score per CXR; the
   // lowest-cost people fill the exit need. Blends the soft constraints:
@@ -15517,7 +15517,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.234'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.235'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
