@@ -4438,11 +4438,15 @@ function ensureStateShape(s){
   return s;
 }
 
+function _dayFileKey(){ return 'cmh-v2-' + ((typeof _bizDayKey==='function') ? _bizDayKey() : _localDayKey(new Date())); }   // v60.236 (decision B): the file is the business day's file
 function loadState() {
-  const TODAY = _localDayKey(new Date());
-  const LS_KEY = 'cmh-v2-' + TODAY;
+  const LS_KEY = _dayFileKey();
   try {
     let raw = localStorage.getItem(LS_KEY);
+    if (!raw) {   // v60.236: a file saved between midnight and 3:30a by a pre-236 build sits under the calendar key
+      const _cal = 'cmh-v2-' + _localDayKey(new Date());
+      if (_cal !== LS_KEY) raw = localStorage.getItem(_cal);
+    }
     if (!raw) {   // v60.226: migration — pre-226 evenings saved under the UTC date
       const _utc = 'cmh-v2-' + new Date().toISOString().slice(0,10);
       if (_utc !== LS_KEY) raw = localStorage.getItem(_utc);
@@ -4637,8 +4641,7 @@ function saveState() {
   // data was being saved when it wasn't. Now logs to console (one warning
   // per session, no toast spam) and emits a custom event consumers can hook.
   try {
-    const TODAY = _localDayKey(new Date());
-    const LS_KEY = 'cmh-v2-' + TODAY;
+    const LS_KEY = _dayFileKey();   // v60.236 (decision B)
     if (typeof _bizDayKey === 'function') STATE.dayOf = _bizDayKey();   // v60.227/228: every save says which BUSINESS day it belongs to
     localStorage.setItem(LS_KEY, JSON.stringify(STATE));
     window._saveStateOk = true;
@@ -4803,7 +4806,7 @@ function showEODRecap() {
   sodInjectStyle();
   const hist = (typeof loadHistory === 'function') ? loadHistory() : [];
   const e = (hist && hist.length) ? hist[0] : null;
-  const todayLbl = new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  const todayLbl = _boardDate().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
   let body = `<div class="sod-date">${todayLbl}</div>`;
 
   // ── 1. LAST NIGHT ────────────────────────────────────────────────────────
@@ -6145,7 +6148,7 @@ function generateTeamText() {
 function buildDaySummary() {
   const f = STATE.fields;
   const data = getGroupNetData();
-  const today = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const today = _boardDate().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 
   // Checklist completion
   const cl = STATE.checklist;
@@ -6369,7 +6372,7 @@ function buildEmailData(type) {
   const dy        = now.getDate();
   const yr        = now.getFullYear();
   const dateShort = mo + '/' + dy;
-  const dateLabel = now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const dateLabel = _boardDate().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   const dow       = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
 
   const toMorning = f.emailToMorning ||
@@ -8483,7 +8486,7 @@ function setEl(id, content) {
 function buildSwitchboard() {
   const now   = new Date();
   const dow   = now.getDay();
-  const dateLabel = now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const dateLabel = _boardDate().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
 
   // Auto-load if nothing set yet
   if (!STATE.staffDuty || Object.keys(STATE.staffDuty).length === 0) {
@@ -9456,12 +9459,21 @@ function tapStation(key, station) {
 // UTILITY FUNCTIONS (required by multiple modules)
 // ═══════════════════════════════════════════════════════════════════════
 
+// v60.236 — DECISION B (Matt, 2026-09-09: "yes, wait until 3:30 am"). The
+// whole board's "today" is the BUSINESS day: it turns at DAY_START_HOUR
+// (3:30a), not midnight. A closer finishing at 00:45 still sees, marks and
+// saves the day they are closing; the opener at 5:30 gets the new one.
+// Every schedule read, day mark, header date, week key and the day FILE key
+// go through here. Calendar-day keys stay only where a calendar date is the
+// fact (HR dates, training log, history-row labels).
 function todayKey() {
+  if (typeof _bizDayKey === 'function') return _bizDayKey();
   const d = new Date();
   return d.getFullYear() + '-' +
     String(d.getMonth()+1).padStart(2,'0') + '-' +
     String(d.getDate()).padStart(2,'0');
 }
+function _boardDate(){ return new Date(todayKey() + 'T12:00:00'); }   // the board's day as a Date (noon, local)
 
 function dateKey(d) {
   if (!d) return null;
@@ -11935,7 +11947,7 @@ function renderNow() {
   const dow = now.getDay();
   const nowH = now.getHours() + now.getMinutes()/60;
   const h = Math.floor(nowH);
-  const dateStr = now.toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  const dateStr = _boardDate().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
   const timeStr = now.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
 
   if (!Object.keys(exp).length) {
@@ -13399,7 +13411,7 @@ function getExitFairnessData() {
 }
 
 function getWeekKey() {
-  const d = new Date();
+  const d = _boardDate();   // v60.236 (decision B): the week follows the board's day
   const day = d.getDay();
   const monday = new Date(d);
   monday.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
@@ -13672,7 +13684,7 @@ function updateWUBtns() {
 function initPreloadedSchedule() {
   const existing = getStoredSection('mgmt');
   // Re-seed if: empty, or older than current PRELOADED endDate, or missing today's data
-  const today = _localDayKey(new Date());
+  const today = todayKey();
   const needsReseed = !existing
     || !existing.grid
     || Object.keys(existing.grid).length === 0
@@ -14727,7 +14739,7 @@ function autoSuggestRotation() {
 // ═══════════════════════════════════════════════════════════════════════
 
 function recordDayPattern() {
-  const today = _localDayKey(new Date());
+  const today = todayKey();
   const PATTERN_KEY = 'cmh-station-patterns-v1';
   let patterns = {};
   try { patterns = JSON.parse(localStorage.getItem(PATTERN_KEY)||'{}'); } catch(e) {}
@@ -14756,7 +14768,7 @@ function recordStationOverride(pid, station) {
   if(!station||!pid)return;
   const KEY='cmh-station-patterns-v1';let p={};try{p=JSON.parse(localStorage.getItem(KEY)||'{}');}catch(e){}
   if(!p[pid])p[pid]={counter:0,exit:0,days:[],overrides:[],suggestedPref:null};
-  const today=_localDayKey(new Date());
+  const today=todayKey();
   p[pid].overrides=p[pid].overrides||[];p[pid].overrides.push({date:today,station});
   if(p[pid].overrides.length>60)p[pid].overrides.shift();
   const recent=p[pid].overrides.slice(-20);
@@ -15517,7 +15529,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.235'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.236'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -19878,7 +19890,7 @@ function sendOpenEmail(){
 
   var body='<div class="deskNote"><b>Nightly send · morning open</b> — composed at capture, released by a manager tap.</div>'
    +'<div class="artifact">'
-   + _sMast('CMH · Open', [now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),
+   + _sMast('CMH · Open', [_boardDate().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),
                            'Sent 6:15 AM · everyone on today'])
    + '<div class="lede">'+(read[0].b==='Nothing flagged'
         ? 'Game plan is captured and on every phone. Nothing flagged before the counter opens.'
@@ -19971,7 +19983,7 @@ function sendCloseEmail(){
   ];
   var body='<div class="deskNote"><b>Nightly send · close</b> — managers + area. Composed at close, released by a manager tap.</div>'
    +'<div class="artifact">'
-   + _sMast('CMH · Close', [now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),
+   + _sMast('CMH · Close', [_boardDate().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}),
                             'Sent 11:58 PM · managers + area'])
    + '<div class="lede">'+(gaps? gaps+' hour'+(gaps===1?'':'s')+' ran below a station minimum today.'
                                 : 'Every hour met its station minimums today.')+'</div>'
@@ -21535,7 +21547,7 @@ function printScheduleMap() {
     return;
   }
   const today = new Date();
-  const dateLabel = today.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+  const dateLabel = _boardDate().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
 
   // Match live timeline ranges
   const H_S = 5, H_E = 26; // 5am to 2am
@@ -25123,7 +25135,7 @@ function printAllChecklists(blank) {
 function printScheduleGrid() {
   const sched = (typeof getStoredSchedule==='function') ? getStoredSchedule() : null;
   const today = (typeof todayKey==='function') ? todayKey() : _localDayKey(new Date());
-  const dateLabel = new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
+  const dateLabel = _boardDate().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   if (!sched || !sched.grid || !Object.keys(sched.grid).length) {
     if(typeof toast==='function') toast('No schedule loaded — paste schedule in Admin first');
     return;
