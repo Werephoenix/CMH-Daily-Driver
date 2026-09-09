@@ -15537,7 +15537,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.238'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.239'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -16846,7 +16846,7 @@ function buildScheduleEditor() {
     const nick = person ? (person.nick || person.name.split(' ')[0]) : pid.replace(/_/g, ' ');
     const fullName = person ? person.name : pid.replace(/_/g, ' ');
     const shiftDisplay = isOff
-      ? 'OFF'
+      ? ((typeof _isMarkerCode==='function' && _isMarkerCode(shiftRaw)) ? offCodeReason(shiftRaw) : 'OFF')   // v60.239: "Retreat" / "Training · Cincinnati base office", not "OFF"
       : (Array.isArray(shiftRaw) ? _fmtShiftPair(shiftRaw) : (shiftRaw || ''));
     return { pid, person, nick, fullName, role, shiftRaw, shiftDisplay, isOff, isEdited, baseRaw };
   });
@@ -23091,7 +23091,7 @@ function ppWeekHtml(pid,p){
 }
 function ppEditDay(pid,key){
   var sc={}; try{ sc=getScheduleForDate(key)||{}; }catch(e){}
-  var cur=sc[pid]; var curTxt = cur==null?'' : (typeof mcFmtShift==='function'?mcFmtShift(cur):String(cur));
+  var cur=sc[pid]; var curTxt = cur==null?'' : (Array.isArray(cur) ? (typeof mcFmtShift==='function'?mcFmtShift(cur):cur.join('–')) : String(cur));   // v60.239: raw code in the prompt, label on the row
   var raw=prompt('Shift for '+key+' — e.g. "530A-2P" or "OFF". Leave blank to revert to the base schedule.', curTxt);
   if(raw===null) return;
   var parsed=null;
@@ -25178,7 +25178,7 @@ function printScheduleGrid() {
         const isToday=k===today;
         return `<td style="font-size:10.5px;font-family:monospace;text-align:center;padding:2px 3px;
           border:1px solid #e5e7eb;background:${isToday?'#fef3c7':shiftColor(s)};
-          font-weight:${isToday?800:400};white-space:nowrap">${s}</td>`;
+          font-weight:${isToday?800:400};white-space:nowrap">${(typeof _isMarkerCode==='function' && _isMarkerCode(s)) ? offCodeShort(s) : s}</td>`;
       }).join('')}
     </tr>`;
   });
@@ -27336,7 +27336,13 @@ function mcRemovePto(key,pid){
   if(typeof saveState==='function') saveState(); mcDay(key);
 }
 function _mcHr(h){ if(h==null) return '?'; var hh=((h%24)+24)%24; var ap=hh<12?'a':'p'; var h12=Math.floor(hh)%12; if(h12===0)h12=12; var m=Math.round((hh-Math.floor(hh))*60); return h12+(m?':'+String(m).padStart(2,'0'):'')+ap; }
-function mcFmtShift(c){ if(Array.isArray(c)) return c.length>=2 ? _mcHr(c[0])+'–'+_mcHr(c[1]) : String(c); return String(c); }
+// v60.239 (Matt: "do it"): a marker cell shows its honest label everywhere the
+// shared formatter is used (card week, calendar day list) — "Training · Cincinnati
+// base office", "Retreat", "MQI" — never the raw sheet code. Plain OFF/VACA/PTO
+// stay as they are; a real shift string is untouched.
+function _isMarkerCode(c){ return typeof c==='string' && typeof isOffCode==='function' && isOffCode(c) && !/^(OFF|VACA?|PTO|—|-)?$/i.test(String(c).trim()); }
+function offCodeShort(code){ if(/\b99\b/.test(String(code||''))) return 'CIN training'; return (typeof offCodeReason==='function') ? offCodeReason(code) : String(code||''); }   // print-width label
+function mcFmtShift(c){ if(Array.isArray(c)) return c.length>=2 ? _mcHr(c[0])+'–'+_mcHr(c[1]) : String(c); if(_isMarkerCode(c)) return offCodeReason(c); return String(c); }
 // v60.72 (Round 1): demand model with event ripple (Design §7) — heavy event:
 // day-before +1 (prep) · day-of +4 · day-after +2 (returns wave); moderate: day-of +2.
 function mcShiftKey(key,delta){ var d=new Date(key+'T12:00:00'); d.setDate(d.getDate()+delta); return _mcKey(d); }
