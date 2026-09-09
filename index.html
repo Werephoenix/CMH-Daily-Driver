@@ -2009,6 +2009,10 @@ button { cursor: pointer; }
   <div style="max-width:640px;margin:0 auto">
     <h1 style="font-size:34px;font-weight:700;letter-spacing:-.8px;margin:6px 0 8px;color:var(--txt)">More</h1>
     <!-- v60.92: Design More hub — DATA section, colored icon tiles, APPEARANCE w/ Calm switch -->
+    <div class="now-sec-hd" style="margin:14px 0 6px 4px">You</div>
+    <div class="more-group">
+      <button class="more-row" onclick="openWhoPicker()"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">👤</span><span class="more-lbl"><span id="who-more-lbl">Who’s this device? Tap your name</span><span class="more-sub">Pick your name so tasks, requests and the change log carry it. Stored on this device only.</span></span><span class="more-ch">›</span></button>
+    </div>
     <div class="now-sec-hd" style="margin:14px 0 6px 4px">Data</div>
     <div class="more-group">
       <button class="more-row" onclick="showTab('paste')"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📋</span><span class="more-lbl">Paste Data</span><span class="more-ch">›</span></button>
@@ -2495,6 +2499,8 @@ button { cursor: pointer; }
   <div style="display:flex;align-items:center;gap:8px;margin:2px 0 14px">
     <h1 class="scr-title" style="margin:0;flex:1">Plan</h1>
     <div id="mgr-mode-bar" style="display:flex;align-items:center;gap:6px">
+      <button id="who-chip" onclick="openWhoPicker()" title="Who is using this device?"
+        style="padding:3px 10px;border-radius:999px;font-size:10.5px;font-weight:700;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer;white-space:nowrap">👤 Who’s this?</button>
       <span id="mgr-mode-status" style="font-size:10px;font-weight:700;color:var(--txt3);white-space:nowrap">🔒 View Mode</span>
       <button id="mgr-mode-btn" onclick="toggleManagerModePrompt()"
         style="padding:3px 11px;border-radius:999px;font-size:10.5px;font-weight:700;
@@ -15537,7 +15543,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.239'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.240'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -27791,7 +27797,7 @@ function rqInjectStyle(){
 function rqRender(){
   var o=document.getElementById('rq-overlay'); if(!o) return; var arr=rqArr(); var ty=(window._rqType||'off');
   var h='<div class="rq-head"><div><div class="rq-kick">Coverage-aware</div><div class="rq-title">Requests</div></div><button class="rq-x" onclick="closeRequests()">✕</button></div><div class="rq-body">';
-  h+='<div class="rq-form"><input id="rq-who" placeholder="Who is requesting?">'
+  h+='<div class="rq-form"><input id="rq-who" placeholder="Who is requesting?" value="'+biEsc((typeof whoName==='function'&&whoName())||'')+'">'   // v60.240: pre-filled from Who's this
     +'<div class="rq-types">'+['off','early','swap','other'].map(function(k){return '<button id="rq-t-'+k+'" class="rq-typebtn'+(ty===k?' on':'')+'" onclick="rqSetType(\''+k+'\')">'+_RQ_TYPE[k]+'</button>';}).join('')+'</div>'
     +'<div class="rq-row2"><input id="rq-date" type="date"><input id="rq-note" placeholder="Note (optional)"></div>'
     +'<button class="rq-submit" onclick="rqAdd()">Submit request</button></div>';
@@ -27824,7 +27830,96 @@ function closeRequests(){ var o=document.getElementById('rq-overlay'); if(o) o.s
 // everything without knowing every key name. Supports moving the app / new device.
 // ═══════════════════════════════════════════════════════════════════════════
 // v60.78: lightweight change log (audit trail) — who/what/when for key actions
-function logAction(txt){ try{ if(!STATE.changeLog) STATE.changeLog=[]; STATE.changeLog.unshift({ts:Date.now(),txt:String(txt)}); if(STATE.changeLog.length>60) STATE.changeLog=STATE.changeLog.slice(0,60); if(typeof saveState==='function') saveState(); }catch(e){} }
+// ════════════════════════════════════════════════════════════════════════
+// v60.240 · WHO'S THIS? — pick-your-name identity (Matt, 2026-09-09).
+// One shared branch sign-in stays; a PERSON is a tap on their own name.
+// Device-local (localStorage, never synced), roster id only — no email, no
+// password, no personal data. Most-used names float to the top on each
+// device (tap counts), and a search box finds anyone else. Managers still
+// gate anything privileged with Manager Mode; this is attribution, not auth.
+// Consumers: the change log stamps "by", the Requests form pre-fills the
+// name, and withWho(fn) opens the picker first when an action needs a name.
+// ════════════════════════════════════════════════════════════════════════
+var WHO_KEY='cmh-who', WHO_TAPS_KEY='cmh-who-taps';
+function whoAmI(){ try{ return localStorage.getItem(WHO_KEY)||null; }catch(e){ return null; } }
+function whoPerson(){ var pid=whoAmI(); return pid ? (typeof personByPid==='function' ? personByPid(pid) : null) : null; }
+function whoName(){ var p=whoPerson(); return p ? (typeof displayName==='function' ? displayName(p) : (p.nick||p.name)) : (whoAmI() ? String(whoAmI()).replace(/_/g,' ') : ''); }
+function _whoTaps(){ try{ return JSON.parse(localStorage.getItem(WHO_TAPS_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function whoSet(pid){
+  try{
+    if(!pid){ localStorage.removeItem(WHO_KEY); }
+    else { localStorage.setItem(WHO_KEY, String(pid)); var t=_whoTaps(); t[pid]=(t[pid]||0)+1; localStorage.setItem(WHO_TAPS_KEY, JSON.stringify(t)); }
+  }catch(e){}
+  whoRefresh();
+  return whoAmI();
+}
+function whoClear(){ whoSet(null); }
+// The people list: active roster, alphabetical by display name.
+function whoPeople(){
+  var r=(typeof getEffectiveRoster==='function') ? getEffectiveRoster() : [];
+  return r.map(function(p){ return {pid:dnPid(p), name:(typeof displayName==='function'?displayName(p):(p.nick||p.name)), full:p.name||'', role:p.role||''}; })
+          .filter(function(x){ return x.pid; })
+          .sort(function(a,b){ return a.name.localeCompare(b.name); });
+}
+// "Most used" on THIS device (tap counts); before anyone has tapped, the people scheduled today.
+function whoMostUsed(n){
+  n=n||6; var taps=_whoTaps(), ppl=whoPeople(), byPid={}; ppl.forEach(function(x){ byPid[x.pid]=x; });
+  var used=Object.keys(taps).filter(function(k){ return byPid[k]; }).sort(function(a,b){ return taps[b]-taps[a]; }).slice(0,n).map(function(k){ return byPid[k]; });
+  if(used.length) return used;
+  try{ var sch=getScheduleForDate(todayKey())||{}; return ppl.filter(function(x){ var c=sch[x.pid]; return c && !(typeof isOffCode==='function' && isOffCode(c)); }).slice(0,n); }catch(e){ return ppl.slice(0,n); }
+}
+function whoCandidates(q){
+  q=String(q||'').trim().toLowerCase(); var ppl=whoPeople(); if(!q) return ppl;
+  return ppl.filter(function(x){ return x.name.toLowerCase().indexOf(q)>=0 || x.full.toLowerCase().indexOf(q)>=0 || x.pid.toLowerCase().replace(/_/g,' ').indexOf(q)>=0; });
+}
+function _whoChip(x, cur){
+  var me = x.pid===cur;
+  return '<button onclick="whoPick(\''+x.pid.replace(/'/g,'\\x27')+'\')" style="min-height:48px;padding:6px 10px;border-radius:12px;cursor:pointer;text-align:left;'
+       +'border:1.5px solid '+(me?'var(--accent)':'var(--bdr2)')+';background:'+(me?'rgba(10,132,255,.12)':'var(--bg3)')+';color:var(--txt)">'
+       +'<div style="font-size:13px;font-weight:800">'+biEsc(x.name)+(me?' ✓':'')+'</div><div style="font-size:10px;color:var(--txt3)">'+biEsc(x.role)+'</div></button>';
+}
+function whoListHtml(q){
+  var cur=whoAmI(), h='';
+  if(!String(q||'').trim()){
+    var mu=whoMostUsed(6);
+    if(mu.length){ h+='<div class="now-sec-hd" style="margin:8px 0 6px">Most used here</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px">'+mu.map(function(x){ return _whoChip(x,cur); }).join('')+'</div>'; }
+    h+='<div class="now-sec-hd" style="margin:12px 0 6px">Everyone</div>';
+  }
+  var list=whoCandidates(q);
+  h+= list.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px">'+list.map(function(x){ return _whoChip(x,cur); }).join('')+'</div>'
+                  : '<div style="padding:12px;color:var(--txt3);font-size:12px">No one matches "'+biEsc(q)+'". Managers add people in Setup → Staff.</div>';
+  return h;
+}
+function whoFilterRender(q){ var el=document.getElementById('who-list'); if(el) el.innerHTML=whoListHtml(q); }
+var _whoAfter=null;
+function openWhoPicker(onPick){
+  _whoAfter = (typeof onPick==='function') ? onPick : null;
+  var cur=whoAmI();
+  var h='<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">Tap your name so this device knows who is acting. Nothing else is stored — just the name, on this device.</div>'
+       +'<input id="who-search" placeholder="Search a name…" autocomplete="off" oninput="whoFilterRender(this.value)" '
+       +'style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:14px">'
+       +'<div id="who-list" style="max-height:52vh;overflow:auto;margin-top:6px">'+whoListHtml('')+'</div>'
+       +'<div style="display:flex;gap:8px;margin-top:10px">'
+       +(cur?'<button onclick="whoPick(null)" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--bdr2);background:transparent;color:var(--txt3);font-size:12px;font-weight:700;cursor:pointer">Not me — clear</button>':'')
+       +'<button onclick="closeModal()" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">Close</button></div>';
+  openModal(cur ? ('You are '+whoName()) : 'Who\u2019s this?', h);
+  setTimeout(function(){ var i=document.getElementById('who-search'); if(i && window.matchMedia && matchMedia('(pointer:fine)').matches) i.focus(); }, 50);
+}
+function whoPick(pid){
+  whoSet(pid); closeModal();
+  if(typeof toast==='function') toast(pid ? ('👤 You\u2019re '+whoName()) : 'Name cleared on this device');
+  var f=_whoAfter; _whoAfter=null; if(f && pid) try{ f(pid); }catch(e){}
+}
+// Actions that need a name: run now if this device knows who, else ask first.
+function withWho(fn){ var pid=whoAmI(); if(pid) return fn(pid); openWhoPicker(fn); }
+function whoRefresh(){
+  var nm=whoName(), pid=whoAmI();
+  var chip=document.getElementById('who-chip'); if(chip){ chip.textContent = pid ? ('👤 '+nm) : '👤 Who\u2019s this?'; chip.style.color = pid ? 'var(--accent)' : 'var(--txt3)'; chip.style.borderColor = pid ? 'var(--accent)' : 'var(--bdr2)'; }
+  var more=document.getElementById('who-more-lbl'); if(more) more.textContent = pid ? ('You: '+nm) : 'Who\u2019s this device? Tap your name';
+}
+try{ document.addEventListener('DOMContentLoaded', whoRefresh); if(document.readyState!=='loading') setTimeout(whoRefresh,0); }catch(e){}
+
+function logAction(txt){ try{ if(!STATE.changeLog) STATE.changeLog=[]; var _by=(typeof whoName==='function')?whoName():''; STATE.changeLog.unshift(_by?{ts:Date.now(),txt:String(txt),by:_by}:{ts:Date.now(),txt:String(txt)}); /* v60.240: stamped with who */ if(STATE.changeLog.length>60) STATE.changeLog=STATE.changeLog.slice(0,60); if(typeof saveState==='function') saveState(); }catch(e){} }
 function bkExport(){
   try{
     logAction('Backup taken');
@@ -27912,7 +28007,7 @@ function bkRender(){
     +(function(){ var a=bkSnaps(); if(!a.length) return '<div class="bk-last">No snapshots yet.</div>';
         return '<div style="margin-top:6px">'+a.map(function(s){ return '<div style="display:flex;align-items:center;gap:8px;padding:9px 2px;border-top:1px solid rgba(255,255,255,.06)"><span style="flex:1;font-size:13px;color:#EBEBF5">'+(s.label==='auto'?'🕑 Auto':'📸 Manual')+' · <span style="color:#8E8E93">'+bkRelTime(s.ts)+'</span></span><button class="dnr-ackbtn" onclick="bkRestoreSnapshot('+s.ts+')">Restore</button></div>'; }).join('')+'</div>'; })()
     +'<div class="bk-div"></div><div class="bk-kick" style="margin-bottom:6px">Recent activity</div>'
-    +(function(){ var l=(STATE.changeLog||[]); if(!l.length) return '<div class="bk-last">No activity logged yet.</div>'; return '<div>'+l.slice(0,20).map(function(e){ return '<div style="display:flex;gap:8px;padding:6px 2px;border-top:1px solid rgba(255,255,255,.06);font-size:12.5px"><span style="flex:1;color:#EBEBF5">'+biEsc(e.txt)+'</span><span style="color:#8E8E93;white-space:nowrap">'+bkRelTime(e.ts)+'</span></div>'; }).join('')+'</div>'; })()
+    +(function(){ var l=(STATE.changeLog||[]); if(!l.length) return '<div class="bk-last">No activity logged yet.</div>'; return '<div>'+l.slice(0,20).map(function(e){ return '<div style="display:flex;gap:8px;padding:6px 2px;border-top:1px solid rgba(255,255,255,.06);font-size:12.5px"><span style="flex:1;color:#EBEBF5">'+biEsc(e.txt)+(e.by?' <span style="color:#8E8E93">· '+biEsc(e.by)+'</span>':'')+'</span><span style="color:#8E8E93;white-space:nowrap">'+bkRelTime(e.ts)+'</span></div>'; }).join('')+'</div>'; })()
     +'</div>';
 }
 function openBackup(){
