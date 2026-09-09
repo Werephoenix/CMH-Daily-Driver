@@ -6290,7 +6290,13 @@ function parseShiftEndHour(code) {
 //     MEETING/MTG, CONFERENCE, ARMS, TOP20, STRONGER
 // A real shift with a note in it — "8A-12P(HALFDAY)" — stays WORKING.
 var OFF_MARKERS = /\b(OFF|VACA?|PTO|LOA|JURY|BEREAVE\w*|SICK|NCNS)\b/i;
-var AWAY_MARKERS = /\b(RETREAT|TRAINING|MQI|VISIT|MEETING|MTG|CONFERENCE|ARMS|TOP ?20|STRONGER)\b/i;
+// v60.238 (Matt, 2026-09-09): a cell carrying "99" (MT 1 -99, CXR TRAINING 99) is
+// TRAINING AT THE CINCINNATI BASE OFFICE — on the clock, off property all day.
+// "MT 1 -99" alone matched nothing, so the sheet readers counted Pat as ON the
+// floor all day (the exact v60.160 bug class); the import path happened to
+// fail-parse it to OFF, which is why the board looked right while the sheet
+// readers (week view, bench, message-team) did not.
+var AWAY_MARKERS = /\b(RETREAT|TRAINING|MQI|VISIT|MEETING|MTG|CONFERENCE|ARMS|TOP ?20|STRONGER|99)\b/i;
 function isOffCode(code){
   if(code==null) return true;
   var c=String(code).trim();
@@ -6303,6 +6309,7 @@ function isOffCode(code){
 function offCodeReason(code){
   var c=String(code==null?'':code).trim();
   if(!c||c==='—'||c==='-') return 'Off';
+  if(/\b99\b/.test(c)) return 'Training · Cincinnati base office';   // v60.238 (Matt): the 99 code
   var m=c.match(/\b(RETREAT|TRAINING|MQI|VISIT|MEETING|MTG|CONFERENCE)\b/i);
   if(m){ var w=m[1].toUpperCase();
     return w==='MQI' ? 'MQI' : w.charAt(0)+w.slice(1).toLowerCase(); }
@@ -15530,7 +15537,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.237'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.238'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
