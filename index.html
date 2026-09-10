@@ -41,6 +41,31 @@ body.view-locked #pt-entry,
 body.view-locked #cov-action-bar,
 body.view-locked .vl-mgr { display:none !important; }
 
+/* ── v60.242 · PLAN v2 (Sep-9 design B4/C1/C5): verdict → stations → timeline → ⋯ More.
+   The killed choosers stay in the DOM (setSchedPattern/_dayRestore still write to them)
+   but never render; !important beats the inline display they get re-set to. */
+#screen-schedule.plan-v2 #sched-dest, #screen-schedule.plan-v2 #sched-seg, #screen-schedule.plan-v2 #sched-groupby-row,
+#screen-schedule.plan-v2 #sp-step-1, #screen-schedule.plan-v2 #sp-step-2, #screen-schedule.plan-v2 #sp-step-3,
+#screen-schedule.plan-v2 #zone-map, #screen-schedule.plan-v2 #who-i-need-wrap, #screen-schedule.plan-v2 #sched-auto-bar,
+#screen-schedule.plan-v2 #cov-action-bar, #screen-schedule.plan-v2 #pt-entry, #screen-schedule.plan-v2 #plan-act-old { display:none !important; }
+#verdict-card{border-radius:12px;padding:12px 14px;margin-bottom:10px;border:1.5px solid var(--bdr2);background:var(--bg3)}
+#verdict-card.v-live{border-color:rgba(248,113,113,.6);background:rgba(248,113,113,.07)}
+#verdict-card.v-clean{border-color:var(--bdr2)}
+#verdict-card .v-title{font-size:17px;font-weight:800;color:var(--txt);letter-spacing:-.2px}
+#verdict-card.v-live .v-title{color:var(--red)}
+#verdict-card .v-sub{font-size:12px;color:var(--txt2);margin:3px 0 10px}
+#verdict-card .v-btn{width:100%;padding:12px;border-radius:10px;border:none;background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer}
+#verdict-card .v-ghosts{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:12px}
+#verdict-card .v-ghosts a{color:var(--acc);font-weight:700;text-decoration:none;cursor:pointer}
+#plan-counters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+#plan-counters span{font-size:11px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2)}
+#station-list .st-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--bdr2);border-radius:10px;background:var(--bg3);margin-bottom:6px;cursor:pointer}
+#station-list .st-row.short{border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.07)}
+#station-list .st-name{font-size:13px;font-weight:800;color:var(--txt);min-width:74px}
+#station-list .st-count{font-size:13px;font-weight:800}
+#station-list .st-names{flex:1;font-size:11px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#station-list .st-next{font-size:10.5px;color:var(--txt3);white-space:nowrap}
+#sched-horizon{padding:3px 10px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer;margin-left:8px}
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
   /* Theme palette — v53 brightened AGAIN per Matt: "still tooooo dark
@@ -2492,12 +2517,12 @@ button { cursor: pointer; }
 <!-- ═══════════════════════════════════════════════════════════════
      SCREEN: SCHEDULE
 ═══════════════════════════════════════════════════════════════ -->
-<div class="scr" id="screen-schedule">
+<div class="scr plan-v2" id="screen-schedule">
   <!-- v60.209 (Matt): the Unlock control shrinks to a small chip beside the
        header, top right — the old full-width mode bar was pure clutter. Same
        ids, so updateManagerModeUI keeps driving it unchanged. -->
   <div style="display:flex;align-items:center;gap:8px;margin:2px 0 14px">
-    <h1 class="scr-title" style="margin:0;flex:1">Plan</h1>
+    <h1 class="scr-title" style="margin:0;flex:1">Plan<button id="sched-horizon" onclick="horizonMenu()" title="Today · Week · Calendar">Today ▾</button></h1>
     <div id="mgr-mode-bar" style="display:flex;align-items:center;gap:6px">
       <button id="who-chip" onclick="openWhoPicker()" title="Who is using this device?"
         style="padding:3px 10px;border-radius:999px;font-size:10.5px;font-weight:700;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);cursor:pointer;white-space:nowrap">👤 Who’s this?</button>
@@ -2532,7 +2557,11 @@ button { cursor: pointer; }
        two things a manager reaches for the moment something changes — a
        call-off, and the guided plan. Everything below follows the ①②③ spine,
        with every toggle sitting DIRECTLY above the thing it controls. -->
-  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+  <!-- v60.242 (Sep-9 design C1/C5): the verdict card, three counters and the station list lead the page. -->
+  <div id="verdict-card"></div>
+  <div id="plan-counters"></div>
+  <div id="station-list" style="margin-bottom:12px"></div>
+  <div id="plan-act-old" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button class="vl-mgr" onclick="openCallOff()" title="Mark anyone off today — coverage adjusts instantly"
       style="flex:1;min-width:150px;padding:12px 14px;border-radius:9px;border:1px solid var(--red,#FF453A);
         background:rgba(255,69,58,.10);color:var(--red,#FF453A);font-size:14px;font-weight:800;cursor:pointer">
@@ -2586,7 +2615,7 @@ button { cursor: pointer; }
   <div id="sched-today-card" class="card" style="padding:10px 12px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <div style="font-size:9px;font-weight:800;text-transform:uppercase;
-        letter-spacing:.08em;color:var(--txt3)">📊 Coverage · Today</div>
+        letter-spacing:.08em;color:var(--txt3)">📊 Coverage · Today <button id="plan-groupbtn" class="vl-mgr" onclick="planGroupCycle()" style="all:unset;cursor:pointer;color:var(--acc);font-weight:800;text-transform:none;letter-spacing:0;margin-left:6px">by station ▾</button></div>
       <div style="display:flex;gap:6px;font-size:8px">
         <span style="color:var(--green)">🟩 Exit</span>
         <span style="color:var(--acc)">🟦 Counter</span>
@@ -2618,7 +2647,7 @@ button { cursor: pointer; }
   <!-- Auto Schedule button — always visible (the rotation engine is the core value of this tab).
        v60.140: renamed to "Fill today's gaps" (today-scoped) so it no longer reads like the
        whole-week "📅 Week" planner; removed the duplicate Print button (top Print… has it). -->
-  <div style="margin-bottom:10px">
+  <div id="who-i-need-wrap" style="margin-bottom:10px">
     <button onclick="openStaffingNeeds()" title="Do I have the people I need today?"
       style="width:100%;padding:11px 14px;border-radius:9px;border:1px solid var(--bdr2);
         background:var(--bg3);color:var(--txt);font-size:14px;font-weight:800;cursor:pointer">
@@ -2655,6 +2684,22 @@ button { cursor: pointer; }
     
   </div>
 
+  <!-- v60.242: ⋯ More — the demoted fix-it buttons and choosers, one row, closed by default -->
+  <details id="plan-more" class="vl-mgr" style="margin:4px 0 10px">
+    <summary style="list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:6px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt3);font-size:11px;font-weight:700;user-select:none">⋯ More</summary>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="gfxStart()" style="border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-weight:800">▶ Guided fix</button>
+      <button class="btn btn-sm" onclick="gfxPlanView()" style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">🧮 Whole plan</button>
+      <button class="btn btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">⚡ Fill today's gaps</button>
+      <button class="btn btn-gh btn-sm" onclick="undoCoverage()">↩ Undo</button>
+      <button class="btn btn-gh btn-sm" onclick="redoCoverage()">↪ Redo</button>
+      <button class="btn btn-gh btn-sm" onclick="openPlanToday()">📋 Plan today (7 steps)</button>
+      <button class="btn btn-gh btn-sm" onclick="openStaffingNeeds()">📊 Who I need today</button>
+      <button class="btn btn-gh btn-sm" onclick="openTrainingMap()">🎓 Training map</button>
+      <button class="btn btn-gh btn-sm" onclick="setSchedPattern('coverage')">📈 Coverage view</button>
+      <button class="btn btn-gh btn-sm" onclick="setSchedPattern('timeline')">📊 Timeline view</button>
+    </div>
+  </details>
   <!-- v60.214: end-of-flow tools — printing, sends and the training map are
        reference actions, not part of running the day; they close the cascade. -->
   <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap;margin-top:2px">
@@ -9234,6 +9279,7 @@ function confirmToday() {
   }
   // Snapshot confirmed state for cancel/revert
   STATE.confirmedCoverage = snapshotCoverage();
+  STATE.confirmedAt = Date.now(); STATE.confirmedBy = (typeof whoName==='function' && whoName()) || '';   // v60.242: the verdict card's clean state reads this
   saveState();
   if (typeof updatePendingIndicator === 'function') updatePendingIndicator();
 
@@ -15535,7 +15581,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.241'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.242'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -17792,6 +17838,7 @@ function setSchedGroup(mode) {
 // existing week pattern (whose hide/restore wiring is untouched); Today returns to
 // whichever day-view render the manager last used.
 function setSchedDest(d) {
+  try{ var _hl=document.getElementById('sched-horizon'); if(_hl) _hl.textContent=({today:'Today',week:'Week',cal:'Calendar'}[d]||'Today')+' ▾'; }catch(e){}   // v60.242: horizon picker label
   // v60.210: Calendar is the third destination of the Plan surface. It keeps
   // its full-bleed month layout (an inline month grid on a phone would fight
   // the coverage bars for width), so the pill opens it in place; closing it
@@ -18958,6 +19005,7 @@ function buildCoverageTimeline() {
   // Wire up tap-to-edit + drag-to-resize for manager blocks. Called every
   // render so freshly-added blocks get handlers automatically.
   if (typeof setupMgmtBlockHandlers === 'function') setupMgmtBlockHandlers();
+  try{ if(typeof renderPlanV2==='function') renderPlanV2(); }catch(e){}   // v60.242: verdict + counters + station list follow every rebuild
 }
 
 // ───────────────────────────────────────────────────────────────────────
@@ -23848,6 +23896,79 @@ function stationPanelHtml(area){
   }
   return h;
 }
+// ════════════════════════════════════════════════════════════════════════
+// v60.242 · STAGE 2 of the Sep-9 design — Plan · Today: verdict, then fix,
+// then instruments. The verdict card names the worst thing about the day in
+// one sentence and carries the ONE filled button. The station list is a list
+// of doors (each row opens the Station Card). Everything that was a chooser
+// or a fix-it button lives under ⋯ More. Locked sees the verdict as a fact.
+// ════════════════════════════════════════════════════════════════════════
+function _planExp(){ return (typeof buildExpectedToday==='function')?buildExpectedToday():{}; }
+function planCounters(){
+  var exp=_planExp(), now=_nowH(), on=0, lunchesLeft=0;
+  Object.keys(exp).forEach(function(pid){ var e=exp[pid]; try{ if(gfOnShiftAt(pid,e,now)) on++; }catch(err){} });
+  try{ Object.keys(STATE.specialBlocks||{}).forEach(function(pid){ (STATE.specialBlocks[pid]||[]).forEach(function(b){ if(b.key==='lunch' && b.from>now && exp[pid]) lunchesLeft++; }); }); }catch(e){}
+  var step=''; try{ var el=document.getElementById('pt-entry'); if(el) step=String(el.textContent||'').replace(/^📋\s*/,'').trim(); }catch(e){}
+  return {on:on, lunchesLeft:lunchesLeft, step:step};
+}
+function planVerdict(){
+  var mgr=(typeof _managerMode!=='undefined')&&_managerMode, now=_nowH();
+  var gaps=[]; try{ gaps=gfDetectGaps(null, Math.floor(now)); }catch(e){}
+  if(gaps.length){
+    var worst=gaps[0], m=GF_AREA_META[worst.area]||{label:worst.area}, w=stationGapWindow(worst.area)||{from:worst.hour,to:worst.hour+1,have:worst.have,need:worst.need};
+    var areas={}; gaps.forEach(function(g){ areas[g.area]=1; }); var nAreas=Object.keys(areas).length;
+    var best=null; try{ best=gfRankCandidates(worst, _planExp()).filter(function(c){ return c.tier!=='protected'; })[0]||null; }catch(e){}
+    var others=Object.keys(areas).filter(function(a){ return a!==worst.area; }).map(function(a){ var ww=stationGapWindow(a); return (GF_AREA_META[a]||{label:a}).label+(ww?' '+_hFmt(ww.from)+'–'+_hFmt(ww.to):''); });
+    return { state:'live', area:worst.area,
+      title: m.label+' is '+(w.have===0?'empty':'short')+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+(nAreas>1?' · 1 of '+nAreas:''),
+      sub: (others.length? 'Also: '+others.join(' · ') : 'Everything else holds through close.')+' · '+w.have+' of '+w.need+' in that window.',
+      best: best, button: best ? {label:'▶ Fix '+m.label+' · move '+_pidNick(best.pid), js:"stationApplyMove('"+String(best.pid).replace(/'/g,'\\x27')+"','"+worst.area+"')"} : {label:'▶ Guided fix', js:'gfxStart()'} };
+  }
+  var confirmed=!!(STATE.confirmedCoverage) && !(typeof hasPendingChanges==='function' && hasPendingChanges());
+  if(confirmed){
+    var at=STATE.confirmedAt?_hFmt(new Date(STATE.confirmedAt).getHours()+new Date(STATE.confirmedAt).getMinutes()/60):null;
+    var last=(STATE.changeLog||[])[0]; var lastAt=last?_hFmt(new Date(last.ts).getHours()+new Date(last.ts).getMinutes()/60):null;
+    return { state:'confirmed', title:'Covered through close', sub:'Confirmed'+(at?' '+at:'')+(STATE.confirmedBy?' by '+STATE.confirmedBy:'')+(lastAt?' · last change '+lastAt:''), button:null };
+  }
+  return { state:'clean', title:'Covered through close', sub:'Nothing to fix.', button:{label:'✓ Confirm the day', js:'confirmToday()'} };
+}
+function verdictCardHtml(){
+  var v=planVerdict(), mgr=(typeof _managerMode!=='undefined')&&_managerMode, c=planCounters();
+  var h='<div class="v-title">'+biEsc(v.title)+'</div><div class="v-sub">'+biEsc(v.sub)+'</div>';
+  if(mgr && v.button) h+='<button class="v-btn vl-mgr" onclick="'+v.button.js+'">'+biEsc(v.button.label)+'</button>';
+  if(mgr) h+='<div class="v-ghosts vl-mgr"><a onclick="openCallOff()">📞 Someone called off</a>'+(window._planLastMove?'<a onclick="undoCoverage();buildCoverageTimeline()">↩ Undo · '+biEsc(window._planLastMove)+'</a>':'')+'<a onclick="var d=document.getElementById(\'plan-more\'); if(d){ d.open=true; d.scrollIntoView({block:\'center\'}); }">Other ways to fix</a></div>';
+  return {html:h, state:v.state};
+}
+function stationListHtml(){
+  var exp=_planExp(), now=_nowH(), dow=new Date().getDay(), h='';
+  var need={}, have={}; try{ need=gfNeedsAt(Math.floor(now),dow)||{}; }catch(e){} try{ have=(typeof gfCountsW==='function')?gfCountsW(exp,Math.floor(now)):{}; }catch(e){}
+  ['exit','counter','returns','emerald'].forEach(function(a){
+    var m=GF_AREA_META[a], here=stationHereNow(a), nd=need[a]||0, hv=(have[a]!=null)?Math.round(have[a]*10)/10:here.length;
+    var short=nd>0 && hv<nd, gap=stationGapWindow(a);
+    var next=''; try{ var b=stationNeedBlocks(a).find(function(x){ return x.from>now; }); if(b) next=b.need+' at '+_hFmt(b.from); }catch(e){}
+    var status = short ? ((hv===0?'Empty':'Short')+(gap?' from '+_hFmt(gap.from):'')) : (gap ? 'Short from '+_hFmt(gap.from) : '');
+    h+='<div class="st-row'+(short||gap?' short':'')+'" onclick="openStationPanel(\''+a+'\')"><span class="st-name"><span style="color:'+m.color+'">●</span> '+m.label+'</span>'
+      +'<span class="st-count" style="color:'+(short?'var(--red)':'var(--txt)')+'">'+hv+(nd?' / '+nd:'')+'</span>'
+      +'<span class="st-names">'+(status?'<span style="color:var(--red);font-weight:700">'+biEsc(status)+'</span>'+(here.length?' · ':''):'')+biEsc(here.slice(0,3).map(function(r){ return r.nick; }).join(', '))+(here.length>3?' +'+(here.length-3):'')+'</span>'
+      +'<span class="st-next">'+biEsc(next)+'</span><span style="color:var(--txt3)">›</span></div>';
+  });
+  try{
+    var mgrs=Object.keys(exp).filter(function(pid){ var e=exp[pid]; var r=(e.person||{}).role||''; return /^(MT|ABRM|BRM|ARM|AM)$/.test(r) && gfOnShiftAt(pid,e,now); });
+    h+='<div class="st-row" style="cursor:default"><span class="st-name"><span style="color:#a5b4fc">●</span> Managers</span><span class="st-count">'+mgrs.length+' on</span><span class="st-names">'+biEsc(mgrs.slice(0,4).map(function(p){ return _pidNick(p); }).join(', '))+'</span></div>';
+  }catch(e){}
+  return h;
+}
+function renderPlanV2(){
+  var vc=document.getElementById('verdict-card'); if(vc){ var v=verdictCardHtml(); vc.className='v-'+v.state; vc.innerHTML=v.html; }
+  var pc=document.getElementById('plan-counters'); if(pc){ var c=planCounters(); pc.innerHTML='<span>'+c.on+' on duty</span><span>'+c.lunchesLeft+' lunches left</span>'+(c.step?'<span class="vl-mgr" style="color:var(--acc);cursor:pointer" onclick="openPlanToday()">'+biEsc(c.step)+' ›</span>':''); }
+  var sl=document.getElementById('station-list'); if(sl) sl.innerHTML=stationListHtml();
+  try{ var gb=document.getElementById('plan-groupbtn'); if(gb) gb.textContent='by '+({station:'station',type:'type',start:'start',end:'end',name:'name'}[STATE.schedGroupBy||'station']||'station')+' ▾'; }catch(e){}
+}
+function planGroupCycle(){ var order=['station','name','type','start','end']; var cur=STATE.schedGroupBy||'station'; var nx=order[(order.indexOf(cur)+1)%order.length]; if(typeof setSchedGroup==='function') setSchedGroup(nx); renderPlanV2(); }
+function horizonMenu(){
+  var b=function(k,l){ return '<button onclick="setSchedDest(\''+k+'\');closeModal()" style="width:100%;padding:12px;margin-bottom:6px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:14px;font-weight:800;cursor:pointer;text-align:left">'+l+'</button>'; };
+  openModal('Plan · horizon', b('today','☀️ Today')+b('week','📅 Week')+b('cal','📆 Calendar'));
+}
 function _stationSheet(){
   var p=document.getElementById('station-panel');
   if(!p){ p=document.createElement('div'); p.id='station-panel'; document.body.appendChild(p); }
@@ -23867,7 +23988,7 @@ function stationApplyMove(pid, area){
   var reopen=function(){ try{ openStationPanel(area); }catch(e){} };
   // mgrAssignStation re-opens the person card at the end; the station is what was pressed, so come back to it
   var _op=window.openPersonPanel; window.openPersonPanel=function(){}; try{ mgrAssignStation(pid, m.station); } finally { window.openPersonPanel=_op; }
-  reopen(); if(typeof toast==='function') toast('Moved '+_pidNick(pid)+' → '+m.label+' · Undo on the card');
+  window._planLastMove='Moved '+_pidNick(pid)+' → '+m.label; reopen(); try{ renderPlanV2(); }catch(e){} if(typeof toast==='function') toast('Moved '+_pidNick(pid)+' → '+m.label);
 }
 
 // ── Employee Card · HUB (Overview) and the spoke chrome ──────────────────
