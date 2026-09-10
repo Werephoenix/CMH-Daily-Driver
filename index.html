@@ -59,12 +59,20 @@ body.view-locked .vl-mgr { display:none !important; }
 #verdict-card .v-ghosts a{color:var(--acc);font-weight:700;text-decoration:none;cursor:pointer}
 #plan-counters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 #plan-counters span{font-size:11px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2)}
-#station-list .st-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--bdr2);border-radius:10px;background:var(--bg3);margin-bottom:6px;cursor:pointer}
-#station-list .st-row.short{border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.07)}
-#station-list .st-name{font-size:13px;font-weight:800;color:var(--txt);min-width:74px}
-#station-list .st-count{font-size:13px;font-weight:800}
-#station-list .st-names{flex:1;font-size:11px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#station-list .st-next{font-size:10.5px;color:var(--txt3);white-space:nowrap}
+#station-list .st-row, #self-floor .st-row{display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--bdr2);border-radius:10px;background:var(--bg3);margin-bottom:6px;cursor:pointer}
+#station-list .st-row.short, #self-floor .st-row.short{border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.07)}
+#station-list .st-name, #self-floor .st-name{font-size:13px;font-weight:800;color:var(--txt);min-width:74px}
+#station-list .st-count, #self-floor .st-count{font-size:13px;font-weight:800}
+#station-list .st-names, #self-floor .st-names{flex:1;font-size:11px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#station-list .st-next, #self-floor .st-next{font-size:10.5px;color:var(--txt3);white-space:nowrap}
+body.view-locked #sched-horizon, body.view-locked .solo-btn { display:none !important; }   /* v60.243: locked = reading edition */
+#verdict-card.v-read{border-color:var(--bdr2);background:var(--bg3)}
+#self-home{margin-bottom:14px}
+#self-home .sh-card{border-radius:12px;padding:12px 14px;border:1.5px solid var(--bdr2);background:var(--bg3);margin-bottom:10px}
+#self-home .sh-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+#self-home .sh-day{border:1px solid var(--bdr2);border-radius:8px;padding:6px 2px;text-align:center;font-size:10px;color:var(--txt2);background:var(--bg2)}
+#self-home .sh-day.today{border-color:var(--accent);color:var(--accent);font-weight:800}
+#self-home .sh-day b{display:block;font-size:10.5px;color:var(--txt)}
 #sched-horizon{padding:3px 10px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer;margin-left:8px}
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
@@ -2040,22 +2048,22 @@ button { cursor: pointer; }
     </div>
     <div class="now-sec-hd" style="margin:14px 0 6px 4px">Data</div>
     <div class="more-group">
-      <button class="more-row" onclick="showTab('paste')"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📋</span><span class="more-lbl">Paste Data</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="showTab('inventory')"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🔢</span><span class="more-lbl">Physical Inventory</span><span class="more-ch">›</span></button>
+      <button class="more-row vl-mgr" onclick="showTab('paste')"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📋</span><span class="more-lbl">Paste Data</span><span class="more-ch">›</span></button>
+      <button class="more-row vl-mgr" onclick="showTab('inventory')"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🔢</span><span class="more-lbl">Physical Inventory</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('reference')"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openEmeraldGuide()"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">💚</span><span class="more-lbl">Emerald Club<span class="more-sub">LOS by tier · MOD codes · aisle rules</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('history')"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('schedule');setSchedDest('cal')"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">📅</span><span class="more-lbl">Master Calendar<span class="more-sub">Lives in Plan → 📆 Calendar</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openScheduleLog()"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="goToWeekPlanner()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">🤖</span><span class="more-lbl">Week Planner<span class="more-sub">Auto-draft &amp; publish the week — opens Schedule → Week</span></span><span class="more-ch">›</span></button>
+      <button class="more-row vl-mgr" onclick="goToWeekPlanner()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">🤖</span><span class="more-lbl">Week Planner<span class="more-sub">Auto-draft &amp; publish the week — opens Schedule → Week</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openStationFairness()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">🔀</span><span class="more-lbl">Station Fairness<span class="more-sub">Who's stuck in Returns / never Emerald · beta</span></span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openBranchAsks()"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
+      <button class="more-row vl-mgr" onclick="openBranchAsks()"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openRequests()"><span class="more-ic tile" style="background:rgba(255,159,10,.16)">📥</span><span class="more-lbl">Requests</span><span class="more-ch">›</span></button>
     </div>
     <div class="now-sec-hd" style="margin:16px 0 6px 4px">Manage</div>
     <div class="more-group">
-      <button class="more-row" onclick="openSetupHub()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">⚙️</span><span class="more-lbl">Setup<span class="more-sub">Staff, schedule, car groups, rules, PINs &amp; more</span></span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openBackup()"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">💾</span><span class="more-lbl">Backup &amp; Restore</span><span class="more-ch">›</span></button>
+      <button class="more-row vl-mgr" onclick="openSetupHub()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">⚙️</span><span class="more-lbl">Setup<span class="more-sub">Staff, schedule, car groups, rules, PINs &amp; more</span></span><span class="more-ch">›</span></button>
+      <button class="more-row vl-mgr" onclick="openBackup()"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">💾</span><span class="more-lbl">Backup &amp; Restore</span><span class="more-ch">›</span></button>
     </div>
     <div class="now-sec-hd" style="margin:16px 0 6px 4px">Appearance</div>
     <div class="more-group">
@@ -4821,10 +4829,18 @@ function startClock() {
 }
 
 function autoRouteByTime() {
+  // v60.243 (Sep-9 design B6, cold open only): who is looking decides the landing.
+  // A device that knows its person and is locked lands on Now (own day on top);
+  // a manager lands on Plan. Only an anonymous device keeps the time-of-day route.
+  try{
+    var _mgr=(typeof _managerMode!=='undefined')&&_managerMode, _who=(typeof whoAmI==='function')&&whoAmI();
+    if(_mgr){ showTab('schedule'); return; }
+    if(_who){ showTab('opening'); return; }
+  }catch(e){}
   const h = new Date().getHours();
   if      (h >= 15) { showTab('checklist'); _forceShowChecklist('closing'); }
   else if (h >= 11) { showTab('checklist'); _forceShowChecklist('mid'); }
-  else               { showTab('opening'); }
+  else               { showTab((typeof _managerMode!=='undefined' && _managerMode) ? 'schedule' : 'opening'); }   // v60.243 (B6): who is looking decides the landing; Unlock never navigates
 }
 
 // ── v60.52: START-OF-DAY GUIDED FLOW ─────────────────────────────────────────
@@ -12143,7 +12159,8 @@ function renderNow() {
   // that is the whole idea — it is the first thing read, before the numbers.
   const _qHero  = (typeof qotdHeroHtml==='function')  ? qotdHeroHtml()  : '';
   const _qQuiet = (typeof qotdQuietHtml==='function') ? qotdQuietHtml() : '';
-  el.innerHTML = _qHero
+  const _self = (typeof selfHomeHtml==='function') ? selfHomeHtml() : '';   // v60.243 (C2): a locked device that knows who is looking leads with their own day
+  el.innerHTML = _self + _qHero
     + `<div class="now-cockpit"><div class="now-main">${html}${_qQuiet}</div><div class="now-rail">${rail}</div></div>`;
 }
 
@@ -15581,7 +15598,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.242'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.243'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -21032,7 +21049,7 @@ function gfxRender(){
    +'<div style="font-size:17px;font-weight:800;color:var(--txt);margin-top:3px">'
    +_gfxFmtH(g.hour)+' — need '+(g.need||'?')+', have '+(g.have!=null?g.have:'?')+'</div></div>';
   if(top){
-    b+='<button onclick="gfxApply()" style="width:100%;padding:14px;border-radius:10px;border:none;'
+    b+='<button class="vl-mgr" onclick="gfxApply()" style="width:100%;padding:14px;border-radius:10px;border:none;'
      +'background:var(--accent);color:#04160e;font-size:14.5px;font-weight:800;cursor:pointer;margin-bottom:8px">'
      +'Send '+top.nick+' → '+lbl.replace(/^[^ ]+ /,'')+'</button>'
      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">'
@@ -23932,8 +23949,16 @@ function planVerdict(){
   }
   return { state:'clean', title:'Covered through close', sub:'Nothing to fix.', button:{label:'✓ Confirm the day', js:'confirmToday()'} };
 }
+function planReadFacts(){   // v60.243 (C3): what a locked reader is told — set or not, by whom, last change
+  var confirmed=!!STATE.confirmedCoverage, at=STATE.confirmedAt?_hFmt(new Date(STATE.confirmedAt).getHours()+new Date(STATE.confirmedAt).getMinutes()/60):null;
+  var last=(STATE.changeLog||[])[0]; var lastAt=last?_hFmt(new Date(last.ts).getHours()+new Date(last.ts).getMinutes()/60):null;
+  return confirmed ? {title:'Today is set', sub:'Set'+(at?' '+at:'')+(STATE.confirmedBy?' by '+STATE.confirmedBy:'')+(lastAt?' · last change '+lastAt:'')}
+                   : {title:'Today is not set yet', sub:'A manager confirms the day from Plan.'+(lastAt?' Last change '+lastAt+'.':'')};
+}
 function verdictCardHtml(){
-  var v=planVerdict(), mgr=(typeof _managerMode!=='undefined')&&_managerMode, c=planCounters();
+  var mgr=(typeof _managerMode!=='undefined')&&_managerMode;
+  if(!mgr){ var f=planReadFacts(); return {html:'<div class="v-title">'+biEsc(f.title)+'</div><div class="v-sub" style="margin-bottom:0">'+biEsc(f.sub)+'</div><div style="font-size:11px;color:var(--txt3);margin-top:8px">🔒 Reading the day. Unlock with a PIN to change anything.</div>', state:'read'}; }
+  var v=planVerdict(), c=planCounters();
   var h='<div class="v-title">'+biEsc(v.title)+'</div><div class="v-sub">'+biEsc(v.sub)+'</div>';
   if(mgr && v.button) h+='<button class="v-btn vl-mgr" onclick="'+v.button.js+'">'+biEsc(v.button.label)+'</button>';
   if(mgr) h+='<div class="v-ghosts vl-mgr"><a onclick="openCallOff()">📞 Someone called off</a>'+(window._planLastMove?'<a onclick="undoCoverage();buildCoverageTimeline()">↩ Undo · '+biEsc(window._planLastMove)+'</a>':'')+'<a onclick="var d=document.getElementById(\'plan-more\'); if(d){ d.open=true; d.scrollIntoView({block:\'center\'}); }">Other ways to fix</a></div>';
@@ -23947,6 +23972,7 @@ function stationListHtml(){
     var short=nd>0 && hv<nd, gap=stationGapWindow(a);
     var next=''; try{ var b=stationNeedBlocks(a).find(function(x){ return x.from>now; }); if(b) next=b.need+' at '+_hFmt(b.from); }catch(e){}
     var status = short ? ((hv===0?'Empty':'Short')+(gap?' from '+_hFmt(gap.from):'')) : (gap ? 'Short from '+_hFmt(gap.from) : '');
+    if(!((typeof _managerMode!=='undefined')&&_managerMode)) status='';   // v60.243 (C3): locked = tinted row only, no instruction
     h+='<div class="st-row'+(short||gap?' short':'')+'" onclick="openStationPanel(\''+a+'\')"><span class="st-name"><span style="color:'+m.color+'">●</span> '+m.label+'</span>'
       +'<span class="st-count" style="color:'+(short?'var(--red)':'var(--txt)')+'">'+hv+(nd?' / '+nd:'')+'</span>'
       +'<span class="st-names">'+(status?'<span style="color:var(--red);font-weight:700">'+biEsc(status)+'</span>'+(here.length?' · ':''):'')+biEsc(here.slice(0,3).map(function(r){ return r.nick; }).join(', '))+(here.length>3?' +'+(here.length-3):'')+'</span>'
@@ -23957,6 +23983,31 @@ function stationListHtml(){
     h+='<div class="st-row" style="cursor:default"><span class="st-name"><span style="color:#a5b4fc">●</span> Managers</span><span class="st-count">'+mgrs.length+' on</span><span class="st-names">'+biEsc(mgrs.slice(0,4).map(function(p){ return _pidNick(p); }).join(', '))+'</span></div>';
   }catch(e){}
   return h;
+}
+function selfHomeHtml(){
+  var mgr=(typeof _managerMode!=='undefined')&&_managerMode; var pid=(typeof whoAmI==='function')?whoAmI():null;
+  if(mgr || !pid) return '';
+  var p=personByPid(pid); if(!p) return '';
+  var ov=(STATE.shiftMod||{})[pid]||{}; var ss=(ov.start!=null)?ov.start:p.shiftStart, se=(ov.end!=null)?ov.end:p.shiftEnd;
+  var exp=_planExp(); var entry=exp[pid]||{person:p, notWorkingToday:true};
+  var st=ppStatusLine(pid, entry, ss, se), nick=_pidNick(pid), tk=todayKey();
+  var h='<div id="self-home"><div class="sh-card"><div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px">'
+    +'<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">Your day</div>'
+    +'<button onclick="openWhoPicker()" style="padding:3px 9px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);font-size:10.5px;font-weight:700;cursor:pointer">👤 '+biEsc(nick)+' · you ▾</button></div>'
+    +'<div class="pid-chip" data-pid="'+biEsc(pid)+'" role="button" tabindex="0" style="cursor:pointer"><div style="font-size:17px;font-weight:800;color:'+(st.color||'var(--txt)')+'">'+biEsc(st.main)+'</div>'+(st.sub?'<div style="font-size:12px;color:var(--txt2);margin-top:2px">'+biEsc(st.sub)+'</div>':'')+'</div>';
+  var chips=[]; try{ var s1=ppStreak(pid); if(s1>=2) chips.push('🔥 Day '+s1+' in a row'); }catch(e){}
+  try{ var d=new Date(tk+'T12:00:00'); for(var i=1;i<=14;i++){ d.setDate(d.getDate()+1); var k=_localDayKey(d); var c=(getScheduleForDate(k)||{})[pid]; if(c==null || (typeof isOffCode==='function' && isOffCode(c))){ chips.push('Next off · '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]); break; } } }catch(e){}
+  try{ if(typeof exitAccommodated==='function' && exitAccommodated(pid)) chips.push('🛡 Accommodated'); }catch(e){}
+  if(chips.length) h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'+chips.map(function(c){ return '<span style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--bg2);border:1px solid var(--bdr2);color:var(--txt2)">'+biEsc(c)+'</span>'; }).join('')+'</div>';
+  h+='</div>';
+  h+='<div class="now-sec-hd" style="margin:0 0 6px 4px">The floor right now</div><div id="self-floor">'+stationListHtml()+'</div>';
+  try{
+    var d2=new Date(tk+'T12:00:00'); d2.setDate(d2.getDate()-d2.getDay()); var days='';
+    for(var j=0;j<7;j++){ var k2=_localDayKey(d2); var c2=(getScheduleForDate(k2)||{})[pid]; var txt=(c2==null)?'—':(Array.isArray(c2)?mcFmtShift(c2).replace(/:00/g,''):mcFmtShift(c2)); if(txt.length>9) txt=txt.slice(0,9);
+      days+='<div class="sh-day'+(k2===tk?' today':'')+'">'+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d2.getDay()]+'<b>'+biEsc(txt)+'</b></div>'; d2.setDate(d2.getDate()+1); }
+    h+='<div class="now-sec-hd" style="margin:10px 0 6px 4px">My week</div><div class="sh-week">'+days+'</div>';
+  }catch(e){}
+  return h+'</div>';
 }
 function renderPlanV2(){
   var vc=document.getElementById('verdict-card'); if(vc){ var v=verdictCardHtml(); vc.className='v-'+v.state; vc.innerHTML=v.html; }
@@ -28159,6 +28210,7 @@ function whoSet(pid){
     else { localStorage.setItem(WHO_KEY, String(pid)); var t=_whoTaps(); t[pid]=(t[pid]||0)+1; localStorage.setItem(WHO_TAPS_KEY, JSON.stringify(t)); }
   }catch(e){}
   whoRefresh();
+  try{ if(typeof renderNow==='function') renderNow(); }catch(e){}   // v60.243: the self home follows the pick
   return whoAmI();
 }
 function whoClear(){ whoSet(null); }
