@@ -73,6 +73,15 @@ body.view-locked #sched-horizon, body.view-locked .solo-btn { display:none !impo
 #self-home .sh-day{border:1px solid var(--bdr2);border-radius:8px;padding:6px 2px;text-align:center;font-size:10px;color:var(--txt2);background:var(--bg2)}
 #self-home .sh-day.today{border-color:var(--accent);color:var(--accent);font-weight:800}
 #self-home .sh-day b{display:block;font-size:10.5px;color:var(--txt)}
+#tab-checklist { display:none !important; }   /* v60.245 (B5): Rituals is a timed card on Now; the checklist screen stays reachable from it */
+.nbtn.nb-desk { display:none; }
+#ritual-card{border-radius:12px;padding:11px 14px;border:1.5px solid var(--bdr2);background:var(--bg3);margin-bottom:10px;display:flex;align-items:center;gap:10px;cursor:pointer}
+#ritual-card.lit{border-color:var(--amber);background:rgba(217,119,6,.08)}
+#ritual-card .rc-t{flex:1;font-size:13px;font-weight:800;color:var(--txt)}
+#ritual-card .rc-s{font-size:11px;color:var(--txt2);font-weight:600}
+.pl-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--bdr2);border-radius:10px;background:var(--bg3);margin-bottom:6px;cursor:pointer}
+.pl-row .pl-n{flex:1;font-size:13px;font-weight:800;color:var(--txt)}
+.pl-row .pl-r{font-size:11px;color:var(--txt3)}
 #sched-horizon{padding:3px 10px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer;margin-left:8px}
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
@@ -1897,6 +1906,8 @@ select option{background:var(--bg3)}
     flex: none; flex-direction: row; justify-content: flex-start;
     gap: 13px; padding: 11px 12px; border-radius: 10px; min-height: 0;
   }
+  .nbtn.nb-desk { display: flex; }   /* v60.245 (Sep-9 design B5): desktop = Now · Plan · Board · People · Admin */
+  #person-panel, #station-panel { left: auto !important; right: 0 !important; top: 48px !important; bottom: 0 !important; width: 400px; max-height: none !important; border-radius: 0 !important; border-top: none !important; border-left: 1px solid var(--bdr2); box-shadow: -6px 0 24px rgba(0,0,0,.25) !important; }   /* v60.245 (B7): the card docks right, nothing opens over anything */
   .nbtn-lbl { font-size: 15px; font-weight: 600; }
   .nbtn.on { background: rgba(35,201,131,.14); color: var(--accent); }
   .nbtn:hover:not(.on) { background: var(--bg3); color: var(--txt); }
@@ -2033,6 +2044,8 @@ button { cursor: pointer; }
   <button class="nbtn"    id="tab-schedule" onclick="showTab('schedule')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg></span><span class="nbtn-lbl">Plan</span></button>
   <button class="nbtn"    id="tab-board"    onclick="showTab('board')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><path d="M5 11l1.4-4.2A2 2 0 018.3 5.4h7.4a2 2 0 011.9 1.4L19 11M5 11h14v4.6a1 1 0 01-1 1h-1.4a1 1 0 01-1-1V15H8.4v.6a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><circle cx="8.2" cy="13.6" r="1"/><circle cx="15.8" cy="13.6" r="1"/></svg></span><span class="nbtn-lbl">Board</span></button>
   <button class="nbtn"    id="tab-checklist" onclick="showTab('checklist')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><path d="M8 12.2l2.8 2.8L16.5 9"/></svg></span><span class="nbtn-lbl">Rituals</span></button>
+  <button class="nbtn nb-desk" id="tab-people" onclick="showTab('people')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5"/><circle cx="17" cy="9.5" r="2.4"/><path d="M15.5 14.5c2.6 0 5 1.8 5 4.5"/></svg></span><span class="nbtn-lbl">People</span></button>
+  <button class="nbtn nb-desk" id="tab-admin" onclick="showTab('admin')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg></span><span class="nbtn-lbl">Admin</span></button>
   <button class="nbtn"    id="tab-more"     onclick="showTab('more')"><span class="ni"><svg viewBox="0 0 24 24" class="ni-svg ni-fill"><circle cx="5.5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="18.5" cy="12" r="1.7"/></svg></span><span class="nbtn-lbl">More</span></button>
   <div id="nav-calm"><span class="nav-calm-lbl">Calm Mode</span><button id="nav-calm-toggle" class="nav-calm-sw" onclick="toggleTheme()" aria-label="Toggle Calm Mode"><span class="nav-calm-knob"></span></button></div>
 </div>
@@ -2048,17 +2061,11 @@ button { cursor: pointer; }
     </div>
     <div class="now-sec-hd" style="margin:14px 0 6px 4px">Data</div>
     <div class="more-group">
-      <button class="more-row vl-mgr" onclick="showTab('paste')"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📋</span><span class="more-lbl">Paste Data</span><span class="more-ch">›</span></button>
-      <button class="more-row vl-mgr" onclick="showTab('inventory')"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🔢</span><span class="more-lbl">Physical Inventory</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('reference')"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openEmeraldGuide()"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">💚</span><span class="more-lbl">Emerald Club<span class="more-sub">LOS by tier · MOD codes · aisle rules</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('history')"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="showTab('schedule');setSchedDest('cal')"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">📅</span><span class="more-lbl">Master Calendar<span class="more-sub">Lives in Plan → 📆 Calendar</span></span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openScheduleLog()"><span class="more-ic tile" style="background:rgba(10,132,255,.16)">🗓</span><span class="more-lbl">Schedule Log</span><span class="more-ch">›</span></button>
-      <button class="more-row vl-mgr" onclick="goToWeekPlanner()"><span class="more-ic tile" style="background:rgba(35,201,131,.16)">🤖</span><span class="more-lbl">Week Planner<span class="more-sub">Auto-draft &amp; publish the week — opens Schedule → Week</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openStationFairness()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">🔀</span><span class="more-lbl">Station Fairness<span class="more-sub">Who's stuck in Returns / never Emerald · beta</span></span><span class="more-ch">›</span></button>
       <button class="more-row vl-mgr" onclick="openBranchAsks()"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openRequests()"><span class="more-ic tile" style="background:rgba(255,159,10,.16)">📥</span><span class="more-lbl">Requests</span><span class="more-ch">›</span></button>
     </div>
     <div class="now-sec-hd" style="margin:16px 0 6px 4px">Manage</div>
     <div class="more-group">
@@ -2389,7 +2396,7 @@ button { cursor: pointer; }
 <div class="scr" id="screen-board">
   <!-- v60.65 (Design handoff §3.5): iOS kicker + timestamp over a "Live Board" large title -->
   <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3);margin-bottom:1px">AVAILABILITY<span id="board-updated"></span></div>
-  <h1 class="scr-title">Live Board</h1>
+  <div style="display:flex;align-items:center;gap:8px"><h1 class="scr-title" style="flex:1">Live Board</h1><button onclick="boardMore()" title="Refresh the board, inventory" style="padding:5px 12px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer">⋯</button></div>
   <!-- v60.60: outbound-cancellation → walk-up 1-way flag -->
   <div id="board-cancel-flag" class="board-cancel-flag"></div>
   <!-- v60.62: city-event → fleet-pressure flag -->
@@ -2704,6 +2711,7 @@ button { cursor: pointer; }
       <button class="btn btn-gh btn-sm" onclick="openPlanToday()">📋 Plan today (7 steps)</button>
       <button class="btn btn-gh btn-sm" onclick="openStaffingNeeds()">📊 Who I need today</button>
       <button class="btn btn-gh btn-sm" onclick="openTrainingMap()">🎓 Training map</button>
+      <button class="btn btn-gh btn-sm" onclick="openRequests()">📥 Requests</button>
       <button class="btn btn-gh btn-sm" onclick="setSchedPattern('coverage')">📈 Coverage view</button>
       <button class="btn btn-gh btn-sm" onclick="setSchedPattern('timeline')">📊 Timeline view</button>
     </div>
@@ -2795,6 +2803,20 @@ button { cursor: pointer; }
 <!-- ═══════════════════════════════════════════════════════════════
      SCREEN: CHECKLIST
 ═══════════════════════════════════════════════════════════════ -->
+<div class="scr" id="screen-people">
+  <div style="max-width:760px;margin:0 auto">
+    <div style="display:flex;align-items:center;gap:8px;margin:2px 0 10px"><h1 class="scr-title" style="margin:0;flex:1">People</h1>
+      <button class="vl-mgr" onclick="showAddStaffModal()" style="padding:5px 12px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer">＋ Add</button></div>
+    <input id="pl-search" placeholder="Find a name…" autocomplete="off" oninput="renderPeople(this.value)" style="width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:14px;margin-bottom:10px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <button onclick="openStationFairness()" style="padding:8px 12px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">🔀 Patterns &amp; fairness</button>
+      <button onclick="openTrainingMap()" style="padding:8px 12px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">🎓 Training map</button>
+      <button class="vl-mgr" onclick="openRequests()" style="padding:8px 12px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">📥 Requests queue</button>
+    </div>
+    <div id="pl-list"></div>
+  </div>
+</div>
+
 <div class="scr" id="screen-checklist">
   <h1 class="scr-title">Rituals</h1>
   <div class="cl-tabs">
@@ -5074,6 +5096,7 @@ function showTab(id) {
   // previously matched nothing and blanked the app (no screen kept .on).
   const tabMap = { emails:'checklist', codes:'reference', hourly:'reference', loyalty:'reference', dashboard:'opening', now:'opening' };
   if (tabMap[id]) id = tabMap[id];
+  if (id==='people' && typeof renderPeople==='function') { try{ renderPeople(); }catch(e){} }   // v60.245
 
   // v60.124: Calendar is a top-level tab but renders as a full-screen overlay
   // (the Master Calendar). Open it ON TOP of the current screen and light its nav
@@ -12193,7 +12216,8 @@ function renderNow() {
   const _qHero  = (typeof qotdHeroHtml==='function')  ? qotdHeroHtml()  : '';
   const _qQuiet = (typeof qotdQuietHtml==='function') ? qotdQuietHtml() : '';
   const _self = (typeof selfHomeHtml==='function') ? selfHomeHtml() : '';   // v60.243 (C2): a locked device that knows who is looking leads with their own day
-  el.innerHTML = _self + _qHero
+  const _ritual = (typeof ritualCardHtml==='function') ? ritualCardHtml() : '';   // v60.245 (B5): the ritual for this hour, as a card
+  el.innerHTML = _self + _ritual + _qHero
     + `<div class="now-cockpit"><div class="now-main">${html}${_qQuiet}</div><div class="now-rail">${rail}</div></div>`;
 }
 
@@ -15631,7 +15655,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.244'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.245'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -24044,6 +24068,32 @@ function selfHomeHtml(){
   }catch(e){}
   return h+'</div>';
 }
+// v60.245 (B5): Rituals becomes a TIMED CARD on Now — the ritual for this hour with its progress; "All rituals ›" opens the checklist screen.
+function ritualCardHtml(){
+  try{
+    var h=(typeof _nowH==='function')?_nowH():new Date().getHours(); var mode = h<11 ? 'opening' : h<15 ? 'mid' : 'closing';
+    var secs=(typeof CL_DATA!=='undefined' && CL_DATA[mode])||[]; var total=0; secs.forEach(function(sec){ total+=((sec.items||[]).length); });
+    var st=(STATE.checklist&&STATE.checklist['cl-'+mode])||{}; var done=Object.keys(st).filter(function(k){ return st[k]; }).length; if(done>total) total=done;
+    var left=Math.max(0,total-done), lbl={opening:'Opening ritual',mid:'Mid-day ritual',closing:'Closing ritual'}[mode];
+    var overdue = (mode==='opening' && h>=10 && left>0) || (mode==='mid' && h>=14 && left>0) || (mode==='closing' && h>=23 && left>0);
+    return '<div id="ritual-card" class="'+(overdue?'lit':'')+'" onclick="showTab(\'checklist\')"><span style="font-size:18px">📋</span><div class="rc-t">'+lbl+'<div class="rc-s">'+done+' of '+total+' done'+(left?' · '+left+' left':' · complete ✓')+(overdue?' · running late':'')+'</div></div><span style="font-size:12px;font-weight:700;color:var(--acc)">All rituals ›</span></div>';
+  }catch(e){ return ''; }
+}
+// v60.245 (C7): the People screen — every person is a door to their card; tools that are about people live here.
+function peopleListHtml(q){
+  q=String(q||'').trim().toLowerCase(); var ppl=(typeof whoCandidates==='function')?whoCandidates(q):[]; if(!ppl.length) return '<div style="font-size:12px;color:var(--txt3);padding:8px">No one matches.</div>';
+  var groups={}; ppl.forEach(function(x){ var g=/^(MT|ABRM|BRM|ARM|AM)$/.test(x.role)?'Managers':(x.role||'Staff'); (groups[g]=groups[g]||[]).push(x); });
+  var order=Object.keys(groups).sort(function(a,b){ var r={Managers:0,CXR:1,EXIT:2,RETURNS:3}; return (r[a]==null?9:r[a])-(r[b]==null?9:r[b]); }), h='';
+  order.forEach(function(g){ h+='<div class="now-sec-hd" style="margin:8px 0 6px 4px">'+biEsc(g)+' · '+groups[g].length+'</div>'
+    +groups[g].map(function(x){ var acc=(typeof accomActive==='function'&&accomActive(x.pid).length)?' 🛡':''; var sch=null; try{ sch=(getScheduleForDate(todayKey())||{})[x.pid]; }catch(e){} var today=sch==null?'—':(typeof mcFmtShift==='function'?mcFmtShift(sch):String(sch));
+      return '<div class="pl-row pid-chip" data-pid="'+biEsc(x.pid)+'" role="button" tabindex="0"><span class="pl-n">'+biEsc(x.name)+acc+'</span><span class="pl-r">'+biEsc(today)+'</span><span style="color:var(--txt3)">›</span></div>'; }).join(''); });
+  return h;
+}
+function renderPeople(q){ var el=document.getElementById('pl-list'); if(!el) return; if(q==null){ var i=document.getElementById('pl-search'); q=i?i.value:''; } el.innerHTML=peopleListHtml(q); }
+function boardMore(){
+  var b=function(js,l){ return '<button onclick="closeModal();'+js+'" style="width:100%;padding:12px;margin-bottom:6px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:14px;font-weight:800;cursor:pointer;text-align:left">'+l+'</button>'; };
+  openModal('Live Board · ⋯', '<span class="vl-mgr">'+b("showTab('paste')",'📋 Refresh the board (paste)')+b("showTab('inventory')",'🔢 Physical inventory')+'</span>'+b("showTab('reference')",'📖 Reference & color key')+'<div style="font-size:11px;color:var(--txt3);margin-top:6px">Locked devices read the board; a manager refreshes it.</div>');
+}
 function renderPlanV2(){
   var vc=document.getElementById('verdict-card'); if(vc){ var v=verdictCardHtml(); vc.className='v-'+v.state; vc.innerHTML=v.html; }
   var pc=document.getElementById('plan-counters'); if(pc){ var c=planCounters(); pc.innerHTML='<span>'+c.on+' on duty</span><span>'+c.lunchesLeft+' lunches left</span>'+(c.step?'<span class="vl-mgr" style="color:var(--acc);cursor:pointer" onclick="openPlanToday()">'+biEsc(c.step)+' ›</span>':''); }
@@ -24053,7 +24103,10 @@ function renderPlanV2(){
 function planGroupCycle(){ var order=['station','name','type','start','end']; var cur=STATE.schedGroupBy||'station'; var nx=order[(order.indexOf(cur)+1)%order.length]; if(typeof setSchedGroup==='function') setSchedGroup(nx); renderPlanV2(); }
 function horizonMenu(){
   var b=function(k,l){ return '<button onclick="setSchedDest(\''+k+'\');closeModal()" style="width:100%;padding:12px;margin-bottom:6px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:14px;font-weight:800;cursor:pointer;text-align:left">'+l+'</button>'; };
-  openModal('Plan · horizon', b('today','☀️ Today')+b('week','📅 Week')+b('cal','📆 Calendar'));
+  var x=function(js,l){ return '<button onclick="closeModal();'+js+'" style="width:100%;padding:10px;margin-bottom:6px;border-radius:9px;border:1px solid var(--bdr2);background:transparent;color:var(--txt2);font-size:13px;font-weight:700;cursor:pointer;text-align:left">'+l+'</button>'; };
+  openModal('Plan · horizon', b('today','☀️ Today')+b('week','📅 Week')+b('cal','📆 Calendar')
+    +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:10px 0 6px">Further out</div>'
+    +'<span class="vl-mgr">'+x("goToWeekPlanner()",'🤖 Week planner')+'</span>'+x("openScheduleLog()",'🗓 Schedule log'));   // v60.245: the More rows moved here
 }
 function _stationSheet(){
   var p=document.getElementById('station-panel');
