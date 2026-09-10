@@ -93,6 +93,66 @@ body.view-locked #sched-horizon, body.view-locked .solo-btn { display:none !impo
 #paste-universal .up-line{font-size:12.5px;color:var(--txt2);margin:6px 0 10px}
 .now-hdr-line{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bdr2);margin-bottom:9px;cursor:pointer;font-size:12.5px;color:var(--txt2)}
 .now-hdr-line b{color:var(--txt);font-weight:800;font-variant-numeric:tabular-nums}
+/* ════════════════════════════════════════════════════════════════════════
+   v60.247 · GLASS SURFACE SYSTEM (Sep-9 design D). Ground = a 3-stop 172° gradient
+   interpolated across six keyframes of the branch day (3:30a → 3:30a), a walk-up
+   status radial from the top, a white "sun" bottom-right; safety replaces the whole
+   ground (amber / rose). Three glass grades — hero / card / chip — over it. Solid
+   colour only for meaning: the lit button, station gems, timeline bars, today.
+   Motion budget: drift 32 s · halo 2.4 s · tier-3 pulse 1.6 s. Calm Mode (theme-bold
+   off) and reduced-motion stop all three and drop blur to 8. No backdrop-filter →
+   alpha .88, gradient stays. High Contrast = the .88 fallback + stronger edges.
+   ═══════════════════════════════════════════════════════════════════════ */
+@keyframes cmhDrift{0%,100%{background-position:50% 0%}50%{background-position:50% 12%}}
+@keyframes cmhBreathe{0%,100%{box-shadow:0 0 0 4px rgba(255,255,255,.55),0 0 0 5px rgba(15,122,71,.25)}50%{box-shadow:0 0 0 4px rgba(255,255,255,.35),0 0 0 9px rgba(15,122,71,.10)}}
+@keyframes cmhBreatheNight{0%,100%{box-shadow:0 0 0 4px rgba(35,201,131,.22),0 0 24px rgba(35,201,131,.35)}50%{box-shadow:0 0 0 8px rgba(35,201,131,.10),0 0 34px rgba(35,201,131,.45)}}
+html.glass { background-size:100% 120%; background-attachment:fixed; }
+body.theme-bold html.glass, html.glass.drift { animation: cmhDrift 32s ease-in-out infinite; }
+/* ── DAY: paper-white glass, dark warm ink ── */
+html.daylight.glass { --txt:#1C1A17; --txt2:#3E3A33; --txt3:#5C574E; --text:#1C1A17; --text2:#3E3A33; --text3:#5C574E;
+  --bg2:rgba(255,255,255,.62); --bg3:rgba(255,255,255,.50); --bdr:rgba(255,255,255,.9); --bdr2:rgba(60,40,40,.18); --bg:transparent; }
+html.daylight.glass .card, html.daylight.glass .more-group, html.daylight.glass .st-row, html.daylight.glass .pl-row, html.daylight.glass #ritual-card,
+html.daylight.glass .fm-zone, html.daylight.glass #person-panel, html.daylight.glass #station-panel, html.daylight.glass #modal-overlay .modal-sheet, html.daylight.glass .now-hdr-line
+  { background:rgba(255,255,255,.55); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.9);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 4px 14px rgba(60,40,40,.08); }
+html.daylight.glass #verdict-card, html.daylight.glass .sh-card, html.daylight.glass #paste-universal
+  { background:rgba(255,255,255,.66); background-image:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,0) 45%);
+    -webkit-backdrop-filter:blur(22px) saturate(1.6); backdrop-filter:blur(22px) saturate(1.6); border:1px solid rgba(255,255,255,.9);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 10px 28px rgba(60,40,40,.10); }
+html.daylight.glass #verdict-card.v-live { background:rgba(255,235,232,.62); border-color:rgba(255,255,255,.9); }
+html.daylight.glass #plan-counters span, html.daylight.glass .up-tile, html.daylight.glass .fm-pill, html.daylight.glass .fm-stat, html.daylight.glass #sched-horizon, html.daylight.glass #who-chip, html.daylight.glass .sh-day
+  { background:rgba(255,255,255,.6); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.9); }
+html.daylight.glass #nav { background:rgba(255,255,255,.55); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); border-color:rgba(255,255,255,.9); }
+html.daylight.glass #topbar { background:rgba(255,255,255,.5); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.9); }
+html.daylight.glass #verdict-card .v-btn { background:linear-gradient(180deg,#1DBE7A 0%,#0F7A47 60%,#0B6E43 100%); color:#fff; border:1px solid rgba(255,255,255,.45); box-shadow:0 0 0 4px rgba(255,255,255,.55),0 0 0 5px rgba(15,122,71,.25); }
+body.theme-bold html.daylight.glass #verdict-card .v-btn, html.daylight.glass.drift #verdict-card .v-btn { animation: cmhBreathe 2.4s ease-in-out infinite; }
+/* ── NIGHT: dark glass, light ink, glow instead of ring ── */
+html.glass:not(.daylight) .card, html.glass:not(.daylight) .more-group, html.glass:not(.daylight) .st-row, html.glass:not(.daylight) .pl-row, html.glass:not(.daylight) #ritual-card,
+html.glass:not(.daylight) .fm-zone, html.glass:not(.daylight) #person-panel, html.glass:not(.daylight) #station-panel, html.glass:not(.daylight) .now-hdr-line
+  { background:rgba(40,44,58,.45); -webkit-backdrop-filter:blur(20px) saturate(1.4); backdrop-filter:blur(20px) saturate(1.4); border:1px solid rgba(255,255,255,.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 14px 36px rgba(0,0,0,.45); }
+html.glass:not(.daylight) #verdict-card, html.glass:not(.daylight) .sh-card, html.glass:not(.daylight) #paste-universal
+  { background:rgba(40,44,58,.55); -webkit-backdrop-filter:blur(22px) saturate(1.4); backdrop-filter:blur(22px) saturate(1.4); border:1px solid rgba(255,255,255,.16);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 14px 36px rgba(0,0,0,.45); }
+html.glass:not(.daylight) #verdict-card.v-live { background:rgba(80,30,34,.55); }
+html.glass:not(.daylight) #plan-counters span, html.glass:not(.daylight) .up-tile, html.glass:not(.daylight) .fm-pill, html.glass:not(.daylight) .fm-stat, html.glass:not(.daylight) #sched-horizon, html.glass:not(.daylight) #who-chip, html.glass:not(.daylight) .sh-day
+  { background:rgba(255,255,255,.10); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.16); }
+html.glass:not(.daylight) #nav { background:rgba(20,22,30,.55); -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px); }
+html.glass:not(.daylight) #verdict-card .v-btn { background:linear-gradient(180deg,#3FDC6B 0%,#23C983 60%,#12A866 100%); color:#06351f; border:1px solid rgba(255,255,255,.3); box-shadow:0 0 0 4px rgba(35,201,131,.22),0 0 24px rgba(35,201,131,.35); }
+body.theme-bold html.glass:not(.daylight) #verdict-card .v-btn, html.glass:not(.daylight).drift #verdict-card .v-btn { animation: cmhBreatheNight 2.4s ease-in-out infinite; }
+html.glass:not(.daylight) .st-name > span, html.glass:not(.daylight) #station-panel span[style*="color:var(--green)"] { text-shadow:0 0 8px currentColor; }
+/* ── Calm Mode / reduced motion: no motion, blur 8 ── */
+html.glass.calm, html.glass.calm #verdict-card .v-btn { animation:none !important; }
+html.glass.calm .card, html.glass.calm .more-group, html.glass.calm .st-row, html.glass.calm #verdict-card, html.glass.calm .sh-card, html.glass.calm #person-panel, html.glass.calm #station-panel, html.glass.calm #nav { -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
+@media (prefers-reduced-motion: reduce) { html.glass, html.glass #verdict-card .v-btn { animation:none !important; } html.glass .card, html.glass #verdict-card, html.glass #person-panel { -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); } }
+/* ── Fallback: no backdrop-filter → alpha .88, the gradient stays ── */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  html.daylight.glass .card, html.daylight.glass .more-group, html.daylight.glass .st-row, html.daylight.glass #verdict-card, html.daylight.glass .sh-card, html.daylight.glass #person-panel, html.daylight.glass #station-panel, html.daylight.glass #nav { background:rgba(255,255,255,.88); }
+  html.glass:not(.daylight) .card, html.glass:not(.daylight) .more-group, html.glass:not(.daylight) .st-row, html.glass:not(.daylight) #verdict-card, html.glass:not(.daylight) .sh-card, html.glass:not(.daylight) #person-panel, html.glass:not(.daylight) #station-panel, html.glass:not(.daylight) #nav { background:rgba(30,33,44,.92); }
+}
+/* ── High Contrast on glass = the .88 fallback + stronger edges ── */
+body.hc html.daylight.glass .card, html.daylight.glass.hc .card, html.daylight.glass.hc #verdict-card, html.daylight.glass.hc .st-row, html.daylight.glass.hc #person-panel { background:rgba(255,255,255,.88); border-color:rgba(255,255,255,1); }
+html.glass.hc:not(.daylight) .card, html.glass.hc:not(.daylight) #verdict-card, html.glass.hc:not(.daylight) .st-row, html.glass.hc:not(.daylight) #person-panel { background:rgba(30,33,44,.92); border-color:rgba(255,255,255,.28); }
 #sched-horizon{padding:3px 10px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer;margin-left:8px}
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
@@ -4694,15 +4754,45 @@ function washVals(){
         +'radial-gradient(40% 30% at 100% 100%, '+seas+' 0%, rgba(0,0,0,0) 70%)'};
 }
 var _washLast=0;
+// v60.247 · GLASS GROUND (Sep-9 design D). Six keyframes across the business day
+// (3:30a → 3:30a), interpolated; walk-up status radial from the top; a white sun
+// bottom-right (day) / faint (night); safety replaces the whole ground.
+var GLASS_DAY=[[4,['#C9D6E8','#E6E4EC','#F2EDE4']],[8.5,['#BFD9F2','#F6E7D2','#F4F0E6']],[13,['#DCE9F5','#F3EFE4','#E9F1E4']],[17.5,['#F8D9B8','#F2C9C4','#DDD3EC']],[21.5,['#E4C9C9','#CBC3E3','#B9C4E0']],[24.5,['#AEB9D6','#C9CEE0','#E4E3EA']]];
+var GLASS_NIGHT=[[4,['#0B0E1A','#101322','#161A28']],[8.5,['#0F1B33','#14233A','#1B2A3A']],[13,['#1A2740','#22304A','#26344A']],[17.5,['#2A1E3A','#3A2432','#4A2E2A']],[21.5,['#1C1A34','#1F2240','#1A2440']],[24.5,['#0B1020','#0E1428','#111827']]];
+function _lerpHex(a,b,t){ var pa=parseInt(a.slice(1),16), pb=parseInt(b.slice(1),16); var r=Math.round(((pa>>16)&255)+(((pb>>16)&255)-((pa>>16)&255))*t), g=Math.round(((pa>>8)&255)+(((pb>>8)&255)-((pa>>8)&255))*t), bl=Math.round((pa&255)+((pb&255)-(pa&255))*t); return '#'+((1<<24)+(r<<16)+(g<<8)+bl).toString(16).slice(1); }
+function _glassStops(stops, hour){ var h=hour; if(h>stops[stops.length-1][0]) h=stops[stops.length-1][0]; if(h<stops[0][0]) h=stops[0][0]; var g=stops[stops.length-1][1]; for(var i=0;i<stops.length-1;i++){ var h0=stops[i][0], a=stops[i][1], h1=stops[i+1][0], b=stops[i+1][1]; if(h>=h0 && h<=h1){ var t=(h-h0)/(h1-h0); g=a.map(function(c,k){ return _lerpHex(c,b[k],t); }); break; } } return g; }
+function glassGround(hour, night, opts){
+  opts=opts||{}; if(hour==null) hour=(typeof _nowH==='function')?_nowH():new Date().getHours();
+  var pol=opts.status || ((typeof STATE!=='undefined'&&STATE&&STATE.walkUpPolicy)||'open'); var status = pol==='open'?'open': pol==='closed'?'closed':'capped';
+  var safety=opts.safety||0;
+  if(safety===0){ try{ var h2=new Date().getHours()+new Date().getMinutes()/60; var solos=(typeof soloCoverage==='function')?(soloCoverage(h2)||[]):[]; var un=solos.filter(function(x){ return (x.tier||0)>=2 && !x.fresh; }).length; safety = un>=2?2:(un===1?1:0); }catch(e){} }
+  var g=_glassStops(night?GLASS_NIGHT:GLASS_DAY, hour);
+  if(safety===1) g = night?['#2A1E0E','#332512','#3A2C16']:['#F6D9A8','#F8E6C8','#FAF0DF'];
+  if(safety===2) g = night?['#2A0F0E','#3A1614','#421B19']:['#F2B8B0','#F6D3CE','#F9E6E2'];
+  var glow = night ? {open:'rgba(35,201,131,.30)',capped:'rgba(255,204,0,.22)',closed:'rgba(255,69,58,.28)'}[status] : {open:'rgba(15,122,71,.26)',capped:'rgba(176,122,0,.30)',closed:'rgba(176,38,26,.26)'}[status];
+  var sun = night ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.7)';
+  return { base:g[2], safety:safety, status:status,
+    image:'radial-gradient(ellipse 120% 50% at 50% -10%, '+glow+', rgba(255,255,255,0) 70%), radial-gradient(ellipse 70% 45% at 90% 100%, '+sun+', rgba(255,255,255,0) 70%), linear-gradient(172deg, '+g[0]+' 0%, '+g[1]+' 52%, '+g[2]+' 100%)' };
+}
+var GLASS_ON = true;   // flip to false to fall back to the flat daylight paper + the v60.203 night wash
 function applyWash(force){
   try{
     var el=document.documentElement; if(!el) return;
-    if(el.classList.contains('daylight')){ el.style.backgroundImage='none'; el.style.backgroundColor='#F2F2F7'; return; }
-    if(document.body && document.body.classList.contains('hc')){ el.style.backgroundImage='none'; el.style.backgroundColor='#000'; return; }
+    var hc = document.body && document.body.classList.contains('hc');
+    el.classList.toggle('glass', !!GLASS_ON);
+    el.classList.toggle('hc', !!hc);
+    el.classList.toggle('calm', !(document.body && document.body.classList.contains('theme-bold')));
+    el.classList.toggle('drift', !!GLASS_ON && !!(document.body && document.body.classList.contains('theme-bold')));
+    if(!GLASS_ON){
+      if(el.classList.contains('daylight')){ el.style.backgroundImage='none'; el.style.backgroundColor='#F2F2F7'; return; }
+      if(hc){ el.style.backgroundImage='none'; el.style.backgroundColor='#000'; return; }
+      var t0=Date.now(); if(!force && t0-_washLast<60000) return; _washLast=t0;
+      var w=washVals(); el.style.backgroundColor=w.base; el.style.backgroundImage=w.glow; return;
+    }
+    if(hc){ el.style.backgroundImage='none'; el.style.backgroundColor=el.classList.contains('daylight')?'#FFFFFF':'#000'; return; }
     var t=Date.now(); if(!force && t-_washLast<60000) return; _washLast=t;
-    var w=washVals();
-    el.style.backgroundColor=w.base;
-    el.style.backgroundImage=w.glow;
+    var gg=glassGround(null, !el.classList.contains('daylight'));
+    el.style.backgroundColor=gg.base; el.style.backgroundImage=gg.image;
   }catch(e){}
 }
 
@@ -15681,7 +15771,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.246'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.247'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
