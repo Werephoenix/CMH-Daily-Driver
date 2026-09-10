@@ -82,6 +82,17 @@ body.view-locked #sched-horizon, body.view-locked .solo-btn { display:none !impo
 .pl-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--bdr2);border-radius:10px;background:var(--bg3);margin-bottom:6px;cursor:pointer}
 .pl-row .pl-n{flex:1;font-size:13px;font-weight:800;color:var(--txt)}
 .pl-row .pl-r{font-size:11px;color:var(--txt3)}
+/* v60.246 (Sep-9 design B8/C9/C10): ONE paste box. The classic eight boxes stay in the DOM behind "Classic boxes" — flip PASTE_V2 to false to revert wholesale. */
+#screen-paste.paste-v2:not(.classic) #paste-classic-card { display:none; }
+#screen-paste:not(.paste-v2) #paste-universal { display:none; }
+#paste-universal .up-box{width:100%;box-sizing:border-box;min-height:120px;padding:12px;border-radius:12px;border:1.5px dashed var(--bdr2);background:var(--bg3);color:var(--txt);font-size:13px;font-family:var(--ff-mono)}
+#paste-universal .up-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;margin:10px 0}
+#paste-universal .up-tile{padding:8px 10px;border-radius:10px;border:1px solid var(--bdr2);background:var(--bg3);font-size:11.5px;font-weight:700;color:var(--txt3);display:flex;align-items:center;gap:6px}
+#paste-universal .up-tile.ok{border-color:rgba(35,201,131,.5);color:var(--txt)}
+#paste-universal .up-tile.ring{border-color:var(--amber);color:var(--amber)}
+#paste-universal .up-line{font-size:12.5px;color:var(--txt2);margin:6px 0 10px}
+.now-hdr-line{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bdr2);margin-bottom:9px;cursor:pointer;font-size:12.5px;color:var(--txt2)}
+.now-hdr-line b{color:var(--txt);font-weight:800;font-variant-numeric:tabular-nums}
 #sched-horizon{padding:3px 10px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer;margin-left:8px}
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
@@ -2291,9 +2302,23 @@ button { cursor: pointer; }
 <!-- ═══════════════════════════════════════════════════════════════
      SCREEN: PASTE DATA
 ═══════════════════════════════════════════════════════════════ -->
-<div class="scr" id="screen-paste">
+<div class="scr paste-v2" id="screen-paste">
   <h1 class="scr-title">Paste Data</h1>
-  <div class="card">
+  <!-- v60.246: universal paste — one box, auto-detected kind / half / counter; loud on anything it can't read -->
+  <div id="paste-universal" class="card" style="margin-bottom:12px">
+    <div class="ch">📋 Paste from Game Plan <span class="sub">any export · the app works out which</span></div>
+    <textarea id="up-text" class="up-box" placeholder="Copy from GreenLight (Reservations or Returns by hour, AM or PM · Agent Sales Summary · counter-filtered views) and paste here…" oninput="upOnInput(this)"></textarea>
+    <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-p" onclick="upAdd()">Add this paste</button>
+      <button class="btn btn-gh btn-sm" onclick="document.getElementById('screen-paste').classList.toggle('classic')">Classic boxes ▾</button>
+      <span id="up-hint" style="font-size:11px;color:var(--txt3)"></span>
+    </div>
+    <div id="up-ask"></div>
+    <div id="up-tiles" class="up-tiles"></div>
+    <div id="up-line" class="up-line"></div>
+    <button class="btn btn-p btn-lg" style="width:100%" onclick="calcBoard();showTab('board')">→ Live Board</button>
+  </div>
+  <div class="card" id="paste-classic-card">
     <div class="ch">📋 Paste Game Plan Data <span class="sub">4 exports · ~2 min</span></div>
     <p style="font-size:12px;color:var(--txt3);margin-bottom:14px">
       Game Plan → By Hour view. Copy each export and paste below. App parses all car codes automatically.
@@ -5097,6 +5122,7 @@ function showTab(id) {
   const tabMap = { emails:'checklist', codes:'reference', hourly:'reference', loyalty:'reference', dashboard:'opening', now:'opening' };
   if (tabMap[id]) id = tabMap[id];
   if (id==='people' && typeof renderPeople==='function') { try{ renderPeople(); }catch(e){} }   // v60.245
+  if (id==='paste' && typeof upRender==='function') { try{ upRender(); }catch(e){} }   // v60.246
 
   // v60.124: Calendar is a top-level tab but renders as a full-screen overlay
   // (the Master Calendar). Open it ON TOP of the current screen and light its nav
@@ -15505,7 +15531,7 @@ function floorSection() {
   const _netCol=_net===null?'var(--txt3)':_net>0?'var(--wu)':'var(--na)';
   const _cs=_fld.cs||'—', _hot=_fld.hot||'—';
   const _stop='event.stopPropagation();';
-  const _strip=`<div class="fm-stats">
+  const _strip = (typeof PASTE_V2!=='undefined' && PASTE_V2 && typeof nowHeaderLineHtml==='function') ? nowHeaderLineHtml(_res,_ret,_netStr,_netCol) : `<div class="fm-stats">
     <span class="fm-stat" onclick="${_stop}showTab('board')">Res <b>${_res}</b></span>
     <span class="fm-stat" onclick="${_stop}showTab('board')">Ret <b>${_ret}</b></span>
     <span class="fm-stat" onclick="${_stop}showTab('board')">Net <b style="color:${_netCol}">${_netStr}</b></span>
@@ -15655,7 +15681,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.245'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.246'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -24093,6 +24119,113 @@ function renderPeople(q){ var el=document.getElementById('pl-list'); if(!el) ret
 function boardMore(){
   var b=function(js,l){ return '<button onclick="closeModal();'+js+'" style="width:100%;padding:12px;margin-bottom:6px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:14px;font-weight:800;cursor:pointer;text-align:left">'+l+'</button>'; };
   openModal('Live Board · ⋯', '<span class="vl-mgr">'+b("showTab('paste')",'📋 Refresh the board (paste)')+b("showTab('inventory')",'🔢 Physical inventory')+'</span>'+b("showTab('reference')",'📖 Reference & color key')+'<div style="font-size:11px;color:var(--txt3);margin-top:6px">Locked devices read the board; a manager refreshes it.</div>');
+}
+// ════════════════════════════════════════════════════════════════════════
+// v60.246 · UNIVERSAL PASTE (Sep-9 design C9). Detection order, as specified:
+//  (1) kind by header — "Agent Sales Summary"/Brands → brands; "Reservations"/
+//      "Returns" → hourly; else REJECT and keep the box open, say what to copy.
+//  (2) half by hour columns (12a–11a / 12p–11p); both → ask for one half.
+//  (3) a counter-filter label in the header → counter series.
+//  (4) first hourly paste of a kind+half = All, with a one-tap "Counter only" chip.
+//  (5) baseline: day-half total vs demandBaseline same-weekday (≥3 samples) —
+//      below ~60 % pre-select Counter and ask; no baseline → All, chip offered.
+//  (6) second paste of same kind+half: smaller → Counter; larger → this is All
+//      and the earlier becomes Counter (said out loud); equal → duplicate, newer wins.
+//  (7) never silent: an unresolved half shows a hollow ring and the line says so.
+// Everything routes into parseStep() — the classic pipeline, byte for byte.
+// ════════════════════════════════════════════════════════════════════════
+var PASTE_V2 = true;
+function upKind(text){
+  var t=String(text||''); var head=t.split('\n').slice(0,6).join(' ').toLowerCase();
+  if(typeof detectPasteType==='function' && detectPasteType(t)==='brands') return 'brands';
+  if(/agent sales summary|\bbrands?\b/.test(head)) return 'brands';
+  if(/\breturns?\b/.test(head)) return 'ret';
+  if(/\breservations?\b|\bres\b/.test(head)) return 'res';
+  return null;
+}
+function upDetect(text){
+  var t=String(text||'').trim(); if(!t) return {ok:false, why:'Nothing pasted yet.'};
+  var kind=upKind(t);
+  if(kind==='brands') return {ok:true, kind:'brands'};
+  var hasAM=/(^|\t|\s)12am(\t|\s|$)/i.test(t), hasPM=/(^|\t|\s)12pm(\t|\s|$)/i.test(t);
+  if(!kind){
+    if(hasAM||hasPM) return {ok:false, why:'Hourly numbers found, but no "Reservations" or "Returns" header. Copy the export from its title row down.'};
+    return {ok:false, why:'This isn’t a Game Plan export I know. Copy Reservations or Returns → By Hour (AM or PM), or the Agent Sales Summary, from the title row down.'};
+  }
+  if(hasAM && hasPM) return {ok:false, kind:kind, why:'Both halves are in one paste. Copy AM and PM separately (GreenLight’s AM / PM arrow).'};
+  if(!hasAM && !hasPM) return {ok:false, kind:kind, why:'No hour columns (12am… / 12pm…) found. Use the By Hour view.'};
+  var half=hasAM?'AM':'PM';
+  var counter=/counter/i.test(t.split('\n').slice(0,4).join(' '));
+  var total=0; try{ var r=parseGLFull(t); if(r&&r.codes) Object.keys(r.codes).forEach(function(c){ total+=(r.codes[c].total||0); }); }catch(e){}
+  return {ok:true, kind:kind, half:half, counter:counter, total:total};
+}
+function _upHalfTotal(series, half){ var a=(STATE.pasteHourly||{})[series]||[]; var lo=half==='AM'?0:12; var t=0; for(var h=lo;h<lo+12;h++) t+=(a[h]||0); return t; }
+function upCompareHalf(kind, half, newTotal){   // rule 6 — returns 'first' | 'counter' | 'all-swap' | 'duplicate'
+  var ex=_upHalfTotal(kind, half); if(!ex) return 'first';
+  if(newTotal<ex) return 'counter'; if(newTotal>ex) return 'all-swap'; return 'duplicate';
+}
+function _upBaselineSays(kind, half, total){   // rule 5 — 'low' | 'ok' | null (no baseline)
+  try{ var b=demandBaseline(new Date().getDay()); if(!b||!b.ok||!b.avg||!b.avg[kind]) return null; var lo=half==='AM'?0:12, base=0; for(var h=lo;h<lo+12;h++) base+=(b.avg[kind][h]||0); if(!base) return null; return total < 0.6*base ? 'low' : 'ok'; }catch(e){ return null; }
+}
+function upOnInput(ta){ var d=upDetect(ta.value); var el=document.getElementById('up-hint'); if(!el) return; el.textContent = d.ok ? (d.kind==='brands' ? 'Looks like the Agent Sales Summary' : 'Looks like '+(d.kind==='res'?'Reservations':'Returns')+' · '+d.half+(d.counter?' · counter-filtered':'')) : (ta.value.trim()? d.why : ''); el.style.color = d.ok?'var(--green)':'var(--amber)'; }
+function upRoute(kind, half, counter, text){
+  var step = kind==='res' ? (half==='AM'?1:2) : (half=='AM'?3:4);
+  var ta=document.getElementById((counter?'pac':'pa')+step); if(!ta){ toast('Classic box '+step+' missing'); return false; }
+  ta.value=text; parseStep(step, counter===true); return true;
+}
+function upAdd(){
+  var ta=document.getElementById('up-text'); var text=(ta&&ta.value||'').trim(); var d=upDetect(text);
+  var ask=document.getElementById('up-ask'); if(ask) ask.innerHTML='';
+  if(!d.ok){ if(typeof toast==='function') toast(d.why); upOnInput(ta); return; }
+  if(d.kind==='brands'){ var t5=document.getElementById('pa5'); if(t5){ t5.value=text; parseStep(5); } ta.value=''; window._upPending=null; upRender(); return; }
+  window._upSnap={pd:JSON.stringify(STATE.pasteData||{}), ph:JSON.stringify(STATE.pasteHourly||{}), at:STATE.boardUpdatedAt||null};
+  window._upLast={text:text, kind:d.kind, half:d.half};
+  if(d.counter){ upRoute(d.kind,d.half,true,text); ta.value=''; window._upPending=null; toast('Counter-filtered '+(d.kind==='res'?'reservations':'returns')+' · '+d.half+' ✓'); upRender(); return; }
+  var cmp=upCompareHalf(d.kind, d.half, d.total);
+  if(cmp==='counter'){ upRoute(d.kind,d.half,true,text); ta.value=''; window._upPending=null; toast('Smaller than the '+d.half+' paste already here → filed as Counter only'); upRender(); return; }
+  if(cmp==='all-swap'){
+    try{ var lo=d.half==='AM'?0:12, all=(STATE.pasteHourly[d.kind]||[]).slice(), ck=d.kind+'Counter'; if(!STATE.pasteHourly[ck]) STATE.pasteHourly[ck]=new Array(24).fill(0); for(var h=lo;h<lo+12;h++) STATE.pasteHourly[ck][h]=all[h]||0; }catch(e){}
+    upRoute(d.kind,d.half,false,text); ta.value=''; window._upPending=null; toast('Bigger than the '+d.half+' paste already here → this is All; the earlier one is now Counter'); upRender(); return;
+  }
+  if(cmp==='duplicate'){ upRoute(d.kind,d.half,false,text); ta.value=''; toast('Same numbers as before — newer copy kept'); upRender(); return; }
+  var base=_upBaselineSays(d.kind, d.half, d.total);
+  if(base==='low'){
+    window._upPending={kind:d.kind, half:d.half, text:text};
+    if(ask) ask.innerHTML='<div style="padding:10px;border-radius:10px;border:1px solid var(--amber);background:rgba(217,119,6,.08);margin-top:8px;font-size:12.5px;color:var(--txt)">This '+d.half+' total ('+d.total+') is well below a usual '+['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()]+'. Which is it?'
+      +'<div style="display:flex;gap:6px;margin-top:8px"><button class="btn btn-p btn-sm" onclick="upResolve(true)">Counter only</button><button class="btn btn-gh btn-sm" onclick="upResolve(false)">All '+(d.kind==='res'?'reservations':'returns')+'</button></div></div>';
+    ta.value=''; upRender(); return;
+  }
+  upRoute(d.kind,d.half,false,text); ta.value='';
+  window._upPending=null;
+  if(ask) ask.innerHTML='<div style="font-size:11.5px;color:var(--txt3);margin-top:6px">Filed as All '+(d.kind==='res'?'reservations':'returns')+' · '+d.half+(base==='ok'?' (fits a usual day)':'')+'. <a href="#" onclick="upFlipToCounter();return false" style="color:var(--acc);font-weight:700">Was it the counter-filtered view? Make it Counter only</a></div>';
+  upRender();
+}
+function upResolve(counter){ var p=window._upPending; if(!p) return; window._upPending=null; upRoute(p.kind,p.half,!!counter,p.text); var ask=document.getElementById('up-ask'); if(ask) ask.innerHTML=''; upRender(); }
+function upFlipToCounter(){
+  var l=window._upLast, sn=window._upSnap; if(!l||!sn) return;
+  try{ STATE.pasteData=JSON.parse(sn.pd); STATE.pasteHourly=JSON.parse(sn.ph); STATE.boardUpdatedAt=sn.at; }catch(e){}
+  upRoute(l.kind,l.half,true,l.text); var ask=document.getElementById('up-ask'); if(ask) ask.innerHTML=''; toast('Re-filed as Counter only'); upRender();
+}
+function upStatusHtml(){
+  var ph=STATE.pasteHourly||{}, pd=STATE.pasteData||{}, pend=window._upPending;
+  var tiles=[['res','AM','Res AM'],['res','PM','Res PM'],['ret','AM','Ret AM'],['ret','PM','Ret PM']].map(function(t){ var ok=_upHalfTotal(t[0],t[1])>0; var ring=pend&&pend.kind===t[0]&&pend.half===t[1]; return '<div class="up-tile'+(ok?' ok':'')+(ring?' ring':'')+'">'+(ring?'◌':(ok?'✓':'○'))+' '+t[2]+'</div>'; }).join('');
+  tiles+='<div class="up-tile'+(pd.brands?' ok':'')+'">'+(pd.brands?'✓':'○')+' Sales summary</div>';
+  var cr=_upHalfTotal('resCounter','AM')+_upHalfTotal('resCounter','PM'), cRet=_upHalfTotal('retCounter','AM')+_upHalfTotal('retCounter','PM');
+  tiles+='<div class="up-tile'+(cr?' ok':'')+'">'+(cr?'✓':'○')+' Counter Res <span style="font-weight:600;opacity:.7">optional</span></div><div class="up-tile'+(cRet?' ok':'')+'">'+(cRet?'✓':'○')+' Counter Ret <span style="font-weight:600;opacity:.7">optional</span></div>';
+  var can=[]; var resOk=_upHalfTotal('res','AM')>0&&_upHalfTotal('res','PM')>0, retOk=_upHalfTotal('ret','AM')>0&&_upHalfTotal('ret','PM')>0;
+  if(resOk&&retOk) can.push('availability by class'); else if(_upHalfTotal('res','AM')||_upHalfTotal('res','PM')||_upHalfTotal('ret','AM')||_upHalfTotal('ret','PM')) can.push('a half-day board (the other half falls back to yesterday, marked stale)');
+  if(pd.brands) can.push('brand totals'); if(cr) can.push('Counter Load');
+  var line = can.length ? 'The Board can show now: '+can.join(' · ')+'.' : 'Nothing pasted yet — the Board shows yesterday, marked stale.';
+  if(pend) line += ' Counter Load: waiting — which paste was counter?';
+  return {tiles:tiles, line:line};
+}
+function upRender(){ var st=upStatusHtml(); var t=document.getElementById('up-tiles'); if(t) t.innerHTML=st.tiles; var l=document.getElementById('up-line'); if(l) l.textContent=st.line; }
+try{ document.addEventListener('DOMContentLoaded', function(){ try{ upRender(); }catch(e){} }); }catch(e){}
+// v60.246 (C10): the Now header line — Res · Ret · Net · walk-up glyph · last paste time. Tap → Board. Replaces the stat tiles.
+function nowHeaderLineHtml(res, ret, netStr, netCol){
+  var pol=(STATE.walkUpPolicy||'open'); var glyph={open:'🟢 walk-ups open', closed:'🔴 walk-ups closed', care:'🟡 walk-ups · care', nonscore:'🟠 walk-ups · non-score'}[pol]||('🚦 '+pol);
+  var at=STATE.boardUpdatedAt?new Date(STATE.boardUpdatedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):null;
+  return '<div class="now-hdr-line" onclick="event.stopPropagation();showTab(\'board\')"><span>Res <b>'+res+'</b></span><span>Ret <b>'+ret+'</b></span><span>Net <b style="color:'+netCol+'">'+netStr+'</b></span><span>'+glyph+'</span><span style="color:var(--txt3)">'+(at?'updated '+at:'no paste yet')+'</span></div>';
 }
 function renderPlanV2(){
   var vc=document.getElementById('verdict-card'); if(vc){ var v=verdictCardHtml(); vc.className='v-'+v.state; vc.innerHTML=v.html; }
