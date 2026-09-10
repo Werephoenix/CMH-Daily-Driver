@@ -4446,6 +4446,7 @@ const TODAY_KEY = _localDayKey(new Date());
 // what hit Matt's work computer on its first sign-in: the pull merged an
 // older-version state and the guards never re-ran.
 function ensureStateShape(s){
+  try{ if(typeof _accomMigrate==='function') _accomMigrate(s); }catch(e){}   // v60.244: exit-only → general accommodations
   if(!s || typeof s!=='object') return s;
   // Ensure all required fields exist (migration safe)
   s.fields        = s.fields        || {};
@@ -9590,8 +9591,9 @@ function mgrAssignStation(pid, val){
 function setStation(key, val) {
   // v60.142: guard — warn (but allow) if a manager manually puts someone with an
   // active exit accommodation onto Exit Booth. Their accommodation still stands.
-  if(val==='Exit Booth' && typeof exitAccommodated==='function' && exitAccommodated(key)){
-    if(!confirm('This person has an active EXIT ACCOMMODATION (no exit rotation). Put them at Exit anyway?')) return;
+  var _act=(typeof accomForStation==='function')?accomForStation(val):null;   // v60.244: any activity
+  if(_act && typeof accommodated==='function' && accommodated(key,_act)){
+    if(!confirm('This person has an active accommodation for '+accomLabel(_act)+'. Put them there anyway?')) return;
   }
   STATE.staffStation[key] = val;
   saveState();
@@ -9609,18 +9611,53 @@ function setStation(key, val) {
 //    STATE.exitAccommodation[pid] = { start:'YYYY-MM-DD', end:'YYYY-MM-DD'|null }
 //      end null/'' = ongoing (until the manager clears it).
 // ═══════════════════════════════════════════════════════════════════════
-function exitAccommodated(pid, dateKey){
-  var a = (STATE.exitAccommodation||{})[pid];
-  if(!a || !a.start) return false;
-  var dk = dateKey || (typeof todayKey==='function' ? todayKey() : '');
-  if(!dk) return true;
-  if(dk < a.start) return false;          // not started yet
-  if(a.end && dk > a.end) return false;   // window ended
-  return true;
+// ════════════════════════════════════════════════════════════════════════
+// v60.244 · ACCOMMODATIONS, GENERALIZED (Matt 2026-09-09: "individualize the
+// accommodation to the activity — it might not be just exit"; Sep-9 design C4).
+//   STATE.accommodations[pid] = [{activity, start:'YYYY-MM-DD', end:'YYYY-MM-DD'|null}]
+//   activity ∈ exit · counter · returns · emerald · shuttle · floater · closing ·
+//   opening · physical · 'custom:<name>'. DATES ONLY — no reason field exists
+//   and none may be added. Readers: station suggestions / fills (any area),
+//   rotation, the week planner (opening/closing windows), the card's station
+//   grid (dashed cell), the card shield chip. Never on print or in a message.
+//   The old single exitAccommodation store is migrated in and MIRRORED back
+//   (exit entries only) so a device on an older build keeps respecting it.
+// ════════════════════════════════════════════════════════════════════════
+var ACCOM_ACTIVITIES=[['exit','Exit Booth'],['counter','Counter'],['returns','Returns'],['emerald','Emerald'],['shuttle','Shuttle'],
+                      ['floater','Floater / lot'],['closing','Closing shifts'],['opening','Opening shifts'],['physical','Lifting / physical']];
+function accomForStation(st){ st=String(st||''); if(/exit/i.test(st)) return 'exit'; if(/emerald|EB2/i.test(st)) return 'emerald'; if(/return/i.test(st)) return 'returns'; if(/counter/i.test(st)) return 'counter'; if(/shuttl/i.test(st)) return 'shuttle'; if(/float/i.test(st)) return 'floater'; return null; }
+function accomLabel(activity){ var m=ACCOM_ACTIVITIES.filter(function(a){ return a[0]===activity; })[0]; if(m) return m[1]; return String(activity||'').replace(/^custom:/,''); }
+function accomList(pid){ return ((STATE.accommodations||{})[pid]||[]).filter(function(a){ return a && a.activity && a.start; }); }
+function _accomLive(a, dk){ if(!dk) return true; if(dk<a.start) return false; if(a.end && dk>a.end) return false; return true; }
+function accomActive(pid, dateKey){ var dk=dateKey||((typeof todayKey==='function')?todayKey():''); return accomList(pid).filter(function(a){ return _accomLive(a,dk); }); }
+function accommodated(pid, activity, dateKey){ if(!activity) return accomActive(pid,dateKey).length>0; return accomActive(pid,dateKey).some(function(a){ return a.activity===activity; }); }
+function _accomMirror(){   // keep the legacy exit store in step for older builds on other devices
+  try{ var ex={}; Object.keys(STATE.accommodations||{}).forEach(function(pid){ var e=accomList(pid).filter(function(a){ return a.activity==='exit'; }).sort(function(a,b){ return a.start<b.start?1:-1; })[0]; if(e) ex[pid]={start:e.start,end:e.end||null}; }); STATE.exitAccommodation=ex; }catch(e){}
 }
+function _accomMigrate(st){
+  try{ st.accommodations=st.accommodations||{}; var ex=st.exitAccommodation||{};
+    Object.keys(ex).forEach(function(pid){ var a=ex[pid]; if(!a||!a.start) return; var list=st.accommodations[pid]=st.accommodations[pid]||[];
+      if(!list.some(function(x){ return x.activity==='exit' && x.start===a.start; })) list.push({activity:'exit', start:a.start, end:a.end||null}); });
+  }catch(e){}
+}
+function accomAdd(pid, activity, start, end){
+  if(!pid||!activity||!start) return false; if(end && end<start){ if(typeof toast==='function') toast('End can’t be before start'); return false; }
+  if(!STATE.accommodations) STATE.accommodations={}; var list=STATE.accommodations[pid]=STATE.accommodations[pid]||[];
+  list.push({activity:activity, start:start, end:end||null}); _accomMirror();
+  if(activity==='exit' && (STATE.staffStation||{})[pid]==='Exit Booth' && accommodated(pid,'exit')) STATE.staffStation[pid]='Counter';
+  if(typeof logAction==='function') logAction('Accommodation added · '+_pidNick(pid)+' · '+accomLabel(activity)+' · '+start+(end?' → '+end:''));
+  if(typeof rotInvalidate==='function') rotInvalidate(); if(typeof saveState==='function') saveState(); return true;
+}
+function accomEnd(pid, idx){
+  var list=(STATE.accommodations||{})[pid]||[]; var a=list[idx]; if(!a) return; var tk=(typeof todayKey==='function')?todayKey():'';
+  if(a.start>=tk){ list.splice(idx,1); } else { a.end=tk; }
+  _accomMirror(); if(typeof logAction==='function') logAction('Accommodation ended · '+_pidNick(pid)+' · '+accomLabel(a.activity));
+  if(typeof rotInvalidate==='function') rotInvalidate(); if(typeof saveState==='function') saveState();
+}
+function exitAccommodated(pid, dateKey){ return accommodated(pid,'exit',dateKey); }
 function exitAccommodationLabel(pid){
-  var a=(STATE.exitAccommodation||{})[pid]; if(!a||!a.start) return '';
-  return a.end ? ('no exit · thru '+a.end) : 'no exit · ongoing';
+  var e=accomActive(pid).filter(function(a){ return a.activity==='exit'; })[0]; if(!e) return '';
+  return e.end ? ('no exit · thru '+e.end) : 'no exit · ongoing';
 }
 function openExitAccommodation(pid, name){
   var a=(STATE.exitAccommodation||{})[pid]||{};
@@ -9664,11 +9701,7 @@ function saveExitAccommodation(pid){
   var e=(document.getElementById('ea-end')||{}).value||'';
   if(!s){ toast('Pick a start date'); return; }
   if(e && e<s){ toast('End can’t be before start'); return; }
-  if(!STATE.exitAccommodation) STATE.exitAccommodation={};
-  STATE.exitAccommodation[pid]={start:s, end:e||null};
-  rotInvalidate();
-  // if they're currently at exit, move them to counter now
-  if((STATE.staffStation||{})[pid]==='Exit Booth' && exitAccommodated(pid)){ STATE.staffStation[pid]='Counter'; }
+  accomAdd(pid,'exit',s,e||null);   // v60.244: the legacy form writes the general store
   saveState(); closeModal();
   toast('Exit accommodation saved 🛡');
   if(typeof buildSwitchboard==='function') buildSwitchboard();
@@ -9676,7 +9709,7 @@ function saveExitAccommodation(pid){
   if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
 }
 function clearExitAccommodation(pid){
-  if(STATE.exitAccommodation) delete STATE.exitAccommodation[pid];
+  if(STATE.accommodations && STATE.accommodations[pid]) STATE.accommodations[pid]=STATE.accommodations[pid].filter(function(a){ return a.activity!=='exit'; }); _accomMirror();   // v60.244
   rotInvalidate();
   saveState(); closeModal();
   toast('Accommodation cleared');
@@ -15598,7 +15631,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.243'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.244'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -19592,7 +19625,7 @@ function demoStop(){
 // than who is in it.
 var DEMO_CLEAR_KEYS = [
   // people, placement, attendance
-  'todayOverrides','absenceType','pto','exitAccommodation','mgmtBlocks','altSchedule',
+  'todayOverrides','absenceType','pto','exitAccommodation','accommodations','mgmtBlocks','altSchedule',
   'shiftMod','staffDuty','staffStation','shiftTimes','stationPref','customSplits',
   'customLunch','specialBlocks','scheduleOverrides','soloChecked','mergedAvailability',
   // named customers — the most sensitive thing in the app
@@ -21006,7 +21039,7 @@ function gfxBench(area, hour){
     if((STATE.absenceType||{})[pid]) return false;                     // v60.224 (Inspector R2): VACA/PTO is away, not bench
     if(((STATE.pto||{})[tk]||{})[pid]) return false;                  // approved time off
     if(typeof trainWeight==='function' && !(trainWeight(pid,area)>0)) return false;
-    if(area==='exit' && typeof exitAccommodated==='function' && exitAccommodated(pid)) return false;
+    if(typeof accommodated==='function' && accommodated(pid, area)) return false;   // v60.244: any accommodated activity
     return true;
   }).slice(0,3);
 }
@@ -21359,7 +21392,7 @@ function ptMgrFillEval(exp){
       if(typeof gfOnShiftAt==='function' && !gfOnShiftAt(pid,e,g.hour)) return false;
       var a=null; try{ a=gfAreaAt(pid,e,g.hour); }catch(err){}
       if(a===g.area) return false;
-      if(g.area==='exit' && typeof exitAccommodated==='function' && exitAccommodated(pid)) return false;
+      if(typeof accommodated==='function' && accommodated(pid, g.area)) return false;   // v60.244
       if(typeof trainWeight==='function' && !(trainWeight(pid,g.area)>0)) return false;
       return true;
     }).sort(function(p1,p2){
@@ -22467,7 +22500,7 @@ function _gfRankCandidatesRaw(gap, exp){
     var cls=gfClassify(pid,exp,h,dow);
     if(cls.area===gap.area) return;                       // already there
     // exit accommodations are absolute — never a candidate for exit
-    if(gap.area==='exit' && typeof exitAccommodated==='function' && exitAccommodated(pid)) return;
+    if(typeof accommodated==='function' && accommodated(pid, gap.area)) return;   // v60.244: accommodations are absolute for every activity
     var ri=order.indexOf(e.person.role);
     if(ri<0) return;                                      // role not eligible for this area
     var fair=0; try{ fair=(typeof getExitHoursWeek==='function')?getExitHoursWeek(pid):0; }catch(err){}
@@ -23557,6 +23590,8 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
         h+=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:5px;margin-bottom:6px">`;
         _mops.forEach(([key,lbl])=>{
           const on = key ? station===key : !station;
+          const _ac = key && typeof accomForStation==='function' && accomForStation(key) && accommodated(pid, accomForStation(key));   // v60.244
+          if(_ac){ h+=`<button disabled title="Accommodated — not placed here" style="padding:9px 3px;border-radius:8px;border:1.5px dashed var(--bdr2);background:transparent;color:var(--txt3);font-size:10.5px;font-weight:800;white-space:nowrap;opacity:.7">${lbl}<span style="display:block;font-size:8px;font-weight:600">accommodated</span></button>`; return; }
           h+=`<button onclick="mgrAssignStation('${pid}','${key}')"
             style="padding:9px 3px;border-radius:8px;border:1.5px solid ${on?'var(--eb)':'var(--bdr2)'};
               background:${on?'rgba(175,156,255,.14)':'var(--bg3)'};color:${on?'var(--eb)':'var(--txt2)'};
@@ -24075,7 +24110,7 @@ function ppHubHtml(pid,p,ss,se,fmtH,entry){
   // chips: streak · next off · shield · next 1:1
   var chips=[]; try{ var s1=ppStreak(pid); if(s1>=2 && !mgr) chips.push('🔥 Day '+s1+' in a row'); }catch(e){}   // manager view already carries the streak in the quick-action chips
   try{ var d=new Date(tk+'T12:00:00'); for(var i=1;i<=14;i++){ d.setDate(d.getDate()+1); var k=_localDayKey(d); var c=(getScheduleForDate(k)||{})[pid]; if(c==null || (typeof isOffCode==='function' && isOffCode(c))){ chips.push('Next off · '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]); break; } } }catch(e){}
-  try{ if(typeof exitAccommodated==='function' && exitAccommodated(pid)){ var a=(STATE.exitAccommodation||{})[pid]||{}; chips.push('🛡 Accommodated'+(mgr&&a.end?' · through '+a.end:'')); } }catch(e){}
+  try{ var _acc=accomActive(pid); if(_acc.length){ var _ends=_acc.map(function(a){ return a.end; }).filter(Boolean).sort()[0]; chips.push('🛡 Accommodated · '+_acc.map(function(a){ return accomLabel(a.activity).replace(/ Booth| shifts/,''); }).join(', ')+(mgr&&_ends?' · through '+_ends:'')); } }catch(e){}   // v60.244
   try{ var mt=(STATE.meetings||[]).filter(function(m){ return m.date>=tk && (m.people||[]).indexOf(pid)>=0; }).sort(function(a,b){ return a.date<b.date?-1:1; })[0]; if(mt) chips.push('🤝 '+(mt.date===tk?'today':mt.date.slice(5))); }catch(e){}
   if(chips.length) h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+chips.map(function(c){ return '<span style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt2)">'+biEsc(c)+'</span>'; }).join('')+'</div>';
   // Here today? (manager) — reuse the existing quick actions
@@ -24084,7 +24119,7 @@ function ppHubHtml(pid,p,ss,se,fmtH,entry){
   var vals={}; try{ vals.hours=fmtH(ss)+'–'+fmtH(se); var sp=(STATE.specialBlocks||{})[pid]||[]; var l=sp.find(function(b){ return b.key==='lunch'; }); if(l) vals.hours+=' · '+fmtH(l.from); }catch(e){}
   try{ vals.where=(STATE.staffStation||{})[pid]||'Floating'; }catch(e){}
   try{ var n=0, d2=new Date(tk+'T12:00:00'); d2.setDate(d2.getDate()-d2.getDay()); for(var j=0;j<7;j++){ var k2=_localDayKey(d2); var c2=(getScheduleForDate(k2)||{})[pid]; if(Array.isArray(c2)) n++; d2.setDate(d2.getDate()+1); } vals.week=n+' shifts'; }catch(e){}
-  try{ vals.accommodations=(typeof exitAccommodated==='function'&&exitAccommodated(pid))?'1 active':'none'; }catch(e){}
+  try{ var _na=accomActive(pid).length; vals.accommodations=_na?(_na+' active'):'none'; }catch(e){}
   try{ vals.profile=(p&&p.role?p.role:'')+(p&&p.shiftCode?' · '+p.shiftCode:''); }catch(e){}
   h+='<div style="border:1px solid var(--bdr2);border-radius:10px;background:var(--bg3);overflow:hidden;margin-bottom:8px">'+PP_SPOKES.map(function(sp){ return _ppRow(pid, sp[0], sp[1], sp[2], vals[sp[0]]); }).join('')+'</div>';
   if(mgr) h+='<div class="vl-mgr" style="padding:8px 10px;border:1px dashed var(--bdr2);border-radius:9px;font-size:11px;color:var(--txt3);margin-bottom:8px">Not built yet · Tasks · Requests · Swaps · Day trades</div>';
@@ -24103,15 +24138,45 @@ function ppHoursHtml(pid,p,ss,se,fmtH){
   return h;
 }
 function ppAccomHtml(pid){
-  var a=(STATE.exitAccommodation||{})[pid]||null, mgr=(typeof _managerMode!=='undefined')&&_managerMode, h='';
-  h+='<div style="font-size:11.5px;color:var(--txt2);margin-bottom:8px">An activity this person is not placed on, and the dates. <b>No reason is recorded.</b></div>';
-  if(a&&a.start) h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:10px;border:1px solid var(--bdr2);border-radius:9px;background:var(--bg3);margin-bottom:8px"><div><div style="font-size:13px;font-weight:800;color:var(--txt)">Exit Booth</div><div style="font-size:11px;color:var(--txt3)">'+biEsc(a.start)+' → '+biEsc(a.end||'no end date')+'</div></div>'
-    +(mgr?'<button class="vl-mgr" onclick="clearExitAccommodation(\''+biEsc(pid)+'\');openPersonPanel(\''+biEsc(pid)+'\',\'accommodations\')" style="padding:7px 10px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt2);font-size:11px;font-weight:700;cursor:pointer">End it</button>':'')+'</div>';
-  else h+='<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">None active.</div>';
-  if(mgr) h+='<button class="vl-mgr" onclick="openExitAccommodation(\''+biEsc(pid)+'\',\''+biEsc(_pidNick(pid))+'\')" style="width:100%;padding:10px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">＋ Add · Exit Booth (other activities arrive in stage 4)</button>';
-  h+='<div style="font-size:10.5px;color:var(--txt3);margin-top:8px">The change log keeps who and the dates. Never on print or in a message.</div>';
+  // v60.244 (Matt: "could work similarly to the training tab"): a chip grid. A lit chip is an
+  // active accommodation (activity · through date · End it); tap a quiet chip to add one —
+  // start date + optional end date, nothing else. Locked: chips read-only, no dates.
+  var mgr=(typeof _managerMode!=='undefined')&&_managerMode, tk=todayKey(), list=accomList(pid), h='';
+  h+='<div style="font-size:11.5px;color:var(--txt2);margin-bottom:8px">Activities this person is not placed on, and the dates. <b>No reason is recorded.</b></div>';
+  var active=list.map(function(a,i){ return {a:a,i:i}; }).filter(function(x){ return _accomLive(x.a,tk); });
+  var acts=ACCOM_ACTIVITIES.slice(); list.forEach(function(a){ if(/^custom:/.test(a.activity) && !acts.some(function(x){ return x[0]===a.activity; })) acts.push([a.activity, accomLabel(a.activity)]); });
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;margin-bottom:8px">';
+  acts.forEach(function(x){
+    var key=x[0], lbl=x[1], on=active.filter(function(y){ return y.a.activity===key; })[0];
+    if(on){
+      h+='<div style="padding:8px 9px;border-radius:10px;border:1.5px solid var(--amber);background:rgba(217,119,6,.10)"><div style="font-size:12px;font-weight:800;color:var(--amber)">🛡 '+biEsc(lbl)+'</div>'
+        +(mgr?'<div style="font-size:10.5px;color:var(--txt2)">'+biEsc(on.a.start)+' → '+biEsc(on.a.end||'no end')+'</div><button class="vl-mgr" onclick="accomEnd(\''+biEsc(pid)+'\','+on.i+');openPersonPanel(\''+biEsc(pid)+'\',\'accommodations\')" style="margin-top:5px;padding:4px 8px;border-radius:7px;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt2);font-size:10.5px;font-weight:700;cursor:pointer">End it</button>':'')+'</div>';
+    } else if(mgr){
+      h+='<button class="vl-mgr" onclick="accomForm(\''+biEsc(pid)+'\',\''+biEsc(key)+'\')" style="padding:10px 9px;border-radius:10px;border:1px dashed var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer;text-align:left">'+biEsc(lbl)+'</button>';
+    }
+  });
+  if(mgr) h+='<button class="vl-mgr" onclick="accomNameDuty(\''+biEsc(pid)+'\')" style="padding:10px 9px;border-radius:10px;border:1px dashed var(--bdr2);background:transparent;color:var(--txt3);font-size:12px;font-weight:700;cursor:pointer;text-align:left">＋ Name a duty</button>';
+  h+='</div>';
+  if(!active.length && !mgr) h+='<div style="font-size:12px;color:var(--txt3);margin-bottom:8px">None active.</div>';
+  var past=list.filter(function(a){ return a.end && a.end<tk; });
+  if(mgr && past.length) h+='<div style="font-size:10.5px;color:var(--txt3);margin-bottom:6px">Ended: '+past.map(function(a){ return biEsc(accomLabel(a.activity))+' '+biEsc(a.start)+' → '+biEsc(a.end); }).join(' · ')+'</div>';
+  h+='<div style="font-size:10.5px;color:var(--txt3);margin-top:6px">Adding one moves them off that activity now; suggestions, rotation and the week planner stop offering it. No reason is recorded — the change log keeps who and the dates. Never on print or in a message.</div>';
   return h;
 }
+function accomForm(pid, activity){
+  var tk=todayKey(), nick=_pidNick(pid);
+  openModal('🛡 '+accomLabel(activity)+' — '+nick,
+    '<div style="font-size:12px;color:var(--txt2);margin-bottom:10px">Dates only. Nothing else is stored.</div>'
+    +'<label style="display:block;font-size:11px;color:var(--txt3);margin-bottom:4px">Starts</label><input id="ac-start" type="date" value="'+tk+'" style="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);margin-bottom:10px">'
+    +'<label style="display:block;font-size:11px;color:var(--txt3);margin-bottom:4px">Ends (optional)</label><input id="ac-end" type="date" style="width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);margin-bottom:12px">'
+    +'<button onclick="accomSave(\''+biEsc(pid)+'\',\''+biEsc(activity)+'\')" style="width:100%;padding:12px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer">Add accommodation</button>');
+}
+function accomSave(pid, activity){
+  var st=(document.getElementById('ac-start')||{}).value||'', en=(document.getElementById('ac-end')||{}).value||'';
+  if(!st){ if(typeof toast==='function') toast('Pick a start date'); return; }
+  if(accomAdd(pid, activity, st, en||null)){ closeModal(); if(typeof toast==='function') toast('🛡 '+accomLabel(activity)+' · '+_pidNick(pid)); openPersonPanel(pid,'accommodations'); try{ buildCoverageTimeline(); }catch(e){} }
+}
+function accomNameDuty(pid){ var n=prompt('Name the duty (e.g. "Lot walks", "Ladder")'); if(!n||!String(n).trim()) return; accomForm(pid, 'custom:'+String(n).trim().slice(0,40)); }
 
 function pidChip(pid, label, extraStyle){
   var esc = String(pid).replace(/"/g,'&quot;');
@@ -28754,6 +28819,16 @@ function _asExtraMgrWindows(){
   }catch(e){ return []; }
 }
 
+// v60.244: a copy of the person whose pattern windows drop the shifts an
+// accommodation forbids on this date — opening (start ≤ 6a) / closing (4P-C or end ≥ 10p).
+function _asAccomFilter(p, dateKey){
+  try{
+    var pid=String(p.name||'').replace(/\s/g,'_'); if(!pid || typeof accommodated!=='function') return p;
+    var noOpen=accommodated(pid,'opening',dateKey), noClose=accommodated(pid,'closing',dateKey); if(!noOpen && !noClose) return p;
+    var wins=(p.patternWindows||[]).filter(function(w){ var pw=_asParseWin(w)||[8,18]; if(noOpen && pw[0]<=6) return false; if(noClose && (w==='4P-C' || pw[1]>=22)) return false; return true; });
+    var c=Object.assign({}, p); c.patternWindows=wins; return c;
+  }catch(e){ return p; }
+}
 function asBuildWeek(seed, _priorDepth){
   var roster = (typeof getEffectiveRoster==='function') ? getEffectiveRoster() : [];
   var days = [];
@@ -28848,6 +28923,7 @@ function asBuildWeek(seed, _priorDepth){
         return a===want ? 0 : (a==='mid' ? 1 : 2);
       };
       var order = pool.map(function(_,i){ return pool[(i+dow+seed) % pool.length]; }); // rotate for fairness
+      order = order.map(function(p){ return (typeof _asAccomFilter==='function') ? _asAccomFilter(p, dateKey) : p; });   // v60.244: opening/closing accommodations
       var assigned = {};
       var _dow = dow;
       var restIfStart = function(p, startH){
