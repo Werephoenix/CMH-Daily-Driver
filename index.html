@@ -7950,7 +7950,7 @@ function buildSmartRotation() {
     if (customLunchFor(r) !== null) return false;
     // v58: manually-defined assignment blocks override the auto rotation
     // entirely. Don't shift the lunch of someone whose blocks are manual.
-    if ((STATE.mgmtBlocks||{})[r.pid] && STATE.mgmtBlocks[r.pid].length) return false;
+    if ((typeof _hasManualBlocks==='function') ? _hasManualBlocks(r.pid) : ((STATE.mgmtBlocks||{})[r.pid] && STATE.mgmtBlocks[r.pid].length)) return false;   // v60.250: a cover doesn't freeze the lunch
     const newFrom = r.lunch.from + deltaH;
     const newTo   = r.lunch.to   + deltaH;
     // Lunch must stay at least 30min into shift on both sides
@@ -9379,10 +9379,10 @@ function showCalloutSuggestion(calledOutPid) {
       // Show a brief actionable toast with a suggestion button
       const toastEl = document.getElementById('toast');
       if (toastEl) {
-        toastEl.innerHTML = `${msg} <button onclick="tapStation('${suggestPid}','Exit Booth');this.closest('#toast').classList.remove('show')"
+        toastEl.innerHTML = `${msg} <button onclick="nowAsk('${suggestPid}');this.closest('#toast').classList.remove('show')"
           style="margin-left:8px;padding:3px 10px;border:1px solid var(--green);background:rgba(22,163,74,.2);
           color:var(--green);border-radius:3px;font-size:11px;font-weight:700;cursor:pointer">
-          Move ${suggest.nick} → Exit</button>`;
+          Ask ${suggest.nick} to cover Exit</button>`;
         toastEl.classList.add('show');
         clearTimeout(window._toastTimer);
         window._toastTimer = setTimeout(() => {
@@ -12287,7 +12287,7 @@ function renderNow() {
         sub: cand
           ? `${cn} is freest at Counter and lowest on exit time this week. <a href="#" onclick="event.preventDefault();event.stopPropagation();openExitWhy();" style="color:var(--accent);font-weight:700;text-decoration:none;white-space:nowrap">Why them?</a>`
           : 'No free Counter CXR to pull — consider an MT/ABRM.',
-        btn: cand ? {label:`Send ${cn} to Exit →`, on:`nowFix('${cand[0]}')`, cls:'wide-green'} : null }; },
+        btn: cand ? {label:`Ask ${cn} to cover Exit ›`, on:`nowAsk('${cand[0]}')`, cls:'wide-green'} : null }; },   // v60.250: ask, don't send
     counter: () => { if (ctrHave >= ctrNeed) return null;
       return { cls:'warn', kicker:'⚠ Counter short — right now', title:`Counter is ${ctrHave}/${ctrNeed}`,
         sub:'Pull an MT/ABRM to Counter or accept reduced coverage.', btn:{label:'Open Schedule →', on:"showTab('schedule')"} }; },
@@ -15813,7 +15813,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.249'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.250'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -18188,7 +18188,7 @@ function renderCoverageFirst() {
   if (!c.closed && c.ex < c.exN) {
     attnCls='urgent'; kicker='⚠ Exit short — right now';
     const cand = _nowExitCandidate(exp, nowFloor);
-    if (cand) { const cn = cand[1].person.nick||cand[1].person.name.split(' ')[0]; fixBtn = `<button class="now-btn wide-green" onclick="nowFix('${cand[0]}')">Send ${cn} to Exit →</button>`; }
+    if (cand) { const cn = cand[1].person.nick||cand[1].person.name.split(' ')[0]; fixBtn = `<button class="now-btn wide-green" onclick="nowAsk('${cand[0]}')">Ask ${cn} to cover Exit ›</button>`; }   /* v60.250 */
   } else if (!c.closed && c.ct < c.ctN) { attnCls='warn'; kicker='⚠ Counter short — right now'; }
   let html = `<div class="now-attn ${attnCls}" style="margin-bottom:14px"><div class="now-kicker">${kicker}</div>
     <div class="now-h">Exit ${c.ex}/${c.exN} · Counter ${c.ct}/${c.ctN}</div>
@@ -19051,13 +19051,14 @@ function buildCoverageTimeline() {
       // auto-distribute. This applies to CXRs as well as managers
       // (Matt's request to extend the assignment block pattern to CXRs
       // — "less commonly done, but do happen").
-      const hasManualBlocks = !!((STATE.mgmtBlocks||{})[pid] || []).length;
+      const hasManualBlocks = (typeof _hasManualBlocks==='function') ? _hasManualBlocks(pid) : !!((STATE.mgmtBlocks||{})[pid] || []).length;   // v60.250: covers don't count
       // Main rotation blocks
       if(rot && !hasManualBlocks){
         if(rot.b1)addSeg(rot.b1.from,rot.lunch?rot.lunch.from:rot.b1.to,rot.b1.station==='exit'?'exit':'counter');
         if(rot.lunch)addSeg(rot.lunch.from,rot.lunch.to,'lunch');
         if(rot.b2)addSeg(rot.lunch?rot.lunch.to:rot.b2.from,rot.b2.to,rot.b2.station==='exit'?'exit':'counter');
         if(rot.b3)addSeg(rot.b3.from,rot.b3.to,rot.b3.station==='exit'?'exit':'counter');
+        ((typeof _coversOf==='function')?_coversOf(pid):[]).forEach(function(cb){ addSeg(cb.from, cb.to, _zoneOfStation(cb.station)); });   // v60.250: the cover sits on top
       } else {
         // No rotation OR rotation overridden by manual assignment blocks.
         // RETURNS role agents are intentionally skipped from buildSmartRotation
@@ -21266,7 +21267,7 @@ function gfxRender(){
   if(top){
     b+='<button class="vl-mgr" onclick="gfxApply()" style="width:100%;padding:14px;border-radius:10px;border:none;'
      +'background:var(--accent);color:#04160e;font-size:14.5px;font-weight:800;cursor:pointer;margin-bottom:8px">'
-     +'Send '+top.nick+' → '+lbl.replace(/^[^ ]+ /,'')+'</button>'
+     +(function(){ var _ex=_planExp()[top.pid]; return _isMgrRole(_ex&&_ex.person&&_ex.person.role) ? ('Send '+top.nick+' → '+lbl.replace(/^[^ ]+ /,'')+' · block') : ('Ask '+top.nick+' first · they agreed →'); })()+'</button>'
      +'<div style="font-size:11px;color:var(--txt3);margin-bottom:10px;line-height:1.5">'
      +(top.why||('Next in the fill order ('+(top.tier==='free'?'free':'flexible')+')'))+'</div>';
   } else {
@@ -21402,8 +21403,8 @@ setInterval(function(){
 // ═══════════════════════════════════════════════════════════════════════════
 function _ptS(){
   var tk=(typeof todayKey==='function')?todayKey():'';
-  if(!STATE.planToday || STATE.planToday.date!==tk){
-    STATE.planToday={date:tk, steps:{}, publishedAt:null, pubHash:null};
+  if(!STATE.planToday || STATE.planToday.date!==tk || STATE.planToday.v!==2){   // v60.250: the steps were renumbered — old accepts don't carry
+    STATE.planToday={date:tk, v:2, steps:{}, publishedAt:null, pubHash:null};
   }
   return STATE.planToday;
 }
@@ -21420,12 +21421,39 @@ function _ptFmt(h){ var t=((h%24)+24)%24, hh=Math.floor(t), m=Math.round((t-hh)*
   var d=hh>12?hh-12:(hh===0?12:hh); return d+(m?':'+String(m).padStart(2,'0'):'')+(hh>=12?'p':'a'); }
 
 // ── step evaluators — each returns {status:'done'|'accepted'|'open', detail, items?} ──
+// v60.250 · the planner's order is Matt's order: 1 Schedule in · 2 Floor targets ·
+// 3 CXR rotation (flips + CXR lunches) · 4 CXR coverage (CXR and agent moves only,
+// asked not assumed, then Confirm CXRs) · 5 Returns and Exit lunches · 6 Managers
+// (EB1 opener/closer are set by the schedule; the rest filled juniors first,
+// no-hurt first, Exit and Returns before Counter; then manager lunches) · 7 Publish.
+function ptLunchMissing(exp, roles){
+  var missing=[];
+  try{ buildSmartRotation(); }catch(e){}
+  Object.keys(exp).forEach(function(pid){
+    var e=exp[pid], p=e.person; if(!p) return;
+    if(roles && roles.indexOf(p.role)<0) return;
+    var ss=(STATE.shiftMod||{})[pid]&&(STATE.shiftMod[pid].start!=null)?STATE.shiftMod[pid].start:p.shiftStart;
+    var se=(STATE.shiftMod||{})[pid]&&(STATE.shiftMod[pid].end!=null)?STATE.shiftMod[pid].end:p.shiftEnd;
+    if(ss==null||se==null||(se-ss)<6) return;
+    if(isOffToday(pid)) return;
+    if((STATE.altSchedule||{})[pid+'_nolunch']===true) return;
+    var _g=((STATE.specialBlocks||{})[pid]||[]).filter(function(b){ return b.key==='split'; })[0];
+    var _seg=_g?Math.max(_g.from-ss, se-_g.to):(se-ss);
+    if(_seg < (typeof LUNCH_MIN_HOURS!=='undefined'?LUNCH_MIN_HOURS:6)) return;
+    var has=false;
+    if((STATE.customLunch||{})[pid]!=null) has=true;
+    var r=(window._lastRotations||{})[pid]; if(r&&r.lunch) has=true;
+    ((STATE.specialBlocks||{})[pid]||[]).forEach(function(b){ if(b.key==='lunch') has=true; });
+    if(!has) missing.push({pid:pid, nick:(typeof dispName==='function')?dispName(p):(p.nick||pid), sug:ptLunchSuggest(pid,ss,se,exp), ss:ss, se:se});
+  });
+  return missing;
+}
 function ptEval(n){
   var st=_ptS(), exp={}; try{ exp=buildExpectedToday(); }catch(e){}
   var people=Object.keys(exp).length;
   if(n===1){
     var stored=null; try{ stored=getScheduleForDate(todayKey()); }catch(e){}
-    if(stored && people) return {status:'done', detail:people+' people in — today\u2019s stored schedule, roster patterns for anyone it doesn\u2019t name'};
+    if(stored && people) return {status:'done', detail:people+' people in — today’s stored schedule, roster patterns for anyone it doesn’t name'};
     if(people) return {status:st.steps[1]||'open', detail:people+' people from roster patterns — no stored day. Paste the Game Plan, or accept the roster fallback.'};
     return {status:'open', detail:'No schedule at all — import one first (Admin → Schedule).'};
   }
@@ -21435,63 +21463,68 @@ function ptEval(n){
     return {status:st.steps[2]||'open', detail:'Using the app defaults — nobody has confirmed them. Fine to accept; better to set them once in 📊 Floor targets.'};
   }
   if(n===3){
-    var missing=[];
-    try{ buildSmartRotation(); }catch(e){}
+    var lunches=ptLunchMissing(exp, ['CXR']), flips=[];
     Object.keys(exp).forEach(function(pid){
-      var e=exp[pid], p=e.person;
-      var ss=(STATE.shiftMod||{})[pid]&&(STATE.shiftMod[pid].start!=null)?STATE.shiftMod[pid].start:p.shiftStart;
-      var se=(STATE.shiftMod||{})[pid]&&(STATE.shiftMod[pid].end!=null)?STATE.shiftMod[pid].end:p.shiftEnd;
-      if(ss==null||se==null||(se-ss)<6) return;
-      if(isOffToday(pid)) return;   // v60.223
-      if((STATE.altSchedule||{})[pid+'_nolunch']===true) return;
-      // v60.222 (Inspector ⑩): same rule as the engine — a split shift's
-      // longest segment decides, and short shifts never needed one.
-      var _g=((STATE.specialBlocks||{})[pid]||[]).filter(function(b){ return b.key==='split'; })[0];
-      var _seg=_g?Math.max(_g.from-ss, se-_g.to):(se-ss);
-      if(_seg < (typeof LUNCH_MIN_HOURS!=='undefined'?LUNCH_MIN_HOURS:6)) return;
-      var has=false;
-      if((STATE.customLunch||{})[pid]!=null) has=true;
-      var r=(window._lastRotations||{})[pid]; if(r&&r.lunch) has=true;
-      ((STATE.specialBlocks||{})[pid]||[]).forEach(function(b){ if(b.key==='lunch') has=true; });
-      if(!has){
-        var sug=ptLunchSuggest(pid,ss,se,exp);
-        missing.push({pid:pid, nick:(typeof dispName==='function')?dispName(p):(p.nick||pid), sug:sug, ss:ss, se:se});
-      }
-    });
-    if(!missing.length) return {status:'done', detail:'Everyone on 6h+ has a lunch planned.'};
-    return {status:st.steps[3]||'open', detail:missing.length+' still need a lunch', items:missing};
-  }
-  if(n===4){
-    var flips=[];
-    Object.keys(exp).forEach(function(pid){
-      var e=exp[pid], p=e.person; if(p.role!=='CXR') return;
-      if(isOffToday(pid)) return;   // v60.223
-      if(typeof exitAccommodated==='function' && exitAccommodated(pid)) return;   // never suggest exit for them
-      if(((STATE.mgmtBlocks||{})[pid]||[]).length) return;                        // custom times = manager decided
+      var e=exp[pid], p=e.person; if(!p||p.role!=='CXR') return;
+      if(isOffToday(pid)) return;
+      if(typeof accommodated==='function' && accommodated(pid,'exit')) return;
+      if(typeof _hasManualBlocks==='function' ? _hasManualBlocks(pid) : ((STATE.mgmtBlocks||{})[pid]||[]).length) return;   // custom legs = manager decided
       var ss=p.shiftStart, se=p.shiftEnd; if(ss==null||se==null||(se-ss)<7.5) return;
       var r=(window._lastRotations||{})[pid];
       var flat = r ? !!r.fullShift : /full/.test((STATE.altSchedule||{})[pid]||'');
       if(!flat) return;
       var d=ptFlipDirection(pid,ss,se,exp);
-      flips.push({pid:pid, nick:(typeof dispName==='function')?dispName(p):(p.nick||pid),
-                  dir:d.dir, why:d.why});
+      flips.push({pid:pid, nick:(typeof dispName==='function')?dispName(p):(p.nick||pid), dir:d.dir, why:d.why});
     });
-    if(!flips.length) return {status:'done', detail:'Every long CXR shift flips stations (or a manager set it flat on purpose).'};
-    return {status:st.steps[4]||'open', detail:flips.length+' long shift'+(flips.length===1?'':'s')+' with no station flip', items:flips};
+    if(!lunches.length && !flips.length) return {status:'done', detail:'Every long CXR shift flips stations and every CXR on 6h+ has a lunch.'};
+    return {status:st.steps[3]||'open', detail:[flips.length?flips.length+' long shift'+(flips.length===1?'':'s')+' with no flip':'', lunches.length?lunches.length+' CXR lunch'+(lunches.length===1?'':'es')+' to place':''].filter(Boolean).join(' · '), flips:flips, lunches:lunches};
+  }
+  if(n===4){
+    var gaps=[]; try{ gaps=halfGaps(['exit','counter','returns'], null, exp); }catch(e){}
+    if(!gaps.length) return {status:'done', detail:'No Exit, Counter or Returns gaps from here on — nothing for CXRs to cover.'};
+    if(st.steps[4]==='confirmed') return {status:'done', detail:'CXRs confirmed'+(st.cxrAt?' at '+_hFmt(new Date(st.cxrAt).getHours()+new Date(st.cxrAt).getMinutes()/60):'')+' · '+gaps.length+' window'+(gaps.length===1?'':'s')+' left for the manager step.', gaps:gaps};
+    return {status:'open', detail:gaps.length+' short window'+(gaps.length===1?'':'s')+'. Cover what you can with CXR and agent moves — ask first, nothing moves until they agree. Then Confirm CXRs; anything left goes to the managers.', gaps:gaps};
   }
   if(n===5){
-    var gaps=[]; try{ gaps=gfxGaps(); }catch(e){}
-    if(!gaps.length) return {status:'done', detail:'No coverage gaps from this hour on — exit/counter is as good as the CXRs can make it.'};
-    return {status:st.steps[5]||'open', detail:gaps.length+' gap'+(gaps.length===1?'':'s')+' open — get exit/counter as good as it can get with the CXR moves, then Accept to CONFIRM before the manager step.', gaps:gaps.length};
+    var al=ptLunchMissing(exp, ['RETURNS','EXIT']);
+    if(!al.length) return {status:'done', detail:'Every Returns and Exit agent on 6h+ has a lunch.'};
+    return {status:st.steps[5]||'open', detail:al.length+' Returns / Exit lunch'+(al.length===1?'':'es')+' to place — scored against the confirmed floor.', items:al};
   }
   if(n===6){
-    var items=ptMgrFillEval(exp);
-    var real=items.filter(function(x){ return !x.none; });
-    if(!items.length) return {status:'done', detail:'Nothing left for managers to cover.'};
-    if(!real.length) return {status:st.steps[6]||'open', detail:items.length+' gap'+(items.length===1?'':'s')+' and no manager on shift is free and cleared for them — a true shortage. Accept to note it and move on.', items:items};
-    return {status:st.steps[6]||'open', detail:real.length+' manager fill'+(real.length===1?'':'s')+' suggested — juniors first (MT → ABRM → BRM → ARM/AM), exit and returns before counter. Each tap drops a block; nothing is automatic.', items:items};
+    var au={}; try{ au=getAutoManagers()||{}; }catch(e){}
+    var f=STATE.fields||{}, openM=f.openMgr||au.open||'', closeM=f.closeMgr||au.close||'';
+    var mg=[]; try{ mg=halfGaps(null, null, exp); }catch(e){}
+    var ml=ptLunchMissing(exp, ['MT','ABRM','BRM','ARM','AM']);
+    var auto='EB1 opener '+(openM||'—')+' · EB1 closer '+(closeM||'—')+' · set by the schedule';
+    if(!mg.length && !ml.length) return {status:'done', detail:'No gaps left and every manager has a lunch. '+auto+'.', auto:auto};
+    return {status:st.steps[6]||'open', detail:[mg.length?mg.length+' window'+(mg.length===1?'':'s')+' for managers — no-hurt first, then juniors first (MT → ABRM → BRM → ARM/AM), Exit and Returns before Counter':'', ml.length?ml.length+' manager lunch'+(ml.length===1?'':'es')+' to place':''].filter(Boolean).join(' · ')+'.', gaps:mg, lunches:ml, auto:auto};
   }
   return {status:'open', detail:''};
+}
+function ptConfirmCxr(){ var st=_ptS(); st.steps[4]='confirmed'; st.cxrAt=Date.now(); if(typeof logAction==='function') logAction('CXRs confirmed'); if(typeof saveState==='function') saveState(); try{ renderPlanV2(); }catch(e){} ptRender(); }
+function _ptLunchRows(items){
+  var b='';
+  (items||[]).slice(0,8).forEach(function(it){
+    b+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--bdr)">'
+      +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+it.nick+' <span style="color:var(--txt3);font-size:10.5px">'+_ptFmt(it.ss)+'–'+_ptFmt(it.se)+'</span></span>'
+      +(it.sug? '<button onclick="ptAddLunch(\''+it.pid+'\','+it.sug.t+')" style="padding:6px 11px;border-radius:7px;border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-size:11.5px;font-weight:800;cursor:pointer">🍽 '+_ptFmt(it.sug.t)+(it.sug.spare>0?' · '+it.sug.spare+' spare':'')+'</button>'
+        : '<span style="font-size:10.5px;color:var(--txt3)">no clean slot</span>')+'</div>';
+  });
+  return b;
+}
+function _ptGapCards(gaps, phase){
+  var b='', exp=_planExp(), booked={};
+  gaps=(gaps||[]).slice();
+  if(phase==='mgr') gaps.sort(function(a,c){ var ra=PT_AREA_ORDER[a.area]!=null?PT_AREA_ORDER[a.area]:9, rc=PT_AREA_ORDER[c.area]!=null?PT_AREA_ORDER[c.area]:9; return (ra-rc)||(a.from-c.from); });   // Exit, then Returns, then Counter
+  var overlaps=function(pid, w){ return (booked[pid]||[]).some(function(x){ return x[0]<w.to && w.from<x[1]; }); };
+  gaps.slice(0,4).forEach(function(g){
+    b+='<div style="font-size:12px;font-weight:800;color:var(--red);margin:10px 0 5px">'+_areaLabel(g.area)+' '+_hFmt(g.from)+'–'+_hFmt(g.to)+' · '+_fmtN(g.minHave)+' of '+g.need+'</div>';
+    var bm=bestMoves(g, phase, exp); bm.cands=bm.cands.filter(function(c){ return !overlaps(c.pid, bm.win); });   // never the same person for two windows at once
+    if(bm.cands.length){ (booked[bm.cands[0].pid]=booked[bm.cands[0].pid]||[]).push([bm.win.from,bm.win.to]); b+=moveCardHtml(bm.cands[0], bm.win, phase); if(bm.cands.length>1) b+='<div style="font-size:11.5px;margin:-2px 0 4px"><a href="#" onclick="openMoveOptions(\''+g.area+'\','+bm.win.from+','+bm.win.to+',\''+phase+'\');return false" style="color:var(--acc);font-weight:700">Other options ('+(bm.cands.length-1)+')</a></div>'; }
+    else b+='<div style="font-size:11.5px;color:var(--txt3);padding:6px 0">'+(phase==='cxr'?'No CXR or agent can cover this — the manager step will.':'No manager on shift is free and cleared for it — a true shortage.')+'</div>';
+  });
+  if((gaps||[]).length>4) b+='<div style="font-size:11px;color:var(--txt3)">+'+(gaps.length-4)+' more — they come up as these close.</div>';
+  return b;
 }
 // coverage-scored lunch slot: surplus at their station first, then closeness to
 // mid-shift — which is exactly why a lunch can legitimately land mid-rotation.
@@ -21639,7 +21672,7 @@ function ptRender(){
       +(n===cur?'background:rgba(255,255,255,.06);':'')+'">'
       +(s2==='done'?'✓': s2==='accepted'?'~': n)+'</span>';
   }
-  var NAMES=['','Schedule in','Floor targets','Lunches','CXR rotation','CXR coverage','Manager fill','Publish'];
+  var NAMES=['','Schedule in','Floor targets','CXR rotation','CXR coverage','Returns & Exit lunches','Managers','Publish'];   // v60.250: Matt's order
   var b='<div style="margin-bottom:12px">'+dots
     +'<span style="font-size:11px;color:var(--txt3);margin-left:6px">step '+cur+' of 7 · '+NAMES[cur]+'</span></div>';
   // completed/accepted steps as one-liners
@@ -21655,50 +21688,24 @@ function ptRender(){
     b+='<div style="margin-top:10px;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bdr2)">'
       +'<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:6px">'+NAMES[cur]+'</div>'
       +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5;margin-bottom:10px">'+e.detail+'</div>';
-    if(cur===3 && e.items){
-      e.items.slice(0,6).forEach(function(it){
+    if(cur===3){
+      (e.flips||[]).slice(0,6).forEach(function(it){
         b+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--bdr)">'
-          +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+it.nick
-          +' <span style="color:var(--txt3);font-size:10.5px">'+_ptFmt(it.ss)+'–'+_ptFmt(it.se)+'</span></span>'
-          +(it.sug? '<button onclick="ptAddLunch(\''+it.pid+'\','+it.sug.t+')" '
-             +'style="padding:6px 11px;border-radius:7px;border:1px solid var(--accent);background:rgba(35,201,131,.10);'
-             +'color:var(--accent);font-size:11.5px;font-weight:800;cursor:pointer">🍽 '+_ptFmt(it.sug.t)
-             +(it.sug.spare>0?' · '+it.sug.spare+' spare':'')+'</button>'
-            : '<span style="font-size:10.5px;color:var(--txt3)">no clean slot</span>')
-          +'</div>';
+          +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+it.nick+'<div style="font-size:10.5px;color:var(--txt3)">'+it.why+'</div></span>'
+          +'<button onclick="ptApplyFlip(\''+it.pid+'\',\''+it.dir+'\')" style="padding:6px 11px;border-radius:7px;border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-size:11.5px;font-weight:800;cursor:pointer">'+(it.dir==='exit-first'?'Exit 1st':'Counter 1st')+'</button></div>';
       });
+      if((e.lunches||[]).length) b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin:10px 0 2px">CXR lunches</div>'+_ptLunchRows(e.lunches);
     }
-    if(cur===4 && e.items){
-      e.items.slice(0,6).forEach(function(it){
-        b+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--bdr)">'
-          +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+it.nick
-          +'<div style="font-size:10.5px;color:var(--txt3)">'+it.why+'</div></span>'
-          +'<button onclick="ptApplyFlip(\''+it.pid+'\',\''+it.dir+'\')" '
-          +'style="padding:6px 11px;border-radius:7px;border:1px solid var(--accent);background:rgba(35,201,131,.10);'
-          +'color:var(--accent);font-size:11.5px;font-weight:800;cursor:pointer">'
-          +(it.dir==='exit-first'?'Exit 1st':'Counter 1st')+'</button></div>';
-      });
-    }
-    if(cur===5 && e.gaps){
-      b+='<button onclick="closeModal();gfxStart()" style="width:100%;padding:12px;border-radius:9px;border:none;'
-        +'background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:8px">'
-        +'▶ Fix with Guided fix ('+e.gaps+')</button>';
-    }
-    if(cur===6 && e.items){
-      var _lblA={exit:'🟩 Exit',returns:'↩ Returns',counter:'🟦 Counter',eb1:'🌟 EB1',emerald:'🌟 Emerald'};
-      e.items.slice(0,6).forEach(function(it){
-        b+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--bdr)">'
-          +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+(_lblA[it.area]||it.area)+' at '+_ptFmt(it.hour)
-          +(it.none?'<div style="font-size:10.5px;color:var(--txt3)">no manager free + cleared</div>':'')+'</span>'
-          +(it.none?'' : '<button onclick="ptMgrFill(\''+it.pid+'\',\''+it.area+'\','+it.hour+')" '
-             +'style="padding:6px 11px;border-radius:7px;border:1px solid var(--eb,#AF9CFF);background:rgba(175,156,255,.10);'
-             +'color:var(--eb,#AF9CFF);font-size:11.5px;font-weight:800;cursor:pointer">'
-             +it.role+' '+it.nick+' →</button>')
-          +'</div>';
-      });
+    if(cur===4 && e.gaps) b+=_ptGapCards(e.gaps, 'cxr');
+    if(cur===5 && e.items) b+=_ptLunchRows(e.items);
+    if(cur===6){
+      if(e.auto) b+='<div style="padding:8px 10px;border-radius:9px;background:var(--bg2);border:1px solid var(--bdr2);font-size:11.5px;color:var(--txt2);margin-bottom:6px">🔒 '+biEsc(e.auto)+'. Left as they are.</div>';
+      if(e.gaps) b+=_ptGapCards(e.gaps, 'mgr');
+      if((e.lunches||[]).length) b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin:10px 0 2px">Manager lunches</div>'+_ptLunchRows(e.lunches);
     }
     b+='<div style="display:flex;gap:8px;margin-top:10px">'
-      +'<button class="btn btn-gh" style="flex:1" onclick="ptAccept('+cur+')">Accept as-is → next</button>'
+      +(cur===4 ? '<button onclick="ptConfirmCxr()" style="flex:1;padding:11px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:13px;font-weight:800;cursor:pointer">✓ Confirm CXRs → managers</button>'
+                : '<button class="btn btn-gh" style="flex:1" onclick="ptAccept('+cur+')">Accept as-is → next</button>')
       +'<button class="btn btn-gh" onclick="closeModal()">Close</button></div></div>';
   } else {
     var published=st.publishedAt && st.pubHash===_ptHash();
@@ -21709,7 +21716,7 @@ function ptRender(){
       +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5;margin-bottom:10px">'
       +(published?'✓ Published '+new Date(st.publishedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' — the plan on every screen is this one.'
         : stale?'The day changed since you published — republish so everyone sees the current plan.'
-        :'Steps 1–5 are settled. Publishing locks today\'s plan in and refreshes every screen.')+'</div>'
+        :'Steps 1–6 are settled. Publishing locks today\'s plan in and refreshes every screen.')+'</div>'
       +'<button onclick="ptPublish()" style="width:100%;padding:13px;border-radius:9px;border:none;'
       +'background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer">'
       +(stale?'↻ Republish':'✓ Publish the day')+'</button>'
@@ -21898,7 +21905,7 @@ function printScheduleMap() {
     const rot = window._lastRotations && window._lastRotations[pid];
     const mblocks = ((STATE.mgmtBlocks||{})[pid] || []);
     // Manual assignment blocks override auto-rotation (v50)
-    const hasManualBlocks = mblocks.length > 0;
+    const hasManualBlocks = (typeof _hasManualBlocks==='function') ? _hasManualBlocks(pid) : mblocks.length > 0;   // v60.250
 
     if (rot && !hasManualBlocks) {
       // CXR with rotation blocks
@@ -21906,6 +21913,7 @@ function printScheduleMap() {
       if (rot.lunch) segs.push({from:rot.lunch.from, to:rot.lunch.to, zone:'lunch'});
       if (rot.b2) segs.push({from:(rot.lunch?rot.lunch.to:rot.b2.from), to:rot.b2.to, zone:rot.b2.station==='exit'?'exit':'counter'});
       if (rot.b3) segs.push({from:rot.b3.from, to:rot.b3.to, zone:rot.b3.station==='exit'?'exit':'counter'});
+      if (typeof _overlayCovers==='function') { const _ov=_overlayCovers(segs, _coversOf(pid)); segs.length=0; _ov.forEach(x=>segs.push(x)); }   // v60.250
     } else if (mblocks.length) {
       // Anyone with multi-station assignment blocks (v50: extended from
       // managers to all roles). Same model as live timeline: blocks are
@@ -24110,22 +24118,12 @@ function stationPanelHtml(area){
     h+=here.map(function(r){ return '<div class="pid-chip" data-pid="'+biEsc(r.pid)+'" role="button" tabindex="0" style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border:1px solid var(--bdr);border-radius:9px;margin-bottom:5px;cursor:pointer;background:var(--bg3)">'
       +'<span style="font-size:13px;font-weight:700;color:var(--txt)">'+biEsc(r.nick)+'</span><span style="font-size:11px;color:var(--txt3)">until '+_hFmt(r.until)+(r.lunch!=null?' · lunch '+_hFmt(r.lunch):'')+' ›</span></div>'; }).join('');
   } else { h+='<div style="font-size:12px;color:var(--txt3);padding:6px 0 8px">Nobody here right now.</div>'; }
-  if(mgr && gap && gap.first){
-    var exp=(typeof buildExpectedToday==='function')?buildExpectedToday():{}; var cands=[];
-    try{ cands=gfRankCandidates(gap.first, exp).filter(function(c){ return c.tier!=='protected'; }); }catch(e){}
-    var best=cands[0];
-    h+='<div class="now-sec-hd vl-mgr" style="margin:10px 0 4px">Best move</div>';
-    if(best){
-      var bn=_pidNick(best.pid), from=(GF_AREA_META[best.area]||{}).label||best.area||'floating';
-      h+='<div class="vl-mgr" style="padding:10px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(35,201,131,.08);margin-bottom:6px">'
-        +'<div style="font-size:13px;font-weight:800;color:var(--txt)">'+biEsc(bn)+' · '+biEsc(from)+' → '+biEsc(m.label)+' · '+_hFmt(gap.from)+'–'+_hFmt(gap.to)+'</div>'
-        +(best.why?'<div style="font-size:11px;color:var(--txt2);margin:2px 0 8px">'+biEsc(best.why)+'</div>':'<div style="height:6px"></div>')
-        +'<button onclick="stationApplyMove(\''+biEsc(best.pid)+'\',\''+area+'\')" style="width:100%;padding:11px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer">'+(function(){ var ex=_planExp()[best.pid], mw=_moveWindow(area); return _isMgrRole(ex&&ex.person&&ex.person.role) ? (biEsc(bn)+' '+_hFmt(mw.from)+'–'+_hFmt(mw.to)+', then back') : ('Ask '+biEsc(bn)+' first ›'); })()+'</button></div>';   /* v60.249 */
-      var others=cands.slice(1,3);
-      if(others.length) h+='<div class="vl-mgr" style="font-size:11px;color:var(--txt3);margin-bottom:6px">Other moves: '+others.map(function(c){ return '<a href="#" onclick="stationApplyMove(\''+biEsc(c.pid)+'\',\''+area+'\');return false" style="color:var(--acc);font-weight:700">'+biEsc(_pidNick(c.pid))+'</a>'; }).join(' · ')+'</div>';
-    } else {
-      h+='<div class="vl-mgr" style="font-size:12px;color:var(--txt3);margin-bottom:6px">No one on shift is cleared and free for '+biEsc(m.label)+' in that window.</div>';
-    }
+  if(mgr && gap){
+    var ph=planPhase(), gw=(halfGaps([area])||[])[0]||{area:area, from:gap.from, to:gap.to}, bm=bestMoves(gw, ph);
+    h+='<div class="now-sec-hd vl-mgr" style="margin:10px 0 4px">Best move'+(ph==='cxr'?' · CXRs and agents first':'')+'</div>';
+    if(bm.cands.length){ h+='<div class="vl-mgr">'+moveCardHtml(bm.cands[0], bm.win, ph)+'</div>';
+      if(bm.cands.length>1) h+='<div class="vl-mgr" style="font-size:11.5px;margin-bottom:6px"><a href="#" onclick="openMoveOptions(\''+area+'\','+bm.win.from+','+bm.win.to+',\''+ph+'\');return false" style="color:var(--acc);font-weight:700">Other options ('+(bm.cands.length-1)+')</a></div>'; }
+    else h+='<div class="vl-mgr" style="font-size:12px;color:var(--txt3);margin-bottom:6px">'+(ph==='cxr'?'No CXR or agent can cover it. It goes to the manager step.':'No one on shift is cleared and free for '+biEsc(m.label)+' in that window.')+'</div>';
     h+='<button class="vl-mgr" onclick="closeStationPanel();openStaffingNeeds()" style="width:100%;padding:9px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">📣 Call someone in</button>';
   }
   return h;
@@ -24146,17 +24144,30 @@ function planCounters(){
   return {on:on, lunchesLeft:lunchesLeft, step:step};
 }
 function planVerdict(){
-  var mgr=(typeof _managerMode!=='undefined')&&_managerMode, now=_nowH();
-  var gaps=[]; try{ gaps=gfDetectGaps(null, Math.floor(now)); }catch(e){}
+  var exp=_planExp(), gaps=[]; try{ gaps=halfGaps(null, null, exp); }catch(e){}
   if(gaps.length){
-    var worst=gaps[0], m=GF_AREA_META[worst.area]||{label:worst.area}, w=stationGapWindow(worst.area)||{from:worst.hour,to:worst.hour+1,have:worst.have,need:worst.need};
+    var phase=planPhase(), worst=gaps[0], bm=bestMoves(worst, phase, exp);
+    if(!bm.cands.length){ for(var gi=1; gi<Math.min(gaps.length,6); gi++){ var tb=bestMoves(gaps[gi], phase, exp); if(tb.cands.length){ worst=gaps[gi]; bm=tb; break; } } }   // lead with what this step can act on
+    var m=GF_AREA_META[worst.area]||{label:worst.area};
     var areas={}; gaps.forEach(function(g){ areas[g.area]=1; }); var nAreas=Object.keys(areas).length;
-    var best=null; try{ best=gfRankCandidates(worst, _planExp()).filter(function(c){ return c.tier!=='protected'; })[0]||null; }catch(e){}
-    var others=Object.keys(areas).filter(function(a){ return a!==worst.area; }).map(function(a){ var ww=stationGapWindow(a); return (GF_AREA_META[a]||{label:a}).label+(ww?' '+_hFmt(ww.from)+'–'+_hFmt(ww.to):''); });
-    return { state:'live', area:worst.area,
-      title: m.label+' is '+(w.have===0?'empty':'short')+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+(nAreas>1?' · 1 of '+nAreas:''),
-      sub: (others.length? 'Also: '+others.join(' · ') : 'Everything else holds through close.')+' · '+w.have+' of '+w.need+' in that window.',
-      best: best, button: best ? {label: (function(){ var ex=_planExp()[best.pid], mg=_isMgrRole(ex&&ex.person&&ex.person.role), mw=_moveWindow(worst.area); return mg ? ('▶ '+_pidNick(best.pid)+' to '+m.label+' '+_hFmt(mw.from)+'–'+_hFmt(mw.to)+', then back') : ('Ask '+_pidNick(best.pid)+' · '+m.label+' '+_hFmt(mw.from)+'–'+_hFmt(mw.to)+' ›'); })(), js:"stationApplyMove('"+String(best.pid).replace(/'/g,'\\x27')+"','"+worst.area+"')"} : {label:'▶ Guided fix', js:'gfxStart()'} };   // v60.249: a block for a manager, an ask for anyone else
+    var best=bm.cands[0], w=bm.win;
+    var others=gaps.filter(function(g){ return g!==worst && !(g.area===worst.area && g.from===worst.from); }).slice(0,2).map(function(g){ return _areaLabel(g.area)+' '+_hFmt(g.from)+'–'+_hFmt(g.to); });
+    var sub=[];
+    if(best){
+      var imp=best.impact; sub.push('Fixes '+(imp.fixes[0]?_impactLine(imp.fixes[0],'fix'):'—'));
+      sub.push('Hurts '+(imp.hurts[0]?_impactLine(imp.hurts[0],'hurt'):'nothing'));
+      var fr=fairnessRead(best.pid, worst.area); if(fr) sub.push(fr);
+    } else sub.push(phase==='cxr'?'No CXR or agent can cover it. It goes to the manager step once CXRs are confirmed.':'Nobody on shift is free and cleared for it.');
+    if(others.length) sub.push('Also: '+others.join(' · '));
+    var btn=null;
+    if(best){
+      var args="'"+String(best.pid).replace(/'/g,"\\'")+"','"+worst.area+"',"+w.from+","+w.to;
+      btn = best.mgr ? {label:'▶ '+_pidNick(best.pid)+' to '+m.label+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+', then back', js:'moveApply('+args+')'}
+                     : {label:'Ask '+_pidNick(best.pid)+' · '+m.label+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+' ›', js:"openMoveCard("+args+",'"+phase+"')"};
+    } else btn = phase==='cxr' ? {label:'Plan today · CXR coverage ›', js:'openPlanToday()'} : {label:'▶ Guided fix', js:'gfxStart()'};
+    return { state:'live', area:worst.area, win:w, phase:phase,
+      title: m.label+' is '+(worst.minHave<=0?'empty':'short')+' '+_hFmt(worst.from)+'–'+_hFmt(worst.to)+(nAreas>1?' · 1 of '+nAreas:''),
+      sub: sub.join(' · '), best: best?{pid:best.pid}:null, button: btn };
   }
   var confirmed=!!(STATE.confirmedCoverage) && !(typeof hasPendingChanges==='function' && hasPendingChanges());
   if(confirmed){
@@ -24179,7 +24190,7 @@ function verdictCardHtml(){
   var h='<div class="v-title">'+biEsc(v.title)+'</div><div class="v-sub">'+biEsc(v.sub)+'</div>';
   if(mgr && v.button) h+='<button class="v-btn vl-mgr" onclick="'+v.button.js+'">'+biEsc(v.button.label)+'</button>';
   window._planV=v;
-  if(mgr) h+='<div class="v-ghosts vl-mgr"><a onclick="openCallOff()">📞 Someone called off</a>'+(window._planLastMove?'<a onclick="undoCoverage();buildCoverageTimeline()">↩ Undo · '+biEsc(window._planLastMove)+'</a>':'')+'<a onclick="var d=document.getElementById(\'plan-more\'); if(d){ d.open=true; d.scrollIntoView({block:\'center\'}); }">Other ways to fix</a></div>';
+  if(mgr) h+='<div class="v-ghosts vl-mgr"><a onclick="openCallOff()">📞 Someone called off</a>'+(window._planLastMove?'<a onclick="moveUndo()">↩ Undo · '+biEsc(window._planLastMove)+'</a>':'')+(v.win?'<a onclick="openMoveOptions(\''+v.area+'\','+v.win.from+','+v.win.to+',\''+v.phase+'\')">Other options</a>':'<a onclick="var d=document.getElementById(\'plan-more\'); if(d){ d.open=true; d.scrollIntoView({block:\'center\'}); }">Other ways to fix</a>')+'</div>';   /* v60.250 */
   return {html:h, state:v.state, verdict:v};
 }
 function stationListHtml(){
@@ -24434,6 +24445,230 @@ function horizonMenu(){
     +'<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:10px 0 6px">Further out</div>'
     +'<span class="vl-mgr">'+x("goToWeekPlanner()",'🤖 Week planner')+'</span>'+x("openScheduleLog()",'🗓 Schedule log'));   // v60.245: the More rows moved here
 }
+// ════════════════════════════════════════════════════════════════════════
+// v60.250 · WINDOW MOVES · ASK, DON'T ASSUME · FIX / HURT / WHY
+// Matt (2026-09-11): "better at telling you what it will fix and hurt and why" ·
+// "Move for the hr / Move for 30 minutes to fill gap … mgrs would only need to
+// fill a block at exit before going back to returns … if a CXR is just needed
+// for 30 minutes and agreeable to it, a manager could ask. Managers should
+// never assume the cxr will just be ok with the extra exit time. When making
+// the suggestion, it should give the fairness read if available." · "no hurt
+// options first."
+//   • gaps are read at HALF-HOUR resolution (a lunch-sized hole is 30 min);
+//   • a move is a COVER block for the window only — the person goes back to
+//     their post after (managers: their station / EB2 / Returns; CXRs: their
+//     rotation). A cover sits on top of the rotation instead of erasing it;
+//   • every suggestion is simulated first: FIXES (short time it closes),
+//     HURTS (time it leaves short), TAKES FROM (where the body comes from,
+//     still covered), WHY, and the fairness read;
+//   • anyone who isn't a manager is ASKED — nothing applies until the manager
+//     taps "Agreed", and a "Not today" stores nothing about the person.
+// ════════════════════════════════════════════════════════════════════════
+var MOVE_PHASE_ROLES={cxr:['CXR','EXIT','RETURNS'], mgr:['MT','ABRM','BRM','ARM','AM']};
+function _areaStation(a){ return a==='exit'?'Exit Booth': a==='returns'?'Returns': a==='emerald'?'Emerald Booth':'Counter'; }
+function _areaLabel(a){ return (GF_AREA_META[a]||{}).label || String(a||''); }
+function _fmtN(n){ return String(Math.round((+n||0)*10)/10); }
+function _nowHalf(){ return Math.floor(_nowH()*2)/2; }
+// every slot's need/have for [fromH, toH), half-hour steps
+function _countSlots(exp, fromH, toH, areas){
+  exp=exp||_planExp(); areas=areas||['exit','counter','returns','emerald'];
+  var dow=new Date().getDay(), out={}; if(fromH<3.5) fromH=3.5; if(toH==null) toH=24.5;
+  for(var h=fromH; h<toH-0.001; h+=0.5){
+    var need={}, have={};
+    try{ need=gfNeedsAt(Math.floor(h),dow)||{}; }catch(e){}
+    try{ have=(typeof gfCountsW==='function'?gfCountsW(exp,h+0.01):gfCountsAt(exp,h+0.01))||{}; }catch(e){}
+    for(var i=0;i<areas.length;i++){ var a=areas[i], nd=need[a]||0; if(nd>0) out[a+'@'+h]={area:a, h:h, need:nd, have:Math.round((have[a]||0)*10)/10}; }
+  }
+  return out;
+}
+// contiguous short windows, ranked like the engine: primaries, soonest, deepest
+function halfGaps(areas, fromH, exp){
+  var sl=_countSlots(exp, fromH!=null?fromH:_nowHalf(), 24.5, areas), list=[];
+  Object.keys(sl).forEach(function(k){ var x=sl[k]; if(x.have<x.need-0.001) list.push(x); });
+  list.sort(function(x,y){ return x.area<y.area?-1:x.area>y.area?1:x.h-y.h; });
+  var out=[], w=null;
+  list.forEach(function(x){ if(w && w.area===x.area && Math.abs(x.h-w.to)<0.01){ w.to=x.h+0.5; w.minHave=Math.min(w.minHave,x.have); } else { if(w) out.push(w); w={area:x.area, from:x.h, to:x.h+0.5, need:x.need, have:x.have, minHave:x.have}; } });
+  if(w) out.push(w);
+  var prim=(typeof gfPrimaryAreas==='function')?gfPrimaryAreas():[];
+  out.sort(function(a,b){ var pa=prim.indexOf(a.area)>=0, pb=prim.indexOf(b.area)>=0; if(pa!==pb) return pa?-1:1; if(a.from!==b.from) return a.from-b.from; return (b.need-b.minHave)-(a.need-a.minHave); });
+  return out;
+}
+// a cover block: the window only, flagged so the rotation keeps drawing around it
+function coverAdd(pid, from, to, area){
+  var st=_areaStation(area);
+  var r=(typeof addMgmtBlock==='function')?addMgmtBlock(pid, from, to, st):{ok:false, error:'no block primitive'};
+  if(r && r.ok===false) return r;
+  var bl=((STATE.mgmtBlocks||{})[pid]||[]).find(function(b){ return b && b.from===from && b.to===to && b.station===st; }); if(bl) bl.cover=true;
+  return {ok:true};
+}
+function _hasManualBlocks(pid){ return ((STATE.mgmtBlocks||{})[pid]||[]).some(function(b){ return b && !b.cover; }); }
+function _coversOf(pid){ return ((STATE.mgmtBlocks||{})[pid]||[]).filter(function(b){ return b && b.cover; }); }
+function _zoneOfStation(st){ var s=String(st||'').toLowerCase(); return s.indexOf('exit')>=0?'exit': s.indexOf('return')>=0?'returns': s.indexOf('emerald')>=0?'emerald':'counter'; }
+// cut a from/to segment list around cover windows and insert the covers (non-overlapping result)
+function _overlayCovers(segs, covers){
+  if(!covers || !covers.length) return segs;
+  var out=segs.slice();
+  covers.forEach(function(c){
+    var next=[]; out.forEach(function(g){ if(g.to<=c.from || g.from>=c.to){ next.push(g); return; } if(g.from<c.from) next.push(Object.assign({},g,{to:c.from})); if(g.to>c.to) next.push(Object.assign({},g,{from:c.to})); });
+    next.push({from:c.from, to:c.to, zone:_zoneOfStation(c.station), cover:true}); out=next;
+  });
+  return out.sort(function(a,b){ return a.from-b.from; });
+}
+function _impactWindows(list){
+  list=list.slice().sort(function(x,y){ return x.area<y.area?-1:x.area>y.area?1:x.h-y.h; }); var out=[], w=null;
+  list.forEach(function(x){ if(w && w.area===x.area && Math.abs(x.h-w.to)<0.01){ w.to=x.h+0.5; } else { if(w) out.push(w); w={area:x.area, from:x.h, to:x.h+0.5, need:x.need, was:x.was, now:x.now}; } });
+  if(w) out.push(w); return out;
+}
+// simulate the move on the live state, then put it back — a cover only changes its own window
+function moveImpact(pid, area, from, to, exp){
+  exp=exp||_planExp();
+  var keep=JSON.stringify(STATE.mgmtBlocks||{}), before=_countSlots(exp, from, to), after={};
+  try{ coverAdd(pid, from, to, area); after=_countSlots(exp, from, to); } finally { STATE.mgmtBlocks=JSON.parse(keep); }
+  var fixes=[], hurts=[], takes=[];
+  Object.keys(before).forEach(function(k){ var b=before[k], a=after[k]; if(!a) return;
+    if(b.have<b.need-0.001 && a.have>b.have+0.001) fixes.push({area:b.area,h:b.h,need:b.need,was:b.have,now:a.have});
+    else if(a.have<b.have-0.001){ if(a.have<a.need-0.001) hurts.push({area:b.area,h:b.h,need:b.need,was:b.have,now:a.have}); else takes.push({area:b.area,h:b.h,need:b.need,was:b.have,now:a.have}); }
+  });
+  return {fixes:_impactWindows(fixes), hurts:_impactWindows(hurts), takes:_impactWindows(takes), fixH:fixes.length/2, hurtH:hurts.length/2};
+}
+function _impactLine(w, kind){
+  var t=_areaLabel(w.area)+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+' · '+_fmtN(w.was)+' to '+_fmtN(w.now)+' of '+w.need;
+  if(kind==='fix') t+= (w.now>=w.need-0.001)?' · closed':' · still short';
+  if(kind==='take') t+=' · still covered';
+  return t;
+}
+function fairnessRead(pid, area){
+  try{
+    if(area!=='exit') return '';
+    var wk=(typeof getExitHoursWeek==='function')?(getExitHoursWeek(pid)||0):0, avg=(typeof getTeamExitAvgWeek==='function')?(getTeamExitAvgWeek()||0):0, td=(typeof getExitHoursToday==='function')?(getExitHoursToday(pid)||0):0;
+    if(!wk && !avg && !td) return '';
+    return _fmtN(wk)+'h exit this week'+(avg?' · team average '+_fmtN(avg)+'h':'')+(td?' · '+_fmtN(td)+'h today':' · none today');
+  }catch(e){ return ''; }
+}
+// who can cover this window, simulated and ranked. phase: 'cxr' | 'mgr' | 'live'
+function moveCandidates(win, phase, exp){
+  exp=exp||_planExp(); phase=phase||'live';
+  var chain=[]; try{ chain=(gfChainFor(win.area)||[]).slice(); }catch(e){}
+  var allow = phase==='live' ? chain : chain.filter(function(r){ return (MOVE_PHASE_ROLES[phase]||[]).indexOf(r)>=0; });
+  if(allow.indexOf('ARM')>=0 && allow.indexOf('AM')<0) allow.push('AM');
+  var no=window._moveNo||{}, pre=[];
+  Object.keys(exp).forEach(function(pid){
+    var e=exp[pid]; if(!e||!e.person) return; var role=e.person.role;
+    if(allow.indexOf(role)<0) return;
+    if(no[pid+'@'+win.area+'@'+win.from]) return;
+    try{ if(isOffToday(pid)) return; }catch(err){}
+    try{ if(!gfOnShiftAt(pid,e,win.from+0.01) || !gfOnShiftAt(pid,e,win.to-0.01)) return; }catch(err){ return; }
+    var at=null; try{ at=gfAreaAt(pid,e,win.from+0.01); }catch(err){}
+    if(at===win.area || at==='lunch' || at==='offsite') return;
+    if(typeof trainWeight==='function' && !(trainWeight(pid,win.area)>0)) return;
+    if(typeof accommodated==='function' && accommodated(pid, win.area)) return;
+    pre.push({pid:pid, role:role, from:at, mgr:_isMgrRole(role), fair:(typeof getExitHoursWeek==='function'?(getExitHoursWeek(pid)||0):0)});
+  });
+  // cheap pre-rank, then simulate the top few (a cover only touches its own window, so this stays fast)
+  pre.sort(function(a,b){ if(a.mgr!==b.mgr) return phase==='mgr'?0:(a.mgr?1:-1); var ra=PT_MGR_ORDER[a.role]!=null?PT_MGR_ORDER[a.role]:9, rb=PT_MGR_ORDER[b.role]!=null?PT_MGR_ORDER[b.role]:9; if(ra!==rb) return ra-rb; return (a.from?1:0)-(b.from?1:0); });
+  var out=[];
+  pre.slice(0,10).forEach(function(c){ c.impact=moveImpact(c.pid, win.area, win.from, win.to, exp); if(c.impact.fixH>0) out.push(c); });
+  out.sort(function(a,b){
+    var ha=a.impact.hurtH>0?1:0, hb=b.impact.hurtH>0?1:0; if(ha!==hb) return ha-hb;                          // no-hurt options first (Matt)
+    if(a.mgr && b.mgr){ var ra=PT_MGR_ORDER[a.role]!=null?PT_MGR_ORDER[a.role]:9, rb=PT_MGR_ORDER[b.role]!=null?PT_MGR_ORDER[b.role]:9; if(ra!==rb) return ra-rb; }   // juniors first
+    if(a.mgr!==b.mgr) return a.mgr?1:-1;                                                                        // staff before managers when both are allowed
+    var na=a.impact.fixH-a.impact.hurtH, nb=b.impact.fixH-b.impact.hurtH; if(Math.abs(na-nb)>0.001) return nb-na;
+    if(win.area==='exit' && a.fair!==b.fair) return a.fair-b.fair;                                             // least exit time this week first
+    return (a.from?1:0)-(b.from?1:0);                                                                           // floating first
+  });
+  return out;
+}
+// the window, then its first hour, then its first 30 min — "move for the hour / for 30 minutes"
+function bestMoves(win, phase, exp){
+  var tries=[win]; if(win.to-win.from>1) tries.push({area:win.area, from:win.from, to:win.from+1}); if(win.to-win.from>0.5) tries.push({area:win.area, from:win.from, to:win.from+0.5});
+  for(var i=0;i<tries.length;i++){ var c=moveCandidates(tries[i], phase, exp); if(c.length) return {win:tries[i], cands:c}; }
+  return {win:win, cands:[]};
+}
+function moveWhy(c, win, phase){
+  var bits=[];
+  bits.push(c.mgr ? (c.role+(phase==='mgr'?', juniors first':'')) : (c.role==='CXR'?'CXR':(c.role.charAt(0)+c.role.slice(1).toLowerCase()+' agent')));
+  try{ var ts=trainStatus(c.pid, win.area); bits.push(ts==='training'?('in training for '+_areaLabel(win.area)+' (counts as half)'):('cleared for '+_areaLabel(win.area))); }catch(e){ bits.push('cleared for '+_areaLabel(win.area)); }
+  bits.push(c.from ? ('covering from '+_areaLabel(c.from)) : 'floating, so nothing is left bare');
+  return bits.join(' · ');
+}
+function moveCardHtml(c, win, phase){
+  var nick=_pidNick(c.pid), rng=_hFmt(win.from)+'–'+_hFmt(win.to), A=_areaLabel(win.area), imp=c.impact||moveImpact(c.pid, win.area, win.from, win.to);
+  var back = c.from ? _areaLabel(c.from) : 'their post', worse = imp.hurtH>imp.fixH, esc=String(c.pid).replace(/'/g,"\\'");
+  var btnP='width:100%;padding:11px;border-radius:9px;font-size:13.5px;font-weight:800;cursor:pointer;'+(worse?'border:1.5px solid var(--bdr2);background:var(--bg3);color:var(--txt2)':'border:none;background:var(--accent);color:#04160e');
+  var btnS='padding:8px 11px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer';
+  var h='<div class="move-card" style="padding:11px 12px;border-radius:12px;border:1px solid var(--bdr2);background:var(--bg3);margin-bottom:8px">';
+  h+= c.mgr ? '<div style="font-size:14.5px;font-weight:800;color:var(--txt)">'+biEsc(nick)+' → '+A+' · '+rng+'</div>'
+            : '<div style="font-size:14.5px;font-weight:800;color:var(--txt)">Ask '+biEsc(nick)+': '+A+' '+rng+'?</div>';
+  h+='<div style="font-size:11.5px;color:var(--txt3);margin-bottom:8px">Then back to '+biEsc(back)+' at '+_hFmt(win.to)+'.</div>';
+  var row=function(col, lbl, lines){ return '<div style="display:flex;gap:8px;font-size:12.5px;margin-bottom:4px"><b style="min-width:62px;color:'+col+'">'+lbl+'</b><span style="color:var(--txt2)">'+lines+'</span></div>'; };
+  h+=row('var(--green)','Fixes', imp.fixes.map(function(w){ return biEsc(_impactLine(w,'fix')); }).join('<br>')||'—');
+  h+=row('var(--amber)','Hurts', imp.hurts.length? imp.hurts.map(function(w){ return biEsc(_impactLine(w,'hurt')); }).join('<br>') : 'Nothing');
+  if(imp.takes.length) h+=row('var(--txt3)','Takes from', imp.takes.map(function(w){ return biEsc(_impactLine(w,'take')); }).join('<br>'));
+  h+=row('var(--txt)','Why', biEsc(moveWhy(c, win, phase)));
+  var fr=fairnessRead(c.pid, win.area); if(fr) h+=row('var(--acc)','Fairness', biEsc(fr));
+  h+='<div style="font-size:11px;color:var(--txt3);margin:4px 0 9px">Net: closes '+_fmtN(imp.fixH)+'h of short time'+(imp.hurtH?', opens '+_fmtN(imp.hurtH)+'h':'')+'.'+(worse?' It hurts more than it fixes.':'')+'</div>';
+  var args="'"+esc+"','"+win.area+"',"+win.from+","+win.to;
+  if(c.mgr){
+    h+='<button class="vl-mgr" onclick="moveApply('+args+')" style="'+btnP+'">Drop block '+rng+'</button>';
+    var alt=''; if(win.to-win.from>1) alt+='<button class="vl-mgr" onclick="moveApply(\''+esc+'\',\''+win.area+'\','+win.from+','+(win.from+1)+')" style="'+btnS+'">Just the first hour</button>';
+    if(win.to-win.from>0.5) alt+='<button class="vl-mgr" onclick="moveApply(\''+esc+'\',\''+win.area+'\','+win.from+','+(win.from+0.5)+')" style="'+btnS+'">Just 30 min</button>';
+    if(alt) h+='<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+alt+'</div>';
+  } else {
+    h+='<div style="display:flex;gap:6px"><button class="vl-mgr" onclick="moveApply('+args+')" style="flex:1;'+btnP+'">Agreed · set it</button>'
+      +'<button class="vl-mgr" onclick="moveNo('+args+',\''+phase+'\')" style="'+btnS+'">Not today</button></div>';
+    var alt2=''; if(win.to-win.from>1) alt2+='<button class="vl-mgr" onclick="moveApply(\''+esc+'\',\''+win.area+'\','+win.from+','+(win.from+1)+')" style="'+btnS+'">Agreed to 1 hour</button>';
+    if(win.to-win.from>0.5) alt2+='<button class="vl-mgr" onclick="moveApply(\''+esc+'\',\''+win.area+'\','+win.from+','+(win.from+0.5)+')" style="'+btnS+'">Agreed to 30 min</button>';
+    if(alt2) h+='<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">'+alt2+'</div>';
+    h+=''
+      +'<div style="font-size:10.5px;color:var(--txt3);margin-top:6px">Nothing changes until they agree. A no isn’t recorded.</div>';
+  }
+  return h+'</div>';
+}
+function _moveAfter(){
+  var ov=document.getElementById('modal-overlay'), open=ov && ov.style.display && ov.style.display!=='none', t=((document.getElementById('modal-title')||{}).textContent)||'';
+  try{ buildCoverageTimeline(); }catch(e){}
+  if(open && /Plan today/.test(t)){ try{ ptRender(); }catch(e){} return; }
+  if(open) try{ closeModal(); }catch(e){}
+  if(window._stationOpen){ try{ openStationPanel(window._stationOpen); }catch(e){} }
+  try{ if(typeof renderNow==='function') renderNow(); }catch(e){}
+}
+function moveApply(pid, area, from, to){
+  window._moveUndo={mb:JSON.stringify(STATE.mgmtBlocks||{}), label:_pidNick(pid)+' '+_areaLabel(area)+' '+_hFmt(from)+'–'+_hFmt(to)};
+  var e=(_planExp()||{})[pid], home=null; try{ home=gfAreaAt(pid,e,from+0.01); }catch(err){}
+  var r=coverAdd(pid, from, to, area);
+  if(r && r.ok===false){ if(typeof toast==='function') toast('Could not place that: '+(r.error||'')); return; }
+  if(typeof saveState==='function') saveState(); if(typeof rotInvalidate==='function') rotInvalidate();
+  var msg=_pidNick(pid)+' → '+_areaLabel(area)+' '+_hFmt(from)+'–'+_hFmt(to)+', then back to '+(home&&home!==area?_areaLabel(home):'their post');
+  if(typeof logAction==='function') logAction('Cover · '+msg);
+  window._planLastMove=window._moveUndo.label;
+  _moveAfter();
+  if(typeof toast==='function') toast('✓ '+msg, 5000);
+}
+function moveUndo(){
+  var u=window._moveUndo; if(!u){ if(typeof undoCoverage==='function') undoCoverage(); return; }
+  STATE.mgmtBlocks=JSON.parse(u.mb); window._moveUndo=null; window._planLastMove=null;
+  if(typeof saveState==='function') saveState(); if(typeof rotInvalidate==='function') rotInvalidate();
+  _moveAfter(); if(typeof toast==='function') toast('Undone · '+u.label);
+}
+// "Not today": this window only, this session only, nothing stored about the person
+function moveNo(pid, area, from, to, phase){
+  window._moveNo=window._moveNo||{}; window._moveNo[pid+'@'+area+'@'+from]=1;
+  var ov=document.getElementById('modal-overlay'), t=((document.getElementById('modal-title')||{}).textContent)||'';
+  if(ov && ov.style.display!=='none' && /Plan today/.test(t)){ ptRender(); return; }
+  openMoveOptions(area, from, to, phase||planPhase());
+}
+function openMoveOptions(area, from, to, phase, firstPid){
+  phase=phase||planPhase(); var exp=_planExp(), win={area:area, from:from, to:to}, list=moveCandidates(win, phase, exp);
+  if(firstPid){ var i=list.findIndex(function(c){ return c.pid===firstPid; }); if(i>0){ var f=list.splice(i,1)[0]; list.unshift(f); } }
+  var h='<div style="font-size:12px;color:var(--txt2);margin-bottom:10px">'+_areaLabel(area)+' '+_hFmt(from)+'–'+_hFmt(to)+' · no-hurt options first'+(phase==='cxr'?' · CXRs and agents only until CXRs are confirmed':phase==='mgr'?' · managers, juniors first':'')+'.</div>';
+  if(!list.length) h+='<div style="padding:10px;border-radius:9px;background:var(--bg3);font-size:12.5px;color:var(--txt2)">'+(phase==='cxr'?'No CXR or agent can cover this window. It goes to the manager step.':'Nobody on shift is free and cleared for this window. A true shortage: the bench or a call are the options.')+'</div>';
+  list.slice(0,4).forEach(function(c){ h+=moveCardHtml(c, win, phase); });
+  openModal('Cover '+_areaLabel(area)+' · '+_hFmt(from)+'–'+_hFmt(to), h);
+}
+function openMoveCard(pid, area, from, to, phase){ openMoveOptions(area, from, to, phase, pid); }
+// the planning phase decides who may be suggested: CXRs until they're confirmed, then managers, then anyone once published
+function planPhase(){ try{ var st=_ptS(); if(st.publishedAt) return 'live'; var s4=ptEval(4).status; return (s4==='done'||s4==='accepted')?'mgr':'cxr'; }catch(e){ return 'live'; } }
+function nowAsk(pid){ var w=(halfGaps(['exit'])||[])[0], n=_nowHalf(); var from=w?Math.max(w.from,n):n, to=w?Math.max(w.to,from+0.5):n+1; openMoveCard(pid,'exit',from,to,'live'); }
 function _stationSheet(){
   var p=document.getElementById('station-panel');
   if(!p){ p=document.createElement('div'); p.id='station-panel'; document.body.appendChild(p); }
@@ -24453,27 +24688,11 @@ function closeStationPanel(){ var p=document.getElementById('station-panel'); if
 function _isMgrRole(r){ return /^(MT|ABRM|BRM|ARM|AM)$/.test(String(r||'')); }
 function _moveWindow(area){ var w=stationGapWindow(area); var n=Math.floor(_nowH()*2)/2; if(!w) return {from:n, to:n+1}; return {from:Math.max(w.from, n), to:w.to}; }
 function stationApplyMove(pid, area){
+  // v60.250: one engine — a manager gets a cover block for the window; anyone else is asked first.
   var m=GF_AREA_META[area]; if(!m) return;
-  var e=(_planExp()||{})[pid], role=e&&e.person&&e.person.role, nick=_pidNick(pid);
-  if(!_isMgrRole(role)){
-    // never assume: the manager asks, then sets it on the card if they agree
-    try{ closeStationPanel(); }catch(err){}
-    openPersonPanel(pid,'where');
-    if(typeof toast==='function') toast('Ask '+nick+' first — if they agree, set it here', 5000);
-    return;
-  }
-  var w=_moveWindow(area), home=null; try{ home=gfAreaAt(pid,e,w.from-0.01); }catch(err){}
-  var station = area==='exit'?'Exit Booth' : area==='returns'?'Returns' : area==='emerald'?'Emerald Booth' : 'Counter';
-  var r = (typeof addMgmtBlock==='function') ? addMgmtBlock(pid, w.from, w.to, station) : {ok:false};
-  if(r && r.ok===false){ if(typeof toast==='function') toast('Could not place that block: '+(r.error||'')); return; }
-  if(typeof saveState==='function') saveState(); if(typeof rotInvalidate==='function') rotInvalidate();
-  try{ buildCoverageTimeline(); }catch(err){}
-  var back=(GF_AREA_META[home]||{}).label || (home?String(home):'their post');
-  var msg=nick+' → '+m.label+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+', then back to '+back;
-  if(typeof logAction==='function') logAction('Block · '+msg);
-  window._planLastMove=nick+' '+_hFmt(w.from)+'–'+_hFmt(w.to);
-  try{ openStationPanel(area); }catch(err){} try{ renderPlanV2(); }catch(err){}
-  if(typeof toast==='function') toast('✓ '+msg, 5000);
+  var e=(_planExp()||{})[pid], w=_moveWindow(area);
+  if(!_isMgrRole(e&&e.person&&e.person.role)){ try{ closeStationPanel(); }catch(err){} openMoveCard(pid, area, w.from, w.to, planPhase()); return; }
+  moveApply(pid, area, w.from, w.to);
 }
 
 // ── Employee Card · HUB (Overview) and the spoke chrome ──────────────────
@@ -30470,12 +30689,11 @@ function coApplyFill(area, hour, pid){
                 : area==='emerald'?'Emerald Booth' : 'Counter';
     var bk=(typeof floorBlockKey==='function')?floorBlockKey(hour%24):'mid';
     var rng=CO_BLOCK_RANGE[bk]||[hour,hour+2];
-    if(isMgr && typeof addMgmtBlock==='function'){
-      addMgmtBlock(pid, rng[0], rng[1], station);     // managers get a time block
-    } else {
-      if(area==='exit' && typeof setAltPosition==='function') setAltPosition(pid,'full-exit');
-      if(typeof setStation==='function') setStation(pid, station);
-    }
+    // v60.250 (Matt): cover the WINDOW, then back to their post — never a whole shift, for anyone.
+    var _gw=null; try{ _gw=(halfGaps([area])||[]).filter(function(g){ return hour>=Math.floor(g.from) && hour<g.to; })[0]; }catch(e){}
+    var _f=_gw?Math.max(_gw.from, Math.floor(hour)):hour, _t=_gw?_gw.to:hour+1;
+    if(typeof coverAdd==='function') coverAdd(pid, _f, _t, area);
+    else if(isMgr && typeof addMgmtBlock==='function') addMgmtBlock(pid, rng[0], rng[1], station);
     if(typeof saveState==='function') saveState();
     var nick=e.person.nick||String(e.person.name||'').split(' ')[0];
     if(typeof toast==='function') toast('✓ '+nick+' → '+station);
