@@ -15813,7 +15813,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.248'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.249'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -24120,7 +24120,7 @@ function stationPanelHtml(area){
       h+='<div class="vl-mgr" style="padding:10px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(35,201,131,.08);margin-bottom:6px">'
         +'<div style="font-size:13px;font-weight:800;color:var(--txt)">'+biEsc(bn)+' · '+biEsc(from)+' → '+biEsc(m.label)+' · '+_hFmt(gap.from)+'–'+_hFmt(gap.to)+'</div>'
         +(best.why?'<div style="font-size:11px;color:var(--txt2);margin:2px 0 8px">'+biEsc(best.why)+'</div>':'<div style="height:6px"></div>')
-        +'<button onclick="stationApplyMove(\''+biEsc(best.pid)+'\',\''+area+'\')" style="width:100%;padding:11px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer">Move '+biEsc(bn)+'</button></div>';
+        +'<button onclick="stationApplyMove(\''+biEsc(best.pid)+'\',\''+area+'\')" style="width:100%;padding:11px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer">'+(function(){ var ex=_planExp()[best.pid], mw=_moveWindow(area); return _isMgrRole(ex&&ex.person&&ex.person.role) ? (biEsc(bn)+' '+_hFmt(mw.from)+'–'+_hFmt(mw.to)+', then back') : ('Ask '+biEsc(bn)+' first ›'); })()+'</button></div>';   /* v60.249 */
       var others=cands.slice(1,3);
       if(others.length) h+='<div class="vl-mgr" style="font-size:11px;color:var(--txt3);margin-bottom:6px">Other moves: '+others.map(function(c){ return '<a href="#" onclick="stationApplyMove(\''+biEsc(c.pid)+'\',\''+area+'\');return false" style="color:var(--acc);font-weight:700">'+biEsc(_pidNick(c.pid))+'</a>'; }).join(' · ')+'</div>';
     } else {
@@ -24156,7 +24156,7 @@ function planVerdict(){
     return { state:'live', area:worst.area,
       title: m.label+' is '+(w.have===0?'empty':'short')+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+(nAreas>1?' · 1 of '+nAreas:''),
       sub: (others.length? 'Also: '+others.join(' · ') : 'Everything else holds through close.')+' · '+w.have+' of '+w.need+' in that window.',
-      best: best, button: best ? {label:'▶ Fix '+m.label+' · move '+_pidNick(best.pid), js:"stationApplyMove('"+String(best.pid).replace(/'/g,'\\x27')+"','"+worst.area+"')"} : {label:'▶ Guided fix', js:'gfxStart()'} };
+      best: best, button: best ? {label: (function(){ var ex=_planExp()[best.pid], mg=_isMgrRole(ex&&ex.person&&ex.person.role), mw=_moveWindow(worst.area); return mg ? ('▶ '+_pidNick(best.pid)+' to '+m.label+' '+_hFmt(mw.from)+'–'+_hFmt(mw.to)+', then back') : ('Ask '+_pidNick(best.pid)+' · '+m.label+' '+_hFmt(mw.from)+'–'+_hFmt(mw.to)+' ›'); })(), js:"stationApplyMove('"+String(best.pid).replace(/'/g,'\\x27')+"','"+worst.area+"')"} : {label:'▶ Guided fix', js:'gfxStart()'} };   // v60.249: a block for a manager, an ask for anyone else
   }
   var confirmed=!!(STATE.confirmedCoverage) && !(typeof hasPendingChanges==='function' && hasPendingChanges());
   if(confirmed){
@@ -24447,13 +24447,33 @@ function openStationPanel(area){
   var p=_stationSheet(); p.innerHTML=stationPanelHtml(area); p.style.display='block'; window._stationOpen=area;
 }
 function closeStationPanel(){ var p=document.getElementById('station-panel'); if(p) p.style.display='none'; window._stationOpen=null; }
+// v60.249 (bug fix): v60.242's one-tap move reassigned the person's WHOLE SHIFT to
+// close a two-hour gap. Matt's rules: managers fill by BLOCK DROP and go back to
+// their post; a CXR is never assumed to be fine with extra Exit time.
+function _isMgrRole(r){ return /^(MT|ABRM|BRM|ARM|AM)$/.test(String(r||'')); }
+function _moveWindow(area){ var w=stationGapWindow(area); var n=Math.floor(_nowH()*2)/2; if(!w) return {from:n, to:n+1}; return {from:Math.max(w.from, n), to:w.to}; }
 function stationApplyMove(pid, area){
   var m=GF_AREA_META[area]; if(!m) return;
-  if(typeof logAction==='function') logAction('Moved '+_pidNick(pid)+' → '+m.label);
-  var reopen=function(){ try{ openStationPanel(area); }catch(e){} };
-  // mgrAssignStation re-opens the person card at the end; the station is what was pressed, so come back to it
-  var _op=window.openPersonPanel; window.openPersonPanel=function(){}; try{ mgrAssignStation(pid, m.station); } finally { window.openPersonPanel=_op; }
-  window._planLastMove='Moved '+_pidNick(pid)+' → '+m.label; reopen(); try{ renderPlanV2(); }catch(e){} if(typeof toast==='function') toast('Moved '+_pidNick(pid)+' → '+m.label);
+  var e=(_planExp()||{})[pid], role=e&&e.person&&e.person.role, nick=_pidNick(pid);
+  if(!_isMgrRole(role)){
+    // never assume: the manager asks, then sets it on the card if they agree
+    try{ closeStationPanel(); }catch(err){}
+    openPersonPanel(pid,'where');
+    if(typeof toast==='function') toast('Ask '+nick+' first — if they agree, set it here', 5000);
+    return;
+  }
+  var w=_moveWindow(area), home=null; try{ home=gfAreaAt(pid,e,w.from-0.01); }catch(err){}
+  var station = area==='exit'?'Exit Booth' : area==='returns'?'Returns' : area==='emerald'?'Emerald Booth' : 'Counter';
+  var r = (typeof addMgmtBlock==='function') ? addMgmtBlock(pid, w.from, w.to, station) : {ok:false};
+  if(r && r.ok===false){ if(typeof toast==='function') toast('Could not place that block: '+(r.error||'')); return; }
+  if(typeof saveState==='function') saveState(); if(typeof rotInvalidate==='function') rotInvalidate();
+  try{ buildCoverageTimeline(); }catch(err){}
+  var back=(GF_AREA_META[home]||{}).label || (home?String(home):'their post');
+  var msg=nick+' → '+m.label+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+', then back to '+back;
+  if(typeof logAction==='function') logAction('Block · '+msg);
+  window._planLastMove=nick+' '+_hFmt(w.from)+'–'+_hFmt(w.to);
+  try{ openStationPanel(area); }catch(err){} try{ renderPlanV2(); }catch(err){}
+  if(typeof toast==='function') toast('✓ '+msg, 5000);
 }
 
 // ── Employee Card · HUB (Overview) and the spoke chrome ──────────────────
