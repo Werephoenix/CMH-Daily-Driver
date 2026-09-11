@@ -2707,7 +2707,7 @@ button { cursor: pointer; }
         background:rgba(255,69,58,.10);color:var(--red,#FF453A);font-size:14px;font-weight:800;cursor:pointer">
       📞 Someone called off
     </button>
-    <button id="pt-entry" onclick="openPlanToday()" title="Seven steps, in order — schedule, targets, lunches, rotation, coverage, manager fill, publish"
+    <button id="pt-entry" onclick="openPlanToday()" title="Particulars → Plan → Asks → Publish — the day solved from what’s different today"
       style="flex:1;min-width:150px;padding:11px 14px;border-radius:9px;border:1px solid var(--bdr2);
         background:var(--bg3);color:var(--txt);font-size:13px;font-weight:800;cursor:pointer">
       📋 Plan today
@@ -2833,7 +2833,7 @@ button { cursor: pointer; }
       <button class="btn btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">⚡ Fill today's gaps</button>
       <button class="btn btn-gh btn-sm" onclick="undoCoverage()">↩ Undo</button>
       <button class="btn btn-gh btn-sm" onclick="redoCoverage()">↪ Redo</button>
-      <button class="btn btn-gh btn-sm" onclick="openPlanToday()">📋 Plan today (7 steps)</button>
+      <button class="btn btn-gh btn-sm" onclick="openPlanToday()">📋 Plan today</button>
       <button class="btn btn-gh btn-sm" onclick="openStaffingNeeds()">📊 Who I need today</button>
       <button class="btn btn-gh btn-sm" onclick="openTrainingMap()">🎓 Training map</button>
       <button class="btn btn-gh btn-sm" onclick="openRequests()">📥 Requests</button>
@@ -4610,6 +4610,7 @@ function ensureStateShape(s){
   s.pasteHourly  = s.pasteHourly  || {};
   s.stationPref  = s.stationPref  || {};
   s.shiftMod     = s.shiftMod     || {};
+  s.particulars  = s.particulars  || {};   // v60.251
   s.customSplits = s.customSplits || {};
   s.adminRoster  = s.adminRoster  || [];
   s.adminCodes   = s.adminCodes   || [];
@@ -4668,7 +4669,7 @@ function loadState() {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
     todayOverrides:{}, physInventory:{}, altSchedule:{}, pasteHourly:{},
-    stationPref:{}, shiftMod:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[], meetings:[],
+    stationPref:{}, shiftMod:{}, particulars:{}, customSplits:{}, customLunch:{}, scheduleOverrides:{}, adminRoster:[], adminCodes:[], specialBlocks:{}, mgmtBlocks:{}, announcements:[], celebrations:[], carPhotos:{}, policyLog:[], meetings:[],
     dnr:[], dnq:[], clReasons:{}, uiDensity:'comfortable', nameAliases:{}, uiTheme:'bold', schedGroupBy:'station', schedPattern:'timeline', actualStation:{}, weather:null, outCancel:0, flightBank:{arr:{},dep:{}}, cityEvents:[], eventDismiss:{},
     closeFields:{}, coverageThresholds:null, floorTargets:null, mgrTargets:null, mgrFunctionsNote:'', exitAccommodation:{}, displayNames:{}, soloChecked:{}, corpAvg:null, absenceType:{}, mgrAnchorOverride:{}, pendingCoverage:null, confirmedCoverage:null, closingExtension:null,
     mgrStationLog:{}, mgrStationLoggedDates:{}, mgrStationDeclared:{}, branchResponses:{}, pto:{},
@@ -7699,7 +7700,8 @@ function buildSmartRotation() {
     const _segMax = _gap ? Math.max(_gap.from - shift.start, shift.end - _gap.to) : _effDur;
     const noLunch    = (STATE.altSchedule || {})[pid + '_nolunch'] === true
                     || (_segMax < (typeof LUNCH_MIN_HOURS!=='undefined'?LUNCH_MIN_HOURS:6));
-    const totalWork  = (shift.end - shift.start) - (noLunch ? 0 : ROTATION.lunchHours);
+    const _LH        = (typeof partLunchHours==='function') ? partLunchHours(pid, ROTATION.lunchHours) : ROTATION.lunchHours;   // v60.251: a longer lunch today (particular), else the branch length
+    const totalWork  = (shift.end - shift.start) - (noLunch ? 0 : _LH);
     const shiftDur   = shift.end - shift.start;
 
     // ── Exit-First: first half exit, second half counter ─────────────────────
@@ -7712,8 +7714,8 @@ function buildSmartRotation() {
       const ls2  = noLunch ? null
         : (typeof customLunch_ef === 'number' && customLunch_ef > shift.start && customLunch_ef < shift.end)
             ? customLunch_ef                                    // the CXR asked — honour it
-            : openerLunchStart(shift.start, shift.end, 'exit', mid2 - ROTATION.lunchHours / 2);
-      const le2  = noLunch ? null : ls2  + ROTATION.lunchHours;
+            : openerLunchStart(shift.start, shift.end, 'exit', mid2 - _LH / 2);
+      const le2  = noLunch ? null : ls2  + _LH;
       return {
         pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
         shiftStart:shift.start, shiftEnd:shift.end,
@@ -7731,8 +7733,8 @@ function buildSmartRotation() {
       const lunchStart = noLunch ? null
         : (typeof customLunch_fc === 'number' && customLunch_fc > shift.start && customLunch_fc < shift.end)
             ? customLunch_fc
-            : shift.start + shiftDur / 2 - ROTATION.lunchHours / 2;
-      const lunchEnd   = noLunch ? null : lunchStart + ROTATION.lunchHours;
+            : shift.start + shiftDur / 2 - _LH / 2;
+      const lunchEnd   = noLunch ? null : lunchStart + _LH;
       return {
         pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
         shiftStart:shift.start, shiftEnd:shift.end,
@@ -7750,8 +7752,8 @@ function buildSmartRotation() {
       const lunchStart = noLunch ? null
         : (typeof customLunch_fe === 'number' && customLunch_fe > shift.start && customLunch_fe < shift.end)
             ? customLunch_fe
-            : shift.start + shiftDur / 2 - ROTATION.lunchHours / 2;
-      const lunchEnd   = noLunch ? null : lunchStart + ROTATION.lunchHours;
+            : shift.start + shiftDur / 2 - _LH / 2;
+      const lunchEnd   = noLunch ? null : lunchStart + _LH;
       return {
         pid, name:cxr.name, nick:cxr.nick, shiftCode:shift.code,
         shiftStart:shift.start, shiftEnd:shift.end,
@@ -7770,7 +7772,7 @@ function buildSmartRotation() {
     const customLunch = (STATE.customLunch || {})[cxr.pid];
     if (typeof customLunch === 'number' && customLunch > shift.start && customLunch < shift.end) {
       block1H = customLunch - shift.start;
-      block2H = shift.end - (customLunch + ROTATION.lunchHours);
+      block2H = shift.end - (customLunch + _LH);
     } else if (custSplit) {
       block1H = custSplit.b1H;
       block2H = custSplit.b2H;
@@ -7795,7 +7797,7 @@ function buildSmartRotation() {
     }
 
     const lunchStart = shift.start + block1H;
-    const lunchEnd   = noLunch ? lunchStart : lunchStart + ROTATION.lunchHours;
+    const lunchEnd   = noLunch ? lunchStart : lunchStart + _LH;
     const shiftEnd   = shift.end;
 
     // v60.213 (Matt, Guenther's card): 'counter-first' is an explicit human
@@ -9104,7 +9106,7 @@ var DAY_FIELD_KEEP = {book24hr:1};
 // v60.233 (Inspector round 12, #2): the retire and the merge door were two
 // hand-copies of one list, and they drifted (outCancel). One list, two doors.
 var DAY_LAYER_KEYS = ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
-                      'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks'];
+                      'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','particulars'];   // v60.251: today's particulars are day-shaped
 var DAY_LAYER_EXTRA = ['confirmedCoverage','pendingCoverage','outCancel','walkUpPolicy','dayOf'];   // v60.237: + walkUpPolicy (day-shaped)   // scalars the door must drop too
 function _retireDayFields(obj){ var f=obj&&obj.fields; if(!f) return; Object.keys(f).forEach(function(k){ if(!DAY_FIELD_KEEP[k]) delete f[k]; }); }
 function _retireDayLayers(){
@@ -9256,8 +9258,9 @@ function autoLoadFromExpected(expectedToday, dow) {
       const pref = (STATE.stationPref||{})[pid]||'none';
       const rosterPref = e.person.pref||'none';
       const overridePref = (pats[pid]&&pats[pid].suggestedPref)||'none';
-      const wantsExit    = pref==='exit' || rosterPref==='exit' || overridePref==='exit';
-      const wantsCounter = !wantsExit && (pref==='counter' || overridePref==='counter');
+      const dayWant = (typeof partWant==='function') ? partWant(pid) : null;   // v60.251: "wants to start at X today" — a soft term, same PREF weight, today only
+      const wantsExit    = dayWant==='exit' || (dayWant!=='counter' && (pref==='exit' || rosterPref==='exit' || overridePref==='exit'));
+      const wantsCounter = !wantsExit && (dayWant==='counter' || pref==='counter' || overridePref==='counter');
       // v60.122: Branch Interview "spread exit-booth time evenly?" — when a manager
       // answered No, drop the weekly-exit-hours fairness term so exit is assigned by
       // preference + start-time only (no day-to-day rotation to equalize hours).
@@ -9810,7 +9813,12 @@ function accomLabel(activity){ var m=ACCOM_ACTIVITIES.filter(function(a){ return
 function accomList(pid){ return ((STATE.accommodations||{})[pid]||[]).filter(function(a){ return a && a.activity && a.start; }); }
 function _accomLive(a, dk){ if(!dk) return true; if(dk<a.start) return false; if(a.end && dk>a.end) return false; return true; }
 function accomActive(pid, dateKey){ var dk=dateKey||((typeof todayKey==='function')?todayKey():''); return accomList(pid).filter(function(a){ return _accomLive(a,dk); }); }
-function accommodated(pid, activity, dateKey){ if(!activity) return accomActive(pid,dateKey).length>0; return accomActive(pid,dateKey).some(function(a){ return a.activity===activity; }); }
+function accommodated(pid, activity, dateKey){
+  if(!activity) return accomActive(pid,dateKey).length>0;
+  // v60.251: a one-day "not at X today" particular counts for today only — never lands in the standing list
+  try{ if((!dateKey || dateKey===todayKey()) && typeof partHas==='function' && partHas(pid,'not',activity)) return true; }catch(e){}
+  return accomActive(pid,dateKey).some(function(a){ return a.activity===activity; });
+}
 function _accomMirror(){   // keep the legacy exit store in step for older builds on other devices
   try{ var ex={}; Object.keys(STATE.accommodations||{}).forEach(function(pid){ var e=accomList(pid).filter(function(a){ return a.activity==='exit'; }).sort(function(a,b){ return a.start<b.start?1:-1; })[0]; if(e) ex[pid]={start:e.start,end:e.end||null}; }); STATE.exitAccommodation=ex; }catch(e){}
 }
@@ -15813,7 +15821,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.250'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.253'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -21403,8 +21411,8 @@ setInterval(function(){
 // ═══════════════════════════════════════════════════════════════════════════
 function _ptS(){
   var tk=(typeof todayKey==='function')?todayKey():'';
-  if(!STATE.planToday || STATE.planToday.date!==tk || STATE.planToday.v!==2){   // v60.250: the steps were renumbered — old accepts don't carry
-    STATE.planToday={date:tk, v:2, steps:{}, publishedAt:null, pubHash:null};
+  if(!STATE.planToday || STATE.planToday.date!==tk || STATE.planToday.v!==3){   // v60.252: no stored steps — the plan is solved fresh each render
+    STATE.planToday={date:tk, v:3, steps:{}, publishedAt:null, pubHash:null};
   }
   return STATE.planToday;
 }
@@ -21413,7 +21421,7 @@ function _ptS(){
 function _ptHash(){
   var src='';
   try{ src=JSON.stringify([STATE.staffStation,STATE.altSchedule,STATE.customLunch,
-        STATE.mgmtBlocks,STATE.todayOverrides,STATE.specialBlocks,STATE.meetings]); }catch(e){}
+        STATE.mgmtBlocks,STATE.todayOverrides,STATE.specialBlocks,STATE.meetings,STATE.particulars]); }catch(e){}   // v60.252: + particulars
   var h=5381; for(var i=0;i<src.length;i++){ h=((h<<5)+h+src.charCodeAt(i))|0; }
   return h;
 }
@@ -21501,7 +21509,6 @@ function ptEval(n){
   }
   return {status:'open', detail:''};
 }
-function ptConfirmCxr(){ var st=_ptS(); st.steps[4]='confirmed'; st.cxrAt=Date.now(); if(typeof logAction==='function') logAction('CXRs confirmed'); if(typeof saveState==='function') saveState(); try{ renderPlanV2(); }catch(e){} ptRender(); }
 function _ptLunchRows(items){
   var b='';
   (items||[]).slice(0,8).forEach(function(it){
@@ -21637,11 +21644,6 @@ function ptMgrFill(pid, area, hour){
   if(typeof toast==='function') toast('👔 '+((typeof dispName==='function')?dispName(pid):pid)+' → '+area+' (block drop)');
   ptRender();
 }
-function ptAccept(n){
-  var st=_ptS(); st.steps[n]='accepted';
-  if(typeof saveState==='function') saveState();
-  ptRender();
-}
 function ptPublish(){
   var st=_ptS();
   try{ if(typeof confirmToday==='function') confirmToday(); }catch(e){}
@@ -21656,72 +21658,78 @@ function ptPublish(){
 }
 
 // ── render ─────────────────────────────────────────────────────────────────
-function ptFirstOpen(){
-  for(var n=1;n<=6;n++){ if(ptEval(n).status==='open') return n; }
-  return 7;
-}
 function ptRender(){
-  var st=_ptS(); var cur=ptFirstOpen();
-  var dots='';
-  for(var n=1;n<=7;n++){
-    var s2 = n===7 ? (st.publishedAt&&st.pubHash===_ptHash()?'done':'open') : ptEval(n).status;
-    var col = s2==='done'?'var(--accent)': s2==='accepted'?'var(--amber)': n===cur?'var(--txt)':'var(--txt3)';
-    dots+='<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;'
-      +'border-radius:50%;font-size:10px;font-weight:800;margin-right:4px;'
-      +'border:1.5px solid '+col+';color:'+col+';'
-      +(n===cur?'background:rgba(255,255,255,.06);':'')+'">'
-      +(s2==='done'?'✓': s2==='accepted'?'~': n)+'</span>';
+  // v60.252 (stage B): four beats — Particulars → Plan → Asks → Publish. The plan is solved
+  // fresh on every render from what's true now; nothing "accepted" is stored, so nothing drifts.
+  var st=_ptS(), exp=_planExp(), sv=solveDay(exp);
+  var sec=function(t,sub){ return '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:14px 0 6px">'+t+(sub?' <span style="font-weight:600;text-transform:none;letter-spacing:0">· '+sub+'</span>':'')+'</div>'; };
+  var card=function(inner,border){ return '<div style="padding:12px;border-radius:10px;background:var(--bg3);border:1px solid '+(border||'var(--bdr2)')+';margin-bottom:8px">'+inner+'</div>'; };
+  // beat 1 — "Anything different today?" — the particulars everything below reads
+  var _pc=partCount(), _po=0; try{ _po=Object.keys(STATE.todayOverrides||{}).filter(function(k){ return STATE.todayOverrides[k]==='callout'; }).length; }catch(e){}
+  var _pt=[_po?_po+' called off':'', _pc?_pc+' particular'+(_pc===1?'':'s'):''].filter(Boolean).join(' · ');
+  var b='<div onclick="openParticulars(true)" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid '+(_pt?'var(--amber3)':'var(--bdr2)')+';background:var(--bg3);margin-bottom:12px;cursor:pointer">'
+    +'<div style="flex:1"><div style="font-size:13.5px;font-weight:800;color:var(--txt)">📝 Anything different today?</div><div style="font-size:11.5px;color:'+(_pt?'var(--amber)':'var(--txt3)')+';margin-top:2px">'+(_pt||'call-offs, late / early, fixed or longer lunches, who wants to start where')+'</div></div><span style="color:var(--txt3);font-size:16px">›</span></div>';
+  // the beats bar
+  var published=st.publishedAt && st.pubHash===_ptHash(), stale=st.publishedAt && st.pubHash!==_ptHash();
+  var beats=[['Particulars', _pt?'done':'open'],['Plan', (sv.decisions.length||sv.left.length)?'open':'done'],['Asks', sv.asks?'open':'done'],['Publish', published?'done':'open']];
+  b+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+beats.map(function(x,i){ var col=x[1]==='done'?'var(--accent)':'var(--txt3)'; return '<span style="font-size:11px;font-weight:800;color:'+col+'"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1.5px solid '+col+';margin-right:4px;font-size:9.5px">'+(x[1]==='done'?'✓':(i+1))+'</span>'+x[0]+'</span>'; }).join('')+'</div>';
+  // beat 2 — the plan for the rest of the day
+  b+=card('<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:4px">The rest of the day</div>'
+    +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5">'+biEsc(solveHeadline(sv))+'</div>'
+    +'<div style="font-size:10.5px;color:var(--txt3);margin-top:4px">Solved from now, hardest window first · no-hurt first · staff before managers · juniors first · nobody booked twice at once.</div>'
+    +(sv.improved.length?'<div style="font-size:10.5px;color:var(--txt3);margin-top:3px">Tidied: '+biEsc(sv.improved.slice(0,4).join(' · '))+(sv.improved.length>4?' · +'+(sv.improved.length-4):'')+'</div>':''), (sv.left.length?'var(--amber3)':(sv.decisions.length?'var(--bdr2)':'var(--accent)')));
+  // before the plan: the two facts the plan is measured against, plus rotation checks and lunches
+  var e1=ptEval(1), e2=ptEval(2), e3=ptEval(3);
+  var line=function(ok,name,detail){ return '<div style="font-size:11.5px;color:var(--txt3);padding:3px 0">'+(ok?'✓':'○')+' <b style="color:var(--txt2)">'+name+'</b> — '+detail+'</div>'; };
+  b+=line(e1.status==='done','Schedule', e1.detail)+line(e2.status==='done','Floor targets', e2.detail);
+  var lunches=[]; try{ lunches=ptLunchMissing(exp, ['CXR','EXIT','RETURNS','MT','ABRM','BRM','ARM','AM']); }catch(e){}
+  if((e3.flips||[]).length || lunches.length){
+    b+=sec('Rotation checks');
+    (e3.flips||[]).slice(0,6).forEach(function(it){
+      b+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--bdr)">'
+        +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+it.nick+'<div style="font-size:10.5px;color:var(--txt3)">'+it.why+'</div></span>'
+        +'<button onclick="ptApplyFlip(\''+it.pid+'\',\''+it.dir+'\')" style="padding:6px 11px;border-radius:7px;border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-size:11.5px;font-weight:800;cursor:pointer">Flip</button></div>';
+    });
+    if(lunches.length) b+='<div style="font-size:11px;color:var(--txt3);margin:6px 0 2px">'+lunches.length+' lunch'+(lunches.length===1?'':'es')+' to place</div>'+_ptLunchRows(lunches);
   }
-  var NAMES=['','Schedule in','Floor targets','CXR rotation','CXR coverage','Returns & Exit lunches','Managers','Publish'];   // v60.250: Matt's order
-  var b='<div style="margin-bottom:12px">'+dots
-    +'<span style="font-size:11px;color:var(--txt3);margin-left:6px">step '+cur+' of 7 · '+NAMES[cur]+'</span></div>';
-  // completed/accepted steps as one-liners
-  for(var m=1;m<cur;m++){
-    var ev=ptEval(m);
-    b+='<div style="font-size:11.5px;color:var(--txt3);padding:3px 0">'
-      +(ev.status==='done'?'✓':'~')+' <b style="color:var(--txt2)">'+NAMES[m]+'</b> — '+ev.detail
-      +(ev.status==='accepted'?' <span style="color:var(--amber)">(accepted as-is)</span>':'')+'</div>';
+  // beat 3 — asks first (a CXR or agent is asked; the fallback is named, applied only if you tap Not today)
+  var asks=sv.decisions.filter(function(d){ return d.ask; }), moves=sv.decisions.filter(function(d){ return !d.ask; });
+  if(asks.length){
+    b+=sec('Ask first', 'nothing moves until they agree');
+    asks.forEach(function(d){
+      b+=moveCardHtml(d.cand, d.win, 'live');
+      if(d.fallback) b+='<div style="font-size:11px;color:var(--txt3);margin:-4px 0 10px 4px">If '+biEsc(_pidNick(d.cand.pid))+' says no → next best is '+biEsc(_pidNick(d.fallback.pid))+(d.fallback.mgr?' ('+biEsc(d.fallback.role)+')':'')+' — tap Not today and the plan re-solves.</div>';
+    });
   }
-  // the current step card
-  if(cur<=6){
-    var e=ptEval(cur);
-    b+='<div style="margin-top:10px;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bdr2)">'
-      +'<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:6px">'+NAMES[cur]+'</div>'
-      +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5;margin-bottom:10px">'+e.detail+'</div>';
-    if(cur===3){
-      (e.flips||[]).slice(0,6).forEach(function(it){
-        b+='<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--bdr)">'
-          +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+it.nick+'<div style="font-size:10.5px;color:var(--txt3)">'+it.why+'</div></span>'
-          +'<button onclick="ptApplyFlip(\''+it.pid+'\',\''+it.dir+'\')" style="padding:6px 11px;border-radius:7px;border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-size:11.5px;font-weight:800;cursor:pointer">'+(it.dir==='exit-first'?'Exit 1st':'Counter 1st')+'</button></div>';
-      });
-      if((e.lunches||[]).length) b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin:10px 0 2px">CXR lunches</div>'+_ptLunchRows(e.lunches);
-    }
-    if(cur===4 && e.gaps) b+=_ptGapCards(e.gaps, 'cxr');
-    if(cur===5 && e.items) b+=_ptLunchRows(e.items);
-    if(cur===6){
-      if(e.auto) b+='<div style="padding:8px 10px;border-radius:9px;background:var(--bg2);border:1px solid var(--bdr2);font-size:11.5px;color:var(--txt2);margin-bottom:6px">🔒 '+biEsc(e.auto)+'. Left as they are.</div>';
-      if(e.gaps) b+=_ptGapCards(e.gaps, 'mgr');
-      if((e.lunches||[]).length) b+='<div style="font-size:10px;font-weight:800;text-transform:uppercase;color:var(--txt3);margin:10px 0 2px">Manager lunches</div>'+_ptLunchRows(e.lunches);
-    }
-    b+='<div style="display:flex;gap:8px;margin-top:10px">'
-      +(cur===4 ? '<button onclick="ptConfirmCxr()" style="flex:1;padding:11px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:13px;font-weight:800;cursor:pointer">✓ Confirm CXRs → managers</button>'
-                : '<button class="btn btn-gh" style="flex:1" onclick="ptAccept('+cur+')">Accept as-is → next</button>')
-      +'<button class="btn btn-gh" onclick="closeModal()">Close</button></div></div>';
-  } else {
-    var published=st.publishedAt && st.pubHash===_ptHash();
-    var stale=st.publishedAt && st.pubHash!==_ptHash();
-    b+='<div style="margin-top:10px;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid '
-      +(published?'var(--accent)':'var(--bdr2)')+'">'
-      +'<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:6px">Publish</div>'
-      +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5;margin-bottom:10px">'
-      +(published?'✓ Published '+new Date(st.publishedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' — the plan on every screen is this one.'
-        : stale?'The day changed since you published — republish so everyone sees the current plan.'
-        :'Steps 1–6 are settled. Publishing locks today\'s plan in and refreshes every screen.')+'</div>'
-      +'<button onclick="ptPublish()" style="width:100%;padding:13px;border-radius:9px;border:none;'
-      +'background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer">'
-      +(stale?'↻ Republish':'✓ Publish the day')+'</button>'
-      +'<button class="btn btn-gh" style="width:100%;margin-top:6px" onclick="closeModal()">Close</button></div>';
+  if(moves.length){
+    b+=sec('Manager moves', 'only what CXRs and agents can’t cover · juniors first');
+    if(moves.length>1) b+='<button class="vl-mgr" onclick="solveApplyAll()" style="width:100%;padding:11px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:13.5px;font-weight:800;cursor:pointer;margin-bottom:8px">▶ Drop in all '+moves.length+' manager moves</button>';
+    moves.forEach(function(d){ b+=moveCardHtml(d.cand, d.win, 'live'); });
   }
+  if(sv.left.length){
+    b+=sec('Nobody can cover', 'a true shortage — said, not hidden');
+    sv.left.forEach(function(g){ b+='<div style="font-size:12.5px;color:var(--txt);padding:4px 0">'+biEsc(_areaLabel(g.area)+' '+_hFmt(g.from)+'–'+_hFmt(g.to))+' <span style="color:var(--txt3)">· '+_fmtN(g.minHave)+' of '+g.need+' · '+(g.trade?'only a trade: '+biEsc(_pidNick(g.trade.pid))+' could come from '+biEsc(_areaLabel(g.trade.from||'their post'))+', which goes short instead':'nobody on shift is free and cleared')+'</span> <a class="vl-mgr" onclick="openMoveOptions(\''+g.area+'\','+g.from+','+g.to+',\'live\')" style="color:var(--acc);cursor:pointer;font-size:11.5px">Other options ›</a></div>'; });
+    b+='<button class="btn btn-gh vl-mgr" style="width:100%;margin-top:6px" onclick="closeModal();gfxStart()">▶ Guided fix · bench or a call</button>';
+  }
+  if(!sv.decisions.length && !sv.left.length) b+='<div style="font-size:12.5px;color:var(--accent);padding:6px 0">✓ Covered from now to close with what’s already set.</div>';
+  // everyone's day — the receipt
+  var people=Object.keys(exp).map(function(pid){ return {pid:pid, nick:_pidNick(pid), ss:(exp[pid].person||{}).shiftStart}; }).sort(function(a,b){ return ((a.ss==null?99:a.ss)-(b.ss==null?99:b.ss)) || (a.nick<b.nick?-1:1); });
+  b+='<details style="margin-top:14px"><summary style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);cursor:pointer">Everyone’s day · '+people.length+'</summary><div style="margin-top:6px">';
+  people.forEach(function(p){ var r=dayReceipt(p.pid, exp); b+='<div style="font-size:11.5px;padding:3px 0;border-top:1px solid var(--bdr)"><b style="color:var(--txt)">'+biEsc(p.nick)+'</b> <span style="color:var(--txt2)">'+biEsc(r||'—')+'</span></div>'; });
+  b+='</div></details>';
+  if(sv.unhonored.length){
+    b+=sec('Couldn’t honor');
+    sv.unhonored.forEach(function(u){ var esc=String(u.pid).replace(/'/g,"\\'"); b+='<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px"><span style="flex:1;color:var(--txt2)"><b style="color:var(--txt)">'+biEsc(_pidNick(u.pid))+'</b> '+biEsc(_solveWhyNot(u))+'</span><button class="vl-mgr" onclick="setAltPosition(\''+esc+'\',\''+(u.want==='exit'?'exit-first':'counter-first')+'\');_partAfter(\''+esc+'\');ptRender()" style="padding:6px 10px;border-radius:7px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:11.5px;font-weight:700;cursor:pointer">Pin it</button></div>'; });
+  }
+  // beat 4 — publish
+  b+='<div style="margin-top:14px;padding:12px;border-radius:10px;background:var(--bg3);border:1px solid '+(published?'var(--accent)':'var(--bdr2)')+'">'
+    +'<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:6px">Publish</div>'
+    +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5;margin-bottom:10px">'
+    +(published?'✓ Published '+new Date(st.publishedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})+' — the plan on every screen is this one.'
+      : stale?'The day changed since you published — republish so everyone sees the current plan.'
+      : (sv.asks?sv.asks+' ask'+(sv.asks===1?'':'s')+' still waiting for a yes. ':'')+'Publishing locks today’s plan in and refreshes every screen.')+'</div>'
+    +'<button onclick="ptPublish()" style="width:100%;padding:13px;border-radius:9px;border:none;background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer">'+(stale?'↻ Republish':'✓ Publish the day')+'</button>'
+    +'<button class="btn btn-gh" style="width:100%;margin-top:6px" onclick="closeModal()">Close</button></div>';
   openModal('📋 Plan today', b);
   ptEntryRefresh();
 }
@@ -21729,12 +21737,13 @@ function openPlanToday(){ _ptS(); ptRender(); }
 // the entry button reflects live status without opening anything
 function ptEntryRefresh(){
   var el=document.getElementById('pt-entry'); if(!el) return;
-  var st=_ptS(); var cur=ptFirstOpen();
+  var st=_ptS(), sv=null; try{ sv=solveDay(); }catch(e){}
+  var n=sv?(sv.decisions.length+sv.left.length):0;
   var published=st.publishedAt && st.pubHash===_ptHash();
   var stale=st.publishedAt && st.pubHash!==_ptHash();
   el.innerHTML = published ? '📋 Day planned ✓'
     : stale ? '📋 Plan today · ↻ republish'
-    : '📋 Plan today · step '+cur+'/7';
+    : '📋 Plan today · '+(n?(sv.asks?sv.asks+' ask'+(sv.asks===1?'':'s')+' · ':'')+(sv.moves?sv.moves+' move'+(sv.moves===1?'':'s'):'')+(sv.left.length?(sv.moves?' · ':'')+sv.left.length+' short':''):'ready');
   el.style.borderColor = published?'var(--accent)': stale?'var(--amber)':'var(--bdr2)';
   el.style.color = published?'var(--accent)': stale?'var(--amber)':'var(--txt)';
 }
@@ -24146,25 +24155,25 @@ function planCounters(){
 function planVerdict(){
   var exp=_planExp(), gaps=[]; try{ gaps=halfGaps(null, null, exp); }catch(e){}
   if(gaps.length){
-    var phase=planPhase(), worst=gaps[0], bm=bestMoves(worst, phase, exp);
-    if(!bm.cands.length){ for(var gi=1; gi<Math.min(gaps.length,6); gi++){ var tb=bestMoves(gaps[gi], phase, exp); if(tb.cands.length){ worst=gaps[gi]; bm=tb; break; } } }   // lead with what this step can act on
+    var phase='live', sv=solveDay(exp), d0=sv.decisions[0], worst=d0?d0.gap:gaps[0];   // v60.252: lead with the plan's first item (soonest primary), not the first gap that happens to have a body
     var m=GF_AREA_META[worst.area]||{label:worst.area};
     var areas={}; gaps.forEach(function(g){ areas[g.area]=1; }); var nAreas=Object.keys(areas).length;
-    var best=bm.cands[0], w=bm.win;
+    var best=d0?d0.cand:null, w=d0?d0.win:worst;
     var others=gaps.filter(function(g){ return g!==worst && !(g.area===worst.area && g.from===worst.from); }).slice(0,2).map(function(g){ return _areaLabel(g.area)+' '+_hFmt(g.from)+'–'+_hFmt(g.to); });
     var sub=[];
     if(best){
       var imp=best.impact; sub.push('Fixes '+(imp.fixes[0]?_impactLine(imp.fixes[0],'fix'):'—'));
       sub.push('Hurts '+(imp.hurts[0]?_impactLine(imp.hurts[0],'hurt'):'nothing'));
       var fr=fairnessRead(best.pid, worst.area); if(fr) sub.push(fr);
-    } else sub.push(phase==='cxr'?'No CXR or agent can cover it. It goes to the manager step once CXRs are confirmed.':'Nobody on shift is free and cleared for it.');
+    } else sub.push('Nobody on shift is free and cleared for it.');
+    sub.push('Plan: '+solveHeadline(sv));
     if(others.length) sub.push('Also: '+others.join(' · '));
     var btn=null;
     if(best){
       var args="'"+String(best.pid).replace(/'/g,"\\'")+"','"+worst.area+"',"+w.from+","+w.to;
       btn = best.mgr ? {label:'▶ '+_pidNick(best.pid)+' to '+m.label+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+', then back', js:'moveApply('+args+')'}
                      : {label:'Ask '+_pidNick(best.pid)+' · '+m.label+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+' ›', js:"openMoveCard("+args+",'"+phase+"')"};
-    } else btn = phase==='cxr' ? {label:'Plan today · CXR coverage ›', js:'openPlanToday()'} : {label:'▶ Guided fix', js:'gfxStart()'};
+    } else btn = {label:'▶ Guided fix', js:'gfxStart()'};
     return { state:'live', area:worst.area, win:w, phase:phase,
       title: m.label+' is '+(worst.minHave<=0?'empty':'short')+' '+_hFmt(worst.from)+'–'+_hFmt(worst.to)+(nAreas>1?' · 1 of '+nAreas:''),
       sub: sub.join(' · '), best: best?{pid:best.pid}:null, button: btn };
@@ -24667,8 +24676,376 @@ function openMoveOptions(area, from, to, phase, firstPid){
 }
 function openMoveCard(pid, area, from, to, phase){ openMoveOptions(area, from, to, phase, pid); }
 // the planning phase decides who may be suggested: CXRs until they're confirmed, then managers, then anyone once published
-function planPhase(){ try{ var st=_ptS(); if(st.publishedAt) return 'live'; var s4=ptEval(4).status; return (s4==='done'||s4==='accepted')?'mgr':'cxr'; }catch(e){ return 'live'; } }
+function planPhase(){ return 'live'; }   // v60.252: CXR-before-managers is enforced by the candidate ORDER (staff before managers, no-hurt first) and shown in the plan's grouping — not a step the manager unlocks
 function nowAsk(pid){ var w=(halfGaps(['exit'])||[])[0], n=_nowHalf(); var from=w?Math.max(w.from,n):n, to=w?Math.max(w.to,from+0.5):n+1; openMoveCard(pid,'exit',from,to,'live'); }
+// ════════════════════════════════════════════════════════════════════════
+// v60.251 · "ANYTHING DIFFERENT TODAY?" · stage A of "the day plans itself"
+// Matt (2026-09-11): the manager enters who called off, any particulars
+// ("needs a lunch at this time / a longer lunch"), and preferences ("x wanted
+// to start at exit today"); the plan reads them. Decisions: times only, NEVER
+// a reason (same rule as accommodations) · a particular is one record in
+// STATE.particulars[pid] (day-shaped: retires with the day, syncs with it) ·
+// facts that already have a store (called off → todayOverrides, hours →
+// shiftMod, lunch time → customLunch, no lunch → altSchedule _nolunch) are
+// WRITTEN THROUGH to that store so every existing reader keeps one truth;
+// the record remembers what it wrote so removing the chip undoes only that.
+// New facts with no store yet (longer lunch, not-at-X today, wants-to-start-at)
+// are read straight from the record by the rotation / accommodated().
+// ════════════════════════════════════════════════════════════════════════
+var PART_KINDS={late:'In late', early:'Leaving early', lunchAt:'Lunch at', lunchLen:'Longer lunch', noLunch:'No lunch', not:'Not today at', start:'Wants to start at'};
+var PART_AREAS=[['exit','Exit'],['counter','Counter'],['returns','Returns'],['emerald','Emerald']];
+function partList(pid){ return ((STATE.particulars||{})[pid]||[]).filter(function(r){ return r && r.k && r.k.charAt(0)!=='_'; }); }   // '_' records are bookkeeping (what a particular replaced), never shown
+function partGet(pid,k,area){ return partList(pid).filter(function(r){ return r.k===k && (area==null || r.area===area); })[0]||null; }
+function partHas(pid,k,area){ return !!partGet(pid,k,area); }
+function partWant(pid){ var r=partGet(pid,'start'); return r ? r.area : null; }
+function partLunchHours(pid, dflt){ var r=partGet(pid,'lunchLen'); return (r && r.min>0) ? r.min/60 : dflt; }
+function _partBase(pid){   // the base shift (before any today-only edit) — what "in late at 7" is measured against
+  var p=(typeof personByPid==='function')?personByPid(pid):null, sh=null;
+  try{ sh=p?getPersonShiftToday(p):null; }catch(e){}
+  var ss=sh?sh.start:(p?p.shiftStart:null), se=sh?sh.end:(p?p.shiftEnd:null);
+  if(ss!=null && se!=null && se<ss) se+=24;
+  return {start:ss, end:se};
+}
+function _partWriteHours(pid){   // derive shiftMod from the late/early records; only ever touches a shiftMod this module wrote
+  var late=partGet(pid,'late'), early=partGet(pid,'early'), cur=(STATE.shiftMod||{})[pid];
+  var raw=(STATE.particulars||{})[pid]||[], prevI=-1; for(var i=0;i<raw.length;i++) if(raw[i]&&raw[i].k==='_prevMod') prevI=i;
+  if(!late && !early){
+    if(cur && cur.reason==='particular'){ delete STATE.shiftMod[pid]; if(STATE.dayMarks) delete STATE.dayMarks[pid]; }
+    if(prevI>=0){   // put back the hours a manager had set by hand before the particular replaced them
+      var pm=raw[prevI].mod; raw.splice(prevI,1);
+      if(pm && !(STATE.shiftMod||{})[pid]){ if(!STATE.shiftMod) STATE.shiftMod={}; STATE.shiftMod[pid]=pm; if(!STATE.dayMarks) STATE.dayMarks={}; STATE.dayMarks[pid]={t:'manual', start:pm.start, end:pm.end, date:todayKey()}; }
+    }
+    return;
+  }
+  if(cur && cur.reason!=='particular' && prevI<0) raw.push({k:'_prevMod', mod:cur});   // remember what we replaced
+  var b=_partBase(pid); if(b.start==null||b.end==null) return;
+  var st=late?late.at:b.start, en=early?early.at:b.end; if(en<=st) en+=24;
+  if(!STATE.shiftMod) STATE.shiftMod={};
+  STATE.shiftMod[pid]={start:st, end:en, reason:'particular', display:_hFmt(st)+'–'+_hFmt(en)+(late&&early?' (late in, early out)':late?' (in late)':' (leaving early)')};
+  if(!STATE.dayMarks) STATE.dayMarks={};
+  STATE.dayMarks[pid]={t:'manual', start:st, end:en, date:todayKey()};   // deliberate — a sync re-derive must not erase it
+}
+function _partAfter(pid){
+  try{ rotInvalidate(); }catch(e){}
+  try{ saveState(); }catch(e){}
+  try{ var _rot=buildSmartRotation(); window._lastRotations=window._lastRotations||{}; if(_rot&&_rot.rotations) _rot.rotations.forEach(function(r){ window._lastRotations[r.pid]=r; }); }catch(e){}
+  try{ if(typeof buildCoverageTimeline==='function') buildCoverageTimeline(); }catch(e){}
+  try{ if(typeof renderPlanV2==='function') renderPlanV2(); }catch(e){}
+}
+// set / clear one particular. Time-shaped kinds take an hour; 'not' and 'start' take an area; 'lunchLen' takes minutes.
+function partSet(pid, k, val){
+  if(!pid || !PART_KINDS[k]) return false;
+  if(!STATE.particulars) STATE.particulars={};
+  var list=STATE.particulars[pid]=STATE.particulars[pid]||[];
+  var rec={k:k};
+  if(k==='late'||k==='early'||k==='lunchAt'){ var t=(typeof val==='number')?val:rotParseClock(val); if(t==null){ if(typeof toast==='function') toast('Try 7a, 7:30a or 0730'); return false; } rec.at=t; }
+  else if(k==='lunchLen'){ rec.min=Math.max(30, Math.min(120, Math.round(+val||0))); if(!(rec.min>0)) return false; }
+  else if(k==='not'||k==='start'){ if(!PART_AREAS.some(function(a){ return a[0]===val; })) return false; rec.area=val; }
+  // one 'start' at a time; one of each time kind; 'not' is per area
+  for(var i=list.length-1;i>=0;i--){ var r=list[i]; if(r.k===k && (k!=='not' || r.area===val)) list.splice(i,1); }
+  list.push(rec);
+  if(k==='lunchAt'){ if(!STATE.customLunch) STATE.customLunch={}; STATE.customLunch[pid]=rec.at; rec.wrote=rec.at; if(STATE.altSchedule) delete STATE.altSchedule[pid+'_nolunch']; for(var j=list.length-1;j>=0;j--) if(list[j].k==='noLunch') list.splice(j,1); }
+  if(k==='noLunch'){ if(!STATE.altSchedule) STATE.altSchedule={}; STATE.altSchedule[pid+'_nolunch']=true; if(STATE.customLunch) delete STATE.customLunch[pid]; for(var q=list.length-1;q>=0;q--) if(list[q].k==='lunchAt'||list[q].k==='lunchLen') list.splice(q,1); }
+  if(k==='late'||k==='early') _partWriteHours(pid);
+  if(typeof logAction==='function') logAction('Particular · '+_pidNick(pid)+' · '+partLabel(rec));
+  _partAfter(pid); return true;
+}
+function partClear(pid, k, area){
+  var list=(STATE.particulars||{})[pid]||[], rec=null;
+  for(var i=list.length-1;i>=0;i--){ if(list[i].k===k && (area==null || list[i].area===area)){ rec=list[i]; list.splice(i,1); } }
+  if(!rec) return;
+  if(k==='lunchAt' && STATE.customLunch && STATE.customLunch[pid]===rec.wrote) delete STATE.customLunch[pid];
+  if(k==='noLunch' && STATE.altSchedule) delete STATE.altSchedule[pid+'_nolunch'];
+  if(k==='late'||k==='early') _partWriteHours(pid);
+  if(!list.length) delete STATE.particulars[pid];
+  if(typeof logAction==='function') logAction('Particular cleared · '+_pidNick(pid)+' · '+partLabel(rec));
+  _partAfter(pid);
+}
+function partToggleOff(pid){   // called off is its own store already (todayOverrides) — the intake just reaches it
+  if(isOffToday(pid)){ if(typeof clearAbsence==='function') clearAbsence(pid); }
+  else if(typeof setAbsence==='function') setAbsence(pid,'calledoff');
+  _partAfter(pid);
+}
+function _partAreaLbl(a){ var m=PART_AREAS.filter(function(x){ return x[0]===a; })[0]; return m?m[1]:String(a||''); }
+function partLabel(r){
+  if(!r) return '';
+  if(r.k==='late') return 'in at '+_hFmt(r.at);
+  if(r.k==='early') return 'out at '+_hFmt(r.at);
+  if(r.k==='lunchAt') return 'lunch '+_hFmt(r.at);
+  if(r.k==='lunchLen') return r.min+'-min lunch';
+  if(r.k==='noLunch') return 'no lunch';
+  if(r.k==='not') return 'not at '+_partAreaLbl(r.area);
+  if(r.k==='start') return 'wants '+_partAreaLbl(r.area)+' first';
+  return r.k;
+}
+// the receipt line: everything different about this person today, in words
+function partSummary(pid){
+  var out=[]; try{ if(isOffToday(pid)) out.push(((STATE.todayOverrides||{})[pid]==='callout')?'called off':'off'); }catch(e){}
+  partList(pid).forEach(function(r){ out.push(partLabel(r)); });
+  return out;
+}
+function partCount(){ var n=0; try{ Object.keys(STATE.particulars||{}).forEach(function(pid){ n+=partList(pid).length; }); }catch(e){} return n; }
+// who is on the intake list: everyone the day expects, plus anyone marked off today (so a call-off can be undone here)
+function _partPeople(){
+  var exp=_planExp(), ids={}; Object.keys(exp).forEach(function(pid){ ids[pid]=1; });
+  Object.keys(STATE.todayOverrides||{}).forEach(function(pid){ if(STATE.todayOverrides[pid]==='callout') ids[pid]=1; });
+  return Object.keys(ids).map(function(pid){ var e=exp[pid]||{}, p=e.person||((typeof personByPid==='function')?personByPid(pid):null)||{}; return {pid:pid, nick:_pidNick(pid), role:p.role||'', ss:p.shiftStart, se:p.shiftEnd}; })
+    .sort(function(a,b){ return ((a.ss==null?99:a.ss)-(b.ss==null?99:b.ss)) || (a.nick<b.nick?-1:1); });
+}
+function openParticulars(back){
+  var rows=_partPeople(), h='';
+  h+='<div style="font-size:12px;color:var(--txt2);line-height:1.5;margin-bottom:10px">Who called off, who’s in late or leaving early, lunches that have to land at a time, and who wants to start where. The plan reads all of it. <b>Times only — no reason is ever recorded.</b></div>';
+  if(!rows.length) h+='<div style="font-size:12.5px;color:var(--txt3)">Nobody on the day yet — import a schedule first.</div>';
+  rows.forEach(function(r){
+    var sum=partSummary(r.pid), off=isOffToday(r.pid), esc=biEsc(r.pid).replace(/'/g,"\\'");
+    h+='<div onclick="openParticularsFor(\''+esc+'\')" style="display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;border:1px solid '+(sum.length?'var(--amber3)':'var(--bdr2)')+';background:var(--bg3);margin-bottom:6px;cursor:pointer'+(off?';opacity:.7':'')+'">'
+      +'<div style="flex:1;min-width:0"><div style="font-size:13.5px;font-weight:800;color:var(--txt)">'+biEsc(r.nick)+' <span style="font-size:10.5px;font-weight:700;color:var(--txt3)">'+biEsc(r.role)+(r.ss!=null?' · '+_hFmt(r.ss)+'–'+_hFmt(r.se):'')+'</span></div>'
+      +'<div style="font-size:11.5px;color:'+(sum.length?'var(--amber)':'var(--txt3)')+';margin-top:2px">'+(sum.length?biEsc(sum.join(' · ')):'nothing different')+'</div></div>'
+      +'<span style="color:var(--txt3);font-size:16px">›</span></div>';
+  });
+  h+='<div style="display:flex;gap:8px;margin-top:10px">'+(back?'<button class="btn btn-gh" style="flex:1" onclick="openPlanToday()">‹ Plan today</button>':'')+'<button class="btn btn-gh" style="flex:1" onclick="closeModal()">Close</button></div>';
+  openModal('📝 Anything different today?', h);
+}
+function _partChip(on, label, js){
+  return '<button onclick="'+js+'" style="padding:7px 11px;border-radius:999px;font-size:12px;font-weight:700;cursor:pointer;'+(on?'border:1.5px solid var(--accent);background:rgba(35,201,131,.12);color:var(--accent)':'border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2)')+'">'+label+'</button>';
+}
+function _partTimeRow(pid, k, label, ph){
+  var r=partGet(pid,k), esc=biEsc(pid).replace(/'/g,"\\'"), id='part-'+k;
+  var h='<div style="display:flex;align-items:center;gap:8px;padding:6px 0">'
+    +'<span style="flex:1;font-size:12.5px;color:var(--txt)">'+label+(r?' <b style="color:var(--accent)">'+_hFmt(r.at)+'</b>':'')+'</span>';
+  if(r) h+='<button onclick="partClear(\''+esc+'\',\''+k+'\');openParticularsFor(\''+esc+'\')" style="padding:6px 10px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:11.5px;font-weight:700;cursor:pointer">Clear</button>';
+  else h+='<input id="'+id+'" placeholder="'+ph+'" inputmode="text" style="width:74px;padding:6px 8px;border-radius:8px;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt);font-size:12.5px">'
+    +'<button onclick="if(partSet(\''+esc+'\',\''+k+'\',(document.getElementById(\''+id+'\')||{}).value)) openParticularsFor(\''+esc+'\')" style="padding:6px 10px;border-radius:8px;border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-size:11.5px;font-weight:800;cursor:pointer">Set</button>';
+  return h+'</div>';
+}
+function openParticularsFor(pid){
+  var nick=_pidNick(pid), esc=biEsc(pid).replace(/'/g,"\\'"), b=_partBase(pid), off=isOffToday(pid), h='';
+  var sum=partSummary(pid);
+  h+='<div style="font-size:11px;color:var(--txt3);margin-bottom:8px">'+(b.start!=null?'Base shift '+_hFmt(b.start)+'–'+_hFmt(b.end)+' · ':'')+'today only · <b>times, never reasons</b></div>';
+  h+='<div style="font-size:12.5px;color:'+(sum.length?'var(--amber)':'var(--txt3)')+';margin-bottom:10px">'+(sum.length?biEsc(sum.join(' · ')):'Nothing different yet.')+'</div>';
+  var sec=function(t){ return '<div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:10px 0 4px">'+t+'</div>'; };
+  h+=sec('Here today?')+'<div style="display:flex;gap:6px;flex-wrap:wrap">'+_partChip(off,'📞 Called off',"partToggleOff('"+esc+"');openParticularsFor('"+esc+"')")+'</div>';
+  if(!off){
+    h+=sec('Hours')+_partTimeRow(pid,'late','In late — at','7:30a')+_partTimeRow(pid,'early','Leaving early — at','2p');
+    var ll=partGet(pid,'lunchLen'), nl=partHas(pid,'noLunch');
+    h+=sec('Lunch')+_partTimeRow(pid,'lunchAt','Has to be at','1p');
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0">'
+      +[45,60,90].map(function(m){ return _partChip(!!(ll&&ll.min===m), m+' min', (ll&&ll.min===m)?"partClear('"+esc+"','lunchLen');openParticularsFor('"+esc+"')":"partSet('"+esc+"','lunchLen',"+m+");openParticularsFor('"+esc+"')"); }).join('')
+      +_partChip(nl,'No lunch', nl?"partClear('"+esc+"','noLunch');openParticularsFor('"+esc+"')":"partSet('"+esc+"','noLunch',1);openParticularsFor('"+esc+"')")+'</div>';
+    h+=sec('Not today at')+'<div style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0">'
+      +PART_AREAS.map(function(a){ var on=partHas(pid,'not',a[0]); return _partChip(on, a[1], on?"partClear('"+esc+"','not','"+a[0]+"');openParticularsFor('"+esc+"')":"partSet('"+esc+"','not','"+a[0]+"');openParticularsFor('"+esc+"')"); }).join('')+'</div>';
+    var w=partWant(pid);
+    h+=sec('Wants to start at')+'<div style="display:flex;gap:6px;flex-wrap:wrap;padding:4px 0">'
+      +[['exit','Exit'],['counter','Counter']].map(function(a){ var on=w===a[0]; return _partChip(on, a[1], on?"partClear('"+esc+"','start');openParticularsFor('"+esc+"')":"partSet('"+esc+"','start','"+a[0]+"');openParticularsFor('"+esc+"')"); }).join('')+'</div>'
+      +'<div style="font-size:10.5px;color:var(--txt3);margin-top:2px">A want, not a rule — the rotation aims for it; a need beats it, and the plan says why.</div>';
+  }
+  h+='<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-gh" style="flex:1" onclick="openParticulars(true)">‹ Everyone</button><button class="btn btn-gh" style="flex:1" onclick="closeModal()">Done</button></div>';
+  openModal('📝 '+biEsc(nick)+' · today', h);
+}
+// ════════════════════════════════════════════════════════════════════════
+// v60.252 · THE DAY PLANS ITSELF · stage B — solveDay()
+// Matt (2026-09-11): "auto suggest … the best combo of moves to make it work
+// and keep everyone happy." Rulings: Particulars → Plan → Asks → Publish;
+// CXR-before-managers is the SOLVER's order and the ledger's grouping, not a
+// step the manager walks; asks are proposed, never applied.
+//   • one pure pass over today: every short window from NOW (halfGaps), hardest
+//     first (primaries, soonest, deepest), each covered by the best body under
+//     the v60.250 rules — no-hurt first, staff before managers, juniors first,
+//     least exit time this week — with a SHARED LEDGER so nobody is booked for
+//     two windows at once and a body already moved today sinks in the order;
+//   • a non-manager is an ASK (with the next-best fallback named); a manager is
+//     a MOVE the manager can drop in one tap (or all at once);
+//   • what nobody can cover is listed as LEFT SHORT, never hidden;
+//   • the same inputs give the same plan (no randomness, stable sorts). Anything
+//     applied (a cover) or answered (a "not today") changes the inputs, and the
+//     next render re-solves from now — there is no stored "accepted step" left
+//     to drift.
+// Score weights (the readout; the pick ORDER is Matt's rule above). Tune later.
+// ════════════════════════════════════════════════════════════════════════
+var SOLVE_W={primary:100, secondary:30, want:10, ask:15, mgrOff:8, move:5, twice:12};
+var SOLVE_PRIMARY={exit:1, returns:1};
+// v60.253 (stage C): the weights are tunable in 📊 Floor targets → Plan; SOLVE_W stays the default.
+function solveWeights(){ var w=Object.assign({}, SOLVE_W); try{ Object.keys(STATE.solveW||{}).forEach(function(k){ if(k in w && typeof STATE.solveW[k]==='number') w[k]=STATE.solveW[k]; }); }catch(e){} return w; }
+// the same gate moveCandidates applies, for ONE body over ONE window (no simulation)
+function _solveCanCover(pid, w, exp){
+  var e=exp[pid]; if(!e||!e.person) return false;
+  try{ if(isOffToday(pid)) return false; }catch(err){}
+  if((window._moveNo||{})[pid+'@'+w.area+'@'+w.from]) return false;
+  try{ if(!gfOnShiftAt(pid,e,w.from+0.01) || !gfOnShiftAt(pid,e,w.to-0.01)) return false; }catch(err){ return false; }
+  var at=null; try{ at=gfAreaAt(pid,e,w.from+0.01); }catch(err){}
+  if(at===w.area || at==='lunch' || at==='offsite') return false;
+  if(typeof trainWeight==='function' && !(trainWeight(pid,w.area)>0)) return false;
+  if(typeof accommodated==='function' && accommodated(pid, w.area)) return false;
+  return true;
+}
+function _solveOverlap(list, pid, w, skip){ return list.some(function(d){ return d!==skip && d.cand.pid===pid && d.win.from<w.to && d.win.to>w.from; }); }
+function _solveTally(out){
+  var w=solveWeights(), moved={}; out.asks=0; out.moves=0; out.leftH=0; out.score=0;
+  out.decisions.forEach(function(d){
+    if(d.ask){ out.asks++; out.score+=w.ask; } else { out.moves++; if(d.cand.from) out.score+=w.mgrOff; }
+    out.score+=w.move+((moved[d.cand.pid]||0)?w.twice:0); moved[d.cand.pid]=(moved[d.cand.pid]||0)+1;
+  });
+  out.left.forEach(function(g){ out.leftH+=(g.to-g.from); out.score+=(g.to-g.from)*2*(SOLVE_PRIMARY[g.area]?w.primary:w.secondary); });
+  out.score+=w.want*(out.unhonored||[]).length;
+  return out;
+}
+function _solveKey(){
+  var k=''; try{ k=_ptHash()+'|'+JSON.stringify([STATE.shiftMod,STATE.staffDuty,STATE.staffStation,STATE.solveW,STATE.floorTargets,STATE.mgrTargets,STATE.accommodations,STATE.branchConfig,STATE.pto,_nowHalf(),window._moveNo||null]); }catch(e){ k='x'+Date.now(); }
+  return k;
+}
+function solveDay(exp){
+  var key=null; if(!exp){ key=_solveKey(); var c=window._solveCache; if(c && c.key===key) return c.out; }   // v60.253: memo — same inputs, same plan, computed once
+  var out=_solveDayRaw(exp||_planExp());
+  if(key) window._solveCache={key:key, out:out};
+  return out;
+}
+function _solveDayRaw(exp){
+  var out={decisions:[], left:[], asks:0, moves:0, leftH:0, score:0, scoreBefore:0, unhonored:[], improved:[]};
+  var gaps=[]; try{ gaps=halfGaps(null, null, exp); }catch(e){}
+  var busy={}, moved={};
+  var overlaps=function(pid, w){ return (busy[pid]||[]).some(function(b){ return b.from<w.to && b.to>w.from; }); };
+  var queue=gaps.slice();   // a partial cover (first hour / 30 min) re-queues what it leaves, so every half-hour ends up either covered or listed
+  while(queue.length){ var gap=queue.shift();
+    var tries=[gap]; if(gap.to-gap.from>1) tries.push({area:gap.area, from:gap.from, to:gap.from+1}); if(gap.to-gap.from>0.5) tries.push({area:gap.area, from:gap.from, to:gap.from+0.5});
+    var pick=null, win=null, list=[];
+    for(var i=0;i<tries.length && !pick;i++){
+      var w=tries[i]; try{ list=moveCandidates(w,'live',exp).filter(function(c){ return !overlaps(c.pid,w); }); }catch(e){ list=[]; }
+      var wash=list.filter(function(c){ return !(c.impact.fixH>c.impact.hurtH+0.001); }); list=list.filter(function(c){ return c.impact.fixH>c.impact.hurtH+0.001; });   // a move that opens as much as it closes is a TRADE, not a fix — named under "nobody can cover", never recommended
+      if(!list.length && wash.length && !gap.trade) gap.trade=wash[0];
+      list.sort(function(a,b){ var ha=a.impact.hurtH>0?1:0, hb=b.impact.hurtH>0?1:0; if(ha!==hb) return ha-hb; return (moved[a.pid]||0)-(moved[b.pid]||0); });   // stable: the engine's order survives inside a tie
+      if(list.length){ pick=list[0]; win=w; }
+    }
+    if(!pick){ out.left.push(gap); continue; }   // gap.trade (if any) names the best wash for the UI
+    var d={gap:gap, win:win, cand:pick, ask:!pick.mgr, fallback:null, alts:list.slice(0,6)};
+    if(d.ask) d.fallback=list.slice(1).filter(function(c){ return c.mgr; })[0]||list[1]||null;
+    busy[pick.pid]=(busy[pick.pid]||[]).concat([win]); moved[pick.pid]=(moved[pick.pid]||0)+1;
+    out.decisions.push(d);
+    if(gap.to-win.to>=0.5) queue.unshift({area:gap.area, from:win.to, to:gap.to, need:gap.need, minHave:gap.minHave, rest:true});   // the remainder, next in line
+  }
+  _solveTally(out); out.scoreBefore=out.score;
+  _solveImprove(out, exp);
+  // wants that the rotation did not give — said plainly, with the pin as the manager's override
+  try{
+    Object.keys(STATE.particulars||{}).forEach(function(pid){
+      var w=partWant(pid); if(!w || !exp[pid]) return;
+      var r=(window._lastRotations||{})[pid]; if(!r || !r.b1) return;
+      if(r.b1.station!==w) out.unhonored.push({pid:pid, want:w, got:r.b1.station});
+    });
+  }catch(e){}
+  _solveTally(out);
+  return out;
+}
+// ── v60.253 · THE IMPROVE PASS ───────────────────────────────────────────
+// Three fixed-order moves, each kept only if the score drops; bounded, so a
+// phone never hangs on it. Deterministic: same plan in → same plan out.
+//   1 MERGE  — the same body covering back-to-back windows on one area becomes
+//              one block (the hourly-blocks churn seen on staging);
+//   2 EXTEND — two different bodies back-to-back on one area: if either could
+//              take the whole run (net-positive, free), one block beats two;
+//   3 RESCUE — a window nobody could cover because the right body was already
+//              spent on an earlier window that had an alternative: swap them.
+function _solveImprove(out, exp){
+  var w=solveWeights(), d=out.decisions, guard=0;
+  var key=function(x){ return x.win.area+'@'+x.win.from; };
+  var sortD=function(){ d.sort(function(a,b){ return a.win.area<b.win.area?-1:a.win.area>b.win.area?1:(a.win.from-b.win.from); }); };
+  var union=function(a,b,pid){ var u={area:a.win.area, from:a.win.from, to:b.win.to}; var imp=null; try{ imp=moveImpact(pid, u.area, u.from, u.to, exp); }catch(e){ return null; } if(!imp || !(imp.fixH>imp.hurtH+0.001)) return null; return {win:u, impact:imp}; };
+  // 1 · merge
+  sortD();
+  for(var i=0;i<d.length-1 && guard<200;i++,guard++){
+    var a=d[i], b=d[i+1];
+    if(a.cand.pid!==b.cand.pid || a.win.area!==b.win.area || a.ask!==b.ask || Math.abs(a.win.to-b.win.from)>0.001) continue;
+    var m=union(a,b,a.cand.pid); if(!m) continue;
+    a.win=m.win; a.cand=Object.assign({}, a.cand, {impact:m.impact}); a.gap={area:a.win.area, from:a.win.from, to:a.win.to, need:a.gap.need, minHave:Math.min(a.gap.minHave,b.gap.minHave)};
+    d.splice(i+1,1); out.improved.push('merged '+_pidNick(a.cand.pid)+' '+_areaLabel(a.win.area)+' '+_hFmt(a.win.from)+'–'+_hFmt(a.win.to)); i--;
+  }
+  // 2 · extend
+  for(var j=0;j<d.length-1 && guard<400;j++,guard++){
+    var p=d[j], q=d[j+1];
+    if(p.win.area!==q.win.area || p.ask!==q.ask || Math.abs(p.win.to-q.win.from)>0.001 || p.cand.pid===q.cand.pid) continue;
+    var done=false;
+    [p,q].forEach(function(src){
+      if(done) return; var pid=src.cand.pid, u={area:p.win.area, from:p.win.from, to:q.win.to};
+      if(d.some(function(x){ return x!==p && x!==q && x.cand.pid===pid && x.win.from<u.to && x.win.to>u.from; })) return;
+      if(!_solveCanCover(pid, u, exp)) return;
+      var m=union(p,q,pid); if(!m) return;
+      var before=_solveTally({decisions:d.slice(), left:out.left, unhonored:[]}).score;
+      var merged={gap:{area:u.area, from:u.from, to:u.to, need:p.gap.need, minHave:Math.min(p.gap.minHave,q.gap.minHave)}, win:m.win, cand:Object.assign({}, src.cand, {impact:m.impact}), ask:src.ask, fallback:src.fallback, alts:src.alts};
+      var trial=d.slice(); trial.splice(j,2,merged);
+      var after=_solveTally({decisions:trial, left:out.left, unhonored:[]}).score;
+      if(after<before-0.001){ d.splice(j,2,merged); out.improved.push('one block: '+_pidNick(pid)+' '+_areaLabel(u.area)+' '+_hFmt(u.from)+'–'+_hFmt(u.to)); j--; done=true; }
+    });
+  }
+  // 3 · rescue
+  for(var k=0;k<out.left.length && guard<600;k++,guard++){
+    var g=out.left[k], tries=[g]; if(g.to-g.from>1) tries.push({area:g.area, from:g.from, to:g.from+1}); if(g.to-g.from>0.5) tries.push({area:g.area, from:g.from, to:g.from+0.5});
+    var found=false;
+    for(var t=0;t<tries.length && !found;t++){
+      var win=tries[t], cands=[]; try{ cands=moveCandidates(win,'live',exp).filter(function(c){ return c.impact.fixH>c.impact.hurtH+0.001; }); }catch(e){}
+      for(var c=0;c<cands.length && !found;c++){
+        var cd=cands[c], blockers=d.filter(function(x){ return x.cand.pid===cd.pid && x.win.from<win.to && x.win.to>win.from; });
+        if(blockers.length!==1) continue;
+        var bl=blockers[0], alt=(bl.alts||[]).filter(function(a){ return a.pid!==cd.pid && !_solveOverlap(d, a.pid, bl.win, bl) && a.impact.fixH>a.impact.hurtH+0.001; })[0];
+        if(!alt) continue;
+        var nd={gap:g, win:win, cand:cd, ask:!cd.mgr, fallback:null, alts:[cd]};
+        var trialD=d.map(function(x){ return x===bl ? Object.assign({}, bl, {cand:alt, ask:!alt.mgr}) : x; }).concat([nd]);
+        var trialL=out.left.filter(function(x){ return x!==g; }); if(g.to-win.to>=0.5) trialL.push({area:g.area, from:win.to, to:g.to, need:g.need, minHave:g.minHave, rest:true});
+        var s0=_solveTally({decisions:d.slice(), left:out.left, unhonored:[]}).score, s1=_solveTally({decisions:trialD, left:trialL, unhonored:[]}).score;
+        if(s1<s0-0.001){ bl.cand=alt; bl.ask=!alt.mgr; d.push(nd); out.left=trialL; out.improved.push('rescued '+_areaLabel(win.area)+' '+_hFmt(win.from)+'–'+_hFmt(win.to)+' with '+_pidNick(cd.pid)+' ('+_pidNick(alt.pid)+' takes '+_areaLabel(bl.win.area)+' '+_hFmt(bl.win.from)+')'); found=true; k=-1; }
+      }
+    }
+  }
+  sortD();
+  // asks re-derive their fallback from what's left in their list
+  d.forEach(function(x){ if(x.ask) x.fallback=(x.alts||[]).filter(function(a){ return a.pid!==x.cand.pid && a.mgr; })[0]||(x.alts||[]).filter(function(a){ return a.pid!==x.cand.pid; })[0]||null; });
+  return out;
+}
+function solveHeadline(sv){
+  var bits=[]; bits.push(sv.moves+' move'+(sv.moves===1?'':'s')); bits.push(sv.asks+' ask'+(sv.asks===1?'':'s'));
+  bits.push(sv.left.length?(_fmtN(sv.leftH)+'h nobody can cover'):'nothing left short');
+  return bits.join(' · ');
+}
+// drop every manager move in the plan at once (asks are never applied here)
+function solveApplyAll(){
+  var sv=solveDay(), ms=sv.decisions.filter(function(d){ return !d.ask; }); if(!ms.length){ if(typeof toast==='function') toast('No manager moves to apply'); return; }
+  window._moveUndo={mb:JSON.stringify(STATE.mgmtBlocks||{}), label:ms.length+' manager move'+(ms.length===1?'':'s')};
+  var n=0; ms.forEach(function(d){ var r=coverAdd(d.cand.pid, d.win.from, d.win.to, d.win.area); if(!(r && r.ok===false)){ n++; if(typeof logAction==='function') logAction('Cover · '+_pidNick(d.cand.pid)+' → '+_areaLabel(d.win.area)+' '+_hFmt(d.win.from)+'–'+_hFmt(d.win.to)+' (plan)'); } });
+  if(typeof saveState==='function') saveState(); if(typeof rotInvalidate==='function') rotInvalidate();
+  window._planLastMove=window._moveUndo.label; _moveAfter();
+  if(typeof toast==='function') toast('✓ '+n+' manager move'+(n===1?'':'s')+' dropped in · Undo on the verdict card', 5000);
+}
+// one line per person: what today looks like for them, in words
+function dayReceipt(pid, exp){
+  var e=(exp||_planExp())[pid], p=e&&e.person, bits=[];
+  if(!p) return '';
+  try{ if(isOffToday(pid)) return partSummary(pid).join(' · ')||'off'; }catch(err){}
+  var ps=partSummary(pid); if(ps.length) bits.push(ps.join(' · '));
+  var r=(window._lastRotations||{})[pid];
+  if(r && r.b1){
+    var seg=[_areaLabel(r.b1.station)+' '+_hFmt(r.b1.from)+'–'+_hFmt(r.b1.to)];
+    if(r.lunch) seg.push('lunch '+_hFmt(r.lunch.from)+(Math.abs((r.lunch.to-r.lunch.from)-0.5)>0.01?' ('+Math.round((r.lunch.to-r.lunch.from)*60)+' min)':''));
+    if(r.b2 && r.b2.to>r.b2.from+0.01) seg.push(_areaLabel(r.b2.station)+' after');
+    bits.push(seg.join(' · '));
+  } else {
+    var st=(STATE.staffStation||{})[pid]; if(st) bits.push(st);
+    try{ var l=((STATE.specialBlocks||{})[pid]||[]).filter(function(b){ return b.key==='lunch'; })[0]; if(l) bits.push('lunch '+_hFmt(l.from)); }catch(err){}
+  }
+  try{ var au=getAutoManagers()||{}; if(au.open===pid) bits.push('EB1 opener'); if(au.close===pid) bits.push('EB1 closer'); }catch(err){}
+  try{ ((STATE.mgmtBlocks||{})[pid]||[]).filter(function(b){ return b.cover; }).forEach(function(b){ bits.push('covers '+_areaLabel(accomForStation(b.station)||b.station)+' '+_hFmt(b.from)+'–'+_hFmt(b.to)); }); }catch(err){}
+  return bits.join(' · ');
+}
+function _solveWhyNot(u){   // v60.253: say WHY the want lost, from what the engine actually did
+  var pid=u.pid, want=_areaLabel(u.want), got=_areaLabel(u.got), why='';
+  try{
+    if(accommodated(pid, u.want)) why='not placed at '+want+' today';
+    else if((STATE.altPinned||{})[pid]) why='a manager pinned '+got+' first';
+    else if(u.want==='exit'){
+      var exp=_planExp(), me=exp[pid], ss=me&&me.person?me.person.shiftStart:null, mine=getExitHoursWeek(pid)||0, less=null;
+      Object.keys(exp).forEach(function(o){ if(o===pid) return; var e=exp[o], r=(window._lastRotations||{})[o]; if(!e||!e.person||e.person.role!=='CXR'||!r||!r.b1||r.b1.station!=='exit') return; if(ss!=null && e.person.shiftStart!=null && Math.abs(e.person.shiftStart-ss)>1) return; var h=getExitHoursWeek(o)||0; if(h<mine-0.01 && (less==null||h<less.h)) less={pid:o,h:h}; });
+      why= less ? _pidNick(less.pid)+' had less Exit time this week, so fairness went first' : 'Exit was already covered at their start';
+    } else why='Exit needed them at their start';
+  }catch(e){ why='the rotation needed them at '+got+' first'; }
+  return 'wanted '+want+' first · got '+got+' first — '+why+' (a want, not a rule)';
+}
 function _stationSheet(){
   var p=document.getElementById('station-panel');
   if(!p){ p=document.createElement('div'); p.id='station-panel'; document.body.appendChild(p); }
@@ -24728,6 +25105,7 @@ function ppHubHtml(pid,p,ss,se,fmtH,entry){
   // chips: streak · next off · shield · next 1:1
   var chips=[]; try{ var s1=ppStreak(pid); if(s1>=2 && !mgr) chips.push('🔥 Day '+s1+' in a row'); }catch(e){}   // manager view already carries the streak in the quick-action chips
   try{ var d=new Date(tk+'T12:00:00'); for(var i=1;i<=14;i++){ d.setDate(d.getDate()+1); var k=_localDayKey(d); var c=(getScheduleForDate(k)||{})[pid]; if(c==null || (typeof isOffCode==='function' && isOffCode(c))){ chips.push('Next off · '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]); break; } } }catch(e){}
+  try{ var _ps=partList(pid); if(_ps.length) chips.push('📝 today: '+_ps.map(partLabel).join(' · ')); }catch(e){}   // v60.251: today's particulars (edit them in Plan today → Anything different today?)
   try{ var _acc=accomActive(pid); if(_acc.length){ var _ends=_acc.map(function(a){ return a.end; }).filter(Boolean).sort()[0]; chips.push('🛡 Accommodated · '+_acc.map(function(a){ return accomLabel(a.activity).replace(/ Booth| shifts/,''); }).join(', ')+(mgr&&_ends?' · through '+_ends:'')); } }catch(e){}   // v60.244
   try{ var mt=(STATE.meetings||[]).filter(function(m){ return m.date>=tk && (m.people||[]).indexOf(pid)>=0; }).sort(function(a,b){ return a.date<b.date?-1:1; })[0]; if(mt) chips.push('🤝 '+(mt.date===tk?'today':mt.date.slice(5))); }catch(e){}
   if(chips.length) h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+chips.map(function(c){ return '<span style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt2)">'+biEsc(c)+'</span>'; }).join('')+'</div>';
@@ -26478,7 +26856,9 @@ function openThresholdQuiz() {
   ftRenderModal();
 }
 function setFtDaytype(dt){ window._ftDaytype = (dt==='weekend'?'weekend':'weekday'); ftRenderModal(); }
-function setFtMode(m){ window._ftMode = (m==='mgr'?'mgr':'staff'); ftRenderModal(); }
+function setFtMode(m){ window._ftMode = (m==='mgr'?'mgr':m==='plan'?'plan':'staff'); ftRenderModal(); }   // v60.253: + Plan (the solver's weights)
+function bumpSolveW(k, delta, lo, hi){ if(!STATE.solveW) STATE.solveW={}; var cur=solveWeights()[k]; STATE.solveW[k]=Math.max(lo, Math.min(hi, cur+delta)); ftRenderModal(); }
+function resetSolveW(){ delete STATE.solveW; if(typeof toast==='function') toast('Plan weights back to the defaults'); ftRenderModal(); }
 // ── v60.180 · WHAT THE BRANCH ACTUALLY RUNS ────────────────────────────────
 // The manager minimums have never been confirmed by anyone — they are the app's
 // DEFAULTS. Checking them against the REAL September + May schedules shows they
@@ -26615,6 +26995,7 @@ function ftRenderModal(){
       <div class="seg-ctl" style="margin-bottom:10px">
         <button class="seg${mode==='staff'?' on':''}" onclick="setFtMode('staff')">🧑‍💼 Staff</button>
         <button class="seg${mode==='mgr'?' on':''}" onclick="setFtMode('mgr')">👔 Managers</button>
+        <button class="seg${mode==='plan'?' on':''}" onclick="setFtMode('plan')">🧭 Plan</button>
       </div>`;
   const daySeg = `
       <div class="seg-ctl" style="margin-bottom:12px">
@@ -26663,6 +27044,22 @@ function ftRenderModal(){
         <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3);margin-bottom:5px">📋 Manager functions — from the AM (paste when you have it)</div>
         <textarea id="mgr-fn-note" oninput="STATE.mgrFunctionsNote=this.value" placeholder="The AM's detailed list of what each manager covers (e.g. who owns Emerald, who's the Returns manager, exit-fill order MT→ABRM→BRM→AM…). Saved with the targets." style="width:100%;min-height:70px;resize:vertical;background:var(--bg3);border:1px solid var(--bdr2);border-radius:5px;color:var(--txt);font-size:12px;padding:8px 9px;line-height:1.5;font-family:inherit">${(STATE.mgrFunctionsNote||'').replace(/</g,'&lt;')}</textarea>
       </div>`;
+  } else if(mode==='plan'){
+    // ── v60.253 · the solver's weights — what "worse" means when Plan today picks between two evils.
+    // The pick ORDER is fixed (no-hurt first, staff before managers, juniors first); these decide the
+    // improve pass and the score readout. Defaults are a guess until a real morning tunes them.
+    const W=solveWeights(), custom=!!(STATE.solveW&&Object.keys(STATE.solveW).length);
+    const rows=[['primary','An hour left bare at Exit or Returns',5,5,300],['secondary','An hour left bare at Counter or Emerald',5,5,300],
+                ['ask','Asking a CXR or agent for extra time',1,0,60],['move','Each move (churn)',1,0,60],['twice','The same person moved twice',1,0,60],
+                ['mgrOff','A manager pulled off their post',1,0,60],['want','A want not honored',1,0,60]];
+    const step=(r)=>`<div class="ft-row"><div class="ft-row-lbl">${r[1]}${W[r[0]]!==SOLVE_W[r[0]]?' <span style="color:var(--amber);font-size:10px">· was '+SOLVE_W[r[0]]+'</span>':''}</div>
+        <div class="ft-step"><button onclick="bumpSolveW('${r[0]}',${-r[2]},${r[3]},${r[4]})" ${W[r[0]]<=r[3]?'disabled':''}>−</button><b>${W[r[0]]}</b><button onclick="bumpSolveW('${r[0]}',${r[2]},${r[3]},${r[4]})" ${W[r[0]]>=r[4]?'disabled':''}>+</button></div></div>`;
+    body = `
+      ${modeSeg}
+      <div style="font-size:12px;color:var(--txt2);line-height:1.5;margin-bottom:8px"><b>Plan weights.</b> Higher = worse. Plan today never changes its order (no-hurt first, staff before managers, juniors first); these decide how it tidies the plan and what the score means.</div>
+      ${rows.map(step).join('')}
+      ${custom?`<button class="ft-copy" onclick="resetSolveW()">↺ Back to the defaults</button>`:''}
+      <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">A starting guess (Matt, 2026-09-11) — tune after a real morning. Saved with the floor targets, shared across devices.</div>`;
   } else {
     // ── Staff floor minimums (Ctr / Exit / Ret) ──
     const T  = (STATE.floorTargets) || FLOOR_TARGETS;
