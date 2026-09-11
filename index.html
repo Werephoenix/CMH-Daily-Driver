@@ -153,6 +153,46 @@ html.glass.calm .card, html.glass.calm .more-group, html.glass.calm .st-row, htm
 /* ── High Contrast on glass = the .88 fallback + stronger edges ── */
 body.hc html.daylight.glass .card, html.daylight.glass.hc .card, html.daylight.glass.hc #verdict-card, html.daylight.glass.hc .st-row, html.daylight.glass.hc #person-panel { background:rgba(255,255,255,.88); border-color:rgba(255,255,255,1); }
 html.glass.hc:not(.daylight) .card, html.glass.hc:not(.daylight) #verdict-card, html.glass.hc:not(.daylight) .st-row, html.glass.hc:not(.daylight) #person-panel { background:rgba(30,33,44,.92); border-color:rgba(255,255,255,.28); }
+/* ════════════════════════════════════════════════════════════════════════
+   v60.248 · THE ATTENTION LADDER (Matt: "find more creative ways to use it to
+   visually lead to the next step or button to push and reduce noise, but keep
+   present the things that are lesser used / important at that moment").
+   Glass stops being decoration and becomes the hierarchy:
+     • a FOURTH grade — quiet — for surfaces that are not part of this step.
+       Quiet is dimmer and flatter, never hidden, never smaller, still tappable.
+       NAVIGATION IS NEVER QUIETED (Matt, explicitly: people must not forget
+       where things live) — ⋯ More, Print, Classic boxes, the horizon picker,
+       the tab bar and the More screen keep their weight at all times.
+     • a SPOTLIGHT in the ground itself, centred on the one lit control.
+     • a THREAD: the verdict lights its station row and that person's timeline row.
+     • FROSTED DIVIDERS instead of flat label headers.
+   Motion: the spotlight eases over 600 ms; nothing loops. Calm Mode keeps the
+   ladder and drops the spotlight.
+   ═══════════════════════════════════════════════════════════════════════ */
+html.glass .g-quiet, html.glass .st-row.g-quiet, html.glass #sched-today-card.g-quiet
+  { transition: opacity .6s ease, filter .6s ease, box-shadow .6s ease, background .6s ease; opacity:.62; filter:saturate(.55); box-shadow:none !important; }
+html.daylight.glass .g-quiet { background:rgba(255,255,255,.34) !important; -webkit-backdrop-filter:blur(6px) !important; backdrop-filter:blur(6px) !important; border-color:rgba(255,255,255,.6) !important; }
+html.glass:not(.daylight) .g-quiet { background:rgba(40,44,58,.26) !important; -webkit-backdrop-filter:blur(6px) !important; backdrop-filter:blur(6px) !important; border-color:rgba(255,255,255,.10) !important; }
+html.glass .g-quiet:hover, html.glass .g-quiet:focus-within { opacity:1; filter:none; }            /* reach for it and it comes back */
+/* the thread — verdict → station row → that person's timeline row */
+html.glass .g-thread { position:relative; transition: box-shadow .6s ease; }
+html.daylight.glass .g-thread { box-shadow: inset 0 0 0 1.5px rgba(15,122,71,.55), 0 0 0 4px rgba(255,255,255,.45) !important; }
+html.glass:not(.daylight) .g-thread { box-shadow: inset 0 0 0 1.5px rgba(35,201,131,.6), 0 0 18px rgba(35,201,131,.22) !important; }
+html.glass .g-thread-row { border-radius:8px; box-shadow: inset 0 0 0 1.5px rgba(15,122,71,.35); transition: box-shadow .6s ease; }
+html.glass:not(.daylight) .g-thread-row { box-shadow: inset 0 0 0 1.5px rgba(35,201,131,.45); }
+/* the spotlight lives IN the ground: z-index -1 paints over the page gradient, under every card */
+#glass-spot { position:fixed; z-index:-1; pointer-events:none; width:940px; height:660px; margin:-330px 0 0 -470px; left:50%; top:40%; opacity:0;
+  transition:left .6s cubic-bezier(.22,.61,.36,1), top .6s cubic-bezier(.22,.61,.36,1), opacity .6s ease; }
+html.daylight.glass #glass-spot { background:radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255,255,255,.85) 0%, rgba(255,255,255,.35) 38%, rgba(255,255,255,0) 70%); }
+html.glass:not(.daylight) #glass-spot { background:radial-gradient(ellipse 50% 50% at 50% 50%, rgba(35,201,131,.20) 0%, rgba(35,201,131,.07) 38%, rgba(35,201,131,0) 70%); }
+html.glass.calm #glass-spot, html:not(.glass) #glass-spot { opacity:0 !important; }
+@media (prefers-reduced-motion: reduce) { #glass-spot { transition:opacity .6s ease; } }
+/* frosted dividers — a band you feel, instead of a label you read past */
+html.glass .now-sec-hd { -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); border-radius:8px; padding:5px 9px; margin-left:0; }
+html.daylight.glass .now-sec-hd { background:linear-gradient(90deg, rgba(255,255,255,.55), rgba(255,255,255,0) 85%); color:#5C574E; }
+html.glass:not(.daylight) .now-sec-hd { background:linear-gradient(90deg, rgba(255,255,255,.10), rgba(255,255,255,0) 85%); }
+/* the lit control sits a grade above everything, in both modes */
+html.glass .g-lit { position:relative; z-index:1; }
 #sched-horizon{padding:3px 10px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer;margin-left:8px}
 /* ── CSS VARIABLES ─────────────────────────────────────────────────────── */
 :root {
@@ -5213,6 +5253,7 @@ function showTab(id) {
   if (tabMap[id]) id = tabMap[id];
   if (id==='people' && typeof renderPeople==='function') { try{ renderPeople(); }catch(e){} }   // v60.245
   if (id==='paste' && typeof upRender==='function') { try{ upRender(); }catch(e){} }   // v60.246
+  if (typeof glassSpotOff==='function' && id!=='schedule' && id!=='opening') { try{ glassSpotOff(); }catch(e){} }   // v60.248
 
   // v60.124: Calendar is a top-level tab but renders as a full-screen overlay
   // (the Master Calendar). Open it ON TOP of the current screen and light its nav
@@ -12333,6 +12374,7 @@ function renderNow() {
   const _qQuiet = (typeof qotdQuietHtml==='function') ? qotdQuietHtml() : '';
   const _self = (typeof selfHomeHtml==='function') ? selfHomeHtml() : '';   // v60.243 (C2): a locked device that knows who is looking leads with their own day
   const _ritual = (typeof ritualCardHtml==='function') ? ritualCardHtml() : '';   // v60.245 (B5): the ritual for this hour, as a card
+  setTimeout(function(){ try{ if(typeof nowLadder==='function') nowLadder(); }catch(e){} }, 30);   // v60.248
   el.innerHTML = _self + _ritual + _qHero
     + `<div class="now-cockpit"><div class="now-main">${html}${_qQuiet}</div><div class="now-rail">${rail}</div></div>`;
 }
@@ -15771,7 +15813,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.247'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.248'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -18962,8 +19004,8 @@ function buildCoverageTimeline() {
       htm+=`<div style="display:flex;align-items:center;margin:12px 0 4px"><div style="width:${LABEL_W}px;flex-shrink:0"></div><div style="flex:1;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bdr);padding-bottom:3px"><span style="width:7px;height:7px;border-radius:50%;background:${grp.color};flex-shrink:0"></span><span style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">${grp.label}</span></div></div>`;
     }
 
-    htm+=`<div style="display:flex;align-items:center;margin-bottom:2px;cursor:pointer"
-      onclick="showShiftModModal('${pid}','${nick.replace(/'/g,'')}')">`;
+    htm+=`<div data-tlrow="${pid}" style="display:flex;align-items:center;margin-bottom:2px;cursor:pointer"
+      onclick="showShiftModModal('${pid}','${nick.replace(/'/g,'')}')">`;   /* v60.248: addressable for the thread */
     const mgmtSt=isMgmt?(STATE.staffStation||{})[pid]||'':'' ;
     const mgmtBadge=isMgmt&&mgmtSt?`<span style="font-size:7px;color:#a5b4fc;display:block;line-height:1;margin-top:1px">${mgmtSt.replace(' Booth','').replace(' Manager','')}</span>`:'';
     if(isMgmt&&!_mgmtHeaderShown){
@@ -24132,12 +24174,13 @@ function planReadFacts(){   // v60.243 (C3): what a locked reader is told — se
 }
 function verdictCardHtml(){
   var mgr=(typeof _managerMode!=='undefined')&&_managerMode;
-  if(!mgr){ var f=planReadFacts(); return {html:'<div class="v-title">'+biEsc(f.title)+'</div><div class="v-sub" style="margin-bottom:0">'+biEsc(f.sub)+'</div><div style="font-size:11px;color:var(--txt3);margin-top:8px">🔒 Reading the day. Unlock with a PIN to change anything.</div>', state:'read'}; }
+  if(!mgr){ var f=planReadFacts(); return {verdict:{state:'read'}, html:'<div class="v-title">'+biEsc(f.title)+'</div><div class="v-sub" style="margin-bottom:0">'+biEsc(f.sub)+'</div><div style="font-size:11px;color:var(--txt3);margin-top:8px">🔒 Reading the day. Unlock with a PIN to change anything.</div>', state:'read'}; }
   var v=planVerdict(), c=planCounters();
   var h='<div class="v-title">'+biEsc(v.title)+'</div><div class="v-sub">'+biEsc(v.sub)+'</div>';
   if(mgr && v.button) h+='<button class="v-btn vl-mgr" onclick="'+v.button.js+'">'+biEsc(v.button.label)+'</button>';
+  window._planV=v;
   if(mgr) h+='<div class="v-ghosts vl-mgr"><a onclick="openCallOff()">📞 Someone called off</a>'+(window._planLastMove?'<a onclick="undoCoverage();buildCoverageTimeline()">↩ Undo · '+biEsc(window._planLastMove)+'</a>':'')+'<a onclick="var d=document.getElementById(\'plan-more\'); if(d){ d.open=true; d.scrollIntoView({block:\'center\'}); }">Other ways to fix</a></div>';
-  return {html:h, state:v.state};
+  return {html:h, state:v.state, verdict:v};
 }
 function stationListHtml(){
   var exp=_planExp(), now=_nowH(), dow=new Date().getDay(), h='';
@@ -24317,11 +24360,71 @@ function nowHeaderLineHtml(res, ret, netStr, netCol){
   var at=STATE.boardUpdatedAt?new Date(STATE.boardUpdatedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):null;
   return '<div class="now-hdr-line" onclick="event.stopPropagation();showTab(\'board\')"><span>Res <b>'+res+'</b></span><span>Ret <b>'+ret+'</b></span><span>Net <b style="color:'+netCol+'">'+netStr+'</b></span><span>'+glyph+'</span><span style="color:var(--txt3)">'+(at?'updated '+at:'no paste yet')+'</span></div>';
 }
+// ════════════════════════════════════════════════════════════════════════
+// v60.248 · THE LADDER, in code. One question per screen — "what is lit right
+// now?" — and three answers follow from it: the spotlight moves there, its
+// supporting cast is threaded, and the surfaces that belong to a different step
+// drop to the quiet grade. Nothing is hidden and NOTHING NAVIGATIONAL changes.
+// ════════════════════════════════════════════════════════════════════════
+function _glassOn(){ try{ return typeof GLASS_ON!=='undefined' && GLASS_ON && document.documentElement.classList.contains('glass'); }catch(e){ return false; } }
+// Calm Mode keeps the ladder (quiet grade, thread) and drops the moving light.
+function _spotOn(){ try{ return _glassOn() && !document.documentElement.classList.contains('calm'); }catch(e){ return false; } }
+function _spotEl(){ var el=document.getElementById('glass-spot'); if(!el && document.body){ el=document.createElement('div'); el.id='glass-spot'; document.body.appendChild(el); } return el; }
+function glassSpotTo(target){
+  var el=_spotEl(); if(!el) return;
+  if(!target || !_spotOn()){ el.style.opacity='0'; document.querySelectorAll('.g-lit').forEach(function(x){ x.classList.remove('g-lit'); }); if(target && _glassOn()) target.classList.add('g-lit'); return; }
+  try{
+    var r=target.getBoundingClientRect(); if(!r.width && !r.height){ el.style.opacity='0'; return; }
+    el.style.left=Math.round(r.left+r.width/2)+'px'; el.style.top=Math.round(r.top+r.height/2)+'px'; el.style.opacity='1';
+    document.querySelectorAll('.g-lit').forEach(function(x){ x.classList.remove('g-lit'); });
+    target.classList.add('g-lit');
+  }catch(e){}
+}
+function glassSpotOff(){ var el=document.getElementById('glass-spot'); if(el) el.style.opacity='0'; document.querySelectorAll('.g-lit').forEach(function(x){ x.classList.remove('g-lit'); }); }
+function _quiet(el, on){ if(el) el.classList.toggle('g-quiet', !!on); }
+// PLAN: a live gap → the verdict and the short station rows lead, the rest steps back.
+// A clean day → the verdict is the quiet one and the floor rises.
+function planLadder(v){
+  try{
+    if(!_glassOn()){ document.querySelectorAll('#screen-schedule .g-quiet,#screen-schedule .g-thread,#screen-schedule .g-thread-row').forEach(function(x){ x.classList.remove('g-quiet','g-thread','g-thread-row'); }); return; }
+    var live = v && v.state==='live', vc=document.getElementById('verdict-card');
+    _quiet(document.getElementById('sched-today-card'), live);          // the instrument waits its turn
+    _quiet(vc, !live);                                                  // nothing to fix → the verdict recedes
+    document.querySelectorAll('#station-list .st-row').forEach(function(row){
+      var isShort=row.classList.contains('short');
+      _quiet(row, live && !isShort);
+      row.classList.remove('g-thread');
+    });
+    document.querySelectorAll('[data-tlrow]').forEach(function(r){ r.classList.remove('g-thread-row'); });
+    if(live && v.area){
+      var idx={exit:0,counter:1,returns:2,emerald:3}[v.area];
+      var row=document.querySelectorAll('#station-list .st-row')[idx]; if(row){ row.classList.add('g-thread'); row.classList.remove('g-quiet'); }
+      if(v.best && v.best.pid){ var tl=document.querySelector('[data-tlrow="'+(''+v.best.pid).replace(/"/g,'')+'"]'); if(tl) tl.classList.add('g-thread-row'); }
+    }
+    var btn = vc && vc.querySelector('.v-btn');
+    glassSpotTo(btn || null);
+  }catch(e){}
+}
+// NOW: the fixed priority — solo tier 3 › ritual overdue › board empty/stale › nothing.
+// Nothing is quieted here; a staff home screen stays whole. The spotlight leads.
+function nowLadder(){
+  try{
+    if(!_spotOn()){ glassSpotOff(); return; }
+    var el = document.querySelector('#screen-opening .now-attn.urgent, #screen-opening .now-attn.solo-urgent')
+          || document.querySelector('#screen-opening #ritual-card.lit')
+          || document.querySelector('#screen-opening .now-attn.warn')
+          || null;
+    glassSpotTo(el);
+  }catch(e){}
+}
+try{ window.addEventListener('resize', function(){ try{ var lit=document.querySelector('.g-lit'); if(lit) glassSpotTo(lit); }catch(e){} }); }catch(e){}
 function renderPlanV2(){
-  var vc=document.getElementById('verdict-card'); if(vc){ var v=verdictCardHtml(); vc.className='v-'+v.state; vc.innerHTML=v.html; }
+  var _v=null;
+  var vc=document.getElementById('verdict-card'); if(vc){ var v=verdictCardHtml(); vc.className='v-'+v.state; vc.innerHTML=v.html; _v=v; }
   var pc=document.getElementById('plan-counters'); if(pc){ var c=planCounters(); pc.innerHTML='<span>'+c.on+' on duty</span><span>'+c.lunchesLeft+' lunches left</span>'+(c.step?'<span class="vl-mgr" style="color:var(--acc);cursor:pointer" onclick="openPlanToday()">'+biEsc(c.step)+' ›</span>':''); }
   var sl=document.getElementById('station-list'); if(sl) sl.innerHTML=stationListHtml();
   try{ var gb=document.getElementById('plan-groupbtn'); if(gb) gb.textContent='by '+({station:'station',type:'type',start:'start',end:'end',name:'name'}[STATE.schedGroupBy||'station']||'station')+' ▾'; }catch(e){}
+  try{ planLadder(_v && _v.verdict ? _v.verdict : (typeof planVerdict==='function' && (typeof _managerMode!=='undefined') && _managerMode ? planVerdict() : null)); }catch(e){}   // v60.248
 }
 function planGroupCycle(){ var order=['station','name','type','start','end']; var cur=STATE.schedGroupBy||'station'; var nx=order[(order.indexOf(cur)+1)%order.length]; if(typeof setSchedGroup==='function') setSchedGroup(nx); renderPlanV2(); }
 function horizonMenu(){
