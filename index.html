@@ -63,13 +63,18 @@ body.view-locked .vl-mgr { display:none !important; }
 #station-list .st-row.short, #self-floor .st-row.short{border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.07)}
 #station-list .st-name, #self-floor .st-name{font-size:13px;font-weight:800;color:var(--txt);min-width:74px}
 #station-list .st-count, #self-floor .st-count{font-size:13px;font-weight:800}
-#station-list .st-names, #self-floor .st-names{flex:1;font-size:11px;color:var(--txt2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#station-list .st-names, #self-floor .st-names{flex:1;min-width:0;font-size:11px;color:var(--txt2)}
+#station-list .st-nm, #self-floor .st-nm{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* v60.256 D: names keep their ellipsis */
+#station-list .st-status, #self-floor .st-status{display:block;font-size:11px;font-weight:800;color:var(--red);white-space:nowrap;line-height:1.3}   /* v60.256 D: status on its own line, never truncated */
+.bd-stale{display:inline-block;padding:1px 7px;border-radius:999px;background:rgba(255,204,0,.18);border:1px solid rgba(255,204,0,.35);color:var(--amber);font-weight:800;letter-spacing:0;text-transform:none;vertical-align:middle}   /* v60.256 E: a chip behind any status text on bare ground */
+html.daylight .bd-stale{background:rgba(255,246,214,.92);border-color:rgba(138,93,0,.35)}
+.tile, .fm-zone, .st-row, .now-attn, .pl-row, .more-group{box-sizing:border-box;min-width:0}   /* v60.256 F2: padded panes inside grid tracks */
 #station-list .st-next, #self-floor .st-next{font-size:10.5px;color:var(--txt3);white-space:nowrap}
 body.view-locked #sched-horizon, body.view-locked .solo-btn { display:none !important; }   /* v60.243: locked = reading edition */
 #verdict-card.v-read{border-color:var(--bdr2);background:var(--bg3)}
 #self-home{margin-bottom:14px}
 #self-home .sh-card{border-radius:12px;padding:12px 14px;border:1.5px solid var(--bdr2);background:var(--bg3);margin-bottom:10px}
-#self-home .sh-week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+#self-home .sh-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 #self-home .sh-day{border:1px solid var(--bdr2);border-radius:8px;padding:6px 2px;text-align:center;font-size:10px;color:var(--txt2);background:var(--bg2)}
 #self-home .sh-day.today{border-color:var(--accent);color:var(--accent);font-weight:800}
 #self-home .sh-day b{display:block;font-size:10.5px;color:var(--txt)}
@@ -79,6 +84,18 @@ body.view-locked #sched-horizon, body.view-locked .solo-btn { display:none !impo
 #ritual-card.lit{border-color:var(--amber);background:rgba(217,119,6,.08)}
 #ritual-card .rc-t{flex:1;font-size:13px;font-weight:800;color:var(--txt)}
 #ritual-card .rc-s{font-size:11px;color:var(--txt2);font-weight:600}
+/* v60.254 · ritual ticker strip — quiet grade, amber past due, never red */
+#ritual-strip{position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:190;display:none;align-items:center;gap:10px;padding:7px 14px;font-size:12px;color:var(--txt2);background:var(--bg2);border-top:1px solid var(--bdr);-webkit-backdrop-filter:saturate(160%) blur(12px);backdrop-filter:saturate(160%) blur(12px)}
+#ritual-strip.lit{background:rgba(217,119,6,.10);border-top-color:var(--amber)}
+#ritual-strip.ok .rs-s{color:var(--accent)}
+#ritual-strip .rs-l{color:var(--txt);font-weight:800;white-space:nowrap}
+#ritual-strip .rs-s{white-space:nowrap}
+#ritual-strip .rs-n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--txt);font-weight:600}
+#ritual-strip .rs-b{padding:5px 10px;border-radius:7px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:11.5px;font-weight:800;cursor:pointer;white-space:nowrap}
+#ritual-strip .rs-b.rs-ok{border-color:var(--accent);color:var(--accent);background:rgba(35,201,131,.10)}
+#ritual-strip .rs-o{color:var(--acc);font-weight:700;cursor:pointer;white-space:nowrap}
+body.rit-strip{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
+@media(min-width:900px){#ritual-strip{left:216px;bottom:0} body.rit-strip{padding-bottom:38px}}
 .pl-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--bdr2);border-radius:10px;background:var(--bg3);margin-bottom:6px;cursor:pointer}
 .pl-row .pl-n{flex:1;font-size:13px;font-weight:800;color:var(--txt)}
 .pl-row .pl-r{font-size:11px;color:var(--txt3)}
@@ -109,34 +126,34 @@ body.view-locked #sched-horizon, body.view-locked .solo-btn { display:none !impo
 html.glass { background-size:100% 120%; background-attachment:fixed; }
 body.theme-bold html.glass, html.glass.drift { animation: cmhDrift 32s ease-in-out infinite; }
 /* ── DAY: paper-white glass, dark warm ink ── */
-html.daylight.glass { --txt:#1C1A17; --txt2:#3E3A33; --txt3:#5C574E; --text:#1C1A17; --text2:#3E3A33; --text3:#5C574E;
-  --bg2:rgba(255,255,255,.62); --bg3:rgba(255,255,255,.50); --bdr:rgba(255,255,255,.9); --bdr2:rgba(60,40,40,.18); --bg:transparent; }
+html.daylight.glass { --txt:var(--g-ink1,#1C1A17); --txt2:var(--g-ink2,#3E3A33); --txt3:var(--g-ink3,#5C574E); --text:var(--g-ink1,#1C1A17); --text2:var(--g-ink2,#3E3A33); --text3:var(--g-ink3,#5C574E);
+  --bg2:var(--g-card,rgba(255,255,255,.62)); --bg3:var(--g-chip,rgba(255,255,255,.50)); --bdr:var(--g-hair,rgba(255,255,255,.9)); --bdr2:var(--g-hairRow,rgba(60,40,40,.18)); --bg:transparent; }   /* v60.256 A3: the palette sets --g-* */
 html.daylight.glass .card, html.daylight.glass .more-group, html.daylight.glass .st-row, html.daylight.glass .pl-row, html.daylight.glass #ritual-card,
 html.daylight.glass .fm-zone, html.daylight.glass #person-panel, html.daylight.glass #station-panel, html.daylight.glass #modal-overlay .modal-sheet, html.daylight.glass .now-hdr-line
-  { background:rgba(255,255,255,.55); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); border:1px solid rgba(255,255,255,.9);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 4px 14px rgba(60,40,40,.08); }
+  { background:var(--g-card,rgba(255,255,255,.55)); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); border:1px solid var(--g-hair,rgba(255,255,255,.9));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 4px 14px rgba(var(--g-shadow,60,40,40),.08); }
 html.daylight.glass #verdict-card, html.daylight.glass .sh-card, html.daylight.glass #paste-universal
-  { background:rgba(255,255,255,.66); background-image:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,0) 45%);
-    -webkit-backdrop-filter:blur(22px) saturate(1.6); backdrop-filter:blur(22px) saturate(1.6); border:1px solid rgba(255,255,255,.9);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 10px 28px rgba(60,40,40,.10); }
+  { background:var(--g-hero,rgba(255,255,255,.66)); background-image:linear-gradient(180deg,rgba(255,255,255,.7),rgba(255,255,255,0) 45%);
+    -webkit-backdrop-filter:blur(22px) saturate(1.6); backdrop-filter:blur(22px) saturate(1.6); border:1px solid var(--g-hair,rgba(255,255,255,.9));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.95), 0 10px 28px rgba(var(--g-shadow,60,40,40),.10); }
 html.daylight.glass #verdict-card.v-live { background:rgba(255,235,232,.62); border-color:rgba(255,255,255,.9); }
 html.daylight.glass #plan-counters span, html.daylight.glass .up-tile, html.daylight.glass .fm-pill, html.daylight.glass .fm-stat, html.daylight.glass #sched-horizon, html.daylight.glass #who-chip, html.daylight.glass .sh-day
-  { background:rgba(255,255,255,.6); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.9); }
-html.daylight.glass #nav { background:rgba(255,255,255,.55); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); border-color:rgba(255,255,255,.9); }
+  { background:var(--g-chip,rgba(255,255,255,.6)); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); border:1px solid var(--g-hair,rgba(255,255,255,.9)); }
+html.daylight.glass #nav { background:var(--g-card,rgba(255,255,255,.55)); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); border-color:rgba(255,255,255,.9); }
 html.daylight.glass #topbar { background:rgba(255,255,255,.5); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); border-bottom:1px solid rgba(255,255,255,.9); }
 html.daylight.glass #verdict-card .v-btn { background:linear-gradient(180deg,#1DBE7A 0%,#0F7A47 60%,#0B6E43 100%); color:#fff; border:1px solid rgba(255,255,255,.45); box-shadow:0 0 0 4px rgba(255,255,255,.55),0 0 0 5px rgba(15,122,71,.25); }
 body.theme-bold html.daylight.glass #verdict-card .v-btn, html.daylight.glass.drift #verdict-card .v-btn { animation: cmhBreathe 2.4s ease-in-out infinite; }
 /* ── NIGHT: dark glass, light ink, glow instead of ring ── */
 html.glass:not(.daylight) .card, html.glass:not(.daylight) .more-group, html.glass:not(.daylight) .st-row, html.glass:not(.daylight) .pl-row, html.glass:not(.daylight) #ritual-card,
 html.glass:not(.daylight) .fm-zone, html.glass:not(.daylight) #person-panel, html.glass:not(.daylight) #station-panel, html.glass:not(.daylight) .now-hdr-line
-  { background:rgba(40,44,58,.45); -webkit-backdrop-filter:blur(20px) saturate(1.4); backdrop-filter:blur(20px) saturate(1.4); border:1px solid rgba(255,255,255,.16);
+  { background:var(--g-card,rgba(40,44,58,.45)); -webkit-backdrop-filter:blur(20px) saturate(1.4); backdrop-filter:blur(20px) saturate(1.4); border:1px solid var(--g-hair,rgba(255,255,255,.16));
     box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 14px 36px rgba(0,0,0,.45); }
 html.glass:not(.daylight) #verdict-card, html.glass:not(.daylight) .sh-card, html.glass:not(.daylight) #paste-universal
-  { background:rgba(40,44,58,.55); -webkit-backdrop-filter:blur(22px) saturate(1.4); backdrop-filter:blur(22px) saturate(1.4); border:1px solid rgba(255,255,255,.16);
+  { background:var(--g-hero,rgba(40,44,58,.55)); -webkit-backdrop-filter:blur(22px) saturate(1.4); backdrop-filter:blur(22px) saturate(1.4); border:1px solid var(--g-hair,rgba(255,255,255,.16));
     box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 14px 36px rgba(0,0,0,.45); }
 html.glass:not(.daylight) #verdict-card.v-live { background:rgba(80,30,34,.55); }
 html.glass:not(.daylight) #plan-counters span, html.glass:not(.daylight) .up-tile, html.glass:not(.daylight) .fm-pill, html.glass:not(.daylight) .fm-stat, html.glass:not(.daylight) #sched-horizon, html.glass:not(.daylight) #who-chip, html.glass:not(.daylight) .sh-day
-  { background:rgba(255,255,255,.10); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.16); }
+  { background:var(--g-chip,rgba(255,255,255,.10)); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); border:1px solid var(--g-hair,rgba(255,255,255,.16)); }
 html.glass:not(.daylight) #nav { background:rgba(20,22,30,.55); -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px); }
 html.glass:not(.daylight) #verdict-card .v-btn { background:linear-gradient(180deg,#3FDC6B 0%,#23C983 60%,#12A866 100%); color:#06351f; border:1px solid rgba(255,255,255,.3); box-shadow:0 0 0 4px rgba(35,201,131,.22),0 0 24px rgba(35,201,131,.35); }
 body.theme-bold html.glass:not(.daylight) #verdict-card .v-btn, html.glass:not(.daylight).drift #verdict-card .v-btn { animation: cmhBreatheNight 2.4s ease-in-out infinite; }
@@ -220,13 +237,13 @@ html.glass .g-lit { position:relative; z-index:1; }
   --accent2:   #12A866;
 
   /* status colors — iOS system values */
-  --wu:        #30D158;  /* OK / covered / above min */
+  --wu:        #23C983;   /* v60.256 A1: GOOD dark */  /* OK / covered / above min */
   --wu-bg:     #06351f;
   --wu-border: #248A3D;
   --up:        #FFCC00;  /* lunch / caution / met-exactly */
   --up-bg:     #2a2100;
   --up-border: #C99700;
-  --na:        #FF453A;  /* short / urgent / below-min */
+  --na:        #FF6B61;   /* v60.256 A1: RED dark */  /* short / urgent / below-min */
   --na-bg:     #2a0606;
   --na-border: #D70015;
 
@@ -256,11 +273,12 @@ html.glass .g-lit { position:relative; z-index:1; }
   --font-hd:   -apple-system, "SF Pro Display", system-ui, "Segoe UI", Roboto, sans-serif;
   /* ── Aliases — both naming schemes work (v60.41: mapped to iOS palette) ── */
   --txt:    #ffffff;  --txt2: rgba(235,235,245,.75);  --txt3:      rgba(235,235,245,.68);   /* v60.203 floor raised from ~.55 */
-  --acc:    #0A84FF;  --acc2: #4DA3FF;   /* counter blue (bars/primary data use --acc) */
+  --acc:    #63B4FF;   /* v60.256 A1: LINK dark */  --acc2: #4DA3FF;   /* counter blue (bars/primary data use --acc) */
   --bdr:       rgba(255,255,255,.15);   /* v60.203 +5pts */  --bdr2:      rgba(255,255,255,.20);   /* v60.203 +5pts */
   --green:  #23C983;  --green2:#06351f;  --green3:#30D158;
   --amber:  #FFCC00;  --amber2:#2a2100;  --amber3:#C99700;
-  --red:    #FF453A;  --red2:  #2a0606;  --red3:  #D70015;
+  --red:    #FF6B61;   /* v60.256 A1: RED dark */
+  --link: var(--acc); --good: var(--green); --warn: var(--amber); --bad: var(--red);   /* v60.256 A1: the five semantic accents, by name */  --red2:  #2a0606;  --red3:  #D70015;
   /* v60.15 — Logical color standard (ported from the D&D app's "color = meaning,
      never decorative"). Prefer these semantic names so a color means the SAME
      thing on every screen. ok=good/covered/open · warn=caution/limited ·
@@ -286,19 +304,21 @@ html.daylight {
   --text:#000000; --text2:rgba(60,60,67,.85); --text3:rgba(60,60,67,.68);
   --txt:#000000;  --txt2:rgba(60,60,67,.85);  --txt3:rgba(60,60,67,.68);
   --bdr:rgba(0,0,0,.14); --bdr2:rgba(0,0,0,.22);
-  --accent:#12A866; --accent2:#0B8A53;
-  --wu:#12A866; --wu-bg:#E2F7EC; --wu-border:#12A866;
-  --up:#A87900; --up-bg:#FFF6DB; --up-border:#C99700;
-  --na:#D70015; --na-bg:#FFE9E7; --na-border:#D70015;
-  --counter:#0066D6; --exit:#12A866; --eb:#6E56CF; --returns:#0C7FA6; --off:#6C6C70;
-  --green:#12A866; --green2:#E2F7EC; --green3:#0E8C57;
-  --amber:#A87900; --amber2:#FFF6DB; --amber3:#8F6700;
-  --red:#D70015; --red2:#FFE9E7; --red3:#B00012;
-  --acc:#0066D6; --acc2:#0A84FF;
-  --purple:#6E56CF; --orange:#C87400; --teal:#0C7FA6;
-  --tab-dashboard:#0066D6; --tab-paste:#A87900; --tab-board:#12A866;
-  --tab-coverage:#6E56CF; --tab-checklist:#C87400;
-  --tab-reference:rgba(60,60,67,.6); --tab-history:#0C7FA6; --tab-admin:#D70015;
+  /* v60.256 (Design Sep-11 A1): the five semantic accents, light — LINK #0A5CB8 · GOOD #0B6E3F · WARN #8A5D00 · RED #C4000F · PURPLE #5B45C9 */
+  --accent:#0B6E3F; --accent2:#0B6E3F;
+  --wu:#0B6E3F; --wu-bg:#E2F7EC; --wu-border:#0B6E3F;
+  --up:#8A5D00; --up-bg:#FFF6DB; --up-border:#8A5D00;
+  --na:#C4000F; --na-bg:#FFE9E7; --na-border:#C4000F;
+  --counter:#0B62C4; --exit:#0B6E3F; --eb:#5B45C9; --returns:#136C8C; --off:#6C6C70;   /* A2: station colours deepened for AA on white */
+  --green:#0B6E3F; --green2:#E2F7EC; --green3:#0B6E3F;
+  --amber:#8A5D00; --amber2:#FFF6DB; --amber3:#8A5D00;
+  --red:#C4000F; --red2:#FFE9E7; --red3:#C4000F;
+  --acc:#0A5CB8; --acc2:#0A5CB8;
+  --purple:#5B45C9; --orange:#C87400; --teal:#136C8C;
+  --link:#0A5CB8; --good:#0B6E3F; --warn:#8A5D00; --bad:#C4000F;
+  --tab-dashboard:#0A5CB8; --tab-paste:#8A5D00; --tab-board:#0B6E3F;
+  --tab-coverage:#5B45C9; --tab-checklist:#C87400;
+  --tab-reference:rgba(60,60,67,.6); --tab-history:#136C8C; --tab-admin:#C4000F;
   background-image:none; background-color:#F2F2F7;
 }
 html.daylight .card { box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 16px rgba(0,0,0,.06); }
@@ -496,7 +516,16 @@ body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
 
 /* Now hero (v60.43) */
 .now-title { font-size: 34px; font-weight: 700; letter-spacing: -.8px; color: var(--txt); line-height: 1.05; }
-.now-sub { font-size: 13px; color: var(--txt2); margin: 2px 0 12px; }
+.now-sub { font-size: 13px; color: var(--txt2); margin: 2px 0 0; }   /* v60.256 B3: title + date are one unit, 2px apart */
+#now-hero { display: flex; flex-direction: column; gap: 12px; }        /* v60.256 B3/F3: the screen owns its vertical rhythm */
+#now-hero > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.now-status { display: flex; flex-direction: column; gap: 10px; }        /* B4 phone: stacked; desktop: a grid (see ≥900) */
+.now-status > * { margin: 0 !important; }
+.now-coming .now-sec-hd { margin: 0 0 6px 0; }
+.now-paste { border-radius: 12px; padding: 12px 14px; cursor: pointer; background: var(--bg2); border: 1px solid var(--bdr); }
+.now-paste .np-k { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--amber); }
+.now-paste .np-h { font-size: 15px; font-weight: 800; color: var(--txt); margin: 2px 0 4px; }
+.now-paste .np-p { font-size: 12px; color: var(--txt2); }
 .now-attn { border-radius: 16px; padding: 16px; margin-bottom: 14px; border: 1px solid var(--bdr); background: var(--bg2); }
 .now-attn.urgent { background: rgba(255,69,58,.12); border-color: rgba(255,69,58,.4); }
 .now-attn.warn   { background: rgba(255,204,0,.10); border-color: rgba(255,204,0,.4); }
@@ -624,14 +653,32 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
    Mobile keeps a plain block so everything stacks in the original order. */
 .now-cockpit{ display:block; }
 @media (min-width:900px){
-  .now-cockpit{ display:grid; grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr); gap:20px; align-items:start; }
-  .now-rail{ position:sticky; top:60px; }
+  .now-cockpit{ display:block; }   /* v60.256 B3: Now is four full-width bands — no rail */
+  .now-rail{ position:static; }
 }
 .floor-seg{display:inline-flex;background:var(--bg3);border-radius:8px;padding:2px}
 .fseg{background:none;border:none;color:var(--txt3);font-family:var(--ff-ui);font-size:12px;font-weight:700;padding:3px 11px;border-radius:6px;cursor:pointer;line-height:1.4}
 .fseg.on{background:rgba(255,255,255,.16);color:var(--txt)}
 /* v60.85: Design "FLOOR MAP · LIVE" look — accent-bordered station cards, count badges, people as pills */
-.fm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.fm-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px;margin-bottom:6px}
+/* v60.256 · Design Sep-11 C · the spatial floor map: one framed card, computed grid areas (QTA / floaters / shuttling only when occupied) */
+.fm-map{display:grid;gap:6px;align-items:stretch;padding:10px;border-radius:16px;background:var(--bg2);border:1px solid var(--bdr);margin-bottom:0}
+.fm-map-hd{grid-area:hd;display:flex;align-items:center;gap:8px;padding:0 2px 2px;min-width:0;flex-wrap:wrap}
+.fm-map-hd .fm-map-t{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)}
+.fm-pane{position:relative;box-sizing:border-box;min-width:0;border-radius:12px;padding:10px 12px;border:1px solid;-webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+.fm-pane.hero{border-radius:14px;min-height:72px;background-image:linear-gradient(180deg,rgba(255,255,255,.35),rgba(255,255,255,0) 45%);-webkit-backdrop-filter:blur(22px) saturate(1.4);backdrop-filter:blur(22px) saturate(1.4)}
+html.glass:not(.daylight) .fm-pane{box-shadow:inset 0 1px 0 rgba(255,255,255,.14)} html.glass:not(.daylight) .fm-pane.hero{background-image:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,0) 45%)}
+.fm-pane-hd{display:flex;align-items:center;gap:4px 6px;margin-bottom:8px;min-width:0;flex-wrap:wrap}
+.fm-pane-gem{flex:none;font-size:13px} .fm-pane.soft .fm-pane-gem{font-size:11px} html.glass:not(.daylight) .fm-pane-gem{text-shadow:0 0 8px currentColor}
+.fm-pane-lbl{font-size:13px;font-weight:800;color:var(--txt);letter-spacing:-.1px;white-space:nowrap;flex:none} .fm-pane.soft .fm-pane-lbl{font-size:11px;color:var(--txt2)}
+.fm-pane-cnt{margin-left:auto;flex:none;padding-left:4px;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--txt2)} .fm-pane.short .fm-pane-cnt{color:var(--red)}
+.fm-pane .fm-pills{display:flex;flex-direction:column;gap:5px} .fm-pane.wide .fm-pills{flex-direction:row;flex-wrap:wrap}
+.fm-pane .fm-pill{display:block;max-width:100%;box-sizing:border-box;overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .fm-pane.wide .fm-pill{display:inline-flex}
+.fm-pane .fm-empty{font-size:11.5px;font-weight:600;white-space:nowrap;padding:2px 0} .fm-pane.short .fm-empty{color:var(--red);font-weight:800;opacity:1}
+.fm-band{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:10px;border:1px dashed var(--bdr2);flex-wrap:wrap;min-width:0}
+.fm-band-lbl{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);white-space:nowrap}
+.fm-band .fm-pill{border-radius:999px;padding:3px 9px;font-size:11.5px}
+@media(min-width:900px){ .fm-map{gap:8px;padding:12px} .fm-pane{padding:10px 12px} .fm-pane.hero{padding:12px 14px} .fm-pane-lbl{font-size:14px} }
 .fm-zone{background:var(--bg2);border:1px solid var(--bdr);border-radius:12px;padding:9px 10px;min-height:52px}
 .fm-zone-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
 .fm-zone-lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
@@ -1236,12 +1283,12 @@ select option { background: var(--bg3); }
 /* ── SUMMARY TILES ─────────────────────────────────────────────────────── */
 .summary-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0,1fr));
   gap: 10px;
   margin-bottom: 16px;
 }
 @media (max-width: 600px) {
-  .summary-row { grid-template-columns: repeat(2, 1fr); }
+  .summary-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
 }
 .summary-tile {
   background: var(--bg3);
@@ -1520,8 +1567,8 @@ select option { background: var(--bg3); }
 .xxar-lbl{font-size:9px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--txt3)}
 
 /* ── QUICK LINKS ── */
-.quick-links{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
-@media(max-width:500px){.quick-links{grid-template-columns:repeat(2,1fr)}}
+.quick-links{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+@media(max-width:500px){.quick-links{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .ql-btn{background:var(--bg2);border:2px solid var(--bdr);border-radius:10px;padding:16px 12px;
   cursor:pointer;transition:all .15s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
 .ql-btn:hover{border-color:var(--acc);background:var(--bg3);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
@@ -1597,8 +1644,8 @@ body.theme-bold .mgr-item:hover{ transform:translateY(-2px); box-shadow:0 16px 3
 .ch .badge,.badge{font-size:10px;background:var(--bg3);padding:2px 8px;border-radius:10px;color:var(--txt3);font-weight:400;letter-spacing:.02em;text-transform:none;font-family:var(--ff-ui)}
 
 /* ── KPI TILES ── */
-.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
-@media(max-width:600px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+.kpi-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+@media(max-width:600px){.kpi-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .kpi{background:var(--bg2);border:1px solid var(--bdr);border-radius:7px;padding:14px 12px;cursor:pointer;transition:all .15s}
 .kpi:hover{border-color:var(--bdr2);background:var(--bg3)}
 .kpi-lbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt3);margin-bottom:5px}
@@ -1931,7 +1978,7 @@ select option{background:var(--bg3)}
     background:#fff !important; border:1px solid #9a9a9e !important;
     border-radius:4px !important; page-break-inside:avoid; break-inside:avoid;
   }
-  .board-wrap { grid-template-columns:repeat(5,1fr) !important; gap:5px !important; }
+  .board-wrap { grid-template-columns:repeat(5,minmax(0,1fr)) !important; gap:5px !important; }
   .tile { padding:6px 8px !important; }
   .tile-name { color:#000 !important; font-size:10px !important; font-weight:700 !important; }
   .tile-net  { font-size:17px !important; font-weight:800 !important; }
@@ -1977,12 +2024,12 @@ select option{background:var(--bg3)}
   /* Board tiles — v60.88: 3 columns on phone (Design). #board-grid ID specificity to beat the
      base #board-grid auto-fill rule. */
   #board-grid.board-wrap {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0,1fr));
   }
 
   /* KPI row — 2x2 on mobile */
   .kpi-row {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0,1fr));
   }
 
   /* Topbar compact */
@@ -2001,12 +2048,12 @@ select option{background:var(--bg3)}
    tab bar becomes a left sidebar (brand at top, nav rows, Calm Mode toggle at bottom),
    active row = green with a soft green fill. Phone bar is untouched below this width. */
 @media (min-width: 900px) {
-  body { padding-bottom: 0; padding-left: 216px; }
+  body { padding-bottom: 0; padding-left: 164px; }   /* v60.256 B1: sidebar 216 → 164 */
   #nav {
     flex-direction: column; align-items: stretch;
-    top: 0; bottom: 0; right: auto; width: 216px;
+    top: 0; bottom: 0; right: auto; width: 164px; box-sizing: border-box;
     border-top: none; border-right: 1px solid var(--bdr);
-    padding: 16px 12px 12px; gap: 3px; overflow-y: auto;
+    padding: 14px 10px; gap: 4px; overflow-y: auto;
   }
   #nav-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 18px; }
   .nav-brand-tile { width: 34px; height: 34px; border-radius: 9px; background: var(--accent);
@@ -2015,12 +2062,34 @@ select option{background:var(--bg3)}
   .nav-brand-txt { font-size: 17px; font-weight: 800; color: var(--txt); letter-spacing: -.02em; }
   .nbtn {
     flex: none; flex-direction: row; justify-content: flex-start;
-    gap: 13px; padding: 11px 12px; border-radius: 10px; min-height: 0;
+    gap: 10px; padding: 10px 12px; border-radius: 10px; min-height: 0; width: 100%; box-sizing: border-box; text-align: left;
   }
+  .nbtn .ni { flex: none; }   /* v60.256 F4: icons in a row-flex nav item never collapse */
   .nbtn.nb-desk { display: flex; }   /* v60.245 (Sep-9 design B5): desktop = Now · Plan · Board · People · Admin */
   #person-panel, #station-panel { left: auto !important; right: 0 !important; top: 48px !important; bottom: 0 !important; width: 400px; max-height: none !important; border-radius: 0 !important; border-top: none !important; border-left: 1px solid var(--bdr2); box-shadow: -6px 0 24px rgba(0,0,0,.25) !important; }   /* v60.245 (B7): the card docks right, nothing opens over anything */
-  .nbtn-lbl { font-size: 15px; font-weight: 600; }
-  .nbtn.on { background: rgba(35,201,131,.14); color: var(--accent); }
+  .nbtn-lbl { font-size: 13.5px; font-weight: 700; letter-spacing: -.1px; }
+  .nbtn.on { background: rgba(35,201,131,.16); color: var(--accent); }   /* v60.256 B1: full-width pill, GOOD .16 dark */
+  html.daylight .nbtn.on { background: rgba(11,110,63,.13); }            /* GOOD .13 light */
+  .scr { max-width: none; padding: 14px 8px; }                            /* v60.256 B2: content fills the frame */
+  #screen-more > div, #screen-people > div { max-width: none; }
+  /* B7 · More and People read as two columns; Admin doors as a 3-across card grid */
+  #screen-more > div { column-count: 2; column-gap: 20px; }
+  #screen-more > div > h1 { column-span: all; }
+  #screen-more .more-group, #screen-more .now-sec-hd { break-inside: avoid; }
+  #screen-more .now-sec-hd { break-after: avoid; }
+  #pl-list { column-count: 2; column-gap: 16px; }
+  #pl-list .pl-row, #pl-list .now-sec-hd { break-inside: avoid; }
+  #pl-list .now-sec-hd { break-after: avoid; }
+  .adm-doors { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+  .adm-doors .btn { text-align: left; padding: 12px 14px; border-radius: 12px; font-size: 13px; min-width: 0; box-sizing: border-box; }
+  /* B5 · Plan: verdict + counters full width, then stations left / timeline right at 6:6 */
+  .plan-cols { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 0 16px; align-items: start; }
+  .plan-col-l, .plan-col-r { min-width: 0; }
+  /* B6 · Board: tiles 4-up full width; the hourly flow sits full width beneath (16 hour columns need ~690px) */
+  #board-grid.board-wrap { grid-template-columns: repeat(4, minmax(0,1fr)); }
+  /* B4 · Now status row: the track count is the number of cards actually rendered */
+  .now-status { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0,1fr); gap: 10px; }
+  .fm-pane.hero { min-height: 88px; }
   .nbtn:hover:not(.on) { background: var(--bg3); color: var(--txt); }
   #nav-calm { display: flex; align-items: center; justify-content: space-between;
     margin-top: auto; padding: 12px 10px 4px; gap: 10px; }
@@ -2147,6 +2216,7 @@ button { cursor: pointer; }
 <!-- ── NAV ── -->
 <!-- v60.42: iOS 5-item bottom tab bar. Secondary screens (Paste, Inventory,
      Reference, History, Admin) live under More. -->
+<div id="ritual-strip" class="vl-mgr" style="display:none"></div>   <!-- v60.254: the ritual ticker (desktop mgr mode; phone only past due) -->
 <div id="nav">
   <!-- v60.86: Design-look nav — monochrome SVG line icons, consistent green active state.
        Desktop (>=900px) reflows this bar into a left sidebar (see @media below). -->
@@ -2198,6 +2268,11 @@ button { cursor: pointer; }
       <button class="more-row" onclick="dayModeCycle()">
         <span class="more-ic tile" style="background:rgba(255,214,77,.16)">☀️</span>
         <span class="more-lbl">Daylight theme<span class="more-sub" id="daymode-sub">Dark — the branch default</span></span>
+        <span class="more-ch">⇄</span>
+      </button>
+      <button class="more-row" onclick="paletteCycle()">   <!-- v60.256 A3: four daylight palettes, per device -->
+        <span class="more-ic tile" style="background:rgba(143,174,207,.22)">🎨</span>
+        <span class="more-lbl">Daylight palette<span class="more-sub" id="palette-sub">Porcelain — daylight ground</span></span>
         <span class="more-ch">⇄</span>
       </button>
       <button class="more-row" onclick="toggleDensity()">
@@ -2521,7 +2596,7 @@ button { cursor: pointer; }
 <div class="scr" id="screen-board">
   <!-- v60.65 (Design handoff §3.5): iOS kicker + timestamp over a "Live Board" large title -->
   <div style="font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--txt3);margin-bottom:1px">AVAILABILITY<span id="board-updated"></span></div>
-  <div style="display:flex;align-items:center;gap:8px"><h1 class="scr-title" style="flex:1">Live Board</h1><button onclick="boardMore()" title="Refresh the board, inventory" style="padding:5px 12px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer">⋯</button></div>
+  <div style="display:flex;align-items:center;gap:8px"><h1 class="scr-title" style="flex:1">Live Board</h1><span data-stf></span><button onclick="boardMore()" title="Refresh the board, inventory" style="padding:5px 12px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer">⋯</button></div>
   <!-- v60.60: outbound-cancellation → walk-up 1-way flag -->
   <div id="board-cancel-flag" class="board-cancel-flag"></div>
   <!-- v60.62: city-event → fleet-pressure flag -->
@@ -2700,6 +2775,7 @@ button { cursor: pointer; }
   <!-- v60.242 (Sep-9 design C1/C5): the verdict card, three counters and the station list lead the page. -->
   <div id="verdict-card"></div>
   <div id="plan-counters"></div>
+  <div class="plan-cols"><div class="plan-col-l">   <!-- v60.256 B5: stations left / timeline right at ≥900px; plain stack on the phone -->
   <div id="station-list" style="margin-bottom:12px"></div>
   <div id="plan-act-old" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <button class="vl-mgr" onclick="openCallOff()" title="Mark anyone off today — coverage adjusts instantly"
@@ -2715,6 +2791,7 @@ button { cursor: pointer; }
   </div>
 
   <!-- ① WHO'S ON -->
+  </div><div class="plan-col-r">
   <div class="sp-step" id="sp-step-1">
     <span class="sp-n">①</span> Who's on
   </div>
@@ -2771,6 +2848,7 @@ button { cursor: pointer; }
       </div>
     </div>
   </div>
+  </div></div>
 
   <!-- ② WHERE ARE THE GAPS -->
   <div class="sp-step" id="sp-step-2">
@@ -2801,7 +2879,7 @@ button { cursor: pointer; }
   </div>
 
   <div id="sched-auto-bar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center">
-    <button class="btn btn-g btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Auto-distribute Exit & Counter rotations for TODAY based on coverage rules">
+    <button class="btn btn-g btn-sm" onclick="stfSnap('Auto-fill');autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" title="Auto-distribute Exit & Counter rotations for TODAY based on coverage rules">
       ⚡ Fill today's gaps
     </button>
     <button class="btn btn-sm" onclick="gfxStart()" title="One gap at a time — apply or skip, with the reasoning shown"
@@ -2819,9 +2897,8 @@ button { cursor: pointer; }
 
   <!-- Coverage action bar (manager mode — undo/redo only) -->
   <div id="cov-action-bar" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-    <button class="btn btn-gh btn-sm" onclick="undoCoverage()" title="Undo">↩ Undo</button>
-    <button class="btn btn-gh btn-sm" onclick="redoCoverage()" title="Redo">↪ Redo</button>
-    
+    <span data-stf></span>
+
   </div>
 
   <!-- v60.242: ⋯ More — the demoted fix-it buttons and choosers, one row, closed by default -->
@@ -2830,9 +2907,8 @@ button { cursor: pointer; }
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
       <button class="btn btn-sm" onclick="gfxStart()" style="border:1px solid var(--accent);background:rgba(35,201,131,.10);color:var(--accent);font-weight:800">▶ Guided fix</button>
       <button class="btn btn-sm" onclick="gfxPlanView()" style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">🧮 Whole plan</button>
-      <button class="btn btn-sm" onclick="autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">⚡ Fill today's gaps</button>
-      <button class="btn btn-gh btn-sm" onclick="undoCoverage()">↩ Undo</button>
-      <button class="btn btn-gh btn-sm" onclick="redoCoverage()">↪ Redo</button>
+      <button class="btn btn-sm" onclick="stfSnap('Auto-fill');autoSchedule();buildCoverageTimeline();toast('Schedule rebuilt')" style="border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-weight:700">⚡ Fill today's gaps</button>
+      <span data-stf></span>
       <button class="btn btn-gh btn-sm" onclick="openPlanToday()">📋 Plan today</button>
       <button class="btn btn-gh btn-sm" onclick="openStaffingNeeds()">📊 Who I need today</button>
       <button class="btn btn-gh btn-sm" onclick="openTrainingMap()">🎓 Training map</button>
@@ -3039,7 +3115,7 @@ button { cursor: pointer; }
       <div style="margin-bottom:12px">
         <div id="adm-grp-ops">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">⚡ Operations</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          <div class="adm-doors" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
             <button class="btn btn-g btn-sm" id="adm-tab-annc" onclick="showAdminSection('annc')">📣 Announcements</button>
             <!-- v60.185: the quote is a communications act, so it lives beside
                  announcements rather than in settings. -->
@@ -3056,7 +3132,7 @@ button { cursor: pointer; }
         </div>
         <div id="adm-grp-setup" style="display:none">
           <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--txt3);margin-bottom:5px">🔧 Setup — set once, rarely changes</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div class="adm-doors" style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-gh btn-sm" id="adm-tab-staff" onclick="showAdminSection('staff')">👥 Staff</button>
             <button class="btn btn-gh btn-sm" onclick="openDisplayNames()">🏷 Display names</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
@@ -4751,7 +4827,9 @@ function dayModeGet(){ try{ return localStorage.getItem('cmh-daymode')||'light';
 function dayModeApply(){
   var m=dayModeGet();
   var light = m==='light' || (m==='auto' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
-  if(document.documentElement) document.documentElement.classList.toggle('daylight', !!light);
+  var pal=(typeof paletteGet==='function')?paletteGet():null, darkGlass=!!(light && pal && pal.darkGlass);   // v60.256 A3: Inverted = daylight ground, night glass
+  if(document.documentElement) document.documentElement.classList.toggle('daylight', !!light && !darkGlass);
+  try{ paletteApplyVars(!!light); }catch(e){}
   var sub=document.getElementById('daymode-sub');
   if(sub) sub.textContent = m==='dark' ? 'Dark — night palette'
     : (m==='light' ? 'Light — the branch default' : 'Auto — follows this device\u2019s setting');
@@ -4807,13 +4885,59 @@ function glassGround(hour, night, opts){
   var pol=opts.status || ((typeof STATE!=='undefined'&&STATE&&STATE.walkUpPolicy)||'open'); var status = pol==='open'?'open': pol==='closed'?'closed':'capped';
   var safety=opts.safety||0;
   if(safety===0){ try{ var h2=new Date().getHours()+new Date().getMinutes()/60; var solos=(typeof soloCoverage==='function')?(soloCoverage(h2)||[]):[]; var un=solos.filter(function(x){ return (x.tier||0)>=2 && !x.fresh; }).length; safety = un>=2?2:(un===1?1:0); }catch(e){} }
-  var g=_glassStops(night?GLASS_NIGHT:GLASS_DAY, hour);
+  var pal=opts.palette||((typeof paletteGet==='function')?paletteGet():null);   // v60.256 A3: the day ground is the palette's
+  var g=_glassStops(night?GLASS_NIGHT:((pal&&pal.stops)||GLASS_DAY), hour);
   if(safety===1) g = night?['#2A1E0E','#332512','#3A2C16']:['#F6D9A8','#F8E6C8','#FAF0DF'];
   if(safety===2) g = night?['#2A0F0E','#3A1614','#421B19']:['#F2B8B0','#F6D3CE','#F9E6E2'];
   var glow = night ? {open:'rgba(35,201,131,.30)',capped:'rgba(255,204,0,.22)',closed:'rgba(255,69,58,.28)'}[status] : {open:'rgba(15,122,71,.26)',capped:'rgba(176,122,0,.30)',closed:'rgba(176,38,26,.26)'}[status];
-  var sun = night ? 'rgba(255,255,255,.10)' : 'rgba(255,255,255,.7)';
+  var sun = night ? 'rgba(255,255,255,.10)' : ((pal&&pal.sun)||'rgba(255,255,255,.7)');
   return { base:g[2], safety:safety, status:status,
     image:'radial-gradient(ellipse 120% 50% at 50% -10%, '+glow+', rgba(255,255,255,0) 70%), radial-gradient(ellipse 70% 45% at 90% 100%, '+sun+', rgba(255,255,255,0) 70%), linear-gradient(172deg, '+g[0]+' 0%, '+g[1]+' 52%, '+g[2]+' 100%)' };
+}
+// ════════════════════════════════════════════════════════════════════════
+// v60.256 · DESIGN SEP-11 A3 · DAYLIGHT PALETTES — four grounds, one `dark` flag
+// Each palette carries six ground keyframes (3:30a → 3:30a, close colour held
+// until the day turns), an ink ramp, the three glass grades + hairlines, the
+// sun and a shadow tint. Porcelain is the default. "Inverted" keeps a daylight
+// sky under smoked dark glass: `darkGlass:true` simply removes the .daylight
+// class, so every accent and grade flips to its night value with no second
+// code path (the sim's `dark = night || palette.darkGlass`). Per device, like
+// the daylight setting (a phone outdoors and the back-office monitor differ).
+// ════════════════════════════════════════════════════════════════════════
+var DAY_PALETTES = {
+  porcelain: { label:'Porcelain', sun:'rgba(255,255,255,.72)',
+    stops:[[4,['#8FAECF','#C6D3E2','#E7E3DA']],[8.5,['#6FA8E0','#EBCFA6','#F0E9DA']],[13,['#8CC0EA','#E7E0CE','#DDE8D6']],[17.5,['#F0B478','#E79D96','#C6B6DF']],[21.5,['#CFA1A1','#A797CE','#8FA0CC']],[27.5,['#8593BC','#AEB6CE','#D6D5DE']]],
+    ink:['#14120F','#2E2B25','#46423B'], card:'rgba(255,255,255,.74)', hero:'rgba(255,255,255,.85)', chip:'rgba(255,255,255,.8)', hair:'rgba(255,255,255,.95)', hairRow:'rgba(40,28,24,.14)', hairD:'rgba(40,28,24,.34)', shadowTint:'40,28,24' },
+  slate: { label:'Slate', sun:'rgba(255,255,255,.55)',
+    stops:[[4,['#6F7E92','#9AA6B4','#C3CAD2']],[8.5,['#7D90A8','#A8B5C2','#D2D7DC']],[13,['#8FA3B8','#B6C1CC','#DADEE2']],[17.5,['#93889E','#B3A9AF','#D3CBCA']],[21.5,['#6E7183','#8E93A2','#B4B8C3']],[27.5,['#5A6272','#7D8494','#A6ACB8']]],
+    ink:['#0E1116','#262D36','#434A55'], card:'rgba(252,253,255,.78)', hero:'rgba(255,255,255,.88)', chip:'rgba(252,253,255,.84)', hair:'rgba(255,255,255,.92)', hairRow:'rgba(20,28,40,.14)', hairD:'rgba(20,28,40,.34)', shadowTint:'18,26,38' },
+  ink: { label:'Ink & Amber', sun:'rgba(255,236,196,.6)',
+    stops:[[4,['#5B6472','#8C8B8C','#C0B4A6']],[8.5,['#6E6F7C','#A79A90','#D6C6B1']],[13,['#7D8592','#B0A99D','#DED3C0']],[17.5,['#A2795E','#C79C74','#E4CBA9']],[21.5,['#6D5A55','#947C6C','#BFA68C']],[27.5,['#4E545E','#7A756F','#A99C8C']]],
+    ink:['#15120E','#2D271F','#47413A'], card:'rgba(255,252,246,.76)', hero:'rgba(255,253,249,.88)', chip:'rgba(255,252,246,.82)', hair:'rgba(255,254,250,.95)', hairRow:'rgba(50,38,26,.16)', hairD:'rgba(50,38,26,.36)', shadowTint:'54,42,28' },
+  smoked: { label:'Inverted', darkGlass:true, sun:'rgba(255,255,255,.14)',
+    stops:[[4,['#1C2331','#272E3C','#333A46']],[8.5,['#1E3350','#3A4152','#44464C']],[13,['#274361','#3C4C5C','#414C52']],[17.5,['#4B3B58','#5A3E4A','#5C4440']],[21.5,['#2B2A45','#34324C','#2E3A52']],[27.5,['#171C2A','#20263A','#262C3C']]],
+    ink:['#FFFFFF','rgba(240,242,248,.84)','rgba(240,242,248,.72)'], card:'rgba(24,26,34,.52)', hero:'rgba(24,26,34,.62)', chip:'rgba(255,255,255,.14)', hair:'rgba(255,255,255,.22)', hairRow:'rgba(255,255,255,.12)', hairD:'rgba(255,255,255,.32)', shadowTint:'0,0,0' }
+};
+var PALETTE_ORDER=['porcelain','slate','ink','smoked'];
+function paletteKey(){ try{ var k=localStorage.getItem('cmh-palette'); return DAY_PALETTES[k]?k:'porcelain'; }catch(e){ return 'porcelain'; } }
+function paletteGet(){ return DAY_PALETTES[paletteKey()]; }
+function paletteCycle(){
+  var nx=PALETTE_ORDER[(PALETTE_ORDER.indexOf(paletteKey())+1)%PALETTE_ORDER.length];
+  try{ localStorage.setItem('cmh-palette', nx); }catch(e){}
+  dayModeApply();
+  if(typeof toast==='function') toast('🎨 '+DAY_PALETTES[nx].label+' — this device only');
+}
+function dayModeIsLight(){ var m=dayModeGet(); return m==='light' || (m==='auto' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches); }
+// the glass grades the CSS reads (var(--g-*)); cleared at night so the night defaults apply
+function paletteApplyVars(light){
+  var el=document.documentElement; if(!el || !el.style) return;
+  var pal=paletteGet(), keys=['card','hero','chip','hair','hairRow','hairD','ink1','ink2','ink3','shadow'];
+  if(!light){ keys.forEach(function(k){ el.style.removeProperty('--g-'+k); }); return; }
+  el.style.setProperty('--g-card', pal.card); el.style.setProperty('--g-hero', pal.hero); el.style.setProperty('--g-chip', pal.chip);
+  el.style.setProperty('--g-hair', pal.hair); el.style.setProperty('--g-hairRow', pal.hairRow); el.style.setProperty('--g-hairD', pal.hairD);
+  el.style.setProperty('--g-ink1', pal.ink[0]); el.style.setProperty('--g-ink2', pal.ink[1]); el.style.setProperty('--g-ink3', pal.ink[2]);
+  el.style.setProperty('--g-shadow', pal.shadowTint);
+  var sub=document.getElementById('palette-sub'); if(sub) sub.textContent=pal.label+(pal.darkGlass?' — daylight sky, dark glass':' — daylight ground');
 }
 var GLASS_ON = true;   // flip to false to fall back to the flat daylight paper + the v60.203 night wash
 function applyWash(force){
@@ -4832,7 +4956,7 @@ function applyWash(force){
     }
     if(hc){ el.style.backgroundImage='none'; el.style.backgroundColor=el.classList.contains('daylight')?'#FFFFFF':'#000'; return; }
     var t=Date.now(); if(!force && t-_washLast<60000) return; _washLast=t;
-    var gg=glassGround(null, !el.classList.contains('daylight'));
+    var gg=glassGround(null, !((typeof dayModeIsLight==='function')?dayModeIsLight():el.classList.contains('daylight')));   // v60.256: Inverted has no .daylight class but a daylight ground
     el.style.backgroundColor=gg.base; el.style.backgroundImage=gg.image;
   }catch(e){}
 }
@@ -5000,6 +5124,8 @@ function startClock() {
       if (onDuty > 0) { onDutyChip.textContent = onDuty + ' on duty'; onDutyChip.style.display = 'block'; }
       else { onDutyChip.style.display = 'none'; }
     }
+    try{ if(typeof ritualStripRender==='function') ritualStripRender(); }catch(e){}   // v60.254
+    try{ if(typeof stfRefresh==='function') stfRefresh(); }catch(e){}   // v60.255
   }
   tick();
   setInterval(tick, 10000);
@@ -6037,12 +6163,13 @@ function buildBoardGrid() {
       var _ageMin=Math.round((Date.now()-STATE.boardUpdatedAt)/60000);
       var _hr=new Date().getHours();
       var _staleWarn = _ageMin>120 && _hr>=7 && _hr<=21;
-      bu.textContent = _staleWarn
-        ? ' · ⚠ pasted '+(_ageMin>=60? Math.floor(_ageMin/60)+'h '+(_ageMin%60)+'m' : _ageMin+'m')+' ago — re-paste for a true board'
+      var _yday=false; try{ _yday = _bizDayKey(new Date(STATE.boardUpdatedAt)) !== _bizDayKey(); }catch(e){}
+      // v60.256 (Design E): the marker sits on bare ground where no single hue clears the whole day arc — give it a chip
+      bu.innerHTML = _yday ? ' · <span class="bd-stale">yesterday · stale</span>'
+        : _staleWarn ? ' · <span class="bd-stale">⚠ pasted '+(_ageMin>=60? Math.floor(_ageMin/60)+'h '+(_ageMin%60)+'m' : _ageMin+'m')+' ago — re-paste for a true board</span>'
         : ' · Updated ' + new Date(STATE.boardUpdatedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-      bu.style.color = _staleWarn ? 'var(--amber)' : '';
-      bu.style.fontWeight = _staleWarn ? '800' : '';
-    } else bu.textContent='';
+      bu.style.color = ''; bu.style.fontWeight = '';
+    } else bu.innerHTML=' · <span class="bd-stale">no paste yet · stale</span>';
   }
   buildBoardOverrides();   // v60.66: keep the per-group switch grid in sync with tiles
   const data = getGroupNetData();
@@ -6338,6 +6465,7 @@ function toggleCheck(mode, text) {
   _clStamp(key, text, STATE.checklist[key][text]);
   saveState();
   renderChecklist(mode);
+  try{ if(typeof ritualStripRender==='function') ritualStripRender(); }catch(e){}   // v60.254
 }
 
 function resetChecklist() {
@@ -9336,12 +9464,12 @@ function sbQuickAbsence(pid){
 // because once marked off they're filtered out of the rest of the
 // timeline and can no longer be tapped to undo via the person panel.
 function reinstatePerson(pid) {
+  stfSnap('Back on · '+_pidNick(pid));   // v60.255: before the write (was after — undo did nothing)
   if (!STATE.todayOverrides) STATE.todayOverrides = {};
   if (STATE.todayOverrides[pid] !== 'callout') return;
   delete STATE.todayOverrides[pid];
   if (STATE.staffDuty) STATE.staffDuty[pid] = true;
   saveState();
-  if (typeof saveCoverageSnapshot === 'function') saveCoverageSnapshot();
   if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
   if (typeof buildMorningBriefing === 'function') buildMorningBriefing();
   if (typeof buildCoverageUI === 'function') buildCoverageUI();
@@ -9772,6 +9900,7 @@ function mgrAssignStation(pid, val){
   if(typeof openPersonPanel==='function') openPersonPanel(pid);
 }
 function setStation(key, val) {
+  stfSnap('Station · '+_pidNick(key)+' → '+(val||'Floating'));   // v60.255
   // v60.142: guard — warn (but allow) if a manager manually puts someone with an
   // active exit accommodation onto Exit Booth. Their accommodation still stands.
   var _act=(typeof accomForStation==='function')?accomForStation(val):null;   // v60.244: any activity
@@ -9927,6 +10056,7 @@ function clearExitAccommodation(pid){
 // with existing blocks (later block trims earlier ones at the boundary,
 // matching how managers usually re-assign in real time).
 function addMgmtBlock(pid, from, to, station) {
+  stfSnap('Block added · '+_pidNick(pid));   // v60.255
   if (typeof from !== 'number' || typeof to !== 'number' || from >= to) {
     return { ok:false, error:'Invalid time range' };
   }
@@ -9969,6 +10099,7 @@ function addMgmtBlock(pid, from, to, station) {
 
 // Remove block at index `idx` from manager's block list.
 function removeMgmtBlock(pid, idx) {
+  stfSnap('Block removed · '+_pidNick(pid));   // v60.255
   if (!STATE.mgmtBlocks || !STATE.mgmtBlocks[pid]) return;
   STATE.mgmtBlocks[pid].splice(idx, 1);
   if (!STATE.mgmtBlocks[pid].length) delete STATE.mgmtBlocks[pid];
@@ -10113,10 +10244,10 @@ function setupMgmtBlockHandlers() {
       st.blockEl.style.width = 'calc(' + ((st.origTo - st.origFrom) / SPAN_H * 100) + '% - 2px)';
       return;
     }
+    stfSnap('Block moved · '+_pidNick(st.pid||''));   // v60.255: before the write
     blocks[st.bidx].from = newFrom;
     blocks[st.bidx].to   = newTo;
     saveState();
-    if (typeof saveCoverageSnapshot === 'function') saveCoverageSnapshot();
     if (typeof buildCoverageTimeline === 'function') buildCoverageTimeline();
     if (typeof toast === 'function') toast(`Block: ${blocks[st.bidx].station}`);
   });
@@ -10195,6 +10326,7 @@ function openEditMgmtBlockModal(pid, bidx) {
 }
 
 function saveEditMgmtBlock(pid, bidx) {
+  stfSnap('Block edited · '+_pidNick(pid));   // v60.255
   const fromEl = document.getElementById('emb-from');
   const toEl   = document.getElementById('emb-to');
   const stEl   = document.getElementById('emb-station');
@@ -10227,6 +10359,7 @@ function deleteMgmtBlockFromModal(pid, bidx) {
 }
 
 function toggleDuty(key) {
+  stfSnap('On-duty · '+_pidNick(key));   // v60.255
   cycleDuty(key);
 }
 
@@ -12041,6 +12174,7 @@ function absenceTypeOf(pid){
   return ((STATE.todayOverrides||{})[pid]==='callout') ? 'calledoff' : null;
 }
 function setAbsence(pid, type){
+  stfSnap(((type==='pto'||type==='vaca')?'Time off · ':'Called off · ')+_pidNick(pid));   // v60.255
   if(typeof rotInvalidate==='function') rotInvalidate();   // v60.192: pool changed
   if(!STATE.todayOverrides) STATE.todayOverrides={};
   if(!STATE.absenceType)    STATE.absenceType={};
@@ -12067,6 +12201,7 @@ function setAbsence(pid, type){
   _absenceRefresh(pid, type);
 }
 function clearAbsence(pid){
+  stfSnap('Back on · '+_pidNick(pid));   // v60.255
   if(typeof rotInvalidate==='function') rotInvalidate();   // v60.192
   if(STATE.todayOverrides) delete STATE.todayOverrides[pid];
   if(STATE.absenceType)    delete STATE.absenceType[pid];
@@ -12322,7 +12457,9 @@ function renderNow() {
   });
   const ritual = h < 11 ? 'Opening' : h < 16 ? 'Mid-shift' : 'Closing';
 
-  let html = `<div class="now-title">Now</div><div class="now-sub">${dateStr} · ${timeStr}</div>`;
+  // v60.256 (Design Sep-11 B3): four full-width bands — header → stat line → attention → status row → floor map.
+  // #now-hero owns the rhythm (flex column, gap 12); every band is a direct child with no margins.
+  let html = `<div class="now-hd"><div class="now-title">Now</div><div class="now-sub">${dateStr} · ${timeStr}</div></div>`;
   html += (typeof boardBarHtml==='function') ? boardBarHtml() : '';   // v60.158
   html += weatherStripHtml(); // v60.59: weather + protection/safety nudge
   html += `<div class="now-attn ${attn.cls}"><div class="now-kicker">${attn.kicker}</div>
@@ -12340,7 +12477,17 @@ function renderNow() {
   // The glance strip (Res/Ret/Net/CS/Hot) shows in both modes. ✋Update keeps the tap-in.
   const _fv = (STATE.floorView==='list') ? 'list' : 'map';
   const _fs = (typeof floorSection==='function') ? floorSection() : {strip:'',body:''};
-  html += `<div class="now-sec-hd" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+  // the stat line sits right under the header (B3); the floor header moves INSIDE the framed map card (C)
+  if(_fs.strip){ html = html.replace('</div></div>', '</div></div>'+_fs.strip); }   // right after the now-hd band (its title+date close together)
+  const _floorHd = `<div class="fm-map-hd"><span class="fm-map-t">On the floor now</span><span style="font-size:11px;color:var(--txt3)">· ${_fs.onNow!=null?_fs.onNow+' on':''}${offPlan?` · <span style="color:var(--up)">${offPlan} off-plan</span>`:''}</span>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:10px">
+      <span class="floor-seg">
+        <button class="fseg${_fv==='list'?' on':''}" onclick="setFloorView('list')">List</button>
+        <button class="fseg${_fv==='map'?' on':''}" onclick="setFloorView('map')">Map</button>
+      </span>
+      <button onclick="showFloorSheet()" style="background:none;border:none;color:var(--exit);font-family:var(--ff-ui);font-size:13px;font-weight:700;cursor:pointer;padding:0">✋ Update</button>
+    </span></div>`;
+  html += `<div class="now-sec-hd" style="display:none;align-items:center;justify-content:space-between;gap:8px">
     <span>On the floor right now${offPlan?` · <span style="color:var(--up)">${offPlan} off-plan</span>`:''}</span>
     <span style="display:flex;align-items:center;gap:10px">
       <span class="floor-seg">
@@ -12350,30 +12497,34 @@ function renderNow() {
       <button onclick="showFloorSheet()" style="background:none;border:none;color:var(--exit);font-family:var(--ff-ui);font-size:13px;font-weight:700;cursor:pointer;padding:0">✋ Update</button>
     </span>
   </div>`;
-  html += _fs.strip || '';
+  // the status row (B4): ritual · paste prompt (only while the board is stale before noon) · coming up
+  let _pasteCard = '';
+  try{ var _bt=STATE.boardUpdatedAt, _fresh = _bt && _bizDayKey(new Date(_bt))===_bizDayKey(); if(!_fresh && h<12) _pasteCard = `<div class="now-paste" onclick="showTab('paste')"><div class="np-k">Board is stale</div><div class="np-h">Paste this morning's GreenLight exports</div><div class="np-p">The Board shows ${_bt?'yesterday':'nothing'} until the first paste lands.</div></div>`; }catch(e){}
+  let _coming = `<div class="card now-coming" style="padding:12px 14px"><div class="now-sec-hd">Coming up</div>`
+    + (typeof weekAheadRow==='function' ? weekAheadRow() : '')
+    + `<div style="font-size:12.5px;color:var(--txt2);line-height:1.6">🍽 Next lunch · <b style="color:var(--txt)">${nextLunch?_nowFmtH(nextLunch.at)+' · '+nextLunch.who:'—'}</b>`
+    + (_fs.upcoming&&_fs.upcoming.length?`<br>👋 ${_fs.upcoming.slice(0,3).map(i=>i.nick+' <b style="color:var(--txt)">'+i.shiftStr.split('–')[0]+'</b>').join(' · ')}`:'')
+    + `</div></div>`;
+  const _ritualCard = (typeof ritualCardHtml==='function') ? ritualCardHtml() : '';
+  html += `<div class="now-status">${_ritualCard}${_pasteCard}${_coming}</div>`;
+  // the floor map (C): one framed card, header inside
   if (_fs.empty) {
-    html += _fs.empty;
+    html += `<div class="card fm-map" style="display:block">${_floorHd}${_fs.empty}</div>`;
   } else if (_fv==='map') {
-    html += _fs.body;
+    html += `<div class="card fm-map" style="${_fs.mapStyle||''}">${_floorHd}${_fs.body}</div>`;
   } else {
-    html += `<div class="more-group">`;
+    html += `<div class="card fm-map" style="display:block">${_floorHd}<div class="more-group">`;
     html += floorRow('🟦','Counter',ctrHave,ctrNeed,zones.counter, closed||ctrHave>=ctrNeed);
     html += floorRow('🟩','Exit booth',exitHave,exitNeed,zones.exit, closed||exitHave>=exitNeed);
     html += floorRow('↩','Returns',zones.returns.length,0,zones.returns, true);
-    html += `</div>`;
+    html += `</div></div>`;
   }
 
   // v60.96: DESKTOP COCKPIT — at >=900px the secondary info (Today's Signals + Coming up)
   // becomes a right rail beside the attention card + floor map. On mobile .now-cockpit is a
   // plain block, so main then rail stack in the SAME order as before (weather stays up top in
   // main) — mobile layout is byte-identical.
-  let rail = '';
-  rail += opsSignalsHtml(); // v60.60: cancellations → walk-up 1-way signal + counter
-  rail += `<div class="now-sec-hd">Coming up</div><div class="more-group">`;
-  rail += (typeof weekAheadRow==='function' ? weekAheadRow() : ''); // v60.72: week-ahead demand heads-up → calendar
-  rail += `<div class="more-row" style="cursor:default"><span class="more-ic">🍽</span><span class="more-lbl">Next lunch</span><span class="now-floor-val" style="color:var(--up)">${nextLunch?_nowFmtH(nextLunch.at)+' · '+nextLunch.who:'—'}</span></div>`;
-  rail += `<button class="more-row" onclick="showTab('checklist')"><span class="more-ic">✅</span><span class="more-lbl">${ritual} ritual</span><span class="more-ch">›</span></button>`;
-  rail += `</div>`;
+  let rail = opsSignalsHtml();   // v60.256: the cancellation signal is its own quiet band under the map; the rest of the old rail is the status row now
 
   // v60.185: the quote leads the first open of the day and settles to a quiet
   // line once someone taps "Start the day". It sits ABOVE everything because
@@ -12381,10 +12532,8 @@ function renderNow() {
   const _qHero  = (typeof qotdHeroHtml==='function')  ? qotdHeroHtml()  : '';
   const _qQuiet = (typeof qotdQuietHtml==='function') ? qotdQuietHtml() : '';
   const _self = (typeof selfHomeHtml==='function') ? selfHomeHtml() : '';   // v60.243 (C2): a locked device that knows who is looking leads with their own day
-  const _ritual = (typeof ritualCardHtml==='function') ? ritualCardHtml() : '';   // v60.245 (B5): the ritual for this hour, as a card
   setTimeout(function(){ try{ if(typeof nowLadder==='function') nowLadder(); }catch(e){} }, 30);   // v60.248
-  el.innerHTML = _self + _ritual + _qHero
-    + `<div class="now-cockpit"><div class="now-main">${html}${_qQuiet}</div><div class="now-rail">${rail}</div></div>`;
+  el.innerHTML = _self + _qHero + html + rail + _qQuiet;   // v60.256 B3: flat bands, no cockpit split (the ritual card lives in the status row)
 }
 
 function autoRoute() { if(typeof autoRouteByTime==="function") autoRouteByTime(); }
@@ -13413,7 +13562,7 @@ function buildHourlyView() {
     const netColor = d.net>0?'var(--green)':d.net<0?'var(--red)':'var(--txt3)';
 
     chartEl.innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">
         <div style="background:var(--bg3);border-radius:6px;padding:12px;text-align:center">
           <div style="font-size:9px;color:var(--txt3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Reservations</div>
           <div style="font-family:var(--ff-mono);font-size:28px;font-weight:700;color:var(--amber)">${d.res}</div>
@@ -14596,7 +14745,7 @@ function getAltPosition(pid) {
 }
 
 function setAltPosition(pid, posKey) {
-  saveCoverageSnapshot();
+  stfSnap('Rotation · '+_pidNick(pid)+' · '+posKey);   // v60.255
   if (!STATE.altSchedule) STATE.altSchedule = {};
   // v60.213 (Matt: "Counter 1st doesn't work" on Guenther's card). Root cause:
   // "Counter 1st" mapped to 'normal', which just DELETED the override — i.e.
@@ -14811,6 +14960,7 @@ function _shiftModParts(pid, personName) {
 }
 
 function applyShiftMod(pid, presetIdx) {
+  stfSnap('Hours · '+_pidNick(pid));   // v60.255
   if (!STATE.shiftMod) STATE.shiftMod = {};
   // Rebuild presets for this person to get the right one
   const person = ROSTER_CXR.find(p => p.name.replace(/\s/g,'_') === pid);
@@ -14899,6 +15049,7 @@ function _shiftEditRebuild(){
   try{ if(typeof renderCovStrip==='function') renderCovStrip(); }catch(e){}
 }
 function applyCustomShiftMod(pid) {
+  stfSnap('Hours · '+_pidNick(pid));   // v60.255
   const rs = document.getElementById('sm-start-range'), re = document.getElementById('sm-end-range');
   if (!rs || !re) return;
   let sv = parseFloat(rs.value), ev = parseFloat(re.value);
@@ -14933,6 +15084,7 @@ function smOnLunchText(lunchHrs) {
   const lbl = document.getElementById('sm-lunch-lbl'); if (lbl) lbl.textContent = 'Lunch: ' + smFmtH(v) + '–' + smFmtH(v + (lunchHrs || 0.5));
 }
 function applyLunch(pid) {
+  stfSnap('Lunch · '+_pidNick(pid));   // v60.255
   const r = document.getElementById('sm-lunch-range');
   if (!r) return;
   if (!STATE.customLunch) STATE.customLunch = {};
@@ -14944,6 +15096,7 @@ function applyLunch(pid) {
   if (typeof toast === 'function') toast('Lunch set: ' + smFmtH(parseFloat(r.value)));
 }
 function resetLunch(pid) {
+  stfSnap('Lunch reset · '+_pidNick(pid));   // v60.255
   if (STATE.customLunch) delete STATE.customLunch[pid];
   saveState();
   if (typeof buildStaffGrid === 'function') buildStaffGrid();
@@ -14978,6 +15131,7 @@ function setRotationFromModal(pid, personName, key) {
 // ═══════════════════════════════════════════════════════════════════════
 
 function cycleStationPref(pid, personName) {
+  stfSnap('Preference · '+_pidNick(pid));   // v60.255
   if (!STATE.stationPref) STATE.stationPref = {};
   const current = STATE.stationPref[pid] || 'none';
   const next = current === 'none' ? 'counter'
@@ -15204,6 +15358,7 @@ function toggleEmailDataSection() {
 
 // Adjust split: +/-30 or +/-60 min on Block 1, opposite on Block 2
 function adjustSplit(pid, minutesDelta) {
+  stfSnap('Split · '+_pidNick(pid));   // v60.255
   if (!STATE.altSchedule)  STATE.altSchedule  = {};
   if (!STATE.customSplits) STATE.customSplits = {};
   const cur = STATE.altSchedule[pid] || 'normal';
@@ -15228,7 +15383,7 @@ function adjustSplit(pid, minutesDelta) {
 }
 
 function toggleNoLunch(pid) {
-  saveCoverageSnapshot();
+  stfSnap('No lunch · '+_pidNick(pid));   // v60.255
   if (!STATE.altSchedule) STATE.altSchedule = {};
   const key = pid + '_nolunch';
   if (STATE.altSchedule[key]) delete STATE.altSchedule[key];
@@ -15678,22 +15833,62 @@ function floorSection() {
     <span class="fm-stat" onclick="${_stop}showTab('checklist')">CS <b style="color:var(--wu)">${_cs}</b></span>
     <span class="fm-stat" onclick="${_stop}showTab('checklist')">Hot <b style="color:${_hot!=='—'&&+_hot>0?'var(--na)':'var(--txt3)'}">${_hot}</b></span>
   </div>`;
-  let out=`<div class="fm-grid">`;
-  zoneDefs.forEach(z=>{ if(!z.always && !z.p.length) return; out+=zoneCard(z.t,z.i,z.p,z.a,z.m); });
-  out+=`</div>`;
+  // v60.256 (Design Sep-11 C): the SPATIAL map. Counter stacked left · Returns top-middle · Emerald
+  // bottom-middle (quieter) · Exit stacked right · QTA a narrow column right of Exit ONLY when someone
+  // is there · Floating a dashed band across the top, Shuttling / On lunch / Office dashed bands across the
+  // bottom, each only when occupied. Grid areas are computed per render. Each zone carries a wash of its
+  // own station colour + hairline; a short station overrides to the red tint. The legacy 2-col fm-grid stays
+  // for the List toggle's older readers (nothing else calls zoneCard now).
+  const _dark = !(document.documentElement && document.documentElement.classList.contains('daylight'));
+  const _rgb = (v)=>{ v=String(v||'').trim(); const m=v.match(/^#([0-9a-f]{6})$/i); if(m){ const n=parseInt(m[1],16); return [(n>>16)&255,(n>>8)&255,n&255].join(','); } const r=v.match(/rgba?\(([^)]+)\)/); return r? r[1].split(',').slice(0,3).map(x=>x.trim()).join(',') : '128,128,128'; };
+  const _cssv = (n)=>{ try{ return getComputedStyle(document.documentElement).getPropertyValue(n); }catch(e){ return ''; } };
+  const _col = { counter:_cssv('--counter'), exit:_cssv('--exit'), returns:_cssv('--returns'), emerald:_cssv('--eb'), qta:_cssv('--txt3') };
+  const qtaPeople = [...onShift,...mgmtOn].filter(i=>/qta/i.test((STATE.staffStation||{})[i.pid]||'') || /qta/i.test(i.info.label||''));
+  const shuttlePeople = [...onShift,...mgmtOn].filter(i=>i.info.zone==='shuttle' || /shuttl/i.test((STATE.staffStation||{})[i.pid]||''));
+  const qtaSet = new Set(qtaPeople.map(i=>i.pid)), shSet = new Set(shuttlePeople.map(i=>i.pid));
+  const officePeople = activeMgmt.filter(i=>!qtaSet.has(i.pid) && !shSet.has(i.pid) && !floatPeople.some(f=>f.pid===i.pid));
+  const pane = (key, label, people, need, strong, area, wide) => {
+    const hv=people.length, short=need>0 && hv<need, rgb=_rgb(_col[key]);
+    const tint = short ? (_dark?'rgba(150,52,56,.40)':'rgba(255,214,208,.85)') : (_dark?`rgba(${rgb},${strong?.16:.10})`:`rgba(${rgb},${strong?.22:.14})`);
+    const edge = short ? (_dark?'rgba(248,113,113,.55)':'rgba(215,0,21,.55)') : (_dark?`rgba(${rgb},.40)`:`rgba(${rgb},.55)`);
+    const _open = (typeof GF_AREA_META!=='undefined' && GF_AREA_META[key]) ? `openStationPanel('${key}')` : '';
+    return `<div class="fm-pane ${strong?'hero':'soft'}${short?' short':''}${wide?' wide':''}" style="grid-area:${area};background:${tint};border-color:${edge};cursor:${_open?'pointer':'default'}" ${_open?`onclick="${_open}"`:''}>
+      <div class="fm-pane-hd"><span class="fm-pane-gem" style="color:${_col[key]||'var(--txt3)'}">●</span><span class="fm-pane-lbl">${label}</span><span class="fm-pane-cnt">${need?`${hv}/${need}`:(hv?String(hv):'')}</span></div>
+      <div class="fm-pills">${people.length?people.map(personRow).join(''):`<span class="fm-empty">${short?'Empty':'—'}</span>`}</div></div>`;
+  };
+  const band = (label, people, area) => people.length ? `<div class="fm-band" style="grid-area:${area}"><span class="fm-band-lbl">${label}</span>${people.map(personRow).join('')}</div>` : '';
+  const hasQta = qtaPeople.length>0, hasFloat = floatPeople.length>0, hasShuttle = shuttlePeople.length>0, hasLunch = lunchPeople.length>0, hasOffice = officePeople.length>0;
+  const nCols = hasQta ? 4 : 3, wide = (n)=>Array(nCols).fill(n).join(' ');
+  const span = hasQta ? 'counter returns exit qta' : 'counter returns exit';
+  const areas = `'${wide('hd')}' ` + (hasFloat?`'${wide('float')}' `:'') + `'${span}' '${span.replace('returns','eb')}'` + (hasShuttle?` '${wide('shuttle')}'`:'') + (hasLunch?` '${wide('lunch')}'`:'') + (hasOffice?` '${wide('office')}'`:'') + ` '${wide('foot')}'`;   // single quotes: this lands inside a double-quoted style attribute
+  const cols = `minmax(0,1fr) minmax(0,1.1fr) minmax(0,1fr)${hasQta?' minmax(0,.7fr)':''}`;
+  let out = '';
+  out += band('Floating', floatPeople, 'float');
+  out += pane('counter','Counter',ctrPeople,rules.counterMin||0,true,'counter',false);
+  out += pane('returns','Returns',returnsPeople,rules.returnsMin||0,true,'returns',true);
+  out += pane('emerald','Emerald',emeraldPeople,0,false,'eb',true);
+  out += pane('exit','Exit',exitPeople,rules.exitMin||0,true,'exit',false);
+  if(hasQta) out += pane('qta','QTA',qtaPeople,0,false,'qta',false);
+  out += band('Shuttling', shuttlePeople, 'shuttle');
+  out += band('On lunch', lunchPeople, 'lunch');
+  out += band('Office', officePeople, 'office');
+  const mapStyle = `grid-template-columns:${cols};grid-template-areas:${areas}`;
+  const onNow = onShift.length + mgmtOn.length;
+  let foot = '';
 
   // Coming up — who's arriving next (compact chips)
   const upcoming=offShift.filter(i=>
     !i.callout&&i.info.zone==='off'&&i.ss!=null&&i.ss>nowH
   ).sort((a,b)=>a.ss-b.ss).slice(0,4);
   if(upcoming.length){
-    out+=`<div class="fm-comingup"><span class="fm-cu-lbl">Coming up</span>${upcoming.map(i=>`<span class="fm-cu-chip">${i.nick} <b>${i.shiftStr}</b></span>`).join('')}</div>`;
+    foot+=`<div class="fm-comingup" style="border-top:none;padding-top:0"><span class="fm-cu-lbl">Coming up</span>${upcoming.map(i=>`<span class="fm-cu-chip">${i.nick} <b>${i.shiftStr}</b></span>`).join('')}</div>`;
   }
 
   const calledOff=offShift.filter(i=>i.callout);
-  if(calledOff.length) out+=`<div style="margin-top:4px;font-size:9px;color:var(--red)">❌ Off: ${calledOff.map(i=>i.nick).join(', ')}</div>`;
+  if(calledOff.length) foot+=`<div style="margin-top:4px;font-size:10px;color:var(--red)">❌ Off: ${calledOff.map(i=>i.nick).join(', ')}</div>`;
+  out += `<div style="grid-area:foot;min-width:0">${foot}</div>`;
 
-  return {strip:_strip, body:out};
+  return {strip:_strip, body:out, mapStyle:mapStyle, onNow:onNow, upcoming:upcoming};
 }
 // v60.87: thin wrapper — keeps the (now hidden) legacy #dash-sched-content in sync.
 // The live, toggleable floor section renders inside the Now hero (renderNow → floorSection()).
@@ -15821,7 +16016,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.253'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.256'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -21317,21 +21512,23 @@ function gfxRender(){
   openModal('▶ Guided fix', b);
 }
 function gfxApply(altIdx){
+  return stfAction('Guided fix', function(){   // v60.255: one entry for the whole action
   var g=_gfx.queue[_gfx.idx]; if(!g) return gfxSummary();
-  var exp; try{ exp=buildExpectedToday(); }catch(e){ exp={}; }
-  var free=(gfRankCandidates(g,exp)||[]).filter(function(c){ return c.tier!=='protected'; });
-  var pick=free[altIdx||0]; if(!pick) return gfxSkip();
-  try{ coApplyFill(g.area, g.hour, pick.pid); }catch(e){}
-  _gfx.applied.push({pid:pick.pid, nick:pick.nick, area:g.area, hour:g.hour});
-  if(typeof rotInvalidate==='function') rotInvalidate();
-  try{ buildCoverageTimeline(); renderCovStrip(); }catch(e){}
-  // THE RE-DETECT: rebuild the remaining queue from live state — a fix that
-  // opened a new hole enqueues it; a fix that closed two skips the second.
-  var done=_gfx.applied.length;
-  _gfx.queue=_gfx.queue.slice(0,_gfx.idx).concat(gfxGaps());
-  _gfx.idx=Math.min(_gfx.idx, _gfx.queue.length);
-  if(typeof toast==='function') toast('✓ '+pick.nick+' → '+g.area+' · '+done+' fixed');
-  gfxRender();
+    var exp; try{ exp=buildExpectedToday(); }catch(e){ exp={}; }
+    var free=(gfRankCandidates(g,exp)||[]).filter(function(c){ return c.tier!=='protected'; });
+    var pick=free[altIdx||0]; if(!pick) return gfxSkip();
+    try{ coApplyFill(g.area, g.hour, pick.pid); }catch(e){}
+    _gfx.applied.push({pid:pick.pid, nick:pick.nick, area:g.area, hour:g.hour});
+    if(typeof rotInvalidate==='function') rotInvalidate();
+    try{ buildCoverageTimeline(); renderCovStrip(); }catch(e){}
+    // THE RE-DETECT: rebuild the remaining queue from live state — a fix that
+    // opened a new hole enqueues it; a fix that closed two skips the second.
+    var done=_gfx.applied.length;
+    _gfx.queue=_gfx.queue.slice(0,_gfx.idx).concat(gfxGaps());
+    _gfx.idx=Math.min(_gfx.idx, _gfx.queue.length);
+    if(typeof toast==='function') toast('✓ '+pick.nick+' → '+g.area+' · '+done+' fixed');
+    gfxRender();
+  });
 }
 function gfxSkip(){ _gfx.idx++; gfxRender(); }
 function gfxEnd(){ closeModal(); }
@@ -21567,6 +21764,7 @@ function ptFlipDirection(pid, ss, se, exp){
 
 // ── actions ────────────────────────────────────────────────────────────────
 function ptAddLunch(pid, t){
+  stfSnap('Lunch · '+_pidNick(pid)+' '+_hFmt(t));   // v60.255
   var exp={}; try{ exp=buildExpectedToday(); }catch(e){}
   var isCXR=exp[pid]&&exp[pid].person&&exp[pid].person.role==='CXR';
   if(isCXR){ if(!STATE.customLunch) STATE.customLunch={}; STATE.customLunch[pid]=t; }
@@ -21677,6 +21875,7 @@ function ptRender(){
   b+=card('<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:4px">The rest of the day</div>'
     +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5">'+biEsc(solveHeadline(sv))+'</div>'
     +'<div style="font-size:10.5px;color:var(--txt3);margin-top:4px">Solved from now, hardest window first · no-hurt first · staff before managers · juniors first · nobody booked twice at once.</div>'
+    +'<div style="margin-top:8px">'+stfButtonsHtml()+'</div>'
     +(sv.improved.length?'<div style="font-size:10.5px;color:var(--txt3);margin-top:3px">Tidied: '+biEsc(sv.improved.slice(0,4).join(' · '))+(sv.improved.length>4?' · +'+(sv.improved.length-4):'')+'</div>':''), (sv.left.length?'var(--amber3)':(sv.decisions.length?'var(--bdr2)':'var(--accent)')));
   // before the plan: the two facts the plan is measured against, plus rotation checks and lunches
   var e1=ptEval(1), e2=ptEval(2), e3=ptEval(3);
@@ -22134,29 +22333,91 @@ function printScheduleMap() {
 }
 
 
-function saveCoverageSnapshot() {
-  _coverageHistory.push(JSON.stringify({staffStation:STATE.staffStation,altSchedule:STATE.altSchedule,shiftMod:STATE.shiftMod,customSplits:STATE.customSplits,specialBlocks:STATE.specialBlocks,mgmtBlocks:STATE.mgmtBlocks}));
-  if(_coverageHistory.length>20)_coverageHistory.shift();
-  _coverageRedoStack=[];
+// ════════════════════════════════════════════════════════════════════════
+// v60.255 · ONE UNDO / REDO FOR EVERY STAFFING CHANGE
+// Matt (2026-09-11): "undo and redo button on any staffing changes." Before:
+// a 20-deep coverage stack fed by 11 of ~90 write sites, buttons on one
+// screen, and the plan's own one-step undo beside it. Now: every staffing
+// writer calls stfSnap(label) BEFORE it writes (one choke point, labelled so
+// the button says what it undoes), one stack, one ↩ ↪ pair rendered wherever
+// staffing changes happen, ⌘Z / ⇧⌘Z on desktop. Thirty deep, kept per
+// business day in localStorage on THIS device (a change made on another
+// device isn't here to undo — the button says so). Redo clears on a new change.
+// A snapshot identical to the top of the stack is not pushed twice (nested
+// writers, or a tap that changed nothing) — it just takes the newer label.
+// ════════════════════════════════════════════════════════════════════════
+var STF_KEYS=['staffStation','altSchedule','altPinned','shiftMod','customSplits','customLunch','mgmtBlocks','specialBlocks','todayOverrides','absenceType','staffDuty','particulars','dayMarks','stationPref','pto'];
+var STF_MAX=30;
+function _stfSnapshot(){ var o={}; STF_KEYS.forEach(function(k){ o[k]=(STATE[k]===undefined)?null:STATE[k]; }); return JSON.stringify(o); }
+function _stfRestore(snap){ var o=JSON.parse(snap); STF_KEYS.forEach(function(k){ if(o[k]==null) delete STATE[k]; else STATE[k]=o[k]; }); }
+function _stfStore(){
+  var tk=(typeof todayKey==='function')?todayKey():'';
+  if(!window._stf){ try{ var raw=localStorage.getItem('cmh-undo'); var o=raw?JSON.parse(raw):null; window._stf=(o && o.day===tk && Array.isArray(o.undo)) ? o : null; }catch(e){ window._stf=null; } }
+  if(!window._stf || window._stf.day!==tk) window._stf={day:tk, undo:[], redo:[]};   // a new business day starts clean
+  return window._stf;
 }
-var _coverageHistory=[], _coverageRedoStack=[];
-function undoCoverage() {
-  if(!_coverageHistory.length){toast('Nothing to undo');return;}
-  const redoSnap=JSON.stringify({staffStation:STATE.staffStation,altSchedule:STATE.altSchedule,shiftMod:STATE.shiftMod,customSplits:STATE.customSplits,specialBlocks:STATE.specialBlocks,mgmtBlocks:STATE.mgmtBlocks});
-  _coverageRedoStack.push(redoSnap);
-  const undoSnap=_coverageHistory.pop();
-  if(!undoSnap){toast('Nothing to undo');return;}
-  try{Object.assign(STATE,JSON.parse(undoSnap));}catch(e){toast('Undo failed');return;}
-  buildCoverageTimeline();buildSwitchboard();toast('Undone ↩');
+function _stfPersist(){ try{ localStorage.setItem('cmh-undo', JSON.stringify(_stfStore())); }catch(e){} }
+// composite writers (a cover, apply-all, guided fix, fill) run their primitives inside stfAction(): one entry, the action's label
+function stfAction(label, fn){ stfSnap(label); window._stfDepth=(window._stfDepth||0)+1; try{ return fn(); } finally{ window._stfDepth--; } }
+function stfSnap(label){
+  if((window._stfDepth||0)>0) return;   // inside an action (or an undo/redo re-render): the outer entry already holds the pre-state
+  var st=_stfStore(), snap=_stfSnapshot(), top=st.undo[st.undo.length-1];
+  label=String(label||'change').slice(0,60);
+  if(top && top.snap===snap){ top.label=label; top.at=Date.now(); }
+  else { st.undo.push({label:label, at:Date.now(), snap:snap}); if(st.undo.length>STF_MAX) st.undo.shift(); }
+  st.redo=[]; _stfPersist(); stfRefresh();
 }
-function redoCoverage() {
-  if(!_coverageRedoStack.length){toast('Nothing to redo');return;}
-  const snap=_coverageRedoStack.pop();
-  if(!snap){toast('Nothing to redo');return;}
-  saveCoverageSnapshot();
-  try{Object.assign(STATE,JSON.parse(snap));}catch(e){toast('Redo failed');return;}
-  buildCoverageTimeline();buildSwitchboard();toast('Redone ↪');
+function stfTop(){ var st=_stfStore(), t=st.undo[st.undo.length-1]; return t?t.label:null; }
+function stfRedoTop(){ var st=_stfStore(), t=st.redo[st.redo.length-1]; return t?t.label:null; }
+function stfUndo(){
+  var st=_stfStore(); if(!st.undo.length){ if(typeof toast==='function') toast('Nothing to undo on this device'); return false; }
+  var e=st.undo.pop(); st.redo.push({label:e.label, at:Date.now(), snap:_stfSnapshot()});
+  try{ _stfRestore(e.snap); }catch(err){ st.undo.push(e); st.redo.pop(); if(typeof toast==='function') toast('Undo failed'); return false; }
+  _stfPersist(); if(typeof logAction==='function') logAction('Undo · '+e.label); window._stfDepth=(window._stfDepth||0)+1; try{ _stfAfter('↩ Undone · '+e.label); } finally{ window._stfDepth--; } return true;
 }
+function stfRedo(){
+  var st=_stfStore(); if(!st.redo.length){ if(typeof toast==='function') toast('Nothing to redo'); return false; }
+  var e=st.redo.pop(); st.undo.push({label:e.label, at:Date.now(), snap:_stfSnapshot()}); if(st.undo.length>STF_MAX) st.undo.shift();
+  try{ _stfRestore(e.snap); }catch(err){ st.redo.push(e); st.undo.pop(); if(typeof toast==='function') toast('Redo failed'); return false; }
+  _stfPersist(); if(typeof logAction==='function') logAction('Redo · '+e.label); window._stfDepth=(window._stfDepth||0)+1; try{ _stfAfter('↪ Redone · '+e.label); } finally{ window._stfDepth--; } return true;
+}
+function _stfAfter(msg){
+  try{ rotInvalidate(); }catch(e){}
+  try{ saveState(); }catch(e){}
+  try{ var _rot=buildSmartRotation(); window._lastRotations=window._lastRotations||{}; if(_rot&&_rot.rotations) _rot.rotations.forEach(function(r){ window._lastRotations[r.pid]=r; }); }catch(e){}
+  ['buildCoverageTimeline','buildSwitchboard','buildBoardGrid','buildDashSchedMini','renderNow','renderPlanV2','ritualStripRender'].forEach(function(fn){ try{ if(typeof window[fn]==='function') window[fn](); }catch(e){} });
+  try{ var t=((document.getElementById('modal-title')||{}).textContent)||'', ov=document.getElementById('modal-overlay'); if(ov && ov.style.display && ov.style.display!=='none' && /Plan today/.test(t) && typeof ptRender==='function') ptRender(); }catch(e){}
+  stfRefresh(); if(msg && typeof toast==='function') toast(msg, 4000);
+}
+function stfButtonsHtml(){
+  var u=stfTop(), r=stfRedoTop(), esc=function(x){ return biEsc(String(x||'')); };
+  var b='padding:5px 10px;border-radius:999px;font-size:11.5px;font-weight:800;cursor:pointer;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis';
+  var d='opacity:.45;cursor:default';
+  return '<span class="stf vl-mgr" data-stf style="display:inline-flex;gap:6px;align-items:center">'
+    +'<button onclick="stfUndo()" title="'+(u?'Undo · '+esc(u):'Nothing to undo on this device')+'" style="'+b+(u?'':';'+d)+'"'+(u?'':' disabled')+'>↩ Undo'+(u?' · '+esc(u):'')+'</button>'
+    +'<button onclick="stfRedo()" title="'+(r?'Redo · '+esc(r):'Nothing to redo')+'" style="'+b+(r?'':';'+d)+'"'+(r?'':' disabled')+'>↪ Redo</button></span>';
+}
+function stfRefresh(){ try{ var h=stfButtonsHtml(); document.querySelectorAll('[data-stf]').forEach(function(el){ var t=document.createElement('div'); t.innerHTML=h; if(t.firstChild) el.replaceWith(t.firstChild); }); }catch(e){} }
+// ⌘Z / ⇧⌘Z (Ctrl on Windows) — desktop, manager mode, not while typing
+try{ document.addEventListener('keydown', function(e){
+  if(!(e.metaKey||e.ctrlKey) || String(e.key).toLowerCase()!=='z') return;
+  var t=e.target, tag=t&&t.tagName?t.tagName.toLowerCase():''; if(tag==='input'||tag==='textarea'||tag==='select'||(t&&t.isContentEditable)) return;
+  if(!((typeof _managerMode!=='undefined')&&_managerMode)) return;
+  e.preventDefault(); if(e.shiftKey) stfRedo(); else stfUndo();
+}); }catch(e){}
+// renders and derives run at action depth: whatever they write (lunch suggestions, auto exit
+// distribution, re-derived blocks) is never a user action and never an undo entry
+(function _stfQuietRenders(){
+  ['buildCoverageTimeline','buildSwitchboard','buildBoardGrid','buildDashSchedMini','renderNow','buildMorningBriefing','autoSchedule','autoDistributeExit','suggestLunches','autoLoadFromExpected'].forEach(function(n){
+    var f=window[n]; if(typeof f!=='function' || f._stfQuiet) return;
+    var w=function(){ window._stfDepth=(window._stfDepth||0)+1; try{ return f.apply(this, arguments); } finally{ window._stfDepth--; } };
+    w._stfQuiet=true; w._stfInner=f; window[n]=w;
+  });
+})();
+// the old names keep working — they are the same stack now
+function saveCoverageSnapshot(label){ stfSnap(label||'coverage change'); }
+function undoCoverage(){ return stfUndo(); }
+function redoCoverage(){ return stfRedo(); }
 // v60.135 (Design #3): current-hour Exit/Counter have + need, for What-if previews.
 function _whatifCoverageNow(){
   try{
@@ -22264,6 +22525,7 @@ function applyEarlyOut(pid,newEnd){
   toast(((person&&person.nick)||pid)+' early out at '+fmtH(newEnd));
 }
 function addSpecialBlock(pid, key, fromTime, toTime) {
+  stfSnap('Block · '+_pidNick(pid)+' · '+key);   // v60.255
   const sa = (SPECIAL_ASSIGNMENTS||[]).find(s=>s.key===key);
   if (!sa) return;
 
@@ -22716,6 +22978,7 @@ function gfSuggest(gap, exp){
 }
 
 function autoSchedule() {
+  // v60.255: no snapshot here — this also runs from showTab / buildCoverageTimeline when there are no rotations yet; the ⚡ buttons and coFillAll snapshot
   // 1. Assign exit rotation first (fill gaps with CXRs fairly)
   const exp=typeof buildExpectedToday==='function'?buildExpectedToday():{};
   autoDistributeExit(exp);
@@ -23182,6 +23445,7 @@ function updateManagerModeUI() {
   // class drives CSS that removes every mutating control; Unlock stays as the
   // one door back.
   try{ document.body.classList.toggle('view-locked', !_managerMode); }catch(e){}
+  try{ if(typeof ritualStripRender==='function') ritualStripRender(); }catch(e){}   // v60.254: the strip is a manager-mode thing
   const bar = document.getElementById('mgr-mode-bar');
   const status = document.getElementById('mgr-mode-status');
   const btn    = document.getElementById('mgr-mode-btn');
@@ -23903,7 +24167,7 @@ function buildManagerControls(pid,person,ss,se,fmtH) {
       h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">`;
       mgmtStations.forEach(s=>{
         const on=station===s.key;
-        h+=`<button onclick="setStation('${pid}','${s.key}');saveCoverageSnapshot();buildCoverageTimeline();openPersonPanel('${pid}')"
+        h+=`<button onclick="setStation('${pid}','${s.key}');buildCoverageTimeline();openPersonPanel('${pid}')"
           style="padding:7px 4px;border-radius:6px;border:1px solid;font-size:11px;font-weight:700;cursor:pointer;
             background:${on?s.col+'22':'var(--bg3)'};border-color:${on?s.col:'var(--bdr2)'};color:${on?s.col:'var(--txt3)'}">${s.label}</button>`;
       });
@@ -24182,10 +24446,11 @@ function planVerdict(){
   if(confirmed){
     var at=STATE.confirmedAt?_hFmt(new Date(STATE.confirmedAt).getHours()+new Date(STATE.confirmedAt).getMinutes()/60):null;
     var last=(STATE.changeLog||[])[0]; var lastAt=last?_hFmt(new Date(last.ts).getHours()+new Date(last.ts).getMinutes()/60):null;
-    return { state:'confirmed', title:'Covered through close', sub:'Confirmed'+(at?' '+at:'')+(STATE.confirmedBy?' by '+STATE.confirmedBy:'')+(lastAt?' · last change '+lastAt:''), button:null };
+    return { state:'confirmed', title:'Covered through close', sub:'Confirmed'+(at?' '+at:'')+(STATE.confirmedBy?' by '+STATE.confirmedBy:'')+(lastAt?' · last change '+lastAt:''), button:null, ritual:_verdictRitual() };
   }
-  return { state:'clean', title:'Covered through close', sub:'Nothing to fix.', button:{label:'✓ Confirm the day', js:'confirmToday()'} };
+  return { state:'clean', title:'Covered through close', sub:'Nothing to fix.', button:{label:'✓ Confirm the day', js:'confirmToday()'}, ritual:_verdictRitual() };
 }
+function _verdictRitual(){ try{ var s=ritualState(); return (s.total>0 && s.left>0) ? {label:'📋 Next: '+s.label+' · '+s.left+' left', mode:s.mode} : null; }catch(e){ return null; } }   // v60.254
 function planReadFacts(){   // v60.243 (C3): what a locked reader is told — set or not, by whom, last change
   var confirmed=!!STATE.confirmedCoverage, at=STATE.confirmedAt?_hFmt(new Date(STATE.confirmedAt).getHours()+new Date(STATE.confirmedAt).getMinutes()/60):null;
   var last=(STATE.changeLog||[])[0]; var lastAt=last?_hFmt(new Date(last.ts).getHours()+new Date(last.ts).getMinutes()/60):null;
@@ -24199,7 +24464,7 @@ function verdictCardHtml(){
   var h='<div class="v-title">'+biEsc(v.title)+'</div><div class="v-sub">'+biEsc(v.sub)+'</div>';
   if(mgr && v.button) h+='<button class="v-btn vl-mgr" onclick="'+v.button.js+'">'+biEsc(v.button.label)+'</button>';
   window._planV=v;
-  if(mgr) h+='<div class="v-ghosts vl-mgr"><a onclick="openCallOff()">📞 Someone called off</a>'+(window._planLastMove?'<a onclick="moveUndo()">↩ Undo · '+biEsc(window._planLastMove)+'</a>':'')+(v.win?'<a onclick="openMoveOptions(\''+v.area+'\','+v.win.from+','+v.win.to+',\''+v.phase+'\')">Other options</a>':'<a onclick="var d=document.getElementById(\'plan-more\'); if(d){ d.open=true; d.scrollIntoView({block:\'center\'}); }">Other ways to fix</a>')+'</div>';   /* v60.250 */
+  if(mgr) h+='<div class="v-ghosts vl-mgr"><a onclick="openCallOff()">📞 Someone called off</a>'+(stfTop()?'<a onclick="stfUndo()">↩ Undo · '+biEsc(stfTop())+'</a>':'')+(stfRedoTop()?'<a onclick="stfRedo()">↪ Redo</a>':'')+(v.win?'<a onclick="openMoveOptions(\''+v.area+'\','+v.win.from+','+v.win.to+',\''+v.phase+'\')">Other options</a>':'<a onclick="var d=document.getElementById(\'plan-more\'); if(d){ d.open=true; d.scrollIntoView({block:\'center\'}); }">Other ways to fix</a>')+(v.ritual?'<a onclick="ritualOpen(\''+v.ritual.mode+'\')">'+biEsc(v.ritual.label)+'</a>':'')+'</div>';   /* v60.250 · v60.254: the ladder's next step when nothing is short */
   return {html:h, state:v.state, verdict:v};
 }
 function stationListHtml(){
@@ -24213,7 +24478,7 @@ function stationListHtml(){
     if(!((typeof _managerMode!=='undefined')&&_managerMode)) status='';   // v60.243 (C3): locked = tinted row only, no instruction
     h+='<div class="st-row'+(short||gap?' short':'')+'" onclick="openStationPanel(\''+a+'\')"><span class="st-name"><span style="color:'+m.color+'">●</span> '+m.label+'</span>'
       +'<span class="st-count" style="color:'+(short?'var(--red)':'var(--txt)')+'">'+hv+(nd?' / '+nd:'')+'</span>'
-      +'<span class="st-names">'+(status?'<span style="color:var(--red);font-weight:700">'+biEsc(status)+'</span>'+(here.length?' · ':''):'')+biEsc(here.slice(0,3).map(function(r){ return r.nick; }).join(', '))+(here.length>3?' +'+(here.length-3):'')+'</span>'
+      +'<span class="st-names">'+(status?'<span class="st-status">'+biEsc(status)+'</span>':'')+'<span class="st-nm">'+biEsc(here.slice(0,3).map(function(r){ return r.nick; }).join(', '))+(here.length>3?' +'+(here.length-3):'')+'</span></span>'   /* v60.256 D: status above the names */
       +'<span class="st-next">'+biEsc(next)+'</span><span style="color:var(--txt3)">›</span></div>';
   });
   try{
@@ -24642,23 +24907,16 @@ function _moveAfter(){
   try{ if(typeof renderNow==='function') renderNow(); }catch(e){}
 }
 function moveApply(pid, area, from, to){
-  window._moveUndo={mb:JSON.stringify(STATE.mgmtBlocks||{}), label:_pidNick(pid)+' '+_areaLabel(area)+' '+_hFmt(from)+'–'+_hFmt(to)};
   var e=(_planExp()||{})[pid], home=null; try{ home=gfAreaAt(pid,e,from+0.01); }catch(err){}
-  var r=coverAdd(pid, from, to, area);
+  var r=stfAction('Cover · '+_pidNick(pid)+' → '+_areaLabel(area)+' '+_hFmt(from)+'–'+_hFmt(to), function(){ return coverAdd(pid, from, to, area); });   // v60.255: one stack, one entry
   if(r && r.ok===false){ if(typeof toast==='function') toast('Could not place that: '+(r.error||'')); return; }
   if(typeof saveState==='function') saveState(); if(typeof rotInvalidate==='function') rotInvalidate();
   var msg=_pidNick(pid)+' → '+_areaLabel(area)+' '+_hFmt(from)+'–'+_hFmt(to)+', then back to '+(home&&home!==area?_areaLabel(home):'their post');
   if(typeof logAction==='function') logAction('Cover · '+msg);
-  window._planLastMove=window._moveUndo.label;
   _moveAfter();
   if(typeof toast==='function') toast('✓ '+msg, 5000);
 }
-function moveUndo(){
-  var u=window._moveUndo; if(!u){ if(typeof undoCoverage==='function') undoCoverage(); return; }
-  STATE.mgmtBlocks=JSON.parse(u.mb); window._moveUndo=null; window._planLastMove=null;
-  if(typeof saveState==='function') saveState(); if(typeof rotInvalidate==='function') rotInvalidate();
-  _moveAfter(); if(typeof toast==='function') toast('Undone · '+u.label);
-}
+function moveUndo(){ return stfUndo(); }   // v60.255: the one stack
 // "Not today": this window only, this session only, nothing stored about the person
 function moveNo(pid, area, from, to, phase){
   window._moveNo=window._moveNo||{}; window._moveNo[pid+'@'+area+'@'+from]=1;
@@ -24735,6 +24993,7 @@ function _partAfter(pid){
 // set / clear one particular. Time-shaped kinds take an hour; 'not' and 'start' take an area; 'lunchLen' takes minutes.
 function partSet(pid, k, val){
   if(!pid || !PART_KINDS[k]) return false;
+  stfSnap('Particular · '+_pidNick(pid)+' · '+(PART_KINDS[k]||k));   // v60.255
   if(!STATE.particulars) STATE.particulars={};
   var list=STATE.particulars[pid]=STATE.particulars[pid]||[];
   var rec={k:k};
@@ -24751,6 +25010,7 @@ function partSet(pid, k, val){
   _partAfter(pid); return true;
 }
 function partClear(pid, k, area){
+  stfSnap('Particular cleared · '+_pidNick(pid));   // v60.255
   var list=(STATE.particulars||{})[pid]||[], rec=null;
   for(var i=list.length-1;i>=0;i--){ if(list[i].k===k && (area==null || list[i].area===area)){ rec=list[i]; list.splice(i,1); } }
   if(!rec) return;
@@ -25007,10 +25267,9 @@ function solveHeadline(sv){
 // drop every manager move in the plan at once (asks are never applied here)
 function solveApplyAll(){
   var sv=solveDay(), ms=sv.decisions.filter(function(d){ return !d.ask; }); if(!ms.length){ if(typeof toast==='function') toast('No manager moves to apply'); return; }
-  window._moveUndo={mb:JSON.stringify(STATE.mgmtBlocks||{}), label:ms.length+' manager move'+(ms.length===1?'':'s')};
-  var n=0; ms.forEach(function(d){ var r=coverAdd(d.cand.pid, d.win.from, d.win.to, d.win.area); if(!(r && r.ok===false)){ n++; if(typeof logAction==='function') logAction('Cover · '+_pidNick(d.cand.pid)+' → '+_areaLabel(d.win.area)+' '+_hFmt(d.win.from)+'–'+_hFmt(d.win.to)+' (plan)'); } });
+  var n=0; stfAction(ms.length+' manager move'+(ms.length===1?'':'s')+' (plan)', function(){ ms.forEach(function(d){ var r=coverAdd(d.cand.pid, d.win.from, d.win.to, d.win.area); if(!(r && r.ok===false)){ n++; if(typeof logAction==='function') logAction('Cover · '+_pidNick(d.cand.pid)+' → '+_areaLabel(d.win.area)+' '+_hFmt(d.win.from)+'–'+_hFmt(d.win.to)+' (plan)'); } }); });   // v60.255: one entry
   if(typeof saveState==='function') saveState(); if(typeof rotInvalidate==='function') rotInvalidate();
-  window._planLastMove=window._moveUndo.label; _moveAfter();
+  _moveAfter();
   if(typeof toast==='function') toast('✓ '+n+' manager move'+(n===1?'':'s')+' dropped in · Undo on the verdict card', 5000);
 }
 // one line per person: what today looks like for them, in words
@@ -25045,6 +25304,59 @@ function _solveWhyNot(u){   // v60.253: say WHY the want lost, from what the eng
     } else why='Exit needed them at their start';
   }catch(e){ why='the rotation needed them at '+got+' first'; }
   return 'wanted '+want+' first · got '+got+' first — '+why+' (a want, not a rule)';
+}
+// ════════════════════════════════════════════════════════════════════════
+// v60.254 · RITUAL TICKER — the next ritual item follows the manager around
+// Matt (2026-09-11): "a ritual ticker bar at the top or bottom on the desktop
+// view when in mgr mode" → all three: ① desktop manager-mode strip at the
+// bottom (next unchecked item, inline ✓ for items without fields, amber past
+// the due time, never red; "complete ✓" for ten minutes, then hides);
+// ② phone: the same strip above the tab bar ONLY while a ritual is past due
+// (the Now card stays the always-there home); ③ the verdict ladder points at
+// it when coverage is clean. Shows the NEXT THING, never just a count.
+// ════════════════════════════════════════════════════════════════════════
+var RITUAL_DUE={opening:10, mid:14, closing:23}, RITUAL_LABEL={opening:'Opening ritual', mid:'Mid-day ritual', closing:'Closing ritual'};
+function ritualState(){
+  var h=(typeof _nowH==='function')?_nowH():new Date().getHours(), mode=h<11?'opening':h<15?'mid':'closing';
+  var data=[]; try{ data=(typeof getCLDataForToday==='function')?(getCLDataForToday()[mode]||[]):((typeof CL_DATA!=='undefined'&&CL_DATA[mode])||[]); }catch(e){}
+  var cl=((STATE.checklist||{})['cl-'+mode])||{}, total=0, done=0, next=null;
+  data.forEach(function(sec){ (sec.items||[]).forEach(function(it){ if(!it||!it.t) return; total++;
+    var ok=cl[it.t]===true || (it.autoKey && typeof checkAutoComplete==='function' && checkAutoComplete(it.autoKey));
+    if(ok) done++; else if(!next) next={t:it.t, fields:!!(it.fields&&it.fields.length), sec:sec.s||''}; }); });
+  var left=Math.max(0,total-done);
+  return {mode:mode, label:RITUAL_LABEL[mode], due:RITUAL_DUE[mode], total:total, done:done, left:left, next:next, overdue:left>0 && h>=RITUAL_DUE[mode], complete:total>0 && left===0};
+}
+function ritualOpen(mode){ window._curCLMode=mode||ritualState().mode; showTab('checklist'); }
+function ritualTick(mode, text){   // the inline ✓ — same store, same stamp as the checklist screen
+  if(!STATE.checklist) STATE.checklist={};
+  toggleCheck(mode, text);
+  var rc=document.getElementById('ritual-card'); if(rc && typeof ritualCardHtml==='function'){ var t=document.createElement('div'); t.innerHTML=ritualCardHtml(); if(t.firstChild) rc.replaceWith(t.firstChild); }
+  ritualStripRender();
+  try{ if(typeof renderPlanV2==='function') renderPlanV2(); }catch(e){}
+}
+function ritualStripRender(){
+  var el=document.getElementById('ritual-strip'); if(!el) return;
+  var mgr=(typeof _managerMode!=='undefined')&&_managerMode, s=ritualState(), desk=(window.innerWidth||1024)>=900;
+  // "complete ✓" lingers ten minutes on desktop, then the strip hides
+  window._ritDone=window._ritDone||{}; if(s.complete){ if(!window._ritDone[s.mode]) window._ritDone[s.mode]=Date.now(); } else delete window._ritDone[s.mode];
+  var linger=s.complete && (Date.now()-(window._ritDone[s.mode]||0) < 10*60*1000);
+  var show = mgr && s.total>0 && (desk ? (!s.complete || linger) : s.overdue);
+  el.style.display=show?'flex':'none'; el.classList.toggle('lit', !!s.overdue); el.classList.toggle('ok', !!s.complete);
+  try{ document.body.classList.toggle('rit-strip', show); }catch(e){}
+  if(!show) return;
+  var esc=function(x){ return String(x).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); };
+  var h='<span class="rs-i">📋</span><b class="rs-l">'+biEsc(s.label)+'</b>';
+  if(s.complete) h+='<span class="rs-s">complete ✓</span>';
+  else{
+    h+='<span class="rs-s">'+s.left+' left · by '+_hFmt(s.due)+(s.overdue?' · past due':'')+'</span>';
+    if(s.next){
+      h+='<span class="rs-n">Next: '+biEsc(s.next.t)+'</span>';
+      h+= s.next.fields ? '<button class="rs-b" onclick="ritualOpen(\''+s.mode+'\')">Enter it ›</button>'
+                        : '<button class="rs-b rs-ok" onclick="ritualTick(\''+s.mode+'\',\''+esc(s.next.t)+'\')">✓ Done</button>';
+    }
+  }
+  h+='<a class="rs-o" onclick="ritualOpen(\''+s.mode+'\')">Open ›</a>';
+  el.innerHTML=h;
 }
 function _stationSheet(){
   var p=document.getElementById('station-panel');
@@ -25111,6 +25423,7 @@ function ppHubHtml(pid,p,ss,se,fmtH,entry){
   if(chips.length) h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+chips.map(function(c){ return '<span style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--bg3);border:1px solid var(--bdr2);color:var(--txt2)">'+biEsc(c)+'</span>'; }).join('')+'</div>';
   // Here today? (manager) — reuse the existing quick actions
   if(mgr && !(entry&&entry.notWorkingToday)) h+='<div class="vl-mgr">'+ppOverviewHtml(pid,p,ss,se,fmtH,entry)+'</div>';
+  if(mgr) h+='<div style="margin-bottom:8px">'+stfButtonsHtml()+'</div>';   // v60.255
   // spoke rows
   var vals={}; try{ vals.hours=fmtH(ss)+'–'+fmtH(se); var sp=(STATE.specialBlocks||{})[pid]||[]; var l=sp.find(function(b){ return b.key==='lunch'; }); if(l) vals.hours+=' · '+fmtH(l.from); }catch(e){}
   try{ vals.where=(STATE.staffStation||{})[pid]||'Floating'; }catch(e){}
@@ -26513,7 +26826,7 @@ function printAllChecklists(blank) {
   // Compact 5-cell summary strip across the top — keep as cards too
   const pol = STATE.walkUpPolicy || 'open';
   const wlbls = {open:'All Open',core:'Core Only',noncore:'Non-Core',closed:'Closed'};
-  const headerHtml = `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:8px">
+  const headerHtml = `<div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-bottom:8px">
     ${[
       ['Open Mgr', blank?'_______':f.openMgr||auto.open||'—', '#2563eb'],
       ['Close Mgr', blank?'_______':f.closeMgr||auto.close||'—', '#7c3aed'],
@@ -26686,8 +26999,8 @@ function printDashboardSummary() {
     <style>
       * {box-sizing:border-box;margin:0;padding:0;}
       body {font-family:Arial,sans-serif;padding:16px;color:#1f2937;font-size:11px;}
-      .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;}
-      .board-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;margin-bottom:10px;}
+      .grid4{display:grid;grid-template-columns:repeat(4, minmax(0,1fr));gap:6px;margin-bottom:10px;}
+      .board-grid{display:grid;grid-template-columns:repeat(5, minmax(0,1fr));gap:5px;margin-bottom:10px;}
       .box{border:1px solid #e5e7eb;border-radius:5px;padding:7px 8px;}
       .lbl{font-size:8px;font-weight:800;text-transform:uppercase;color:#6b7280;margin-bottom:3px;}
       .val{font-size:16px;font-weight:800;}
@@ -26776,7 +27089,7 @@ function printChecklist(blank) {
   const pol = STATE.walkUpPolicy || 'open';
   const wlbls = {open:'All Open', core:'Core Only', noncore:'Non-Core', closed:'Closed'};
   const summaryHtml = `
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:8px">
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-bottom:8px">
       ${[
         ['Open Mgr', blank?'_______':f.openMgr||auto.open||'—'],
         ['Close Mgr', blank?'_______':f.closeMgr||auto.close||'—'],
@@ -28299,7 +28612,7 @@ function biRender(){
     +'<button class="bi-x" onclick="closeBranchInterview()">✕</button></div>'
     +'<div class="bi-respbar"><span class="bi-resplbl">Answering as</span>'+chips+'</div>'
     +'<div class="bi-progwrap"><div class="bi-track"><i id="bi-progbar"></i></div><div class="bi-prog" id="bi-prog"></div></div>'
-    +'<div class="bi-body">'+((typeof biFast5Html==='function')?biFast5Html():'')+'<p class="bi-intro"><b style="color:#4DA3FF">Branch facts</b> are pre-filled from the app — confirm or fix. <b style="color:#AF9CFF">Your view</b> questions each manager answers separately; where you differ, reconcile to one standard at the bottom. Saves as you go.</p>';
+    +'<div class="bi-body">'+((typeof biFast5Html==='function')?biFast5Html():'')+'<p class="bi-intro"><b style="color:#4DA3FF">Branch facts</b> are pre-filled from the app — confirm or fix. <b style="color:var(--purple)">Your view</b> questions each manager answers separately; where you differ, reconcile to one standard at the bottom. Saves as you go.</p>';
   // v60.197: stations & logic first (①), then car codes get slotted after
   // the shift-windows section by importance — see the Fast Five ranking.
   h+='<div class="bi-sec"><div class="bi-sec-hd">🧭 Manager stations <span class="bi-scope fact">branch fact</span>'
@@ -28602,8 +28915,8 @@ function mcRailHtml(key){
       }
     }catch(e){}
     h+='<div class="mc-rail-card" style="border-style:dashed;border-color:rgba(255,255,255,.18);margin-top:12px"><div style="font-weight:700">🌴 Time off (PTO)</div><div class="mc-none" style="margin-top:2px">Mark someone off or plan the week from the full day view — it becomes a hard constraint for the auto-scheduler.</div></div>';
-    h+='<button class="mc-addbtn" style="width:100%;background:#23C983;color:#00301c;margin-top:4px" onclick="mcDay(\''+key+'\')">Open full day →</button>';
-    h+='<button class="mc-addbtn" style="width:100%;background:#0A84FF;color:#fff;margin-top:6px" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day →</button>';
+    h+='<button class="mc-addbtn" style="width:100%;background:var(--green);color:#00301c;margin-top:4px" onclick="mcDay(\''+key+'\')">Open full day →</button>';
+    h+='<button class="mc-addbtn" style="width:100%;background:var(--acc);color:#fff;margin-top:6px" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day →</button>';
     return h;
   }catch(e){ return ''; }
 }
@@ -28824,9 +29137,9 @@ function mcInjectStyle(){
   +'.mc-back{background:none;border:none;color:#0A84FF;font-size:15px;font-weight:600;cursor:pointer;flex:none}'
   +'.mc-x{background:#1C1C1E;color:#fff;border:1px solid rgba(255,255,255,.12);border-radius:50%;width:34px;height:34px;font-size:14px;cursor:pointer;flex:none}'
   +'.mc-monthscroll{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}'
-  +'.mc-dow{display:grid;grid-template-columns:repeat(7,1fr);padding:8px 8px 4px}'
+  +'.mc-dow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));padding:8px 8px 4px}'
   +'.mc-dow>div{text-align:center;font-size:11px;font-weight:700;color:#8E8E93}'
-  +'.mc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:0 8px 8px}'
+  +'.mc-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;padding:0 8px 8px}'
   +'.mc-cell{position:relative;min-height:62px;background:#1C1C1E;border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:4px;cursor:pointer;color:#fff;text-align:left;overflow:hidden}'
   +'.mc-cell.mc-empty{background:transparent;border:none;cursor:default}'
   +'.mc-today{border-color:#0A84FF;background:rgba(10,132,255,.12)}'
@@ -28890,7 +29203,7 @@ function mcRender(){
   h+='</div></div>';   // close .mc-grid + .mc-monthscroll
   h+='<div class="mc-rail" id="mc-rail">'+mcRailHtml(_mcSel||todayKey)+'</div>';
   h+='</div>';         // close .mc-cols
-  h+='<div class="mc-legend"><span><span class="mc-sw heavy"></span>Short / heavy demand</span><span><span class="mc-sw elev"></span>Busy</span><span>🌴 PTO</span><span>🎂 Celebration</span><span><b style="color:#64D2FF">N</b> staff scheduled</span></div>';
+  h+='<div class="mc-legend"><span><span class="mc-sw heavy"></span>Short / heavy demand</span><span><span class="mc-sw elev"></span>Busy</span><span>🌴 PTO</span><span>🎂 Celebration</span><span><b style="color:var(--returns)">N</b> staff scheduled</span></div>';
   o.innerHTML=h;
 }
 function mcNav(delta){ _mcCur=new Date(_mcCur.getFullYear(), _mcCur.getMonth()+delta, 1); mcRender(); }
@@ -28903,14 +29216,14 @@ function mcDay(key){
   // v60.137 (usability): primary day actions FIRST, so a BM who taps a day to act
   // doesn't scroll past events/celebrations/roster to find the buttons.
   h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px">'
-    +'<button class="mc-addbtn" style="background:#0A84FF;color:#fff;flex:1;min-width:120px" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day</button>'
-    +'<button class="mc-addbtn" style="background:#23C983;color:#00301c;flex:1;min-width:120px" onclick="goToWeekPlanner('+_asOffsetForKey(key)+')">🤖 Plan the week</button>'
+    +'<button class="mc-addbtn" style="background:var(--acc);color:#fff;flex:1;min-width:120px" onclick="openDayInScheduleEditor(\''+key+'\')">📋 Edit this day</button>'
+    +'<button class="mc-addbtn" style="background:var(--green);color:#00301c;flex:1;min-width:120px" onclick="goToWeekPlanner('+_asOffsetForKey(key)+')">🤖 Plan the week</button>'
     +'</div>';
   // v60.124: PTO conflict guard leads the day when time-off collides with a short day.
   var _grd = mcPtoGuard(key);
   if(_grd){
-    h+='<div class="mc-sec" style="border-color:#FF453A;background:rgba(255,69,58,.1)">'
-      +'<div class="mc-sec-h" style="color:#FF453A">⚠ PTO conflict — day is already short</div>'
+    h+='<div class="mc-sec" style="border-color:var(--red);background:rgba(255,69,58,.1)">'
+      +'<div class="mc-sec-h" style="color:var(--red)">⚠ PTO conflict — day is already short</div>'
       +'<div class="mc-item" style="font-size:13px;color:#EBEBF5">Peak coverage is <b>'+_grd.have+'/'+_grd.need+'</b> with '+biEsc(_grd.names.join(', '))+' off. Hold new PTO for this day, or add a shift.</div></div>';
   }
   // v60.72: readiness card — demand (events + ripple) vs staff scheduled
@@ -29250,7 +29563,7 @@ function rqRender(){
     else s+='<div class="rq-status '+r.status+'">'+(r.status==='approved'?'✓ Approved':'✕ Denied')+(r.decidedAt?' · '+r.decidedAt:'')+(r.applied?' · <span style="color:var(--green)">schedule updated</span>':'')+'<button class="rq-reopen" onclick="rqReopen('+r.id+')">re-open</button></div>';
     return s+'</div>';
   }
-  if(open.length){ h+='<div class="now-sec-hd" style="color:#FFCC00">Open ('+open.length+')</div>'; open.forEach(function(r){ h+=card(r); }); }
+  if(open.length){ h+='<div class="now-sec-hd" style="color:var(--amber)">Open ('+open.length+')</div>'; open.forEach(function(r){ h+=card(r); }); }
   if(done.length){ h+='<div class="now-sec-hd">Decided</div>'; done.forEach(function(r){ h+=card(r); }); }
   h+='</div>'; o.innerHTML=h;
 }
@@ -30289,7 +30602,7 @@ function asInjectStyle(){
   '.as-nm{font-weight:600;color:var(--txt,#fff);flex:1;min-width:0}' +
   '.as-tm{font-family:var(--ff-mono,monospace);font-size:11px;color:var(--txt3,rgba(235,235,245,.6))}' +
   '.as-prop{font-size:9px;font-weight:700;color:var(--up,#FFCC00);margin-left:4px}' +
-  '@media(min-width:900px){.as-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.as-day{margin-bottom:0}}';
+  '@media(min-width:900px){.as-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.as-day{margin-bottom:0}}';
   var s=document.createElement('style'); s.id='as-style'; s.textContent=css; document.head.appendChild(s);
 }
 
@@ -30734,21 +31047,23 @@ function sfSuggestStations(){
   openStationFairness();
 }
 function sfApplySuggest(){
+  return stfAction('Split shift', function(){   // v60.255: one entry for the whole action
   if(!_sfSuggestData || !_sfSuggestData.length){ return; }
-  if(!confirm('Apply these station suggestions to today’s timeline?\n\nEach manager gets a full-shift block at the suggested station — you can still split/adjust it on the timeline afterward.')) return;
-  if(!STATE.mgmtBlocks) STATE.mgmtBlocks = {};
-  var n=0;
-  _sfSuggestData.forEach(function(s){
-    if(s.start==null || s.end==null) return;
-    var label = SF_APPLY_LABEL[s.station] || s.station;
-    STATE.mgmtBlocks[s.pid] = [{from:s.start, to:s.end, station:label}];
-    n++;
+    if(!confirm('Apply these station suggestions to today’s timeline?\n\nEach manager gets a full-shift block at the suggested station — you can still split/adjust it on the timeline afterward.')) return;
+    if(!STATE.mgmtBlocks) STATE.mgmtBlocks = {};
+    var n=0;
+    _sfSuggestData.forEach(function(s){
+      if(s.start==null || s.end==null) return;
+      var label = SF_APPLY_LABEL[s.station] || s.station;
+      STATE.mgmtBlocks[s.pid] = [{from:s.start, to:s.end, station:label}];
+      n++;
+    });
+    if(typeof saveState==='function') saveState();
+    if(typeof loadScheduleForToday==='function') loadScheduleForToday(false);
+    if(typeof toast==='function') toast('✓ Applied '+n+' station suggestions to today');
+    _sfSuggestData = null;
+    openStationFairness();
   });
-  if(typeof saveState==='function') saveState();
-  if(typeof loadScheduleForToday==='function') loadScheduleForToday(false);
-  if(typeof toast==='function') toast('✓ Applied '+n+' station suggestions to today');
-  _sfSuggestData = null;
-  openStationFairness();
 }
 function sfInjectStyle(){
   if(_sfStyled) return; _sfStyled=true;
@@ -30785,7 +31100,7 @@ function sfInjectStyle(){
   '.sf-stn{font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;min-width:90px;text-align:center}' +
   '.sf-sgn{font-weight:700;color:var(--txt,#fff)}' +
   '.sf-sgw{font-size:10.5px;color:var(--txt3,rgba(235,235,245,.55));margin-left:auto;text-align:right}' +
-  '@media(min-width:900px){.sf-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.sf-row{margin-bottom:0}}';
+  '@media(min-width:900px){.sf-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.sf-row{margin-bottom:0}}';
   var s=document.createElement('style'); s.id='sf-style'; s.textContent=css; document.head.appendChild(s);
 }
 function openStationFairness(){
@@ -30871,7 +31186,7 @@ function openStationFairness(){
     '<span class="sf-note" style="display:block;margin:-6px 0 12px">✨ Suggest = a fair station for each manager working today, from the balances below. ＋ Log = tally the stations set on today’s timeline (once at end of day).</span>' +
     sgHtml +
     '<div class="sf-legend">'+legend+'</div>' +
-    (anyData ? '' : '<p class="sf-note" style="margin:-4px 0 12px">Tracking starts now — the more days you log, the sharper the fairness picture. Declare each manager’s <b>usual station</b> to describe the intended rotation in the meantime. Flags for <b style="color:var(--na,#FF453A)">stuck in Returns</b> and <b style="color:#AF9CFF">never Emerald Booth</b> appear once there’s tracked time.</p>') +
+    (anyData ? '' : '<p class="sf-note" style="margin:-4px 0 12px">Tracking starts now — the more days you log, the sharper the fairness picture. Declare each manager’s <b>usual station</b> to describe the intended rotation in the meantime. Flags for <b style="color:var(--na,#FF453A)">stuck in Returns</b> and <b style="color:var(--purple)">never Emerald Booth</b> appear once there’s tracked time.</p>') +
     '<div class="sf-grid">'+rowsHtml+'</div>' +
     '<p class="sf-note" style="margin-top:14px">Bars show each manager’s share of time by station. Next step (later): the scheduler will use these balances to <b>autosuggest</b> stations — giving the prized posts to whoever’s had the least, and rotating people off Returns.</p>' +
   '</div>';
@@ -31079,33 +31394,37 @@ function _coRefreshOpened(opened, snap){
 }
 // One-tap fill: put the suggested person on the gap's station for that block.
 function coApplyFill(area, hour, pid){
+  return stfAction('Cover · '+_pidNick(pid)+' → '+_areaLabel(area), function(){   // v60.255: one entry for the whole action
   try{
-    var exp=buildExpectedToday(), e=exp[pid]; if(!e||!e.person) return;
-    var isMgr=['ARM','BRM','ABRM','MT'].indexOf(e.person.role)>=0;
-    var station = area==='exit'?'Exit Booth' : area==='returns'?'Returns'
-                : area==='emerald'?'Emerald Booth' : 'Counter';
-    var bk=(typeof floorBlockKey==='function')?floorBlockKey(hour%24):'mid';
-    var rng=CO_BLOCK_RANGE[bk]||[hour,hour+2];
-    // v60.250 (Matt): cover the WINDOW, then back to their post — never a whole shift, for anyone.
-    var _gw=null; try{ _gw=(halfGaps([area])||[]).filter(function(g){ return hour>=Math.floor(g.from) && hour<g.to; })[0]; }catch(e){}
-    var _f=_gw?Math.max(_gw.from, Math.floor(hour)):hour, _t=_gw?_gw.to:hour+1;
-    if(typeof coverAdd==='function') coverAdd(pid, _f, _t, area);
-    else if(isMgr && typeof addMgmtBlock==='function') addMgmtBlock(pid, rng[0], rng[1], station);
-    if(typeof saveState==='function') saveState();
-    var nick=e.person.nick||String(e.person.name||'').split(' ')[0];
-    if(typeof toast==='function') toast('✓ '+nick+' → '+station);
-    // re-measure: filling one hole can reveal another
-    var snap=_coGapSnapshot();
-    if(window._coImpact) window._coImpact.opened=_coRefreshOpened(window._coImpact.opened, snap);
-    try{ buildCoverageTimeline&&buildCoverageTimeline(); }catch(e2){}
-    coRender();
-  }catch(err){ if(typeof toast==='function') toast('Could not apply that fill'); }
+      var exp=buildExpectedToday(), e=exp[pid]; if(!e||!e.person) return;
+      var isMgr=['ARM','BRM','ABRM','MT'].indexOf(e.person.role)>=0;
+      var station = area==='exit'?'Exit Booth' : area==='returns'?'Returns'
+                  : area==='emerald'?'Emerald Booth' : 'Counter';
+      var bk=(typeof floorBlockKey==='function')?floorBlockKey(hour%24):'mid';
+      var rng=CO_BLOCK_RANGE[bk]||[hour,hour+2];
+      // v60.250 (Matt): cover the WINDOW, then back to their post — never a whole shift, for anyone.
+      var _gw=null; try{ _gw=(halfGaps([area])||[]).filter(function(g){ return hour>=Math.floor(g.from) && hour<g.to; })[0]; }catch(e){}
+      var _f=_gw?Math.max(_gw.from, Math.floor(hour)):hour, _t=_gw?_gw.to:hour+1;
+      if(typeof coverAdd==='function') coverAdd(pid, _f, _t, area);
+      else if(isMgr && typeof addMgmtBlock==='function') addMgmtBlock(pid, rng[0], rng[1], station);
+      if(typeof saveState==='function') saveState();
+      var nick=e.person.nick||String(e.person.name||'').split(' ')[0];
+      if(typeof toast==='function') toast('✓ '+nick+' → '+station);
+      // re-measure: filling one hole can reveal another
+      var snap=_coGapSnapshot();
+      if(window._coImpact) window._coImpact.opened=_coRefreshOpened(window._coImpact.opened, snap);
+      try{ buildCoverageTimeline&&buildCoverageTimeline(); }catch(e2){}
+      coRender();
+    }catch(err){ if(typeof toast==='function') toast('Could not apply that fill'); }
+  });
 }
 function coFillAll(){
+  return stfAction('Fill all gaps', function(){   // v60.255: one entry for the whole action
   try{ if(typeof autoSchedule==='function') autoSchedule(); }catch(e){}
-  var snap=_coGapSnapshot();
-  if(window._coImpact) window._coImpact.opened=_coRefreshOpened(window._coImpact.opened, snap);
-  coRender();
+    var snap=_coGapSnapshot();
+    if(window._coImpact) window._coImpact.opened=_coRefreshOpened(window._coImpact.opened, snap);
+    coRender();
+  });
 }
 // ═══════════════════════════════════════════════════════════════════════════
 // v60.148 · UNAMBIGUOUS DISPLAY NAMES
@@ -31618,19 +31937,21 @@ function rotAdd(){
 }
 function rotRemove(i){ _rotDraft.splice(i,1); _rotReRender(); }
 function rotSave(){
+  return stfAction('Rotation edit', function(){   // v60.255: one entry for the whole action
   var pid=_rotPid;
-  var clean=_rotDraft.filter(function(b){ return b && b.to>b.from && b.station; })
-                     .sort(function(a,b){ return a.from-b.from; })
-                     .map(function(b){ return {from:b.from,to:b.to,station:b.station}; });
-  if(!STATE.mgmtBlocks) STATE.mgmtBlocks={};
-  if(clean.length) STATE.mgmtBlocks[pid]=clean; else delete STATE.mgmtBlocks[pid];
-  if(typeof saveState==='function') saveState();
-  if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
-  if(typeof buildSwitchboard==='function') buildSwitchboard();
-  if(typeof renderNow==='function') { try{ renderNow(); }catch(e){} }
-  closeModal();
-  if(typeof toast==='function') toast('🔄 Rotation saved — '+clean.length+' segment'+(clean.length===1?'':'s'));
-  if(typeof openPersonPanel==='function') openPersonPanel(pid);
+    var clean=_rotDraft.filter(function(b){ return b && b.to>b.from && b.station; })
+                       .sort(function(a,b){ return a.from-b.from; })
+                       .map(function(b){ return {from:b.from,to:b.to,station:b.station}; });
+    if(!STATE.mgmtBlocks) STATE.mgmtBlocks={};
+    if(clean.length) STATE.mgmtBlocks[pid]=clean; else delete STATE.mgmtBlocks[pid];
+    if(typeof saveState==='function') saveState();
+    if(typeof buildCoverageTimeline==='function') buildCoverageTimeline();
+    if(typeof buildSwitchboard==='function') buildSwitchboard();
+    if(typeof renderNow==='function') { try{ renderNow(); }catch(e){} }
+    closeModal();
+    if(typeof toast==='function') toast('🔄 Rotation saved — '+clean.length+' segment'+(clean.length===1?'':'s'));
+    if(typeof openPersonPanel==='function') openPersonPanel(pid);
+  });
 }
 function rotClear(){
   var pid=_rotPid;
@@ -31696,17 +32017,19 @@ function openProposedAreas(existing){
 
 // Apply the proposal into the real structure managers already edit.
 function applyProposedManagerAreas(proposal){
+  return stfAction('Manager areas', function(){   // v60.255: one entry for the whole action
   proposal = proposal || proposeManagerAreas();
-  if(!STATE.mgmtBlocks) STATE.mgmtBlocks={};
-  Object.keys(proposal.plan).forEach(function(pid){
-    STATE.mgmtBlocks[pid]=proposal.plan[pid].map(function(b){
-      return {from:b.from, to:b.to, station:b.station};
+    if(!STATE.mgmtBlocks) STATE.mgmtBlocks={};
+    Object.keys(proposal.plan).forEach(function(pid){
+      STATE.mgmtBlocks[pid]=proposal.plan[pid].map(function(b){
+        return {from:b.from, to:b.to, station:b.station};
+      });
     });
+    if(typeof saveState==='function') saveState();
+    try{ buildCoverageTimeline&&buildCoverageTimeline(); }catch(e){}
+    if(typeof toast==='function') toast('✓ Draft manager areas applied — edit any block to correct it', 5000);
+    return proposal;
   });
-  if(typeof saveState==='function') saveState();
-  try{ buildCoverageTimeline&&buildCoverageTimeline(); }catch(e){}
-  if(typeof toast==='function') toast('✓ Draft manager areas applied — edit any block to correct it', 5000);
-  return proposal;
 }
 
 // ── Override + backfill (Design 2a) ────────────────────────────────────────
