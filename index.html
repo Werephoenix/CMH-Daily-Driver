@@ -84,6 +84,38 @@ body.view-locked #sched-horizon, body.view-locked .solo-btn { display:none !impo
 #ritual-card.lit{border-color:var(--amber);background:rgba(217,119,6,.08)}
 #ritual-card .rc-t{flex:1;font-size:13px;font-weight:800;color:var(--txt)}
 #ritual-card .rc-s{font-size:11px;color:var(--txt2);font-weight:600}
+/* v60.260 · car codes reference */
+.cc-head{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.cc-search{flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt);font-size:14px}
+.cc-btn{flex:none;padding:9px 12px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
+.cc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.cc-chip{padding:6px 11px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer}
+.cc-chip.on{border-color:var(--accent);background:rgba(35,201,131,.12);color:var(--accent)}
+.cc-count{font-size:11.5px;color:var(--txt3);margin:0 2px 10px}
+.cc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.cc-fam{grid-column:1/-1;display:flex;align-items:baseline;gap:8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3);margin:10px 2px 0}
+.cc-fam-g{font-size:14px} .cc-fam-n{font-weight:600;text-transform:none;letter-spacing:0;margin-left:auto}
+.cc-group{padding:10px 11px 10px 14px;margin:0;position:relative;overflow:hidden} .cc-group>*{position:relative;z-index:1}
+.cc-group::before{content:'';position:absolute;inset:0;z-index:0;pointer-events:none;border-radius:inherit;background:linear-gradient(180deg,rgba(var(--cc-hue,120,120,120),.09),rgba(var(--cc-hue,120,120,120),.03));box-shadow:inset 3px 0 0 rgb(var(--cc-hue,120,120,120))}   /* the family wash + edge, drawn under the glass rules so nothing overrides it */
+.cc-group.pending::before{box-shadow:inset 3px 0 0 var(--amber)}
+.cc-sub{margin-top:6px} .cc-sub-hd{font-size:11.5px;font-weight:800;color:var(--txt);display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--bdr);padding-bottom:2px} .cc-sub-hd .cc-ex{font-weight:600;white-space:normal} .cc-sub-hd.quiet{border-bottom:none;padding-bottom:0}
+.cc-sub-codes{display:flex;flex-direction:column;padding:2px 0 0 4px} .cc-c{display:flex;align-items:baseline;gap:8px;padding:2px 0} .cc-var{font-size:10.5px;color:var(--txt3)}
+.cc-kick{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;margin-bottom:3px;min-height:14px} .cc-kick-g{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--txt3)}
+.cc-group-hd{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;min-width:0}
+.cc-group > .cc-ex{display:block;font-size:11px;color:var(--txt3);white-space:normal;margin:0 0 4px;border-bottom:1px solid var(--bdr);padding-bottom:4px}
+.cc-group-name{font-size:14px;font-weight:800;color:var(--txt)}
+.cc-core{font-size:9px;font-weight:800;padding:1px 6px;border-radius:3px;background:rgba(11,98,196,.10);color:var(--acc);border:1px solid rgba(11,98,196,.3)}
+.cc-badge{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:999px} .cc-badge.ok{background:rgba(11,110,63,.12);color:var(--green)} .cc-badge.warn{background:rgba(138,93,0,.12);color:var(--amber)} .cc-badge.bad{background:rgba(196,0,15,.10);color:var(--red)}
+.cc-thresh{font-size:9.5px;color:var(--txt3);margin-left:auto;white-space:nowrap}
+.cc-rows{display:flex;flex-direction:column}
+.cc-row{display:flex;align-items:center;gap:9px;padding:6px 0;border-top:1px solid var(--bdr);min-width:0}
+.cc-row:first-child{border-top:none}
+.cc-pic{width:34px;height:22px;object-fit:cover;border-radius:4px;flex:none;border:1px solid var(--bdr);align-self:center} .cc-glyph{width:40px;text-align:center;font-size:18px;flex:none}
+.cc-code{font-family:var(--ff-mono);font-size:13px;font-weight:800;color:var(--txt);width:52px;flex:none;letter-spacing:.02em}
+.cc-cls{flex:1;min-width:0;font-size:12.5px;color:var(--txt);display:flex;flex-direction:column;gap:1px} .cc-ex{font-size:11px;color:var(--txt3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc-note{font-size:11px;color:var(--txt3);margin-top:6px;line-height:1.45}
+.cc-empty{padding:18px;text-align:center;color:var(--txt3);font-size:13px}
+@media(min-width:900px){ .cc-grid{grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px} }
 /* v60.254 · ritual ticker strip — quiet grade, amber past due, never red */
 #ritual-strip{position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom,0px));z-index:190;display:none;align-items:center;gap:10px;padding:7px 14px;font-size:12px;color:var(--txt2);background:var(--bg2);border-top:1px solid var(--bdr);-webkit-backdrop-filter:saturate(160%) blur(12px);backdrop-filter:saturate(160%) blur(12px)}
 #ritual-strip.lit{background:rgba(217,119,6,.10);border-top-color:var(--amber)}
@@ -3410,11 +3442,14 @@ Genesis Cochran, 5/14</pre>
         <button class="btn btn-g btn-sm" id="ref-tab-codes" onclick="showRefSection('codes')">🚗 Car Codes</button>
         <button class="btn btn-gh btn-sm" id="ref-tab-loyalty" onclick="showRefSection('loyalty')">🏆 Loyalty</button>
       </div>
-      <div id="ref-sec-codes">
-        <input id="code-search" placeholder="🔍 Search codes, groups, or a car model…" oninput="filterCodes()"
-          style="width:100%;padding:7px 10px;background:var(--bg3);border:1px solid var(--bdr2);
-            border-radius:4px;color:var(--txt);font-size:12px;margin-bottom:8px">
-        <div id="code-grid"></div>
+      <div id="ref-sec-codes">   <!-- v60.260: search + print, filter chips, families in fleet-size order -->
+        <div class="cc-head">
+          <input id="code-search" class="cc-search" placeholder="🔍 A code, a group, or a car (RAV4, Tahoe, Corolla…)" oninput="filterCodes()" autocomplete="off">
+          <button id="cc-print-btn" class="cc-btn" onclick="printCarCodes()" title="A clean page of what's showing">🖨 Print all</button>
+        </div>
+        <div id="cc-chips" class="cc-chips"></div>
+        <div id="code-result-count" class="cc-count"></div>
+        <div id="code-grid" class="cc-grid"></div>
       </div>
       <div id="ref-sec-loyalty" style="display:none"><div id="loyalty-content"></div></div>
       <div id="ref-sec-hourly" style="display:none"><div id="hourly-content"></div></div>
@@ -10094,6 +10129,14 @@ function clearExitAccommodation(pid){
 // matching how managers usually re-assign in real time).
 function addMgmtBlock(pid, from, to, station) {
   stfSnap('Block added · '+_pidNick(pid));   // v60.255
+  var r=_mgmtBlockInsert(pid, from, to, station);
+  if (r.ok) saveState();
+  return r;
+}
+// v60.260: the PURE insert — no snapshot, no save. coverAdd (and every simulation inside moveImpact / solveDay)
+// goes through this; the old path wrote the whole state to localStorage on every simulated cover, ~50 ms each,
+// which is what made a morning solve take 5 s.
+function _mgmtBlockInsert(pid, from, to, station) {
   if (typeof from !== 'number' || typeof to !== 'number' || from >= to) {
     return { ok:false, error:'Invalid time range' };
   }
@@ -10130,7 +10173,6 @@ function addMgmtBlock(pid, from, to, station) {
   next.push({ from, to, station });
   next.sort((a,b)=>a.from - b.from);
   STATE.mgmtBlocks[pid] = next;
-  saveState();
   return { ok:true };
 }
 
@@ -12826,23 +12868,6 @@ var FLEET_CODES = [
 ];
 
 // ── Build compendium UI ───────────────────────────────────────────────────────
-function buildCodeCompendium() {
-  const grid = document.getElementById('code-grid');
-  const groupFilter = document.getElementById('code-filter-group');
-  if (!grid) return;
-
-  // Populate group filter dropdown
-  const groups = [...new Set(FLEET_CODES.map(c => c.group))].sort();
-  if (groupFilter && groupFilter.options.length <= 1) {
-    groups.forEach(g => {
-      const opt = document.createElement('option');
-      opt.value = g; opt.textContent = g;
-      groupFilter.appendChild(opt);
-    });
-  }
-
-  renderCodes(FLEET_CODES);
-}
 
 // v60.106: MODEL_INDEX — model names per SIPP code (from the Enterprise SIPP master catalog,
 // 2026-08). Lets the Reference search resolve a car model ("Sorento", "RAV4") to its code.
@@ -12889,30 +12914,6 @@ var MODEL_INDEX = {
   PPAR:'ram 1500 ford f150 chevrolet silverado 1500 nissan titan toyota tundra',
   QPAR:'ford f250 dodge ram gmc sierra chevrolet silverado 2500 hd'
 };
-function filterCodes() {
-  const q      = (document.getElementById('code-search')?.value || '').toLowerCase();
-  const grp    = document.getElementById('code-filter-group')?.value || '';
-  const core   = document.getElementById('code-filter-core')?.value || '';
-
-  const filtered = FLEET_CODES.filter(c => {
-    // v56: defensive guards — if a fleet code entry is malformed (missing
-    // code/group/desc), `(c.code).toLowerCase()` would throw and the
-    // filter aborts silently, leaving the user with what looks like a
-    // broken search box. Coerce to empty string instead.
-    const code = (c && c.code  ? String(c.code).toLowerCase()  : '');
-    const grpL = (c && c.group ? String(c.group).toLowerCase() : '');
-    const desc = (c && c.desc  ? String(c.desc).toLowerCase()  : '');
-    const models = (c && c.code && MODEL_INDEX[c.code]) ? MODEL_INDEX[c.code] : '';
-    const matchQ = !q || code.includes(q) || grpL.includes(q) || desc.includes(q) || models.includes(q);
-    const matchG = !grp || (c && c.group === grp);
-    const matchC = !core ||
-      (core === 'core' && c && c.core) ||
-      (core === 'noncore' && c && !c.core);
-    return matchQ && matchG && matchC;
-  });
-
-  renderCodes(filtered);
-}
 
 function clearCodeSearch() {
   const ids = ['code-search','code-filter-group','code-filter-core'];
@@ -12923,102 +12924,6 @@ function clearCodeSearch() {
   renderCodes(FLEET_CODES);
 }
 
-function renderCodes(codes) {
-  const grid = document.getElementById('code-grid');
-  const countEl = document.getElementById('code-result-count');
-  if (!grid) return;
-
-  if (countEl) countEl.textContent = `${codes.length} of ${FLEET_CODES.length} codes`;
-
-  // Group by category for display
-  const byGroup = {};
-  codes.forEach(c => {
-    if (!byGroup[c.group]) byGroup[c.group] = [];
-    byGroup[c.group].push(c);
-  });
-
-  if (codes.length === 0) {
-    grid.innerHTML = '<div style="color:var(--txt3);font-size:13px;padding:20px;text-align:center;grid-column:1/-1">No codes match your search.</div>';
-    return;
-  }
-
-  // Get current board data for live status
-  const boardData = typeof getGroupNetData === 'function' ? getGroupNetData() : {};
-  const wuPolicy  = STATE.walkUpPolicy || 'open';
-
-  let html = '';
-  Object.entries(byGroup).forEach(([group, groupCodes]) => {
-    // Get live status for this group
-    const gData = boardData[group];
-    const net   = gData && gData.has ? gData.net : null;
-    const hasData = net !== null;
-    const status = hasData ? (typeof getStatus === 'function' ? getStatus(group, net) : 'na') : null;
-
-    const statusBadge = hasData
-      ? `<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;
-           background:${status==='wu'?'rgba(22,163,74,.2)':status==='up'?'rgba(217,119,6,.2)':'rgba(220,38,38,.15)'};
-           color:${status==='wu'?'var(--green)':status==='up'?'var(--amber)':'var(--red)'}">
-           ${status==='wu'?'WU+UP':status==='up'?'UP':'NA'} · Net ${net>0?'+':''}${net}
-         </span>`
-      : '';
-
-    const thresh  = typeof THRESHOLDS !== 'undefined' ? THRESHOLDS[group] : [3,2];
-    const isCore  = typeof CORE !== 'undefined' ? CORE.has(group) : false;
-    const isPending = group.includes('Pending');
-
-    html += `<div style="background:var(--bg3);border:1px solid ${isPending?'var(--amber3)':isCore?'rgba(37,99,235,.25)':'var(--bdr)'};
-      border-radius:7px;padding:12px;display:flex;flex-direction:column;gap:6px">
-      <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
-        <span style="font-family:var(--ff-hd);font-size:13px;font-weight:700;
-          color:${isPending?'var(--amber)':isCore?'var(--acc)':'var(--txt)'}">${group}</span>
-        ${isCore ? '<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:rgba(37,99,235,.12);color:var(--acc);border:1px solid rgba(37,99,235,.3)">◆ CORE</span>' : ''}
-        ${statusBadge}
-        ${thresh ? `<span style="font-size:9px;color:var(--txt3);margin-left:auto">WU≥${thresh[0]} UP≥${thresh[1]}</span>` : ''}
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:4px">
-        ${groupCodes.map(c => {
-          // v59: photo URL lookup. Lives in STATE.carPhotos[CODE] (managed
-          // via Admin → Car Codes). If no URL, fall back to a body-type
-          // emoji per the group (small visual differentiation).
-          const photoUrl = (STATE.carPhotos||{})[c.code] || '';
-          const groupIcons = {
-            'Econ/Compact Car':'🚗','Intermediate Car':'🚙','Standard Car':'🚘',
-            'Full Size Car':'🚖','Premium Car':'✨','Luxury Car':'💎',
-            'Compact SUV':'🚙','Intermediate SUV':'🚐','Standard SUV':'🚐',
-            'Full Size SUV':'🚐','Premium SUV':'🚙','Standard Pickup':'🛻',
-            'Large Pickup':'🛻','Passenger Van':'🚌','Cargo Van':'📦',
-            'Convertible':'🏎️','Sports Car':'🏎️',
-          };
-          const fallbackIcon = groupIcons[c.group] || '🚗';
-          // Photo shown as 28x18 thumbnail to the left of code+desc. Errors
-          // are absorbed (img.onerror=this.style.display=none) so a broken
-          // link doesn't break the layout.
-          const thumb = photoUrl
-            ? `<img src="${_sanitizeImageUrl(photoUrl)}" alt="${c.code} reference"
-                onerror="this.style.display='none';this.nextSibling.style.display='inline'"
-                style="width:36px;height:24px;object-fit:cover;border-radius:3px;flex-shrink:0;border:1px solid var(--bdr)">
-               <span style="display:none;font-size:18px" title="${c.code} (photo unavailable)">${fallbackIcon}</span>`
-            : `<span style="font-size:18px;line-height:1">${fallbackIcon}</span>`;
-          return `<div style="background:var(--bg2);border:1px solid var(--bdr2);border-radius:4px;
-            padding:4px 8px;display:flex;align-items:center;gap:7px;min-width:130px">
-            ${thumb}
-            <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
-              <span style="font-family:var(--ff-mono);font-size:12px;font-weight:500;
-                color:${(c.code||'').includes('⚠')||(c.group||'').includes('Pending')?'var(--amber)':'var(--txt)'}">${c.code||''}</span>
-              <span style="font-size:9px;color:var(--txt3);line-height:1.3">${(c.desc||'').split('—')[0].trim()}</span>
-              ${MODEL_INDEX[c.code] ? `<span style="font-size:8.5px;color:var(--txt3);opacity:.65;line-height:1.3">e.g. ${MODEL_INDEX[c.code].split(' ').slice(0,4).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ').replace(/(\w+) (\w+) (\w+) (\w+)/,'$1 $2, $3 $4')}…</span>` : ''}
-            </div>
-          </div>`;
-        }).join('')}
-      </div>
-      <div style="font-size:10px;color:var(--txt3);line-height:1.5">
-        ${(groupCodes[0]?.desc||'').split('—').slice(1).join('—').trim()}
-      </div>
-    </div>`;
-  });
-
-  grid.innerHTML = html;
-}
 
 
 
@@ -13977,6 +13882,167 @@ function injectExitFairnessPanel() { buildSwitchboard(); }
 
 function buildStaffGrid() { buildSwitchboard(); }
 
+// ════════════════════════════════════════════════════════════════════════
+// v60.260 · CAR CODES REFERENCE (Matt, 2026-09-12: "needs a print page option for all the
+// codes, filter option … organized better and formatted more visually pleasing").
+//   • ONE source: getEffectiveCodes() — the Admin edits/additions now show here too (they didn't);
+//   • families in FLEET-SIZE order (GROUP_SIZE_ORDER), never alphabetical: Cars → Car specialty →
+//     SUVs → SUV specialty → Vans & Trucks → Showcase → Other;
+//   • filter chips (family · ◆ Core · 📊 On the board) + the search (code, group, or a car model);
+//   • rows instead of pills: CODE · class · examples, photo or family glyph;
+//   • the live status badge and WU/UP thresholds per group, as before;
+//   • 🖨 Print — a clean letter page of whatever is showing (all codes, or the current filter).
+// ════════════════════════════════════════════════════════════════════════
+var CC_FAMILIES=[
+  {key:'cars',   label:'Cars',         groups:['Econ/Compact Car','Intermediate Car','Standard Car','Standard Elite Car','Full-Size Car','Fullsize Elite Car','Premium Car','Premium Elite Car','Luxury Car']},
+  {key:'carsx',  label:'Car specialty',groups:['Electric/Hybrid','Convertibles','Sports Car']},
+  {key:'suvs',   label:'SUVs',         groups:['Crossovers','Compact SUV','Midsize SUV','Standard SUV','Standard Elite SUV','Fullsize SUV','Premium SUV','Premium Large SUV','Premium Elite SUV','Luxury SUV','Luxury Elite SUV']},
+  {key:'suvx',   label:'SUV specialty',groups:['Wrangler / Bronco']},
+  {key:'vans',   label:'Vans & Trucks',groups:['Minivan 7-Seat','Minivan 8-Seat','Passenger Van','Standard Pickup','Large Pickup']},
+  {key:'show',   label:'Showcase',     groups:['Exotic']}
+];
+var CC_CHIPS=[['all','All'],['core','◆ Core'],['cars','Cars'],['suvs','SUVs'],['vans','Vans & Trucks'],['spec','Specialty'],['stock','📊 On the board']];
+var CC_GLYPH={cars:'🚗', carsx:'⚡', suvs:'🚙', suvx:'🏔', vans:'🚐', show:'💎', other:'❔'};
+// v60.260 (Matt): a subtle colour per family — a wash + a left edge, never loud
+var CC_HUE={cars:'11,98,196', carsx:'91,69,201', suvs:'19,108,140', suvx:'138,93,0', vans:'70,80,95', show:'160,120,20', other:'196,0,15'};
+// (Matt): "Economy Car: ECAR EDAR ECDR — group by class, then the codes stacked" — the class is the desc before the dash
+function ccSubgroups(codes){
+  var order=[], by={};
+  codes.forEach(function(c){ var d=String(c.desc||''); var cls=d.indexOf('—')>=0 ? d.split('—')[0].trim() : d.split(/\s+(cdw|debit|alternate)\b/i)[0].split('.')[0].trim();   // a desc with no dash: the class is what comes before the billing tail
+    cls=cls||'Other'; if(!by[cls]){ by[cls]=[]; order.push(cls); } by[cls].push(c); });
+  return order.map(function(cls){ var list=by[cls], ex=''; for(var i=0;i<list.length && !ex;i++) ex=ccExamples(list[i].code,3);
+    var note='', carSent='';
+    list.forEach(function(c){ if(!note){ var r=String(c.desc||'').split('—').slice(1).join('—').trim(); if(r && !CC_DROP.test(r) && r.length>28) note=r; } });
+    // (Matt): ONE list of cars per card — the note's "X, Y or similar" sentence is a second list, so it is lifted out;
+    // it becomes the examples line only when the model index has none for this class
+    if(note){ var keep=[]; note.split(/(?<=\.)\s+/).forEach(function(sent){ if(/or similar|similar\b|^[A-Z][^.]*,[^.]*[A-Z]/.test(sent) && !/class|assignment|availability|demand|supply|stocked|maps to|counts|replaces|kept|group/i.test(sent)){ if(!carSent) carSent=sent.replace(/\s*or similar\.?$/i,'').replace(/\.$/,''); } else keep.push(sent); }); note=keep.join(' ').trim(); }
+    if(!ex && carSent) ex=carSent;
+    return {cls:cls, ex:ex, note:note, codes:list.map(function(c){ var rest=String(c.desc||'').split('—').slice(1).join('—').trim(); var v=(CC_KEEP.test(rest) && rest.length<=48)?rest.replace(/\.$/,''):''; return {code:c.code, variant:v}; })}; });
+}
+// (Matt): "CDW variant and Debit/alternate rate variant isn't necessary. Hybrid or AWD notes on the codes are good though."
+var CC_DROP=/\b(cdw|debit|alternate (rate|code|vehicle type|billing)|billing rate|rate code|rate variant|rate\.)/i;
+var CC_KEEP=/\b(hybrid|awd|4wd|4x4|electric|ev|plug-in|diesel|open-top|open-air|off-road|crew cab|convertible|\d-seat|seat)\b/i;
+function ccFamilyOf(group){ for(var i=0;i<CC_FAMILIES.length;i++){ if(CC_FAMILIES[i].groups.indexOf(group)>=0) return CC_FAMILIES[i].key; } return 'other'; }
+function ccFilter(){ return window._ccFilter||(window._ccFilter={fam:'all', core:false, stock:false}); }
+function ccCodes(){ try{ return (typeof getEffectiveCodes==='function')?getEffectiveCodes():FLEET_CODES; }catch(e){ return FLEET_CODES; } }
+function ccSetChip(k){
+  var f=ccFilter();
+  if(k==='core') f.core=!f.core; else if(k==='stock') f.stock=!f.stock; else f.fam=(f.fam===k?'all':k);
+  filterCodes();
+}
+function ccClearAll(){ window._ccFilter={fam:'all', core:false, stock:false}; var i=document.getElementById('code-search'); if(i) i.value=''; filterCodes(); }
+function ccChipsHtml(){
+  var f=ccFilter();
+  return CC_CHIPS.map(function(c){ var on = c[0]==='core'?f.core : c[0]==='stock'?f.stock : f.fam===c[0]; return '<button class="cc-chip'+(on?' on':'')+'" onclick="ccSetChip(\''+c[0]+'\')">'+c[1]+'</button>'; }).join('');
+}
+var CC_MAKES=['chevrolet','chevy','kia','ford','toyota','honda','nissan','hyundai','jeep','dodge','buick','gmc','mazda','subaru','volkswagen','vw','bmw','mercedes','mercedes-benz','audi','lexus','infiniti','cadillac','lincoln','chrysler','ram','mitsubishi','fiat','tesla','volvo','acura','genesis','mini','land','porsche','jaguar','scion','maserati','alfa','polestar','rivian'];
+function ccExamples(code, n){   // the model index is one flat word list — split it back into models at each make name
+  var m=(typeof MODEL_INDEX!=='undefined' && MODEL_INDEX[code])||''; if(!m) return '';
+  var words=m.split(' '), models=[], cur=[];
+  words.forEach(function(w){ if(CC_MAKES.indexOf(w)>=0 && cur.length){ models.push(cur.join(' ')); cur=[]; } cur.push(w); }); if(cur.length) models.push(cur.join(' '));
+  return models.slice(0, n||3).map(function(x){ return x.replace(/\b\w/g,function(ch){ return ch.toUpperCase(); }); }).join(' · ');
+}
+function ccModelsList(code){ var m=(typeof MODEL_INDEX!=='undefined' && MODEL_INDEX[code])||''; return m; }
+function buildCodeCompendium(){
+  var chips=document.getElementById('cc-chips'); if(chips) chips.innerHTML=ccChipsHtml();
+  filterCodes();
+}
+function filterCodes(){
+  var q=((document.getElementById('code-search')||{}).value||'').toLowerCase().trim(), f=ccFilter();
+  var board=(typeof getGroupNetData==='function')?getGroupNetData():{};
+  var all=ccCodes();
+  var list=all.filter(function(c){
+    if(!c) return false;
+    var code=String(c.code||'').toLowerCase(), grp=String(c.group||'').toLowerCase(), desc=String(c.desc||'').toLowerCase(), models=ccModelsList(c.code||'');
+    if(q && !(code.includes(q)||grp.includes(q)||desc.includes(q)||models.includes(q))) return false;
+    if(f.core && !c.core) return false;
+    var fam=ccFamilyOf(c.group);
+    if(f.fam==='cars' && fam!=='cars') return false;
+    if(f.fam==='suvs' && fam!=='suvs') return false;
+    if(f.fam==='vans' && fam!=='vans') return false;
+    if(f.fam==='spec' && ['carsx','suvx','show'].indexOf(fam)<0) return false;
+    if(f.stock){ var g=board[c.group]; if(!(g && g.has)) return false; }
+    return true;
+  });
+  var chips=document.getElementById('cc-chips'); if(chips) chips.innerHTML=ccChipsHtml();
+  var cnt=document.getElementById('code-result-count');
+  if(cnt){ var active=q||f.core||f.stock||f.fam!=='all'; cnt.innerHTML=(active?list.length+' of '+all.length+' codes':all.length+' codes · '+CORE_GROUPS.size+' core groups')+(active?' · <a onclick="ccClearAll()" style="color:var(--acc);cursor:pointer;font-weight:700">Clear ›</a>':''); }
+  var pb=document.getElementById('cc-print-btn'); if(pb) pb.textContent = (q||f.core||f.stock||f.fam!=='all') ? '🖨 Print these '+list.length : '🖨 Print all';
+  window._ccLast=list;
+  renderCodes(list);
+}
+function ccGroupsInOrder(codes){
+  var byGroup={}; codes.forEach(function(c){ (byGroup[c.group]=byGroup[c.group]||[]).push(c); });
+  var order=Object.keys(byGroup).sort(function(a,b){ var fa=CC_FAMILIES.findIndex(function(x){ return x.groups.indexOf(a)>=0; }), fb=CC_FAMILIES.findIndex(function(x){ return x.groups.indexOf(b)>=0; }); if(fa<0) fa=99; if(fb<0) fb=99; if(fa!==fb) return fa-fb; return groupSizeRank(a)-groupSizeRank(b); });
+  return order.map(function(g){ return {group:g, codes:byGroup[g], fam:ccFamilyOf(g)}; });
+}
+function renderCodes(codes){
+  var grid=document.getElementById('code-grid'); if(!grid) return;
+  if(!codes.length){ grid.innerHTML='<div class="cc-empty">No codes match. <a onclick="ccClearAll()" style="color:var(--acc);cursor:pointer;font-weight:700">Clear the filters ›</a></div>'; return; }
+  var board=(typeof getGroupNetData==='function')?getGroupNetData():{};
+  var groups=ccGroupsInOrder(codes), html='', lastFam=null;
+  groups.forEach(function(gi){
+    var famDef=CC_FAMILIES.filter(function(x){ return x.key===gi.fam; })[0], famLabel=famDef?famDef.label:'Other';
+    if(gi.fam!==lastFam){ var famGroups=groups.filter(function(x){ return x.fam===gi.fam; }); var famCodes=famGroups.reduce(function(n,x){ return n+x.codes.length; },0); html+='<div class="cc-fam"><span class="cc-fam-g">'+(CC_GLYPH[gi.fam]||'❔')+'</span>'+biEsc(famLabel)+'<span class="cc-fam-n">'+famGroups.length+' group'+(famGroups.length===1?'':'s')+' · '+famCodes+' code'+(famCodes===1?'':'s')+'</span></div>'; lastFam=gi.fam; }
+    var g=gi.group, gData=board[g], net=(gData&&gData.has)?gData.net:null, hasData=net!==null;
+    var status=hasData?((typeof getStatus==='function')?getStatus(g,net):'na'):null;
+    var badge=hasData?'<span class="cc-badge '+(status==='wu'?'ok':status==='up'?'warn':'bad')+'">'+(status==='wu'?'WU+UP':status==='up'?'UP only':'NA')+' · net '+(net>0?'+':'')+net+'</span>':'';
+    var thresh=(typeof THRESHOLDS!=='undefined')?THRESHOLDS[g]:null, isCore=CORE_GROUPS.has(g), isPending=/Pending|Error|No Supply/i.test(g);
+    var note=(gi.codes[0]&&gi.codes[0].desc||'').split('—').slice(1).join('—').trim();
+    var hue=CC_HUE[gi.fam]||CC_HUE.other, subs=ccSubgroups(gi.codes);
+    subs.forEach(function(sg){
+      var sameAsGroup = subs.length===1 && sg.cls.toLowerCase().replace(/[^a-z]/g,'')===String(g).toLowerCase().replace(/[^a-z]/g,'');
+      var photo=''; sg.codes.forEach(function(c){ if(!photo && (STATE.carPhotos||{})[c.code]) photo=(STATE.carPhotos||{})[c.code]; });   // Admin → Car Photos: one thumb per class
+      var pic=photo?'<img class="cc-pic" src="'+_sanitizeImageUrl(photo)+'" alt="" onerror="this.style.display=\'none\'">':'';
+      var kicker=(sameAsGroup?'':'<span class="cc-kick-g">'+biEsc(g)+'</span>')+(isCore?'<span class="cc-core">◆ CORE</span>':'')+badge+(thresh?'<span class="cc-thresh" title="Walk-up / upgrade thresholds">WU ≥'+thresh[0]+' · UP ≥'+thresh[1]+'</span>':'');
+      html+='<div class="card cc-group'+(isCore?' core':'')+(isPending?' pending':'')+'" style="--cc-hue:'+hue+'">'
+        +'<div class="cc-kick">'+kicker+'</div>'
+        +'<div class="cc-group-hd">'+pic+'<span class="cc-group-name">'+biEsc(sg.cls)+'</span></div>'
+        +(sg.ex?'<div class="cc-ex">'+biEsc(sg.ex)+'</div>':'')
+        +'<div class="cc-sub-codes">'+sg.codes.map(function(c){ return '<div class="cc-c"><span class="cc-code">'+biEsc(c.code||'')+'</span>'+(c.variant?'<span class="cc-var">'+biEsc(c.variant)+'</span>':'')+'</div>'; }).join('')+'</div>'
+        +(sg.note?'<div class="cc-note">'+biEsc(sg.note)+'</div>':'')
+        +'</div>';
+    });
+  });
+  grid.innerHTML=html;
+}
+// 🖨 a clean letter page of what is showing — all codes, or the current filter
+function printCarCodes(){
+  var list=window._ccLast||ccCodes(); var groups=ccGroupsInOrder(list); var f=ccFilter(), q=((document.getElementById('code-search')||{}).value||'').trim();
+  var filtered=!!(q||f.core||f.stock||f.fam!=='all');
+  var w=window.open('','_blank','width=900,height=1100'); if(!w){ if(typeof toast==='function') toast('Allow popups to print'); return; }
+  var lastFam=null, body='';
+  groups.forEach(function(gi){
+    var famDef=CC_FAMILIES.filter(function(x){ return x.key===gi.fam; })[0], famLabel=famDef?famDef.label:'Other';
+    if(gi.fam!==lastFam){ body+='<h2>'+famLabel+'</h2>'; lastFam=gi.fam; }
+    var thresh=(typeof THRESHOLDS!=='undefined')?THRESHOLDS[gi.group]:null, isCore=CORE_GROUPS.has(gi.group);
+    var note=(gi.codes[0]&&gi.codes[0].desc||'').split('—').slice(1).join('—').trim();
+    var hue=CC_HUE[gi.fam]||CC_HUE.other, subs=ccSubgroups(gi.codes);
+    subs.forEach(function(sg){
+      var sameAsGroup = subs.length===1 && sg.cls.toLowerCase().replace(/[^a-z]/g,'')===String(gi.group).toLowerCase().replace(/[^a-z]/g,'');
+      body+='<div class="grp" style="border-left:3px solid rgb('+hue+');background:rgba('+hue+',.05)"><div class="kick">'+(sameAsGroup?'':gi.group+' · ')+(isCore?'<span class="core">◆ CORE</span> ':'')+(thresh?'<span class="th">WU ≥'+thresh[0]+' · UP ≥'+thresh[1]+'</span>':'')+'</div>'
+        +'<div class="grp-hd"><b>'+sg.cls+'</b>'+(sg.ex?' <i>'+sg.ex+'</i>':'')+'</div>'
+        +sg.codes.map(function(c){ return '<div class="cd"><span class="c">'+(c.code||'')+'</span>'+(c.variant?'<span class="v">'+c.variant+'</span>':'')+'</div>'; }).join('')
+        +(sg.note?'<div class="note">'+sg.note+'</div>':'')+'</div>';
+    });
+  });
+  var title=filtered?'Car codes — '+list.length+' of '+ccCodes().length+(q?' · “'+q+'”':'')+(f.core?' · core':'')+(f.fam!=='all'?' · '+f.fam:''):'Car codes — all '+list.length;
+  w.document.write('<!DOCTYPE html><html><head><title>CMH '+title+'</title><style>'
+    +'*{box-sizing:border-box;margin:0;padding:0} body{font-family:-apple-system,Segoe UI,Arial,sans-serif;padding:14px;font-size:9.5px;color:#111}'
+    +'.hd{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:8px} .hd b{font-size:16px} .hd span{color:#666;font-size:10px}'
+    +'h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#444;margin:12px 0 5px;border-bottom:1px solid #ccc;padding-bottom:2px;page-break-after:avoid}'
+    +'.wrap{column-count:3;column-gap:12px} .grp{break-inside:avoid;margin-bottom:6px;border:1px solid #ddd;border-radius:5px;padding:5px 7px}'
+    +'.kick{font-size:7.5px;color:#666;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px} .grp-hd{font-size:10.5px;margin-bottom:3px} .grp-hd i{font-weight:400;color:#777;font-style:normal;margin-left:4px;font-size:8px} .core{font-size:8px;font-weight:800;color:#0A5CB8;border:1px solid #0A5CB8;border-radius:3px;padding:0 3px;vertical-align:middle} .th{font-size:8px;color:#666;float:right}'
+    +'.sub{margin:3px 0 2px} .sub-hd{font-size:9px;font-weight:700;color:#333;border-bottom:1px solid #e8e8e8;margin-bottom:1px} .sub-hd i{font-weight:400;color:#777;font-style:normal;margin-left:4px;font-size:8px} .cd{display:flex;gap:6px;align-items:baseline;padding:1px 0 1px 6px} .c{font-family:ui-monospace,Menlo,monospace;font-weight:800;font-size:9.5px;width:38px;flex:none} .v{font-size:8px;color:#777}'
+    +'.note{font-size:9px;color:#666;margin-top:3px} .ft{margin-top:10px;font-size:9px;color:#777;border-top:1px solid #ccc;padding-top:4px}'
+    +'@media print{@page{margin:.4in;size:letter portrait} body{padding:0}}'
+    +'</style></head><body>'
+    +'<div class="hd"><b>🚗 CMH Daily Driver — '+title+'</b><span>Printed '+new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+'</span></div>'
+    +'<div class="wrap">'+body+'</div>'
+    +'<div class="ft">◆ CORE = a core car group · WU / UP = walk-up and upgrade thresholds (net cars available) · codes and examples from the Enterprise SIPP catalog; Admin → Car Codes edits included.</div>'
+    +'</body></html>');
+  w.document.close(); setTimeout(function(){ try{ w.print(); }catch(e){} }, 400);
+}
 function showRefSection(sec) {
   ['codes','loyalty'].forEach(s => {
     const el  = document.getElementById('ref-sec-'+s);
@@ -16053,7 +16119,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.259'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.260'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -22698,6 +22764,10 @@ function gfOnShiftAt(pid, e, h){
 }
 // Where is this person at hour h? mgmtBlocks (time-aware) wins, else staffStation.
 function gfAreaAt(pid, e, h){
+  var _gc=window._gaCache; if(_gc){ var _m=_gc[pid]; if(_m && _m[h]!==undefined) return _m[h]; var _v=_gfAreaAtRaw(pid,e,h); (_gc[pid]=_gc[pid]||{})[h]=_v; return _v; }   // v60.260: cached inside a solve
+  return _gfAreaAtRaw(pid,e,h);
+}
+function _gfAreaAtRaw(pid, e, h){
   // v60.191: someone in a MEETING is not covering a station. Without this the
   // coverage counter and the solo alert kept counting attendees as on-post, so
   // pulling two people into a 1:1 never showed the dip it actually causes.
@@ -22784,6 +22854,10 @@ function trainStatus(pid, area){
   return _trainDefault(role, area);
 }
 function trainWeight(pid, area){
+  var _tm=window._trainMemo; if(_tm){ var _k=pid+'@'+area; if(_k in _tm) return _tm[_k]; var _v=_trainWeightRaw(pid, area); _tm[_k]=_v; return _v; }   // v60.260: memoized inside a solve — trainStatus rebuilds the day map on every call
+  return _trainWeightRaw(pid, area);
+}
+function _trainWeightRaw(pid, area){
   var s=trainStatus(pid, area);
   if(s==='trained') return 1;
   if(s==='training'){
@@ -24822,8 +24896,9 @@ function halfGaps(areas, fromH, exp){
 }
 // a cover block: the window only, flagged so the rotation keeps drawing around it
 function coverAdd(pid, from, to, area){
+  if(window._gaCache) delete window._gaCache[pid];   // v60.260: this person's areas change
   var st=_areaStation(area);
-  var r=(typeof addMgmtBlock==='function')?addMgmtBlock(pid, from, to, st):{ok:false, error:'no block primitive'};
+  var r=(typeof _mgmtBlockInsert==='function')?_mgmtBlockInsert(pid, from, to, st):{ok:false, error:'no block primitive'};   // v60.260: pure insert — callers that persist call saveState themselves
   if(r && r.ok===false) return r;
   var bl=((STATE.mgmtBlocks||{})[pid]||[]).find(function(b){ return b && b.from===from && b.to===to && b.station===st; }); if(bl) bl.cover=true;
   return {ok:true};
@@ -24850,7 +24925,7 @@ function _impactWindows(list){
 function moveImpact(pid, area, from, to, exp){
   exp=exp||_planExp();
   var keep=JSON.stringify(STATE.mgmtBlocks||{}), before=_countSlots(exp, from, to), after={};
-  try{ coverAdd(pid, from, to, area); after=_countSlots(exp, from, to); } finally { STATE.mgmtBlocks=JSON.parse(keep); }
+  try{ coverAdd(pid, from, to, area); after=_countSlots(exp, from, to); } finally { STATE.mgmtBlocks=JSON.parse(keep); if(window._gaCache) delete window._gaCache[pid]; }
   var fixes=[], hurts=[], takes=[], fixW=0, hurtW=0;
   // v60.258 (Matt took the recommendation, 2026-09-12): the NET that decides a move is weighted —
   // a slot that gets fully CLOSED counts 1, one that only gets less short counts .5; a slot that goes
@@ -24899,7 +24974,7 @@ function moveCandidates(win, phase, exp){
   // cheap pre-rank, then simulate the top few (a cover only touches its own window, so this stays fast)
   pre.sort(function(a,b){ if(a.mgr!==b.mgr) return phase==='mgr'?0:(a.mgr?1:-1); var ra=PT_MGR_ORDER[a.role]!=null?PT_MGR_ORDER[a.role]:9, rb=PT_MGR_ORDER[b.role]!=null?PT_MGR_ORDER[b.role]:9; if(ra!==rb) return ra-rb; return (a.from?1:0)-(b.from?1:0); });
   var out=[];
-  pre.slice(0,10).forEach(function(c){ c.impact=moveImpact(c.pid, win.area, win.from, win.to, exp); if(c.impact.fixH>0) out.push(c); });   // v60.258: the weighted net decides below
+  pre.slice(0,6).forEach(function(c){ c.impact=moveImpact(c.pid, win.area, win.from, win.to, exp); if(c.impact.fixH>0) out.push(c); });   // v60.258: the weighted net decides below · v60.260: six is plenty, the pre-rank is the engine order
   out.sort(function(a,b){
     var ha=a.impact.hurtH>0?1:0, hb=b.impact.hurtH>0?1:0; if(ha!==hb) return ha-hb;                          // no-hurt options first (Matt)
     if(a.mgr && b.mgr){ var ra=PT_MGR_ORDER[a.role]!=null?PT_MGR_ORDER[a.role]:9, rb=PT_MGR_ORDER[b.role]!=null?PT_MGR_ORDER[b.role]:9; if(ra!==rb) return ra-rb; }   // juniors first
@@ -25230,11 +25305,13 @@ function _solveDayRaw(exp){
   var overlaps=function(pid, w){ return (busy[pid]||[]).some(function(b){ return b.from<w.to && b.to>w.from; }); };
   var givenUp=function(gp){ return out.left.some(function(l){ return l.area===gp.area && l.from<=gp.from+0.001 && l.to>=gp.to-0.001; }); };
   var depth=window._stfDepth||0; window._stfDepth=depth+1;   // working covers are simulation, never an undo entry
+  window._gaCache={}; window._trainMemo={};   // v60.260: area-at-hour + training caches for the whole solve (areas invalidate per person on every cover change; training never changes mid-solve)
   var loop=function(){ while(guard++<80){
       var gaps=[]; try{ gaps=halfGaps(null, null, exp); }catch(e){}
       var gap=null; for(var gi=0; gi<gaps.length; gi++){ if(!givenUp(gaps[gi])){ gap=gaps[gi]; break; } }
       if(!gap) break;   // nothing short that we haven't already given up on
-      var tries=[gap]; if(gap.to-gap.from>1) tries.push({area:gap.area, from:gap.from, to:gap.from+1, need:gap.need, minHave:gap.minHave}); if(gap.to-gap.from>0.5) tries.push({area:gap.area, from:gap.from, to:gap.from+0.5, need:gap.need, minHave:gap.minHave});
+      var first={area:gap.area, from:gap.from, to:Math.min(gap.to, gap.from+3), need:gap.need, minHave:gap.minHave};   // v60.260: a cover try is at most 3 h — the rest re-queues; the old 14-hour try cost 5 s a solve
+      var tries=[first]; if(first.to-gap.from>1) tries.push({area:gap.area, from:gap.from, to:gap.from+1, need:gap.need, minHave:gap.minHave}); if(first.to-gap.from>0.5) tries.push({area:gap.area, from:gap.from, to:gap.from+0.5, need:gap.need, minHave:gap.minHave});
       var pick=null, win=null, list=[];
       for(var i=0; i<tries.length && !pick; i++){
         var w=tries[i]; try{ list=moveCandidates(w,'live',exp).filter(function(c){ return !overlaps(c.pid,w); }); }catch(e){ list=[]; }
@@ -25261,12 +25338,12 @@ function _solveDayRaw(exp){
     var trades={}; out.left.forEach(function(l){ if(l.trade) trades[l.area]=trades[l.area]||l.trade; });
     var fin=[]; try{ fin=halfGaps(null, null, exp); }catch(e){}
     out.left=fin.map(function(gp){ if(trades[gp.area]) gp.trade=trades[gp.area]; return gp; });
-  } finally { window._stfDepth=depth; STATE.mgmtBlocks=JSON.parse(keepMB); }
+  } finally { window._stfDepth=depth; STATE.mgmtBlocks=JSON.parse(keepMB); window._gaCache=null; window._trainMemo=null; }
   _solveTally(out);
   return out;
 }
 // working-cover helpers for the improve pass: lift a decision's cover out of the working state, put it back
-function _solveOff(d){ var list=(STATE.mgmtBlocks||{})[d.cand.pid]||[]; var st=_areaStation(d.win.area); for(var i=list.length-1;i>=0;i--){ var b=list[i]; if(b && b.cover && b.station===st && Math.abs(b.from-d.win.from)<0.001 && Math.abs(b.to-d.win.to)<0.001){ list.splice(i,1); } } if(!list.length) delete STATE.mgmtBlocks[d.cand.pid]; }
+function _solveOff(d){ if(window._gaCache) delete window._gaCache[d.cand.pid]; var list=(STATE.mgmtBlocks||{})[d.cand.pid]||[]; var st=_areaStation(d.win.area); for(var i=list.length-1;i>=0;i--){ var b=list[i]; if(b && b.cover && b.station===st && Math.abs(b.from-d.win.from)<0.001 && Math.abs(b.to-d.win.to)<0.001){ list.splice(i,1); } } if(!list.length) delete STATE.mgmtBlocks[d.cand.pid]; }
 function _solveOn(d){ coverAdd(d.cand.pid, d.win.from, d.win.to, d.win.area); }
 // ── v60.253 · THE IMPROVE PASS (v60.257: runs on the working state) ─────────
 // Three fixed-order moves, each kept only if the score drops; bounded, so a
