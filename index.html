@@ -16016,7 +16016,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.256'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.258'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -22670,6 +22670,15 @@ function gfAreaAt(pid, e, h){
   // reads as "counter" and is wrongly treated as load-bearing.
   var ss=gfAreaOf((STATE.staffStation||{})[pid]);
   if(ss==='floater'||ss==='emerald'||ss==='returns'||ss==='offsite') return ss;
+  // v60.257 (pressure test): the ROLE is the default post when nothing explicit is set. Returns agents are
+  // Returns, Exit agents are Exit — the Now reader (_nowZone) always knew this; the engine relied on
+  // autoLoadFromExpected having written staffStation, so on a fresh day (the day layer retires at 3:30a)
+  // every Returns and Exit agent counted nowhere and the planner opened phantom "Returns 0/3" holes
+  // that nobody in the fill chain could close. An explicit posting still wins (an Exit agent sent to
+  // Counter counts at Counter).
+  var _role=e&&e.person&&e.person.role;
+  if(!ss && _role==='RETURNS') return 'returns';
+  if(!ss && _role==='EXIT') return 'exit';
   if(typeof _nowZone==='function' && e && e.person && e.person.role==='CXR'){
     var z=_nowZone(pid, e.person, h);              // rotation-aware for CXRs
     if(z==='exit') return 'exit';
@@ -24514,13 +24523,11 @@ function selfHomeHtml(){
 }
 // v60.245 (B5): Rituals becomes a TIMED CARD on Now — the ritual for this hour with its progress; "All rituals ›" opens the checklist screen.
 function ritualCardHtml(){
+  // v60.258: ONE reader (ritualState — today's list, checked or auto-complete) feeds the card, the strip and the verdict pointer
   try{
-    var h=(typeof _nowH==='function')?_nowH():new Date().getHours(); var mode = h<11 ? 'opening' : h<15 ? 'mid' : 'closing';
-    var secs=(typeof CL_DATA!=='undefined' && CL_DATA[mode])||[]; var total=0; secs.forEach(function(sec){ total+=((sec.items||[]).length); });
-    var st=(STATE.checklist&&STATE.checklist['cl-'+mode])||{}; var done=Object.keys(st).filter(function(k){ return st[k]; }).length; if(done>total) total=done;
-    var left=Math.max(0,total-done), lbl={opening:'Opening ritual',mid:'Mid-day ritual',closing:'Closing ritual'}[mode];
-    var overdue = (mode==='opening' && h>=10 && left>0) || (mode==='mid' && h>=14 && left>0) || (mode==='closing' && h>=23 && left>0);
-    return '<div id="ritual-card" class="'+(overdue?'lit':'')+'" onclick="showTab(\'checklist\')"><span style="font-size:18px">📋</span><div class="rc-t">'+lbl+'<div class="rc-s">'+done+' of '+total+' done'+(left?' · '+left+' left':' · complete ✓')+(overdue?' · running late':'')+'</div></div><span style="font-size:12px;font-weight:700;color:var(--acc)">All rituals ›</span></div>';
+    var s=(typeof ritualState==='function')?ritualState():null; if(!s) return '';
+    var lbl=s.label, done=s.done, total=s.total, left=s.left, overdue=!!s.overdue;
+    return '<div id="ritual-card" class="'+(overdue?'lit':'')+'" onclick="showTab(\'checklist\')"><span style="font-size:18px">📋</span><div class="rc-t">'+lbl+'<div class="rc-s">'+done+' of '+total+' done'+(left?' · '+left+' left':' · complete ✓')+(overdue?' · <b style="color:var(--amber)">past due</b>':'')+'</div></div><span style="font-size:12px;font-weight:700;color:var(--acc)">All rituals ›</span></div>';
   }catch(e){ return ''; }
 }
 // v60.245 (C7): the People screen — every person is a door to their card; tools that are about people live here.
@@ -24798,12 +24805,17 @@ function moveImpact(pid, area, from, to, exp){
   exp=exp||_planExp();
   var keep=JSON.stringify(STATE.mgmtBlocks||{}), before=_countSlots(exp, from, to), after={};
   try{ coverAdd(pid, from, to, area); after=_countSlots(exp, from, to); } finally { STATE.mgmtBlocks=JSON.parse(keep); }
-  var fixes=[], hurts=[], takes=[];
+  var fixes=[], hurts=[], takes=[], fixW=0, hurtW=0;
+  // v60.258 (Matt took the recommendation, 2026-09-12): the NET that decides a move is weighted —
+  // a slot that gets fully CLOSED counts 1, one that only gets less short counts .5; a slot that goes
+  // NEWLY short counts 1 against, one that only gets deeper .5; Exit / Returns weigh 1, Counter / Emerald .6.
+  // The hours (fixH / hurtH) stay as they were for the card's plain-words lines.
+  var aw=function(area){ return SOLVE_PRIMARY[area]?1:0.6; };
   Object.keys(before).forEach(function(k){ var b=before[k], a=after[k]; if(!a) return;
-    if(b.have<b.need-0.001 && a.have>b.have+0.001) fixes.push({area:b.area,h:b.h,need:b.need,was:b.have,now:a.have});
-    else if(a.have<b.have-0.001){ if(a.have<a.need-0.001) hurts.push({area:b.area,h:b.h,need:b.need,was:b.have,now:a.have}); else takes.push({area:b.area,h:b.h,need:b.need,was:b.have,now:a.have}); }
+    if(b.have<b.need-0.001 && a.have>b.have+0.001){ fixes.push({area:b.area,h:b.h,need:b.need,was:b.have,now:a.have}); fixW+=aw(b.area)*((a.have>=a.need-0.001)?1:0.5); }
+    else if(a.have<b.have-0.001){ if(a.have<a.need-0.001){ hurts.push({area:b.area,h:b.h,need:b.need,was:b.have,now:a.have}); hurtW+=aw(b.area)*((b.have>=b.need-0.001)?1:0.5); } else takes.push({area:b.area,h:b.h,need:b.need,was:b.have,now:a.have}); }
   });
-  return {fixes:_impactWindows(fixes), hurts:_impactWindows(hurts), takes:_impactWindows(takes), fixH:fixes.length/2, hurtH:hurts.length/2};
+  return {fixes:_impactWindows(fixes), hurts:_impactWindows(hurts), takes:_impactWindows(takes), fixH:fixes.length/2, hurtH:hurts.length/2, fixW:fixW, hurtW:hurtW, net:fixW-hurtW};
 }
 function _impactLine(w, kind){
   var t=_areaLabel(w.area)+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+' · '+_fmtN(w.was)+' to '+_fmtN(w.now)+' of '+w.need;
@@ -24841,12 +24853,12 @@ function moveCandidates(win, phase, exp){
   // cheap pre-rank, then simulate the top few (a cover only touches its own window, so this stays fast)
   pre.sort(function(a,b){ if(a.mgr!==b.mgr) return phase==='mgr'?0:(a.mgr?1:-1); var ra=PT_MGR_ORDER[a.role]!=null?PT_MGR_ORDER[a.role]:9, rb=PT_MGR_ORDER[b.role]!=null?PT_MGR_ORDER[b.role]:9; if(ra!==rb) return ra-rb; return (a.from?1:0)-(b.from?1:0); });
   var out=[];
-  pre.slice(0,10).forEach(function(c){ c.impact=moveImpact(c.pid, win.area, win.from, win.to, exp); if(c.impact.fixH>0) out.push(c); });
+  pre.slice(0,10).forEach(function(c){ c.impact=moveImpact(c.pid, win.area, win.from, win.to, exp); if(c.impact.fixH>0) out.push(c); });   // v60.258: the weighted net decides below
   out.sort(function(a,b){
     var ha=a.impact.hurtH>0?1:0, hb=b.impact.hurtH>0?1:0; if(ha!==hb) return ha-hb;                          // no-hurt options first (Matt)
     if(a.mgr && b.mgr){ var ra=PT_MGR_ORDER[a.role]!=null?PT_MGR_ORDER[a.role]:9, rb=PT_MGR_ORDER[b.role]!=null?PT_MGR_ORDER[b.role]:9; if(ra!==rb) return ra-rb; }   // juniors first
     if(a.mgr!==b.mgr) return a.mgr?1:-1;                                                                        // staff before managers when both are allowed
-    var na=a.impact.fixH-a.impact.hurtH, nb=b.impact.fixH-b.impact.hurtH; if(Math.abs(na-nb)>0.001) return nb-na;
+    var na=a.impact.net, nb=b.impact.net; if(Math.abs(na-nb)>0.001) return nb-na;   // v60.258: weighted net
     if(win.area==='exit' && a.fair!==b.fair) return a.fair-b.fair;                                             // least exit time this week first
     return (a.from?1:0)-(b.from?1:0);                                                                           // floating first
   });
@@ -24867,7 +24879,7 @@ function moveWhy(c, win, phase){
 }
 function moveCardHtml(c, win, phase){
   var nick=_pidNick(c.pid), rng=_hFmt(win.from)+'–'+_hFmt(win.to), A=_areaLabel(win.area), imp=c.impact||moveImpact(c.pid, win.area, win.from, win.to);
-  var back = c.from ? _areaLabel(c.from) : 'their post', worse = imp.hurtH>imp.fixH, esc=String(c.pid).replace(/'/g,"\\'");
+  var back = c.from ? _areaLabel(c.from) : 'their post', worse = (imp.net!=null ? imp.net<0 : imp.hurtH>imp.fixH), esc=String(c.pid).replace(/'/g,"\\'");
   var btnP='width:100%;padding:11px;border-radius:9px;font-size:13.5px;font-weight:800;cursor:pointer;'+(worse?'border:1.5px solid var(--bdr2);background:var(--bg3);color:var(--txt2)':'border:none;background:var(--accent);color:#04160e');
   var btnS='padding:8px 11px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer';
   var h='<div class="move-card" style="padding:11px 12px;border-radius:12px;border:1px solid var(--bdr2);background:var(--bg3);margin-bottom:8px">';
@@ -25160,63 +25172,77 @@ function solveDay(exp){
   return out;
 }
 function _solveDayRaw(exp){
+  // v60.257 (pressure test, 2026-09-12): a CLOSED LOOP. The v60.252 pass simulated every move against the
+  // morning state, so a second move could drain the same source the first had thinned, a window that
+  // needed two bodies got one and was marked done, and "left short" understated what actually landed
+  // (measured: 583 short half-hours across 12 random days → the plan listed 152 left, landing it left 506).
+  // Now every cover is applied to a WORKING copy of the blocks as it is chosen; the gaps are re-read from
+  // that state each turn; a window is re-visited until it is covered or nobody can help. What the loop
+  // ends with IS the honest "left" list — listed equals landed by construction.
   var out={decisions:[], left:[], asks:0, moves:0, leftH:0, score:0, scoreBefore:0, unhonored:[], improved:[]};
-  var gaps=[]; try{ gaps=halfGaps(null, null, exp); }catch(e){}
-  var busy={}, moved={};
+  var keepMB=JSON.stringify(STATE.mgmtBlocks||{}), busy={}, moved={}, guard=0;
   var overlaps=function(pid, w){ return (busy[pid]||[]).some(function(b){ return b.from<w.to && b.to>w.from; }); };
-  var queue=gaps.slice();   // a partial cover (first hour / 30 min) re-queues what it leaves, so every half-hour ends up either covered or listed
-  while(queue.length){ var gap=queue.shift();
-    var tries=[gap]; if(gap.to-gap.from>1) tries.push({area:gap.area, from:gap.from, to:gap.from+1}); if(gap.to-gap.from>0.5) tries.push({area:gap.area, from:gap.from, to:gap.from+0.5});
-    var pick=null, win=null, list=[];
-    for(var i=0;i<tries.length && !pick;i++){
-      var w=tries[i]; try{ list=moveCandidates(w,'live',exp).filter(function(c){ return !overlaps(c.pid,w); }); }catch(e){ list=[]; }
-      var wash=list.filter(function(c){ return !(c.impact.fixH>c.impact.hurtH+0.001); }); list=list.filter(function(c){ return c.impact.fixH>c.impact.hurtH+0.001; });   // a move that opens as much as it closes is a TRADE, not a fix — named under "nobody can cover", never recommended
-      if(!list.length && wash.length && !gap.trade) gap.trade=wash[0];
-      list.sort(function(a,b){ var ha=a.impact.hurtH>0?1:0, hb=b.impact.hurtH>0?1:0; if(ha!==hb) return ha-hb; return (moved[a.pid]||0)-(moved[b.pid]||0); });   // stable: the engine's order survives inside a tie
-      if(list.length){ pick=list[0]; win=w; }
-    }
-    if(!pick){ out.left.push(gap); continue; }   // gap.trade (if any) names the best wash for the UI
-    var d={gap:gap, win:win, cand:pick, ask:!pick.mgr, fallback:null, alts:list.slice(0,6)};
-    if(d.ask) d.fallback=list.slice(1).filter(function(c){ return c.mgr; })[0]||list[1]||null;
-    busy[pick.pid]=(busy[pick.pid]||[]).concat([win]); moved[pick.pid]=(moved[pick.pid]||0)+1;
-    out.decisions.push(d);
-    if(gap.to-win.to>=0.5) queue.unshift({area:gap.area, from:win.to, to:gap.to, need:gap.need, minHave:gap.minHave, rest:true});   // the remainder, next in line
-  }
-  _solveTally(out); out.scoreBefore=out.score;
-  _solveImprove(out, exp);
-  // wants that the rotation did not give — said plainly, with the pin as the manager's override
+  var givenUp=function(gp){ return out.left.some(function(l){ return l.area===gp.area && l.from<=gp.from+0.001 && l.to>=gp.to-0.001; }); };
+  var depth=window._stfDepth||0; window._stfDepth=depth+1;   // working covers are simulation, never an undo entry
+  var loop=function(){ while(guard++<80){
+      var gaps=[]; try{ gaps=halfGaps(null, null, exp); }catch(e){}
+      var gap=null; for(var gi=0; gi<gaps.length; gi++){ if(!givenUp(gaps[gi])){ gap=gaps[gi]; break; } }
+      if(!gap) break;   // nothing short that we haven't already given up on
+      var tries=[gap]; if(gap.to-gap.from>1) tries.push({area:gap.area, from:gap.from, to:gap.from+1, need:gap.need, minHave:gap.minHave}); if(gap.to-gap.from>0.5) tries.push({area:gap.area, from:gap.from, to:gap.from+0.5, need:gap.need, minHave:gap.minHave});
+      var pick=null, win=null, list=[];
+      for(var i=0; i<tries.length && !pick; i++){
+        var w=tries[i]; try{ list=moveCandidates(w,'live',exp).filter(function(c){ return !overlaps(c.pid,w); }); }catch(e){ list=[]; }
+        var wash=list.filter(function(c){ return !(c.impact.net>0.001); }); list=list.filter(function(c){ return c.impact.net>0.001; });   // a move that opens as much as it closes (weighted) is a TRADE, not a fix
+        if(!list.length && wash.length && !gap.trade) gap.trade=wash[0];
+        list.sort(function(a,b){ var ha=a.impact.hurtH>0?1:0, hb=b.impact.hurtH>0?1:0; if(ha!==hb) return ha-hb; return (moved[a.pid]||0)-(moved[b.pid]||0); });   // stable: the engine's order survives inside a tie
+        if(list.length){ pick=list[0]; win=w; }
+      }
+      if(!pick){ out.left.push(gap); continue; }   // give this window up (gap.trade names the best wash for the UI); the loop moves on
+      var d={gap:gap, win:win, cand:pick, ask:!pick.mgr, fallback:null, alts:list.slice(0,6)};
+      if(d.ask) d.fallback=list.slice(1).filter(function(c){ return c.mgr; })[0]||list[1]||null;
+      busy[pick.pid]=(busy[pick.pid]||[]).concat([win]); moved[pick.pid]=(moved[pick.pid]||0)+1;
+      out.decisions.push(d);
+      coverAdd(pick.pid, win.from, win.to, win.area);   // the working state: every later window sees this cover's fixes AND its drain
+    } };
   try{
-    Object.keys(STATE.particulars||{}).forEach(function(pid){
-      var w=partWant(pid); if(!w || !exp[pid]) return;
-      var r=(window._lastRotations||{})[pid]; if(!r || !r.b1) return;
-      if(r.b1.station!==w) out.unhonored.push({pid:pid, want:w, got:r.b1.station});
-    });
-  }catch(e){}
+    loop();
+    // wants the rotation did not give — counted in both scores so the improve pass is judged on its own work
+    try{ Object.keys(STATE.particulars||{}).forEach(function(pid){ var w=partWant(pid); if(!w || !exp[pid]) return; var r=(window._lastRotations||{})[pid]; if(!r || !r.b1) return; if(r.b1.station!==w) out.unhonored.push({pid:pid, want:w, got:r.b1.station}); }); }catch(e){}
+    _solveTally(out); out.scoreBefore=out.score;
+    _solveImprove(out, exp, busy);
+    if(out.improved.length){ out.left=[]; loop(); }   // a second pass only when the improve pass moved something: a window given up earlier may be coverable now
+    // what the working state still shows short is the honest "left" — carry any named trade across
+    var trades={}; out.left.forEach(function(l){ if(l.trade) trades[l.area]=trades[l.area]||l.trade; });
+    var fin=[]; try{ fin=halfGaps(null, null, exp); }catch(e){}
+    out.left=fin.map(function(gp){ if(trades[gp.area]) gp.trade=trades[gp.area]; return gp; });
+  } finally { window._stfDepth=depth; STATE.mgmtBlocks=JSON.parse(keepMB); }
   _solveTally(out);
   return out;
 }
-// ── v60.253 · THE IMPROVE PASS ───────────────────────────────────────────
+// working-cover helpers for the improve pass: lift a decision's cover out of the working state, put it back
+function _solveOff(d){ var list=(STATE.mgmtBlocks||{})[d.cand.pid]||[]; var st=_areaStation(d.win.area); for(var i=list.length-1;i>=0;i--){ var b=list[i]; if(b && b.cover && b.station===st && Math.abs(b.from-d.win.from)<0.001 && Math.abs(b.to-d.win.to)<0.001){ list.splice(i,1); } } if(!list.length) delete STATE.mgmtBlocks[d.cand.pid]; }
+function _solveOn(d){ coverAdd(d.cand.pid, d.win.from, d.win.to, d.win.area); }
+// ── v60.253 · THE IMPROVE PASS (v60.257: runs on the working state) ─────────
 // Three fixed-order moves, each kept only if the score drops; bounded, so a
 // phone never hangs on it. Deterministic: same plan in → same plan out.
-//   1 MERGE  — the same body covering back-to-back windows on one area becomes
-//              one block (the hourly-blocks churn seen on staging);
-//   2 EXTEND — two different bodies back-to-back on one area: if either could
-//              take the whole run (net-positive, free), one block beats two;
-//   3 RESCUE — a window nobody could cover because the right body was already
-//              spent on an earlier window that had an alternative: swap them.
-function _solveImprove(out, exp){
-  var w=solveWeights(), d=out.decisions, guard=0;
-  var key=function(x){ return x.win.area+'@'+x.win.from; };
+//   1 MERGE  — the same body covering back-to-back windows on one area becomes one block;
+//   2 EXTEND — two different bodies back-to-back on one area: if either could take the whole run, one block beats two;
+//   3 RESCUE — a window nobody could cover because the right body was already spent on an earlier window
+//              that had an alternative: swap them.
+function _solveImprove(out, exp, busy){
+  var d=out.decisions, guard=0; busy=busy||{};
   var sortD=function(){ d.sort(function(a,b){ return a.win.area<b.win.area?-1:a.win.area>b.win.area?1:(a.win.from-b.win.from); }); };
-  var union=function(a,b,pid){ var u={area:a.win.area, from:a.win.from, to:b.win.to}; var imp=null; try{ imp=moveImpact(pid, u.area, u.from, u.to, exp); }catch(e){ return null; } if(!imp || !(imp.fixH>imp.hurtH+0.001)) return null; return {win:u, impact:imp}; };
+  var score=function(){ return _solveTally({decisions:d.slice(), left:out.left, unhonored:[]}).score; };
+  var unionImpact=function(a,b,pid){ var u={area:a.win.area, from:a.win.from, to:b.win.to}; var imp=null; try{ imp=moveImpact(pid, u.area, u.from, u.to, exp); }catch(e){ return null; } if(!imp || !(imp.net>0.001)) return null; return {win:u, impact:imp}; };
   // 1 · merge
   sortD();
   for(var i=0;i<d.length-1 && guard<200;i++,guard++){
     var a=d[i], b=d[i+1];
     if(a.cand.pid!==b.cand.pid || a.win.area!==b.win.area || a.ask!==b.ask || Math.abs(a.win.to-b.win.from)>0.001) continue;
-    var m=union(a,b,a.cand.pid); if(!m) continue;
+    _solveOff(a); _solveOff(b); var m=unionImpact(a,b,a.cand.pid);
+    if(!m){ _solveOn(a); _solveOn(b); continue; }
     a.win=m.win; a.cand=Object.assign({}, a.cand, {impact:m.impact}); a.gap={area:a.win.area, from:a.win.from, to:a.win.to, need:a.gap.need, minHave:Math.min(a.gap.minHave,b.gap.minHave)};
-    d.splice(i+1,1); out.improved.push('merged '+_pidNick(a.cand.pid)+' '+_areaLabel(a.win.area)+' '+_hFmt(a.win.from)+'–'+_hFmt(a.win.to)); i--;
+    _solveOn(a); d.splice(i+1,1); out.improved.push('merged '+_pidNick(a.cand.pid)+' '+_areaLabel(a.win.area)+' '+_hFmt(a.win.from)+'–'+_hFmt(a.win.to)); i--;
   }
   // 2 · extend
   for(var j=0;j<d.length-1 && guard<400;j++,guard++){
@@ -25226,36 +25252,39 @@ function _solveImprove(out, exp){
     [p,q].forEach(function(src){
       if(done) return; var pid=src.cand.pid, u={area:p.win.area, from:p.win.from, to:q.win.to};
       if(d.some(function(x){ return x!==p && x!==q && x.cand.pid===pid && x.win.from<u.to && x.win.to>u.from; })) return;
-      if(!_solveCanCover(pid, u, exp)) return;
-      var m=union(p,q,pid); if(!m) return;
-      var before=_solveTally({decisions:d.slice(), left:out.left, unhonored:[]}).score;
+      _solveOff(p); _solveOff(q);
+      var ok=_solveCanCover(pid, u, exp), m=ok?unionImpact(p,q,pid):null;
+      if(!m){ _solveOn(p); _solveOn(q); return; }
+      var before=score();
       var merged={gap:{area:u.area, from:u.from, to:u.to, need:p.gap.need, minHave:Math.min(p.gap.minHave,q.gap.minHave)}, win:m.win, cand:Object.assign({}, src.cand, {impact:m.impact}), ask:src.ask, fallback:src.fallback, alts:src.alts};
       var trial=d.slice(); trial.splice(j,2,merged);
       var after=_solveTally({decisions:trial, left:out.left, unhonored:[]}).score;
-      if(after<before-0.001){ d.splice(j,2,merged); out.improved.push('one block: '+_pidNick(pid)+' '+_areaLabel(u.area)+' '+_hFmt(u.from)+'–'+_hFmt(u.to)); j--; done=true; }
+      if(after<before-0.001){ d.splice(j,2,merged); _solveOn(merged); out.improved.push('one block: '+_pidNick(pid)+' '+_areaLabel(u.area)+' '+_hFmt(u.from)+'–'+_hFmt(u.to)); j--; done=true; }
+      else { _solveOn(p); _solveOn(q); }
     });
   }
-  // 3 · rescue
-  for(var k=0;k<out.left.length && guard<600;k++,guard++){
-    var g=out.left[k], tries=[g]; if(g.to-g.from>1) tries.push({area:g.area, from:g.from, to:g.from+1}); if(g.to-g.from>0.5) tries.push({area:g.area, from:g.from, to:g.from+0.5});
+  // 3 · rescue — on the working state, so the swap is judged with every other cover in place
+  var left=[]; try{ left=halfGaps(null, null, exp); }catch(e){}
+  for(var k=0;k<left.length && guard<600;k++,guard++){
+    var g=left[k], tries=[g]; if(g.to-g.from>1) tries.push({area:g.area, from:g.from, to:g.from+1}); if(g.to-g.from>0.5) tries.push({area:g.area, from:g.from, to:g.from+0.5});
     var found=false;
     for(var t=0;t<tries.length && !found;t++){
-      var win=tries[t], cands=[]; try{ cands=moveCandidates(win,'live',exp).filter(function(c){ return c.impact.fixH>c.impact.hurtH+0.001; }); }catch(e){}
-      for(var c=0;c<cands.length && !found;c++){
-        var cd=cands[c], blockers=d.filter(function(x){ return x.cand.pid===cd.pid && x.win.from<win.to && x.win.to>win.from; });
-        if(blockers.length!==1) continue;
-        var bl=blockers[0], alt=(bl.alts||[]).filter(function(a){ return a.pid!==cd.pid && !_solveOverlap(d, a.pid, bl.win, bl) && a.impact.fixH>a.impact.hurtH+0.001; })[0];
+      var win=tries[t], blockers=d.filter(function(x){ return x.win.from<win.to && x.win.to>win.from; });
+      for(var c=0;c<blockers.length && !found;c++){
+        var bl=blockers[c], alt=(bl.alts||[]).filter(function(a){ return a.pid!==bl.cand.pid && !d.some(function(x){ return x!==bl && x.cand.pid===a.pid && x.win.from<bl.win.to && x.win.to>bl.win.from; }); })[0];
         if(!alt) continue;
-        var nd={gap:g, win:win, cand:cd, ask:!cd.mgr, fallback:null, alts:[cd]};
-        var trialD=d.map(function(x){ return x===bl ? Object.assign({}, bl, {cand:alt, ask:!alt.mgr}) : x; }).concat([nd]);
-        var trialL=out.left.filter(function(x){ return x!==g; }); if(g.to-win.to>=0.5) trialL.push({area:g.area, from:win.to, to:g.to, need:g.need, minHave:g.minHave, rest:true});
-        var s0=_solveTally({decisions:d.slice(), left:out.left, unhonored:[]}).score, s1=_solveTally({decisions:trialD, left:trialL, unhonored:[]}).score;
-        if(s1<s0-0.001){ bl.cand=alt; bl.ask=!alt.mgr; d.push(nd); out.left=trialL; out.improved.push('rescued '+_areaLabel(win.area)+' '+_hFmt(win.from)+'–'+_hFmt(win.to)+' with '+_pidNick(cd.pid)+' ('+_pidNick(alt.pid)+' takes '+_areaLabel(bl.win.area)+' '+_hFmt(bl.win.from)+')'); found=true; k=-1; }
+        _solveOff(bl);
+        var altImp=null, cdImp=null; try{ if(_solveCanCover(alt.pid, bl.win, exp)) altImp=moveImpact(alt.pid, bl.win.area, bl.win.from, bl.win.to, exp); }catch(e){}
+        if(altImp && altImp.net>0.001){ coverAdd(alt.pid, bl.win.from, bl.win.to, bl.win.area); try{ if(_solveCanCover(bl.cand.pid, win, exp)) cdImp=moveImpact(bl.cand.pid, win.area, win.from, win.to, exp); }catch(e){} }
+        if(cdImp && cdImp.net>0.001){
+          var was=bl.cand; bl.cand=Object.assign({}, alt, {impact:altImp}); bl.ask=!alt.mgr;
+          var nd={gap:g, win:win, cand:Object.assign({}, was, {impact:cdImp}), ask:!was.mgr, fallback:null, alts:[was]}; d.push(nd); coverAdd(was.pid, win.from, win.to, win.area);
+          out.improved.push('rescued '+_areaLabel(win.area)+' '+_hFmt(win.from)+'–'+_hFmt(win.to)+' with '+_pidNick(was.pid)+' ('+_pidNick(alt.pid)+' takes '+_areaLabel(bl.win.area)+' '+_hFmt(bl.win.from)+')'); found=true;
+        } else { if(altImp && altImp.net>0.001) _solveOff({cand:{pid:alt.pid}, win:bl.win}); _solveOn(bl); }
       }
     }
   }
   sortD();
-  // asks re-derive their fallback from what's left in their list
   d.forEach(function(x){ if(x.ask) x.fallback=(x.alts||[]).filter(function(a){ return a.pid!==x.cand.pid && a.mgr; })[0]||(x.alts||[]).filter(function(a){ return a.pid!==x.cand.pid; })[0]||null; });
   return out;
 }
