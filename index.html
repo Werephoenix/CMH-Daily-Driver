@@ -4774,6 +4774,13 @@ function _dayFileKey(){ return 'cmh-v2-' + ((typeof _bizDayKey==='function') ? _
 // ════════════════════════════════════════════════════════════════════════
 var STANDING_KEYS=['accommodations','exitAccommodation','stationPref','lunchPref','lunchHist','floorTargets','mgrTargets','coverageThresholds','branchConfig','branchResponses','adminRoster','adminCodes','displayNames','nameAliases','scheduleOverrides','carPhotos','physInventory','meetings','announcements','celebrations','pto','scheduleLog','trainMap','training','corpAvg','mgrStationLog','mgrStationLoggedDates','mgrStationDeclared','mgrAnchorOverride','groupOverrides','cityEvents','policyLog','clReasons','solveW','dnr','dnq','demandBaseline','fairness','mgrFunctionsNote','closingExtension','weeklyPlan','requests','quotes'];
 function _isBlankVal(v){ if(v==null) return true; if(Array.isArray(v)) return v.length===0; if(typeof v==='object') return Object.keys(v).length===0; if(typeof v==='string') return v===''; return false; }
+// v60.261 (incident rule 5, 2026-09-12): the board's typed numbers are DAY-shaped, so rule 3 (standing keys) did not
+// cover them — a blank `fields` pushed by a fresh device still replaced the filled same-day `fields` on the desk that
+// typed them (the work computer's 6:38a numbers would have gone on its next refresh). A remote `fields` with NO typed
+// value (nothing, or only the kept keys) never overwrites a local `fields` that has one. And whenever a merge keeps
+// anything the cloud copy was missing, the device pushes the healed record back — the cloud heals from the first good
+// device that syncs, with no manual step and no way for a blank to win twice.
+function _fieldsTyped(f){ if(!f || typeof f!=='object') return false; var keep=(typeof DAY_FIELD_KEEP==='object' && DAY_FIELD_KEEP)||{}; return Object.keys(f).some(function(k){ return !keep[k] && !_isBlankVal(f[k]); }); }
 function _prevDayFile(){   // the newest earlier day file on this device (up to 14 days back), read through getItem so it works everywhere
   try{
     var today=_dayFileKey(), m=today.match(/(\d{4})-(\d{2})-(\d{2})$/); if(!m) return null;
@@ -16119,7 +16126,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.260'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.261'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -16261,6 +16268,11 @@ function mergeRemoteIntoState(state, remote) {
   // v60.259 rule 3: a blank remote value ({} / [] / null / '') never overwrites a FILLED standing value.
   // Day layers are not in the list, so clearing a call-off on one device still clears it everywhere.
   const keepLocal = {}; STANDING_KEYS.forEach(function(k){ if (_isBlankVal(remote[k]) && !_isBlankVal(state[k])) keepLocal[k] = state[k]; });
+  if (('fields' in remote) && !_fieldsTyped(remote.fields) && _fieldsTyped(state.fields)) {   // v60.261 rule 5: no typed number in the remote → today's typed numbers stay
+    keepLocal.fields = Object.assign({}, state.fields);
+    var _rk = remote.fields && typeof remote.fields==='object' ? remote.fields : {}; Object.keys((typeof DAY_FIELD_KEEP==='object' && DAY_FIELD_KEEP)||{}).forEach(function(k){ if (k in _rk) keepLocal.fields[k] = _rk[k]; });
+  }
+  window._mergeKept = Object.keys(keepLocal);   // v60.261: what this merge refused to lose — applyRemoteRecord pushes the healed record back
   const localLog = Array.isArray(state.scheduleLog) ? state.scheduleLog.slice() : [];
   Object.assign(state, remote);
   Object.keys(keepLocal).forEach(function(k){ state[k] = keepLocal[k]; });
@@ -16366,6 +16378,12 @@ function applyRemoteRecord(record, apply) {
   // call-offs; its dayOf rides in the merge and retires them here.
   if(typeof _retireDayLayers==='function' && _retireDayLayers()){ try{ loadScheduleForToday(false); }catch(e){} }
   rebuildAfterSync();
+  // v60.261 rule 5b: the cloud copy was missing things this device still has — send the healed record back now.
+  if (window._mergeKept && window._mergeKept.length) {
+    var _kept = window._mergeKept; window._mergeKept = null;
+    try { saveState(); } catch(e) {}
+    try { if (typeof toast === 'function') toast('↺ The cloud copy was missing '+_kept.length+' thing'+(_kept.length===1?'':'s')+' this device still has — sending them back', 6000); } catch(e) {}
+  }
   const _newPub = STATE.publishMeta;
   if (_newPub && _newPub.at && _newPub.at !== _prevPub) {
     const pt = new Date(_newPub.at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
