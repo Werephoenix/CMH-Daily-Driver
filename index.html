@@ -4723,6 +4723,36 @@ function ensureStateShape(s){
 }
 
 function _dayFileKey(){ return 'cmh-v2-' + ((typeof _bizDayKey==='function') ? _bizDayKey() : _localDayKey(new Date())); }   // v60.236 (decision B): the file is the business day's file
+// ════════════════════════════════════════════════════════════════════════
+// v60.259 · INCIDENT FIX (2026-09-12, 8:48a): since v60.236 the local file is the BUSINESS DAY's file, so
+// every device began each day with a BLANK state and relied on the cloud pull refilling it before its
+// first push. This morning the boot save queued a push, the pull was DEFERRED by the pending-push guard,
+// the blank pushed, and the cloud record (full) became 4.7 KB. Every device that pulled it then had its
+// standing data — accommodations, prefs, floor targets, roster edits, schedule log — overwritten by the
+// blank's {} and null through the shallow merge. Four rules now:
+//   1 a day starts from YESTERDAY's file on this device (day layers retire as before), never from blank;
+//   2 standing keys that are blank today but filled in yesterday's file are restored (heals a device
+//     that already merged the blank);
+//   3 a BLANK remote value never overwrites a filled standing value (day layers still propagate);
+//   4 a device that has not pulled this session pulls before its first push, and a fresh (blank) state
+//     applies the remote instead of deferring it.
+// ════════════════════════════════════════════════════════════════════════
+var STANDING_KEYS=['accommodations','exitAccommodation','stationPref','lunchPref','lunchHist','floorTargets','mgrTargets','coverageThresholds','branchConfig','branchResponses','adminRoster','adminCodes','displayNames','nameAliases','scheduleOverrides','carPhotos','physInventory','meetings','announcements','celebrations','pto','scheduleLog','trainMap','training','corpAvg','mgrStationLog','mgrStationLoggedDates','mgrStationDeclared','mgrAnchorOverride','groupOverrides','cityEvents','policyLog','clReasons','solveW','dnr','dnq','demandBaseline','fairness','mgrFunctionsNote','closingExtension','weeklyPlan','requests','quotes'];
+function _isBlankVal(v){ if(v==null) return true; if(Array.isArray(v)) return v.length===0; if(typeof v==='object') return Object.keys(v).length===0; if(typeof v==='string') return v===''; return false; }
+function _prevDayFile(){   // the newest earlier day file on this device (up to 14 days back), read through getItem so it works everywhere
+  try{
+    var today=_dayFileKey(), m=today.match(/(\d{4})-(\d{2})-(\d{2})$/); if(!m) return null;
+    var d=new Date(+m[1], +m[2]-1, +m[3], 12, 0, 0);
+    for(var i=1;i<=14;i++){ d.setDate(d.getDate()-1); var k='cmh-v2-'+_localDayKey(d); var raw=localStorage.getItem(k); if(raw){ try{ var o=JSON.parse(raw); if(o && typeof o==='object') return {key:k, state:o}; }catch(e){} } }
+  }catch(e){}
+  return null;
+}
+function _seedStanding(s){   // rule 2: fill blank standing keys from yesterday's file
+  var prev=_prevDayFile(); if(!prev) return [];
+  var got=[]; STANDING_KEYS.forEach(function(k){ if(_isBlankVal(s[k]) && !_isBlankVal(prev.state[k])){ s[k]=prev.state[k]; got.push(k); } });
+  if(got.length) window._seededStanding={key:prev.key, keys:got};
+  return got;
+}
 function loadState() {
   const LS_KEY = _dayFileKey();
   try {
@@ -4738,9 +4768,15 @@ function loadState() {
     if (raw) {
       const s = JSON.parse(raw);
       ensureStateShape(s);
+      try{ _seedStanding(s); }catch(e){}   // v60.259 rule 2
       return s;
     }
+    // v60.259 rule 1: no file for today — start from the newest earlier day file on this device.
+    // Its day layers retire on boot exactly as a device that slept through the turn; its standing data is today's.
+    var prev = _prevDayFile();
+    if (prev) { ensureStateShape(prev.state); window._seededFromPrev = prev.key; return prev.state; }
   } catch(e) {}
+  window._stateFresh = true;   // v60.259 rule 4: a blank state must take the cloud's word first
   return {
     fields:{}, walkUpPolicy:'open', pasteData:{}, groupOverrides:{},
     checklist:{}, staffDuty:{}, staffStation:{}, shiftTimes:{},
@@ -5041,6 +5077,7 @@ window.onload = function() {
   if (typeof _mgrCounterPurge === 'function') _mgrCounterPurge();  // v60.210: clear auto-stamped mgr Counter
   if (typeof _stalePidPurge === 'function') _stalePidPurge();      // v60.225: drop ghost pids (e.g. Toney_Returns)
   if (typeof _retireDayLayers === 'function') _retireDayLayers();  // v60.227: yesterday's call-offs do not greet the opener
+  try{ if (window._seededFromPrev || window._seededStanding) { saveState(); var _w = window._seededStanding ? window._seededStanding.keys.length + ' setting group' + (window._seededStanding.keys.length === 1 ? '' : 's') : 'the day'; setTimeout(function(){ if (typeof toast === 'function') toast('↺ Restored ' + _w + ' from yesterday\u2019s file on this device', 7000); }, 1200); if (typeof logAction === 'function') logAction('Restored from ' + (window._seededFromPrev || window._seededStanding.key)); } }catch(e){}   // v60.259
   if (typeof checklistRolloverIfNeeded === 'function') checklistRolloverIfNeeded();  // v60.211: rituals reset with the branch day
   if (typeof applyDensity === 'function') applyDensity();  // v60.13: apply saved density pref
   if (typeof applyTheme === 'function') applyTheme();  // v60.32: apply saved bold/calm theme
@@ -16016,7 +16053,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.258'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.259'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -16091,6 +16128,7 @@ async function cloudPush() {
   // SYNCHRONOUS (before any await) so an actively-editing device resumes
   // accepting remote pulls the moment it pushes. test_sync.js asserts this.
   window._syncPending = false;
+  if (!window._pulledOnce) { try { await cloudPull(true); } catch(e){} }   // v60.259 rule 4: never push a state that has not heard from the cloud this session
   // v60.209 · DIRTY CHECK — if the state is byte-identical to what this device
   // last pushed, there is nothing to say. This is what stops the two-desk loop:
   // pull → re-derive → save → push → the other desk pulls → re-derives → … The
@@ -16154,7 +16192,14 @@ function mergeRemoteIntoState(state, remote) {
   const localCL  = JSON.parse(JSON.stringify(state.checklist || {}));
   const localDNR = Array.isArray(state.dnr) ? state.dnr.slice() : [];
   const localDNQ = Array.isArray(state.dnq) ? state.dnq.slice() : [];
+  // v60.259 rule 3: a blank remote value ({} / [] / null / '') never overwrites a FILLED standing value.
+  // Day layers are not in the list, so clearing a call-off on one device still clears it everywhere.
+  const keepLocal = {}; STANDING_KEYS.forEach(function(k){ if (_isBlankVal(remote[k]) && !_isBlankVal(state[k])) keepLocal[k] = state[k]; });
+  const localLog = Array.isArray(state.scheduleLog) ? state.scheduleLog.slice() : [];
   Object.assign(state, remote);
+  Object.keys(keepLocal).forEach(function(k){ state[k] = keepLocal[k]; });
+  if (localLog.length) { const seen = {}; const out = []; (Array.isArray(state.scheduleLog) ? state.scheduleLog : []).concat(localLog).forEach(function(e){ var key = JSON.stringify(e); if (!seen[key]) { seen[key] = 1; out.push(e); } }); state.scheduleLog = out; }   // the schedule log is a union, never a replace
+  window._stateFresh = false;
   delete state._meta;
   if (!state.checklist) state.checklist = {};
   Object.keys(localCL).forEach(mode => {
@@ -16202,7 +16247,7 @@ function applyRemoteRecord(record, apply) {
   // upload the clobbered state — silently losing the edit. Defer: leave
   // _lastRemoteAt UNCHANGED so the next poll (after our push fires and
   // _syncPending clears) re-sees this remote change and applies it then.
-  if (apply && syncPushPending()) { setSyncStatus('syncing', 'Local edit pending…'); return 'deferred'; }
+  if (apply && syncPushPending() && !window._stateFresh) { setSyncStatus('syncing', 'Local edit pending…'); return 'deferred'; }   // v60.259 rule 4: a blank state has nothing to protect — take the cloud's word
   _lastRemoteAt = remoteAt;
   if (!apply) return 'noted';
   // v60.230 (Inspector round 9, item 1): a same-day record arriving on a tab
@@ -16283,6 +16328,7 @@ async function cloudPull(apply) {
       return;
     }
     const rows = await res.json();
+    window._pulledOnce = true;   // v60.259
     if (!rows || !rows.length) { setSyncStatus('synced','Ready'); return; }   // first run, nothing stored yet
     // Re-shaped to the record contract applyRemoteRecord already expects, so
     // the race guard and union merge below are reused completely unchanged.
