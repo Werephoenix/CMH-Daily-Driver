@@ -2298,7 +2298,7 @@ button { cursor: pointer; }
       <button class="more-row" onclick="showTab('reference')"><span class="more-ic tile" style="background:rgba(100,210,255,.16)">📖</span><span class="more-lbl">Reference &amp; Color Key</span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="openEmeraldGuide()"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">💚</span><span class="more-lbl">Emerald Club<span class="more-sub">LOS by tier · MOD codes · aisle rules</span></span><span class="more-ch">›</span></button>
       <button class="more-row" onclick="showTab('history')"><span class="more-ic tile" style="background:rgba(48,209,88,.16)">🕑</span><span class="more-lbl">Shift History</span><span class="more-ch">›</span></button>
-      <button class="more-row" onclick="openStationFairness()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">🔀</span><span class="more-lbl">Station Fairness<span class="more-sub">Who's stuck in Returns / never Emerald · beta</span></span><span class="more-ch">›</span></button>
+      <button class="more-row" onclick="openStationFairness()"><span class="more-ic tile" style="background:rgba(175,156,255,.16)">🔀</span><span class="more-lbl">Patterns &amp; fairness<span class="more-sub">Who's stuck in Returns / never Emerald · beta</span></span><span class="more-ch">›</span></button>
       <button class="more-row vl-mgr" onclick="openBranchAsks()"><span class="more-ic tile" style="background:rgba(255,204,0,.16)">📣</span><span class="more-lbl">Ask the Branch</span><span class="more-ch">›</span></button>
     </div>
     <div class="now-sec-hd" style="margin:16px 0 6px 4px">Manage</div>
@@ -2540,12 +2540,13 @@ button { cursor: pointer; }
     <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-p" onclick="upAdd()">Add this paste</button>
       <button class="btn btn-gh btn-sm" onclick="document.getElementById('screen-paste').classList.toggle('classic')">Classic boxes ▾</button>
+      <span id="up-undo"></span>
       <span id="up-hint" style="font-size:11px;color:var(--txt3)"></span>
     </div>
     <div id="up-ask"></div>
     <div id="up-tiles" class="up-tiles"></div>
     <div id="up-line" class="up-line"></div>
-    <button class="btn btn-p btn-lg" style="width:100%" onclick="calcBoard();showTab('board')">→ Live Board</button>
+    <button id="up-go-board" class="btn btn-gh btn-lg" style="width:100%" onclick="calcBoard();showTab('board')">→ Live Board</button>   <!-- v60.274: lit only once something is in for today -->
   </div>
   <div class="card" id="paste-classic-card">
     <div class="ch">📋 Paste Game Plan Data <span class="sub">4 exports · ~2 min</span></div>
@@ -3142,7 +3143,7 @@ button { cursor: pointer; }
         Unlock →
       </button>
       <div id="admin-pin-error" style="color:var(--red);font-size:11px;margin-top:8px"></div>
-      <div style="font-size:10px;color:var(--txt3);margin-top:16px">Default PIN: 2826 (CMH0)</div>
+      <div style="font-size:10px;color:var(--txt3);margin-top:16px">No PIN on this device yet? The first unlock sets one.</div>
     </div>
 
     <!-- Admin content (hidden until PIN entered) -->
@@ -3192,7 +3193,7 @@ button { cursor: pointer; }
             <button class="btn btn-gh btn-sm" onclick="openDisplayNames()">🏷 Display names</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-codes" onclick="showAdminSection('codes')">🚗 Car Codes</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-photos" onclick="showAdminSection('photos')">📸 Car Photos</button>
-            <button class="btn btn-gh btn-sm" onclick="openThresholdQuiz()">📊 Coverage targets</button>
+            <button class="btn btn-gh btn-sm" onclick="openThresholdQuiz()">📊 Floor targets</button>
             <button class="btn btn-gh btn-sm" onclick="openBranchInterview()">🗒 Branch setup</button>
             <button class="btn btn-gh btn-sm" id="adm-tab-pin" onclick="showAdminSection('pin')">🔑 Change PINs</button>
           </div>
@@ -3298,21 +3299,19 @@ button { cursor: pointer; }
           </div>
         </div>
         <div class="card">
-          <div class="ch">🔓 Manager Mode PIN <span style="font-size:10px;color:var(--txt3);font-weight:400">(Daily Coverage Controls)</span></div>
+          <div class="ch">🔓 Manager PIN <span style="font-size:10px;color:var(--txt3);font-weight:400">(Daily Coverage Controls)</span></div>
           <div style="display:grid;gap:8px;max-width:260px">
-            <input id="mod-pin-current" type="password" inputmode="numeric" maxlength="6" placeholder="Current MOD PIN"
+            <input id="mod-pin-current" type="password" inputmode="numeric" maxlength="6" placeholder="Current Manager PIN"
               style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
-            <input id="mod-pin-new" type="password" inputmode="numeric" maxlength="6" placeholder="New MOD PIN"
+            <input id="mod-pin-new" type="password" inputmode="numeric" maxlength="6" placeholder="New Manager PIN"
               style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
-            <input id="mod-pin-confirm" type="password" inputmode="numeric" maxlength="6" placeholder="Confirm MOD PIN"
+            <input id="mod-pin-confirm" type="password" inputmode="numeric" maxlength="6" placeholder="Confirm Manager PIN"
               style="width:100%;padding:8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-family:var(--ff-mono);font-size:16px">
-            <button class="btn btn-g" onclick="changeModPin()">Save MOD PIN</button>
+            <button class="btn btn-g" onclick="changeModPin()">Save Manager PIN</button>
             <div id="mod-pin-msg" style="font-size:11px;min-height:16px"></div>
           </div>
         </div>
-        <div style="font-size:10px;color:var(--txt3);margin-top:4px">
-          Default Admin PIN: 2826 · Default MOD PIN: 1234
-        </div>
+        <div style="font-size:10px;color:var(--txt3);margin-top:4px">PINs live on each device. A device with no PIN yet sets one on its first unlock.</div>
       </div>
 
       <!-- SCHEDULE IMPORT section -->
@@ -3322,7 +3321,7 @@ button { cursor: pointer; }
             <span class="sub">Paste weekly mgmt or CXR/Exit schedule grid</span>
           </div>
           <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
-            Paste from the schedule grid (Excel / copied text). Management and CXR/Exit parse separately.
+            Paste from the schedule grid (Excel / copied text). Managers and CXR/Exit go in separate boxes.
           </p>
           <div id="stored-status" style="margin-bottom:12px;font-size:11px;color:var(--txt3)">Loading...</div>
 
@@ -3355,7 +3354,7 @@ button { cursor: pointer; }
           </div>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-gh btn-sm" onclick="confirmDestructive('Clear imported schedule?', 'The stored weekly schedule will be wiped. You will need to re-import.', ()=>clearStoredSchedule&&clearStoredSchedule())">🗑 Clear Schedule</button>
+            <button class="btn btn-gh btn-sm" onclick="confirmDestructive('Clear imported schedule?', 'This removes the week you pasted. You can paste it again any time.', ()=>clearStoredSchedule&&clearStoredSchedule())">🗑 Clear Schedule</button>
             <button class="btn btn-gh btn-sm" onclick="if(typeof resetAndReloadToday==='function')resetAndReloadToday()">🔄 Reset &amp; Reload Today</button>
           </div>
         </div>
@@ -3368,8 +3367,8 @@ button { cursor: pointer; }
             <span class="sub">Post a message to the top of the dashboard</span>
           </div>
           <p style="font-size:12px;color:var(--txt3);margin-bottom:12px">
-            Announcements appear at the top of the Dashboard for all users.
-            Set an expiry date if you want it to auto-remove.
+            Everyone sees announcements at the top of Now.
+            Give one an end date and it takes itself down.
           </p>
           <div style="display:grid;gap:10px;margin-bottom:12px">
             <textarea id="annc-input-text" rows="3" placeholder="Type your announcement here..."
@@ -3393,7 +3392,7 @@ button { cursor: pointer; }
             </div>
             <div id="annc-policy-row" style="display:none;background:rgba(37,99,235,.06);border:1px solid rgba(37,99,235,.2);border-radius:5px;padding:10px">
               <label style="font-size:10px;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;font-weight:700">⚠️ Manager Name (required for Policy)</label>
-              <input type="text" id="annc-input-mgr" placeholder="Your name — e.g. Matt J"
+              <input type="text" id="annc-input-mgr" placeholder="Your name — e.g. Avery N"
                 style="width:100%;margin-top:4px;padding:7px 8px;background:var(--bg3);border:1px solid var(--acc);border-radius:4px;color:var(--txt);font-size:12px">
             </div>
             <button class="btn btn-g" onclick="submitNewAnnouncement()" style="padding:8px 16px;width:100%">📣 Post Announcement</button>
@@ -3447,7 +3446,7 @@ Casey Example, 5/14</pre>
             id="adm-photos-list"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
             <button class="btn btn-g btn-sm" onclick="saveAllCarPhotos()">💾 Save All</button>
-            <button class="btn btn-gh btn-sm" onclick="prePopulateCarPhotos()">🖼 Pre-populate Defaults</button>
+            <button class="btn btn-gh btn-sm" onclick="prePopulateCarPhotos()">🖼 Fill in the defaults</button>
             <button class="btn btn-gh btn-sm" style="margin-left:auto" onclick="confirmDestructive('Clear all car photos?', 'All saved photo URLs will be removed.', clearAllCarPhotos)">🗑 Clear All</button>
           </div>
         </div>
@@ -4575,6 +4574,7 @@ function ensureStateShape(s){
   s.mgrStationDeclared    = (s.mgrStationDeclared && typeof s.mgrStationDeclared === 'object') ? s.mgrStationDeclared : {};  // v60.111: {pid:station} declared usual station
   s.branchResponses       = (s.branchResponses && typeof s.branchResponses === 'object') ? s.branchResponses : {};  // v60.117: {mgrName:{answers,notes,ts}} per-manager interview viewpoints
   s.pto                   = (s.pto && typeof s.pto === 'object') ? s.pto : {};
+  s.pasteStamp            = (s.pasteStamp && typeof s.pasteStamp === 'object') ? s.pasteStamp : {};   // v60.274: {resAM:'2026-10-07',…}
   s.rosterBase            = Array.isArray(s.rosterBase) ? s.rosterBase : [];   // v60.266: the branch's people (cloud-held)
   s.shippedGrids          = (s.shippedGrids && typeof s.shippedGrids === 'object') ? s.shippedGrids : {};   // v60.266: may / sept / mgmt grids  // v60.120: {YYYY-MM-DD:{pid:true}} time-off (read by scheduler + calendar + station suggest)
 
@@ -4958,6 +4958,7 @@ window.onload = function() {
   try{ if (typeof _pruneDayFiles === 'function') _pruneDayFiles(); }catch(e){}   // v60.269
   if (typeof rebuildRosters === 'function') rebuildRosters();      // v60.267: the base roster comes from the state now — build it BEFORE the purge below reads it (caught by the pressure harness: the purge would have deleted every real pid as a ghost)
   if (typeof _stalePidPurge === 'function') _stalePidPurge();      // v60.225: drop ghost pids
+  try{ window._bootSnap = JSON.stringify(STATE); }catch(e){}   // v60.274: what this device had BEFORE anyone touched it — the base for the first merge
   if (typeof _retireDayLayers === 'function') _retireDayLayers();  // v60.227: yesterday's call-offs do not greet the opener
   try{ if (window._seededFromPrev || window._seededStanding) { saveState(); var _w = window._seededStanding ? window._seededStanding.keys.length + ' setting group' + (window._seededStanding.keys.length === 1 ? '' : 's') : 'the day'; setTimeout(function(){ if (typeof toast === 'function') toast('↺ Restored ' + _w + ' from yesterday\u2019s file on this device', 7000); }, 1200); if (typeof logAction === 'function') logAction('Restored from ' + (window._seededFromPrev || window._seededStanding.key)); } }catch(e){}   // v60.259
   if (typeof checklistRolloverIfNeeded === 'function') checklistRolloverIfNeeded();  // v60.211: rituals reset with the branch day
@@ -5600,6 +5601,7 @@ function parseStep(stepNum, ctr) {
   if (!_ctrOnly) {
     STATE.pasteData[key] = result;
     STATE.boardUpdatedAt = Date.now();  // v60.65: powers the Live Board "· Updated HH:MM" header
+    try{ (STATE.pasteStamp = STATE.pasteStamp || {})[key] = _bizDayKey(); }catch(e){}   // v60.274: this half is in for TODAY
   }
 
   // Also try to parse brand section if present.
@@ -5814,6 +5816,7 @@ function calculateAndShowBoard() {
 function getGroupNetData() {
   const pd = STATE.pasteData || {};
   const result = {};
+  const _retPasted = !!(pd['ret-am-remaining'] || pd['ret-pm-remaining']);   // v60.274
 
   GROUP_META.forEach(g => {
     // AM and PM pastes both contain the SAME 'Remaining' column for the full day.
@@ -5826,7 +5829,7 @@ function getGroupNetData() {
     const ret = Math.max(retAM, retPM);
     const net = ret - res;
     const has = !!(res || ret);
-    result[g.name] = {res, ret, net, has, hasData: has};
+    result[g.name] = {res, ret, net, has, hasData: has, retMissing: !_retPasted};   // v60.274: no Returns paste yet → not a deficit
   });
   return result;
 }
@@ -6170,14 +6173,15 @@ function buildBoardGrid() {
   _shown.forEach(g => {
     const d = data[g.name];
     const has = d && d.has;
-    const net = has ? d.net : null;
+    const _retMissing = !!(d && d.retMissing && has);   // v60.274: reservations in, returns not yet → muted, never red
+    const net = (has && !_retMissing) ? d.net : null;
 
     // Per-group override check
     const override = STATE.groupOverrides ? STATE.groupOverrides[g.name] : null;
     let st;
     if (override === 'open')  st = has ? getGroupStatus(g.name, net) : 'wu'; // force eligible
     else if (override === 'close') st = 'na';
-    else st = has ? getGroupStatus(g.name, net) : 'no-data';
+    else st = (has && !_retMissing) ? getGroupStatus(g.name, net) : 'no-data';   // v60.274: returns missing → muted, not a deficit
 
     const netClass  = net===null?'no-data':net>0?'positive':net<0?'negative':'zero';
     const netDisplay = net===null?'—':(net>0?'+':'')+net;
@@ -6200,7 +6204,7 @@ function buildBoardGrid() {
     // v60.88: Design tile — code + status badge (top), big colored number, group name (bottom).
     // Long-press / the override grid behind the policy pill still handle forced open/close.
     const _icn = st==='wu'?'▲':st==='up'?'▶':st==='na'?'■':'○';
-    const _num = net===null?'—':String(net);
+    const _num = _retMissing ? (d.res+' out') : (net===null?'—':String(net));   // v60.274
     const _ovRing = (override==='open'||override==='close') ? ' gt-ov' : '';
     html += `<div class="group-tile ${st}${_ovRing}" onclick="tileClick('${g.name.replace(/'/g,"\\'")}')"
         oncontextmenu="event.preventDefault();cycleGroupOverride('${g.name.replace(/'/g,"\\'")}')">
@@ -9140,7 +9144,7 @@ var DAY_FIELD_KEEP = {book24hr:1};
 // v60.233 (Inspector round 12, #2): the retire and the merge door were two
 // hand-copies of one list, and they drifted (outCancel). One list, two doors.
 var DAY_LAYER_KEYS = ['staffDuty','staffStation','altSchedule','altPinned','shiftMod','todayOverrides','absenceType',
-                      'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','particulars'];   // v60.251: today's particulars are day-shaped
+                      'customSplits','customLunch','mgmtBlocks','specialBlocks','dayMarks','particulars','pasteStamp'];   // v60.251: today's particulars are day-shaped; v60.274: which halves were pasted TODAY
 var DAY_LAYER_EXTRA = ['confirmedCoverage','pendingCoverage','outCancel','walkUpPolicy','dayOf'];   // v60.237: + walkUpPolicy (day-shaped)   // scalars the door must drop too
 function _retireDayFields(obj){ var f=obj&&obj.fields; if(!f) return; Object.keys(f).forEach(function(k){ if(!DAY_FIELD_KEEP[k]) delete f[k]; }); }
 function _retireDayLayers(){
@@ -10282,9 +10286,10 @@ function updateStatusBand() {
   const auto = getAutoManagers();
   const onDuty = Object.keys((typeof buildExpectedToday==='function')?buildExpectedToday():{}).filter(p=>!isOffToday(p)).length;   // v60.225
   const items = [];
-  if (pasteDone < 4) items.push({c:'var(--amber)', t:pasteDone+'/4 Game Plan pastes done'});
+  if (pasteDone < 4) { var _nt=(typeof upNextTarget==='function')?upNextTarget():null; items.push({c:'var(--amber)', t:_nt?('Next paste: '+_nt.label):('Game Plan pastes in progress')}); }   // v60.274: the next step, not an owed count
   else items.push({c:'var(--green)', t:'All 4 pastes complete'});
   if (wuOpen > 0) items.push({c:'var(--green)', t:wuOpen+' groups walk-up open'});
+  else if (pasteDone>0 && !(STATE.pasteData['ret-am-remaining']||STATE.pasteData['ret-pm-remaining'])) items.push({c:'var(--amber)', t:'Returns not pasted yet'});   // v60.274
   else if (pasteDone>0) items.push({c:'var(--red)', t:'No groups at walk-up threshold'});
   const openName = STATE.fields.openMgr || auto.open;
   if (openName) items.push({c:'var(--green)', t:'Opening: '+openName});
@@ -10345,7 +10350,8 @@ function refreshDash() {
   const calcRet = hasRem ? calcRetRem : 0;
   const showRes = calcRes > 0 ? calcRes : (tBrands.totalRes || f.totalRes || '—');
   const showRet = calcRet > 0 ? calcRet : (tBrands.totRet   || f.totalRet || '—');
-  const showNet = hasRem ? (calcRetRem - calcResRem) : null;
+  const _retPasted2 = !!(pd2['ret-am-remaining'] || pd2['ret-pm-remaining']);
+  const showNet = (hasRem && _retPasted2) ? (calcRetRem - calcResRem) : null;   // v60.274: no Net until Returns are in
   s('db-totalres', showRes); s('db-totalret', showRet);
   // v60.122: Branch Interview D1/D2 (resLow/resHigh) — when the branch's typical
   // daily-reservation range is set, Total Res reads green inside the range and
@@ -11243,9 +11249,9 @@ function soloInjectStyle(){
    +'.solo-strip.warn{background:rgba(255,214,51,.13);border:1px solid rgba(255,214,51,.36);color:#FFD633}'
    +'.solo-strip .solo-ago{opacity:.72;font-size:11px;white-space:nowrap}'
    +'.solo-strip .solo-btn{flex-shrink:0}'
-   +'.now-attn.solo-t3{border:1.5px solid var(--red,#FF453A);background:rgba(255,69,58,.17);'
+   +'.now-attn.solo-t3{border:1.5px solid var(--amber,#FF9F0A);background:rgba(255,159,10,.16);'
    +'animation:soloPulse 2.2s ease-in-out infinite}'
-   +'.now-attn.solo-t3 .solo-kick{color:var(--red,#FF453A);font-weight:800}'
+   +'.now-attn.solo-t3 .solo-kick{color:var(--amber,#FF9F0A);font-weight:900;letter-spacing:.08em}'
    +'.solo-h.big{font-size:17px;font-weight:800}'
    +'@keyframes soloPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,69,58,.34)}'
    +'50%{box-shadow:0 0 0 6px rgba(255,69,58,0)}}'
@@ -15835,7 +15841,7 @@ async function sbStatusSheet(){
   var signed = (typeof sbSignedIn==='function') && sbSignedIn();
   lines.push((signed?'✅':'❌')+' This device is '+(signed?'signed in':'NOT signed in — nothing syncs from or to it'));
   if(signed){
-    lines.push(((window._syncPending)?'📤 Changes on this device are waiting to save (about 2.5 seconds after each change)':'✅ Nothing waiting to save'));
+    lines.push(((window._syncPending)?'📤 Changes here are about to save':'✅ Nothing waiting to save'));
     try{
       var H=await _sbHeaders();
       var r=await fetch(SB_URL+'/rest/v1/branch_state?id=eq.'+encodeURIComponent(SB_ROW)+'&select=saved_at,saved_by',{headers:H});
@@ -15875,7 +15881,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.273'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.274'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -15954,6 +15960,31 @@ function _healStandingFromRemote(state, remote){   // fill blanks from the cloud
   STANDING_KEYS.forEach(function(k){ if (_isBlankVal(state[k]) && !_isBlankVal(remote[k]) && !(k==='rosterBase' && _rosterLooksDemo(remote[k]))) { state[k]=remote[k]; got.push(k); } });
   return got;
 }
+// v60.274 (Inspector, round 4): when a person edits before the first pull lands (or edits offline, or signs in after a
+// dead session), rule C healed STANDING keys only — the first push then replaced the cloud's DAY layers with this
+// device's, deleting another desk's same-day call-off. Now the first merge is a 3-way against the boot snapshot:
+// a key this device did NOT change takes the cloud's value; a day-layer object it DID change is merged per person
+// (the cloud's additions and the other desk's changes come in, this device's own changes stay). Blank standing values
+// still never win (rule 3).
+function _firstMergeTouched(state, remote){
+  var base={}; try{ base=JSON.parse(window._bootSnap||'{}')||{}; }catch(e){}
+  var same=function(a,b){ try{ return JSON.stringify(a===undefined?null:a)===JSON.stringify(b===undefined?null:b); }catch(e){ return false; } };
+  var isObj=function(v){ return v && typeof v==='object' && !Array.isArray(v); };
+  var derived={staffStation:1, staffDuty:1, altSchedule:1};
+  var took=[], mergedKeys=[];
+  Object.keys(remote||{}).forEach(function(k){
+    if(k==='_meta' || derived[k]) return;
+    if(STANDING_KEYS.indexOf(k)>=0 && _isBlankVal(remote[k]) && !_isBlankVal(state[k])) return;   // rule 3
+    if(k==='rosterBase' && _rosterLooksDemo(remote[k])) return;
+    if(same(state[k], base[k])){ state[k]=remote[k]; took.push(k); return; }                      // untouched here → the cloud's word
+    if(isObj(state[k]) && isObj(remote[k]) && isObj(base[k]||{})){                                   // touched here → merge per entry
+      var b=base[k]||{}; Object.keys(remote[k]).forEach(function(sub){ if(same(state[k][sub], b[sub])) state[k][sub]=remote[k][sub]; });
+      mergedKeys.push(k);
+    }
+  });
+  try{ _healStandingFromRemote(state, remote); }catch(e){}
+  return {took:took, merged:mergedKeys};
+}
 function _pushBlockReason(){   // '' = allowed
   if (!window._mergedOnce) return 'first-sync';
   if (!window._rosterFromCloud) return 'demo';
@@ -15968,9 +15999,10 @@ async function _firstSync(){   // returns true when this session has heard from 
   if (!rows || !rows.length) { window._mergedOnce = true; return true; }   // nothing stored yet
   var rec = { state: rows[0].state, savedAt: rows[0].saved_at, by: rows[0].saved_by };
   if (!window._userTouched) { applyRemoteRecord(rec, true); window._mergedOnce = true; return true; }   // nobody has edited: the cloud's word first
-  var got = _healStandingFromRemote(STATE, rec.state);   // rule C
-  _lastRemoteAt = rec.savedAt; window._mergedOnce = true;
-  if (got.length) { try{ rebuildRosters(); }catch(e){} try{ if (typeof loadScheduleForToday==='function') loadScheduleForToday(false); }catch(e){} try{ rebuildAfterSync(); }catch(e){} }
+  var r3 = _firstMergeTouched(STATE, rec.state);   // v60.274: rule C is a 3-way merge now, day layers included
+  _lastRemoteAt = rec.savedAt; window._mergedOnce = true; window._mergeKept = null;
+  try{ rebuildRosters(); }catch(e){} try{ if (typeof loadScheduleForToday==='function') loadScheduleForToday(false); }catch(e){} try{ rebuildAfterSync(); }catch(e){}
+  try{ if (typeof saveState==='function') saveState(); }catch(e){}   // the merged state is what this device pushes next
   return true;
 }
 async function cloudPush() {
@@ -15989,7 +16021,7 @@ async function cloudPush() {
   // SYNCHRONOUS (before any await) so an actively-editing device resumes
   // accepting remote pulls the moment it pushes. test_sync.js asserts this.
   window._syncPending = false;
-  if (!window._mergedOnce) { var _fs=false; try { _fs = await _firstSync(); } catch(e){} if (!_fs) { window._syncPending = true; try{ setSyncStatus('offline','Waiting to hear from the cloud'); }catch(e){} return; } }   // v60.269 rules A+C (replaces v60.259 rule 4's _pulledOnce, which a deferred pull could satisfy)
+  if (!window._mergedOnce) { var _fs=false; try { _fs = await _firstSync(); } catch(e){} if (!_fs) { window._syncPending = true; try{ setSyncStatus('offline', (typeof sbSignedIn==='function' && sbSignedIn()) ? 'Waiting to hear from the cloud' : 'Sign in to sync'); }catch(e){} return; } }   // v60.269 rules A+C; v60.274: honest wording, re-armed by _syncPullNow (replaces v60.259 rule 4's _pulledOnce, which a deferred pull could satisfy)
   if (!window._rosterFromCloud) { try{ setSyncStatus('synced', 'Demo branch — not syncing'); }catch(e){} return; }   // v60.269 rule D
   // v60.209 · DIRTY CHECK — if the state is byte-identical to what this device
   // last pushed, there is nothing to say. This is what stops the two-desk loop:
@@ -16282,6 +16314,7 @@ function _syncScheduleNext() {
 }
 function _syncPullNow() {
   _lastActivity = Date.now();
+  if (window._syncPending && !window._mergedOnce && typeof cloudPush === 'function') { Promise.resolve(cloudPush()).then(_syncScheduleNext, _syncScheduleNext); return; }   // v60.274: a push that waited for the cloud (signed out / offline) goes now — through the first-sync door
   Promise.resolve(cloudPull(true)).then(_syncScheduleNext, _syncScheduleNext);
 }
 
@@ -16428,15 +16461,16 @@ function initSync() {
 var _adminUnlocked = false;
 var ADMIN_PIN_KEY  = 'cmh-admin-pin';
 var MOD_PIN_KEY    = 'cmh-mod-pin';
-var DEFAULT_PIN    = '2826';
-var DEFAULT_MOD_PIN= '1234';
+// v60.274: no default PINs — they were readable in the public page. A device with none set creates one on its first unlock.
 var _managerMode   = false;
 
-function getAdminPin() { return localStorage.getItem(ADMIN_PIN_KEY) || DEFAULT_PIN; }
-function getModPin()   { return localStorage.getItem(MOD_PIN_KEY)   || DEFAULT_MOD_PIN; }
+function getAdminPin() { return localStorage.getItem(ADMIN_PIN_KEY) || null; }
+function getModPin()   { return localStorage.getItem(MOD_PIN_KEY)   || null; }
+function _pinSetIfNone(key, value){ if(localStorage.getItem(key)) return false; var v=String(value||'').trim(); if(!/^\d{4,6}$/.test(v)) return false; localStorage.setItem(key, v); return true; }   // v60.274
 function isManagerMode(){ return _managerMode; }
 
 function unlockManagerMode(pin) {
+  if (!getModPin() && _pinSetIfNone(MOD_PIN_KEY, pin)) { try{ toast('Manager PIN set on this device'); }catch(e){} }   // v60.274: first unlock creates it
   if (pin === getModPin()) {
     _managerMode = true;
     toast('Manager Mode unlocked 🔓');
@@ -16460,6 +16494,7 @@ function checkAdminPin() {
   const input = document.getElementById('admin-pin-input');
   const err   = document.getElementById('admin-pin-error');
   if (!input) return;
+  if (!getAdminPin() && _pinSetIfNone(ADMIN_PIN_KEY, input.value)) { try{ toast('Admin PIN set on this device'); }catch(e){} }   // v60.274
   if (input.value === getAdminPin()) {
     _adminUnlocked = true;
     const lock    = document.getElementById('admin-lock');
@@ -16800,7 +16835,7 @@ var CAR_PHOTO_ALIASES = {
 };
 
 function prePopulateCarPhotos() {
-  openModal('Pre-populate Car Photos', `
+  openModal('Fill in Car Photos', `
     <div style="text-align:center;padding:8px 0">
       <div style="font-size:13px;color:var(--txt2);margin-bottom:8px">
         Fill in representative photos for all vehicle groups using current-year base model images.
@@ -16830,7 +16865,7 @@ function _doPrePopulate(replaceAll) {
   });
   saveState();
   buildCarPhotosList();
-  toast('Pre-populated ' + count + ' car photo' + (count !== 1 ? 's' : ''));
+  toast('Fill ind ' + count + ' car photo' + (count !== 1 ? 's' : ''));
 }
 
 // ── Get effective roster (admin overrides merged with hardcoded) ───────────
@@ -16951,7 +16986,7 @@ function showEditStaffModal(id) {
         </div>
         <div>
           <label style="font-size:10px;color:var(--txt3);display:block;margin-bottom:3px">Nickname (short)</label>
-          <input id="es-nick" value="${person?person.nick||'':''}" placeholder="Matt"
+          <input id="es-nick" value="${person?person.nick||'':''}" placeholder="Ave"
             style="width:100%;padding:7px 8px;background:var(--bg3);border:1px solid var(--bdr2);border-radius:4px;color:var(--txt);font-size:13px">
         </div>
       </div>
@@ -18869,7 +18904,7 @@ function buildCoverageTimeline() {
         `<span style="font-size:9px;color:var(--txt3)">${_blabel}</span>`+
         (_tag?`<span style="margin-left:auto;font-size:10px;font-weight:800;color:${_fg}">${_tag}</span>`:'')+
       `</div>`+
-      `<div style="font-size:10px;color:var(--txt2);line-height:1.5">${_detail||'<span style="color:var(--txt3)">no manager minimums set — Setup → 📊 Coverage targets → 👔 Managers</span>'}</div>`+
+      `<div style="font-size:10px;color:var(--txt2);line-height:1.5">${_detail||'<span style="color:var(--txt3)">no manager minimums set — Setup → 📊 Floor targets → 👔 Managers</span>'}</div>`+
     `</div>`;
   }
 
@@ -21363,7 +21398,7 @@ function gfxRender(){
   } else {
     b+='<div style="padding:10px;border-radius:8px;background:var(--bg3);font-size:12.5px;color:var(--txt2);margin-bottom:10px">'
      +'Nobody free or flexible — everyone else is holding a station at its minimum. '
-     +'A true shortage: leave it open or make a call the app shouldn’t make for you.</div>';
+     +'A true shortage: leave it open, or decide it yourself.</div>';
     // v60.215 (design §Phone, Fill card): the bench — off today AND cleared.
     var bench=gfxBench(g.area, g.hour);
     if(bench.length){
@@ -21827,7 +21862,7 @@ function ptEntryRefresh(){
   var n=sv?(sv.decisions.length+sv.left.length):0;
   var published=st.publishedAt && st.pubHash===_ptHash();
   var stale=st.publishedAt && st.pubHash!==_ptHash();
-  el.innerHTML = published ? '📋 Day planned ✓'
+  el.innerHTML = published ? '📋 Day published ✓'
     : stale ? '📋 Plan today · ↻ republish'
     : '📋 Plan today · '+(n?(sv.asks?sv.asks+' ask'+(sv.asks===1?'':'s')+' · ':'')+(sv.moves?sv.moves+' move'+(sv.moves===1?'':'s'):'')+(sv.left.length?(sv.moves?' · ':'')+sv.left.length+' short':''):'ready');
   el.style.borderColor = published?'var(--accent)': stale?'var(--amber)':'var(--bdr2)';
@@ -23321,8 +23356,8 @@ function changeModPin() {
   const conf = document.getElementById('mod-pin-confirm');
   const msg  = document.getElementById('mod-pin-msg');
   if (!cur||!nw||!conf) return;
-  if (cur.value !== getModPin()) {
-    if(msg){msg.textContent='Current MOD PIN incorrect';msg.style.color='var(--red)';}
+  if (getModPin() && cur.value !== getModPin()) {
+    if(msg){msg.textContent='Current Manager PIN incorrect';msg.style.color='var(--red)';}
     return;
   }
   if (nw.value.length < 4) {
@@ -23335,7 +23370,7 @@ function changeModPin() {
   }
   localStorage.setItem(MOD_PIN_KEY, nw.value);
   cur.value=''; nw.value=''; conf.value='';
-  if(msg){msg.textContent='✓ MOD PIN updated';msg.style.color='var(--green)';}
+  if(msg){msg.textContent='✓ Manager PIN updated';msg.style.color='var(--green)';}
 }
 
 function toggleManagerModePrompt() {
@@ -23347,7 +23382,7 @@ function toggleManagerModePrompt() {
   // Use inline modal instead of prompt() (prompt blocked on some corporate browsers)
   openModal('🔓 Manager Mode', `
     <div style="display:grid;gap:12px">
-      <div style="font-size:12px;color:var(--txt3)">Enter Manager (MOD) PIN to unlock daily controls.</div>
+      <div style="font-size:12px;color:var(--txt3)">Enter the Manager PIN to unlock daily controls.</div>
       <input id="mod-pin-entry" type="password" inputmode="numeric" maxlength="6"
         placeholder="PIN"
         style="width:100%;padding:12px;text-align:center;font-size:24px;font-weight:700;
@@ -23359,7 +23394,7 @@ function toggleManagerModePrompt() {
         <button class="btn btn-g" style="flex:1" onclick="applyModPin()">Unlock</button>
         <button class="btn btn-gh" onclick="closeModal()">Cancel</button>
       </div>
-      <div style="font-size:10px;color:var(--txt3);text-align:center">Default MOD PIN: 1234</div>
+      <div style="font-size:10px;color:var(--txt3);text-align:center">No PIN on this device yet? The number you enter becomes it.</div>
     </div>
   `);
   setTimeout(()=>{const el=document.getElementById('mod-pin-entry');if(el)el.focus();},100);
@@ -24318,7 +24353,7 @@ function stationPanelHtml(area){
   var h='';
   h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px"><div><div style="font-size:16px;font-weight:800;color:var(--txt)"><span style="color:'+m.color+'">●</span> '+biEsc(m.label)+'</div>'
     +'<div style="font-size:11px;color:var(--txt3)">'+(blocks.length?('Needs '+blocks.map(function(b){ return b.need+' '+_hFmt(b.from)+'–'+_hFmt(b.to); }).join(' · ')):'No minimum set')+'</div></div>'
-    +'<button onclick="closeStationPanel()" style="font-size:22px;color:var(--txt3);background:none;border:none;cursor:pointer;line-height:1">×</button></div>';
+    +'<button onclick="closeStationPanel()" aria-label="Close" style="font-size:22px;color:var(--txt3);background:none;border:none;cursor:pointer;line-height:1;min-width:44px;min-height:44px">×</button></div>';   // v60.274: a close you can hit
   if(gap){
     var who=stationHereNow(area, gap.from);
     h+='<div style="padding:9px 11px;border-radius:9px;border:1px solid rgba(248,113,113,.45);background:rgba(248,113,113,.08);margin-bottom:10px">'
@@ -24333,6 +24368,7 @@ function stationPanelHtml(area){
     h+=here.map(function(r){ return '<div class="pid-chip" data-pid="'+biEsc(r.pid)+'" role="button" tabindex="0" style="display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border:1px solid var(--bdr);border-radius:9px;margin-bottom:5px;cursor:pointer;background:var(--bg3)">'
       +'<span style="font-size:13px;font-weight:700;color:var(--txt)">'+biEsc(r.nick)+'</span><span style="font-size:11px;color:var(--txt3)">until '+_hFmt(r.until)+(r.lunch!=null?' · lunch '+_hFmt(r.lunch):'')+' ›</span></div>'; }).join('');
   } else { h+='<div style="font-size:12px;color:var(--txt3);padding:6px 0 8px">Nobody here right now.</div>'; }
+  if(!mgr) h+='<button onclick="closeStationPanel();toggleManagerModePrompt()" style="width:100%;margin:6px 0 10px;padding:10px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12.5px;font-weight:700;cursor:pointer">🔓 Unlock to change this</button>';   // v60.274: view mode is not a dead end
   if(mgr && gap){
     var ph=planPhase(), gw=(halfGaps([area])||[])[0]||{area:area, from:gap.from, to:gap.to}, bm=bestMoves(gw, ph);
     h+='<div class="now-sec-hd vl-mgr" style="margin:10px 0 4px">Best move'+(ph==='cxr'?' · CXRs and agents first':'')+'</div>';
@@ -24431,7 +24467,7 @@ function stationListHtml(){
     var m=GF_AREA_META[a], here=stationHereNow(a), nd=need[a]||0, hv=(have[a]!=null)?Math.round(have[a]*10)/10:here.length;
     var short=nd>0 && hv<nd, gap=stationGapWindow(a);
     var next=''; try{ var b=stationNeedBlocks(a).find(function(x){ return x.from>now; }); if(b) next=b.need+' at '+_hFmt(b.from); }catch(e){}
-    var status = short ? ((hv===0?'Empty':'Short')+(gap?' from '+_hFmt(gap.from):'')) : (gap ? 'Short from '+_hFmt(gap.from) : '');
+    var status = short ? ((hv===0?'Empty':'Short')+(gap?' from '+_hFmt(gap.from):'')) : ((gap && gap.from > now+0.01) ? 'Short from '+_hFmt(gap.from) : '');   // v60.274: a gap that has already begun while the count reads full is the solver's finer reading — the row keeps one story
     if(!((typeof _managerMode!=='undefined')&&_managerMode)) status='';   // v60.243 (C3): locked = tinted row only, no instruction
     h+='<div class="st-row'+(short||gap?' short':'')+'" onclick="openStationPanel(\''+a+'\')"><span class="st-name"><span style="color:'+m.color+'">●</span> '+m.label+'</span>'
       +'<span class="st-count" style="color:'+(short?'var(--red)':'var(--txt)')+'">'+hv+(nd?' / '+nd:'')+'</span>'
@@ -24480,7 +24516,7 @@ function ritualCardHtml(){
   try{
     var s=(typeof ritualState==='function')?ritualState():null; if(!s) return '';
     var lbl=s.label, done=s.done, total=s.total, left=s.left, overdue=!!s.overdue;
-    return '<div id="ritual-card" class="'+(overdue?'lit':'')+'" onclick="showTab(\'checklist\')"><span style="font-size:18px">📋</span><div class="rc-t">'+lbl+'<div class="rc-s">'+done+' of '+total+' done'+(left?' · '+left+' left':' · complete ✓')+(overdue?' · <b style="color:var(--amber)">past due</b>':'')+'</div></div><span style="font-size:12px;font-weight:700;color:var(--acc)">All rituals ›</span></div>';
+    return '<div id="ritual-card" class="'+(overdue?'lit':'')+'" onclick="showTab(\'checklist\')"><span style="font-size:18px">📋</span><div class="rc-t">'+lbl+'<div class="rc-s">'+(left?('next: '+biEsc((s.next&&s.next.t)||'…')):'complete ✓')+(overdue?' · <b style="color:var(--amber)">past due</b>':'')+'</div></div><span style="font-size:12px;font-weight:700;color:var(--acc)">All rituals ›</span></div>';
   }catch(e){ return ''; }
 }
 // v60.245 (C7): the People screen — every person is a door to their card; tools that are about people live here.
@@ -24546,7 +24582,7 @@ function _upBaselineSays(kind, half, total){   // rule 5 — 'low' | 'ok' | null
   try{ var b=demandBaseline(new Date().getDay()); if(!b||!b.ok||!b.avg||!b.avg[kind]) return null; var lo=half==='AM'?0:12, base=0; for(var h=lo;h<lo+12;h++) base+=(b.avg[kind][h]||0); if(!base) return null; return total < 0.6*base ? 'low' : 'ok'; }catch(e){ return null; }
 }
 function upOnInput(ta){ var d=upDetect(ta.value); var el=document.getElementById('up-hint'); if(!el) return;
-  if(d.ok && d.kind!=='brands'){ var tg=upTarget(); el.textContent = tg ? ('Will file as '+tg.label.replace(/ (AM|PM)$/,'')+' '+d.half+(d.counter?' (counter-filtered)':'')+' — tap a different pill to change') : 'All four halves are in — tap the pill to replace'; return; }   // v60.271
+  if(d.ok && d.kind!=='brands'){ var tg=upTarget(); el.textContent = tg ? ('Will file as '+tg.label.replace(/ (AM|PM)$/,'')+' '+d.half+(d.counter?' (counter-filtered)':'')+' — tap a different pill to change') : 'All four are in. Tap a pill to replace one.'; return; }   // v60.271
   el.textContent = d.ok ? (d.kind==='brands' ? 'Looks like the Agent Sales Summary' : 'Looks like '+(d.kind==='res'?'Reservations':'Returns')+' · '+d.half+(d.counter?' · counter-filtered':'')) : (ta.value.trim()? d.why : ''); el.style.color = d.ok?'var(--green)':'var(--amber)'; }
 // v60.271 (Matt, 2026-10-06): "the parser can't tell Res from Ret… you should be able to one-click the pill for
 // whichever it is, it should advance in the normal order, and someone can pick a different one if wanted."
@@ -24555,7 +24591,8 @@ function upOnInput(ta){ var d=upDetect(ta.value); var el=document.getElementById
 // never from the paste's header words. AM vs PM is still read from the paste (the 12am/12pm column is reliable)
 // and corrects the pill's half with a toast when they disagree.
 var UP_ORDER=[['res','AM','Res AM'],['res','PM','Res PM'],['ret','AM','Ret AM'],['ret','PM','Ret PM']];
-function upNextTarget(){ for(var i=0;i<UP_ORDER.length;i++){ var t=UP_ORDER[i]; if(!(_upHalfTotal(t[0],t[1])>0)) return {kind:t[0], half:t[1], label:t[2]}; } return null; }
+function _upDoneToday(kind, half){ try{ return (STATE.pasteStamp||{})[kind+half] === _bizDayKey(); }catch(e){ return false; } }   // v60.274: yesterday's numbers do not tick today's pill
+function upNextTarget(){ for(var i=0;i<UP_ORDER.length;i++){ var t=UP_ORDER[i]; if(!_upDoneToday(t[0],t[1])) return {kind:t[0], half:t[1], label:t[2]}; } return null; }
 function upTarget(){ var p=window._upTarget; if(p && p.kind) return p; return upNextTarget(); }
 function upPick(kind, half){ var t=UP_ORDER.filter(function(x){ return x[0]===kind && x[1]===half; })[0]; window._upTarget = t ? {kind:kind, half:half, label:t[2], picked:true} : null; upRender(); try{ var ta=document.getElementById('up-text'); if(ta) upOnInput(ta); }catch(e){} }
 function upRoute(kind, half, counter, text){
@@ -24568,8 +24605,10 @@ function upAdd(){
   var ask=document.getElementById('up-ask'); if(ask) ask.innerHTML='';
   if(!d.ok){ if(typeof toast==='function') toast(d.why); upOnInput(ta); return; }
   if(d.kind==='brands'){ var t5=document.getElementById('pa5'); if(t5){ t5.value=text; parseStep(5); } ta.value=''; window._upPending=null; upRender(); return; }
-  var _tg=upTarget(); if(_tg){ d.kind=_tg.kind; if(d.half && _tg.half && d.half!==_tg.half && _tg.picked) toast('That paste has '+d.half+' hours — filed as '+(_tg.kind==='res'?'Res':'Ret')+' '+d.half); }   // v60.271: Res vs Ret comes from the pill; AM/PM from the paste
+  var _tg=upTarget(); if(!_tg){ toast('All four are in for today. Tap a pill to replace one.'); return; }   // v60.274: never let the header words decide Res vs Ret
+  if(_tg){ d.kind=_tg.kind; if(d.half && _tg.half && d.half!==_tg.half && _tg.picked) toast('That paste has '+d.half+' hours — filed as '+(_tg.kind==='res'?'Res':'Ret')+' '+d.half); }   // v60.271: Res vs Ret comes from the pill; AM/PM from the paste
   window._upTarget=null;   // the next pill in order lights up after this paste lands
+  setTimeout(function(){ try{ var _ta=document.getElementById('up-text'); if(_ta) upOnInput(_ta); }catch(e){} }, 0);   // v60.274: the hint names the NEXT pill, not the one just filed
   window._upSnap={pd:JSON.stringify(STATE.pasteData||{}), ph:JSON.stringify(STATE.pasteHourly||{}), at:STATE.boardUpdatedAt||null};
   window._upLast={text:text, kind:d.kind, half:d.half};
   if(d.counter){ upRoute(d.kind,d.half,true,text); ta.value=''; window._upPending=null; toast('Counter-filtered '+(d.kind==='res'?'reservations':'returns')+' · '+d.half+' ✓'); upRender(); return; }
@@ -24601,7 +24640,7 @@ function upFlipToCounter(){
 function upStatusHtml(){
   var ph=STATE.pasteHourly||{}, pd=STATE.pasteData||{}, pend=window._upPending;
   var tg=upTarget();
-  var tiles=UP_ORDER.map(function(t){ var ok=_upHalfTotal(t[0],t[1])>0; var ring=pend&&pend.kind===t[0]&&pend.half===t[1]; var isT=tg&&tg.kind===t[0]&&tg.half===t[1]; return '<button type="button" class="up-tile'+(ok?' ok':'')+(ring?' ring':'')+(isT?' tgt':'')+'" onclick="upPick(\''+t[0]+'\',\''+t[1]+'\')" title="File the next paste as '+t[2]+'">'+(ring?'◌':(ok?'✓':(isT?'▶':'○')))+' '+t[2]+(isT?' <span style="font-weight:600;opacity:.75">next</span>':'')+'</button>'; }).join('')   // v60.271: pills are the target;
+  var tiles=UP_ORDER.map(function(t){ var ok=_upDoneToday(t[0],t[1]); var ring=pend&&pend.kind===t[0]&&pend.half===t[1]; var isT=tg&&tg.kind===t[0]&&tg.half===t[1]; return '<button type="button" class="up-tile'+(ok?' ok':'')+(ring?' ring':'')+(isT?' tgt':'')+'" onclick="upPick(\''+t[0]+'\',\''+t[1]+'\')" title="File the next paste as '+t[2]+'">'+(ring?'◌':(ok?'✓':(isT?'▶':'○')))+' '+t[2]+(isT?' <span style="font-weight:600;opacity:.75">next</span>':'')+'</button>'; }).join('')   // v60.271: pills are the target;
   tiles+='<div class="up-tile'+(pd.brands?' ok':'')+'">'+(pd.brands?'✓':'○')+' Sales summary</div>';
   var cr=_upHalfTotal('resCounter','AM')+_upHalfTotal('resCounter','PM'), cRet=_upHalfTotal('retCounter','AM')+_upHalfTotal('retCounter','PM');
   tiles+='<div class="up-tile'+(cr?' ok':'')+'">'+(cr?'✓':'○')+' Counter Res <span style="font-weight:600;opacity:.7">optional</span></div><div class="up-tile'+(cRet?' ok':'')+'">'+(cRet?'✓':'○')+' Counter Ret <span style="font-weight:600;opacity:.7">optional</span></div>';
@@ -24612,7 +24651,9 @@ function upStatusHtml(){
   if(pend) line += ' Counter Load: waiting — which paste was counter?';
   return {tiles:tiles, line:line};
 }
-function upRender(){ var st=upStatusHtml(); var t=document.getElementById('up-tiles'); if(t) t.innerHTML=st.tiles; var l=document.getElementById('up-line'); if(l) l.textContent=st.line; }
+function upRemoveLast(){ var sn=window._upSnap; if(!sn) return; try{ STATE.pasteData=JSON.parse(sn.pd); STATE.pasteHourly=JSON.parse(sn.ph); STATE.boardUpdatedAt=sn.at; var l=window._upLast; if(l && STATE.pasteStamp) delete STATE.pasteStamp[l.kind+l.half]; }catch(e){} window._upSnap=null; window._upLast=null; window._upPending=null; try{ saveState(); calcBoard(); }catch(e){} upRender(); toast('Last paste removed'); }   // v60.274
+function upRender(){ var st=upStatusHtml(); var t=document.getElementById('up-tiles'); if(t) t.innerHTML=st.tiles; var l=document.getElementById('up-line'); if(l) l.textContent=st.line;
+  try{ var u=document.getElementById('up-undo'); if(u) u.innerHTML = window._upSnap ? '<button class="btn btn-gh btn-sm" onclick="upRemoveLast()">↩ Remove last paste</button>' : ''; var gb=document.getElementById('up-go-board'); if(gb){ var any=UP_ORDER.some(function(x){ return _upDoneToday(x[0],x[1]); }); gb.className='btn '+(any?'btn-p':'btn-gh')+' btn-lg'; } }catch(e){} }
 try{ document.addEventListener('DOMContentLoaded', function(){ try{ upRender(); }catch(e){} }); }catch(e){}
 // v60.246 (C10): the Now header line — Res · Ret · Net · walk-up glyph · last paste time. Tap → Board. Replaces the stat tiles.
 function nowHeaderLineHtml(res, ret, netStr, netCol){
@@ -24908,7 +24949,7 @@ function moveNo(pid, area, from, to, phase){
 function openMoveOptions(area, from, to, phase, firstPid){
   phase=phase||planPhase(); var exp=_planExp(), win={area:area, from:from, to:to}, list=moveCandidates(win, phase, exp);
   if(firstPid){ var i=list.findIndex(function(c){ return c.pid===firstPid; }); if(i>0){ var f=list.splice(i,1)[0]; list.unshift(f); } }
-  var h='<div style="font-size:12px;color:var(--txt2);margin-bottom:10px">'+_areaLabel(area)+' '+_hFmt(from)+'–'+_hFmt(to)+' · no-hurt options first'+(phase==='cxr'?' · CXRs and agents only until CXRs are confirmed':phase==='mgr'?' · managers, juniors first':'')+'.</div>';
+  var h='<div style="font-size:12px;color:var(--txt2);margin-bottom:10px">'+_areaLabel(area)+' '+_hFmt(from)+'–'+_hFmt(to)+' · moves that hurt nothing first'+(phase==='cxr'?' · CXRs and agents only until CXRs are confirmed':phase==='mgr'?' · managers, juniors first':'')+'.</div>';
   if(!list.length) h+='<div style="padding:10px;border-radius:9px;background:var(--bg3);font-size:12.5px;color:var(--txt2)">'+(phase==='cxr'?'No CXR or agent can cover this window. It goes to the manager step.':'Nobody on shift is free and cleared for this window. A true shortage: the bench or a call are the options.')+'</div>';
   list.slice(0,4).forEach(function(c){ h+=moveCardHtml(c, win, phase); });
   openModal('Cover '+_areaLabel(area)+' · '+_hFmt(from)+'–'+_hFmt(to), h);
@@ -25443,7 +25484,7 @@ function ppHubHtml(pid,p,ss,se,fmtH,entry){
   try{ var _na=accomActive(pid).length; vals.accommodations=_na?(_na+' active'):'none'; }catch(e){}
   try{ vals.profile=(p&&p.role?p.role:'')+(p&&p.shiftCode?' · '+p.shiftCode:''); }catch(e){}
   h+='<div style="border:1px solid var(--bdr2);border-radius:10px;background:var(--bg3);overflow:hidden;margin-bottom:8px">'+PP_SPOKES.map(function(sp){ return _ppRow(pid, sp[0], sp[1], sp[2], vals[sp[0]]); }).join('')+'</div>';
-  if(mgr) h+='<div class="vl-mgr" style="padding:8px 10px;border:1px dashed var(--bdr2);border-radius:9px;font-size:11px;color:var(--txt3);margin-bottom:8px">Not built yet · Tasks · Requests · Swaps · Day trades</div>';
+  if(mgr) h+='<div class="vl-mgr" style="padding:8px 10px;border:1px dashed var(--bdr2);border-radius:9px;font-size:11px;color:var(--txt3);margin-bottom:8px">Coming later: Tasks, Requests, Swaps, Day trades</div>';
   else h+='<div style="padding:8px 10px;border-radius:9px;background:var(--bg3);font-size:11px;color:var(--txt3);margin-bottom:8px">🔒 Reading the day. Unlock with a PIN to change anything.</div>';
   h+='<div style="display:flex;gap:6px">'
     +'<button onclick="ppText(\''+biEsc(pid)+'\')" style="flex:1;padding:9px;border-radius:9px;border:1px solid var(--bdr2);background:var(--bg3);color:var(--txt2);font-size:12px;font-weight:700;cursor:pointer">💬 Text</button>'
@@ -27386,7 +27427,7 @@ function ftRenderModal(){
       <div style="font-size:12px;color:var(--txt2);line-height:1.5;margin-bottom:8px"><b>Plan weights.</b> Higher = worse. Plan today never changes its order (moves that hurt nothing first, staff before managers, juniors first); these decide how it tidies the plan and what the score means.</div>
       ${rows.map(step).join('')}
       ${custom?`<button class="ft-copy" onclick="resetSolveW()">↺ Back to the defaults</button>`:''}
-      <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">A starting guess (Matt, 2026-09-11) — tune after a real morning. Saved with the floor targets, shared across devices.</div>`;
+      <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">A starting guess. Tune it after a real morning. Saved with the floor targets, shared across devices.</div>`;
   } else {
     // ── Staff floor minimums (Ctr / Exit / Ret) ──
     const T  = (STATE.floorTargets) || FLOOR_TARGETS;
@@ -30861,10 +30902,10 @@ function asApplyWeek(){
   // v60.130 (Design #11): publishing the MANAGER schedule is BRM-gated. MTs can draft;
   // a BRM PIN (the admin PIN, or any PIN starting with 2 per the branch rule) publishes.
   if(_asPlanner==='mgr' && _asPublishTier!=='brm'){
-    var _pin = prompt('Publishing the Manager schedule needs a BRM PIN.\n(MTs can draft the week; BRMs publish it.)');
+    var _pin = prompt('Publishing the Manager schedule needs the Admin PIN.\n(Managers can draft the week; the Admin PIN publishes it.)');
     if(_pin===null) return;
-    if(_pin===((typeof getAdminPin==='function')?getAdminPin():'2826') || (_pin && _pin.charAt(0)==='2')){ _asPublishTier='brm'; }
-    else if(typeof getModPin==='function' && _pin===getModPin()){ alert('That’s an MT PIN — MTs can draft but not publish. A BRM PIN is required.'); return; }
+    if(typeof getAdminPin==='function' && getAdminPin() && _pin===getAdminPin()){ _asPublishTier='brm'; }   // v60.274: the Admin PIN only — the old 'any PIN starting with 2' door is closed
+    else if(typeof getModPin==='function' && getModPin() && _pin===getModPin()){ alert('That’s the Manager PIN — managers can draft but not publish. The Admin PIN is required.'); return; }
     else { alert('Incorrect PIN.'); return; }
   }
   var today = new Date(); today.setHours(0,0,0,0);
@@ -31190,7 +31231,7 @@ function openStationFairness(){
     }
   }
   var html =
-  '<div class="sf-hd"><div><div class="eb">Fairness · beta</div><h2>Station Fairness</h2></div>' +
+  '<div class="sf-hd"><div><div class="eb">Fairness · beta</div><h2>Patterns & fairness</h2></div>' +
     '<button class="sf-x" onclick="closeStationFairness()" aria-label="Close">✕</button></div>' +
   '<div class="sf-body">' +
     '<div class="sf-tools">' +
@@ -32283,7 +32324,7 @@ function snRender(){
   var pct=needFloor?Math.min(100,Math.round(haveFloor/needFloor*100)):100;
   var barColor=short>0?'var(--na,#FF453A)':'var(--accent,#23C983)';
   var h='';
-  h+='<div class="qa-lead">A quick read on <b>whether you have the bodies</b> for today, and the <b>typical count you need at each station</b> on a normal day. Station counts come from your branch floor targets (Setup → Coverage).</div>';
+  h+='<div class="qa-lead">A quick read on <b>whether you have the bodies</b> for today, and the <b>typical count you need at each station</b> on a normal day. Station counts come from your branch floor targets (Setup → Floor targets).</div>';
   h+='<div class="qa-sec">Today · '+(isWknd?'weekend':'weekday')+' peak (12p–4p)</div>';
   h+='<div class="sn-card">'+
      '<div class="sn-have"><div class="sn-big">'+haveFloor+'</div>'+
@@ -32330,7 +32371,7 @@ function snRender(){
   });
   var mPeak=mrows.reduce(function(a,b){return b.tot>a.tot?b:a;},mrows[0]);
   h+='</table>'+
-     '<div class="sn-note">Peak is <b>'+mPeak.block+'</b> — '+mPeak.tot+' managers on station. Numbers were <b>guesstimated from the manager rotation</b>; set your real minimums in <b>Setup → 📊 Coverage targets → 👔 Managers</b>.</div>'+
+     '<div class="sn-note">Peak is <b>'+mPeak.block+'</b> — '+mPeak.tot+' managers on station. Numbers were <b>guesstimated from the manager rotation</b>; set your real minimums in <b>Setup → 📊 Floor targets → 👔 Managers</b>.</div>'+
      '<button class="qa-done" style="margin-top:12px" onclick="openProposedAreas()">🤖 Draft today’s manager areas</button>'+
      '<div class="sn-note" style="margin-top:6px">Builds a starting plan from who’s on and these minimums — then you (or the AM) correct it.</div></div>';
   var b=document.getElementById('sn-body'); if(b) b.innerHTML=h;
@@ -32405,9 +32446,9 @@ function suRender(){
   function adm(sec){ return "setupEdit(function(){openAdminSection('"+sec+"')})"; }
   function ovl(fn){ return "setupEdit(function(){closeSetupHub();"+fn+"})"; }
   o.innerHTML='<div class="su-head"><div><div class="su-kick">Self-service</div><div class="su-title">Setup</div></div><button class="su-x" onclick="closeSetupHub()">✕</button></div>'
-    +'<div class="su-body"><p>Everything a branch changes — <b>no code, ever</b>. Your current settings show below; the Manager PIN is asked only when you change something, and every change snapshots first — undo anytime from Backup.</p>'
+    +'<div class="su-body"><p>Everything a branch can change, no code needed. Your current settings show below. The Manager PIN is asked only when you change something, and every change is backed up first — undo any time from Backup.</p>'
     +'<div class="su-sech">Coverage &amp; hours</div>'
-    +card('📊','Coverage targets', suCoverageSummary(), ovl("openThresholdQuiz()"))
+    +card('📊','Floor targets', suCoverageSummary(), ovl("openThresholdQuiz()"))
     +card('🕐','Hours of operation', suHoursSummary(), adm('sched'))
     +'<div class="su-sech">People &amp; schedule</div>'
     +card('👥','Staff &amp; roles', suStaffCount()+' people', adm('staff'))
