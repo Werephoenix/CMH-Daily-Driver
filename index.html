@@ -385,6 +385,10 @@ body.hc{
   background:#000 !important;                       /* cover the html radial glow */
 }
 body.hc .card{ border-color:rgba(255,255,255,.30) !important; }
+/* v60.272 (Design Critic): High Contrast under the DAYLIGHT theme used to paint a black body under the day ink (1.1:1). Daylight HC = black ink on white. */
+html.daylight body.hc{ --txt:#000; --text:#000; --txt2:#111; --text2:#111; --txt3:#333; --text3:#333; --bdr:#000; --border:#000; --bdr2:#222; --border2:#222; --bg:#fff; --bg2:#fff; --bg3:#f0f0f0; --off:#444; --g-ink1:#000; --g-ink2:#111; --g-ink3:#333; --g-card:#fff; --g-hero:#fff; --g-chip:#fff; --g-hair:#000; --g-hairRow:#555; --g-hairD:#000; background:#fff !important; color:#000 !important; }
+html.daylight body.hc .card, html.daylight.glass body.hc .card, html.daylight.glass.hc .card, html.daylight body.hc #verdict-card, html.daylight body.hc .st-row{ background:#fff !important; border-color:#000 !important; }
+html.daylight body.hc .more-row{ border-bottom-color:#555 !important; }
 /* faint inline hairline separators used across the list/overlay modules */
 body.hc .more-row{ border-bottom-color:rgba(255,255,255,.16) !important; }
 body.hc .as-row, body.hc .sf-sgr, body.hc .as-warn .wl, body.hc .bi-cs-row,
@@ -1745,6 +1749,7 @@ select option{background:var(--bg3)}
 /* ── BUTTONS ── */
 .btn{font-family:var(--ff-ui);font-size:13px;font-weight:600;padding:8px 16px;border-radius:5px;border:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:all .15s;white-space:nowrap}
 .btn-p{background:var(--acc);color:#fff}.btn-p:hover{background:var(--acc2)}
+html:not(.daylight) .btn-p{color:#06212e}   /* v60.272: the night accent is tuned as text-on-dark; as a fill it needs dark ink (white was 1.9:1) */
 .btn-g{background:var(--exit);color:#04140C}.btn-g:hover{background:#3ee39a}
 .btn-gh{background:var(--bg3);color:var(--txt);border:1px solid rgba(255,255,255,.08)}.btn-gh:hover{background:var(--bg2)}
 .btn-sm{font-size:11px;padding:5px 11px}
@@ -2252,7 +2257,7 @@ button { cursor: pointer; }
   <div id="logo">🚗 <span class="accent">CMH</span> <span style="font-weight:600;color:var(--txt2);letter-spacing:.01em">Daily Driver</span></div>
   <div id="topbar-date" style="display:none"></div>
   <div style="margin-left:auto;display:flex;align-items:center;gap:9px">
-    <div id="topbar-onduty" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(10,132,255,.14);color:var(--counter);display:none"></div>
+    <div id="topbar-onduty" style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:999px;background:rgba(10,132,255,.14);color:var(--txt);display:none"></div>
     <div id="topbar-time" style="font-family:var(--ff-mono);font-size:13px;color:var(--txt2)"></div>
     <div id="topbar-shift-badge" class="shift-pill opening">OPENING</div>
   </div>
@@ -2315,7 +2320,7 @@ button { cursor: pointer; }
         <span class="more-lbl">Daylight theme<span class="more-sub" id="daymode-sub">Dark — the branch default</span></span>
         <span class="more-ch">⇄</span>
       </button>
-      <button class="more-row" onclick="paletteCycle()">   <!-- v60.256 A3: four daylight palettes, per device -->
+      <button class="more-row" id="palette-row" onclick="paletteCycle()">   <!-- v60.256 A3: four daylight palettes, per device; v60.272: hidden at night (it paints nothing there) -->
         <span class="more-ic tile" style="background:rgba(143,174,207,.22)">🎨</span>
         <span class="more-lbl">Daylight palette<span class="more-sub" id="palette-sub">Porcelain — daylight ground</span></span>
         <span class="more-ch">⇄</span>
@@ -4694,6 +4699,8 @@ function applyTheme() {
   // v60.86: reflect Calm Mode on the desktop sidebar toggle (calm = on).
   var calmSw = document.getElementById('nav-calm-toggle');
   if (calmSw) calmSw.classList.toggle('on', !bold);
+  try{ if (typeof applyWash === 'function') applyWash(true); }catch(e){}   // v60.272 (Design Critic): Calm Mode never reached the wash — drift, breathing, blur and spotlight kept running
+  try{ if (typeof renderNow === 'function') renderNow(); }catch(e){}
   // v60.92: same for the More-screen Calm switch.
   var moreCalm = document.getElementById('more-calm-toggle');
   if (moreCalm) moreCalm.classList.toggle('on', !bold);
@@ -4712,6 +4719,7 @@ function applyContrast() {
   if (document.body) document.body.classList.toggle('hc', hc);
   var sw = document.getElementById('more-hc-toggle');
   if (sw) sw.classList.toggle('on', hc);
+  try{ if (typeof renderNow === 'function') renderNow(); }catch(e){}   // v60.272: inline tints (floor map) follow the mode
 }
 function toggleContrast() {
   STATE.uiContrast = (STATE.uiContrast === 'high') ? 'normal' : 'high';
@@ -4736,6 +4744,7 @@ function dayModeApply(){
   if(sub) sub.textContent = m==='dark' ? 'Dark — night palette'
     : (m==='light' ? 'Light — the branch default' : 'Auto — follows this device\u2019s setting');
   if(typeof applyWash==='function') applyWash(true);
+  try{ if (typeof renderNow === 'function') renderNow(); }catch(e){}   // v60.272 (Design Critic): the floor map's tints are inline — a theme flip must re-render it, or night keeps the day tint
 }
 function dayModeCycle(){
   var order=['dark','light','auto'], nx=order[(order.indexOf(dayModeGet())+1)%order.length];
@@ -4833,6 +4842,7 @@ function dayModeIsLight(){ var m=dayModeGet(); return m==='light' || (m==='auto'
 // the glass grades the CSS reads (var(--g-*)); cleared at night so the night defaults apply
 function paletteApplyVars(light){
   var el=document.documentElement; if(!el || !el.style) return;
+  try{ var _pr=document.getElementById('palette-row'); if(_pr) _pr.style.display = light ? '' : 'none'; }catch(e){}   // v60.272
   var pal=paletteGet(), keys=['card','hero','chip','hair','hairRow','hairD','ink1','ink2','ink3','shadow'];
   if(!light){ keys.forEach(function(k){ el.style.removeProperty('--g-'+k); }); return; }
   el.style.setProperty('--g-card', pal.card); el.style.setProperty('--g-hero', pal.hero); el.style.setProperty('--g-chip', pal.chip);
@@ -13760,13 +13770,13 @@ function printCarCodes(){
   });
   var title=filtered?'Car codes — '+list.length+' of '+ccCodes().length+(q?' · “'+q+'”':'')+(f.core?' · core':'')+(f.fam!=='all'?' · '+f.fam:''):'Car codes — all '+list.length;
   w.document.write('<!DOCTYPE html><html><head><title>CMH '+title+'</title><style>'
-    +'*{box-sizing:border-box;margin:0;padding:0} body{font-family:-apple-system,Segoe UI,Arial,sans-serif;padding:14px;font-size:9.5px;color:#111}'
+    +'*{box-sizing:border-box;margin:0;padding:0} body{font-family:-apple-system,Segoe UI,Arial,sans-serif;padding:14px;font-size:10.5px;color:#111}'
     +'.hd{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #111;padding-bottom:6px;margin-bottom:8px} .hd b{font-size:16px} .hd span{color:#666;font-size:10px}'
     +'h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#444;margin:12px 0 5px;border-bottom:1px solid #ccc;padding-bottom:2px;page-break-after:avoid}'
     +'.wrap{column-count:3;column-gap:12px} .grp{break-inside:avoid;margin-bottom:6px;border:1px solid #ddd;border-radius:5px;padding:5px 7px}'
-    +'.kick{font-size:7.5px;color:#666;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px} .grp-hd{font-size:10.5px;margin-bottom:3px} .grp-hd i{font-weight:400;color:#777;font-style:normal;margin-left:4px;font-size:8px} .core{font-size:8px;font-weight:800;color:#0A5CB8;border:1px solid #0A5CB8;border-radius:3px;padding:0 3px;vertical-align:middle} .th{font-size:8px;color:#666;float:right}'
-    +'.sub{margin:3px 0 2px} .sub-hd{font-size:9px;font-weight:700;color:#333;border-bottom:1px solid #e8e8e8;margin-bottom:1px} .sub-hd i{font-weight:400;color:#777;font-style:normal;margin-left:4px;font-size:8px} .cd{display:flex;gap:6px;align-items:baseline;padding:1px 0 1px 6px} .c{font-family:ui-monospace,Menlo,monospace;font-weight:800;font-size:9.5px;width:38px;flex:none} .v{font-size:8px;color:#777}'
-    +'.note{font-size:9px;color:#666;margin-top:3px} .ft{margin-top:10px;font-size:9px;color:#777;border-top:1px solid #ccc;padding-top:4px}'
+    +'.kick{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1px} .grp-hd{font-size:10.5px;margin-bottom:3px} .grp-hd i{font-weight:400;color:#777;font-style:normal;margin-left:4px;font-size:10px} .core{font-size:10px;font-weight:800;color:#0A5CB8;border:1px solid #0A5CB8;border-radius:3px;padding:0 3px;vertical-align:middle} .th{font-size:10px;color:#666;float:right}'
+    +'.sub{margin:3px 0 2px} .sub-hd{font-size:10px;font-weight:700;color:#333;border-bottom:1px solid #e8e8e8;margin-bottom:1px} .sub-hd i{font-weight:400;color:#777;font-style:normal;margin-left:4px;font-size:10px} .cd{display:flex;gap:6px;align-items:baseline;padding:1px 0 1px 6px} .c{font-family:ui-monospace,Menlo,monospace;font-weight:800;font-size:10.5px;width:38px;flex:none} .v{font-size:10px;color:#777}'
+    +'.note{font-size:10px;color:#666;margin-top:3px} .ft{margin-top:10px;font-size:10px;color:#777;border-top:1px solid #ccc;padding-top:4px}'
     +'@media print{@page{margin:.4in;size:letter portrait} body{padding:0}}'
     +'</style></head><body>'
     +'<div class="hd"><b>🚗 CMH Daily Driver — '+title+'</b><span>Printed '+new Date().toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})+'</span></div>'
@@ -15861,7 +15871,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.271'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.272'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -21919,6 +21929,7 @@ function printScheduleMap() {
     if (typeof toast === 'function') toast('No schedule loaded');
     return;
   }
+  try{ if (typeof _noSchedSaved === 'function' && typeof todayKey === 'function' && _noSchedSaved(todayKey())) { if (typeof toast === 'function') toast('Nothing to print yet — no schedule saved for today'); return; } }catch(e){}   // v60.272
   const today = new Date();
   const dateLabel = _boardDate().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
 
