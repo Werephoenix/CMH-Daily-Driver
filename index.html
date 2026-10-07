@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">   <!-- v60.265: a branch tool, not a web page — keep it out of search engines -->
-<title>CMH Daily Driver — Enterprise Rent-A-Car</title>
+<title>CMH Daily Driver</title>
 <!-- v60.50: installed-PWA identity (iOS home screen). Green-bolt squircle icon,
      standalone display, dark status bar. Single-file: icon is an inline data URI. -->
 <meta name="theme-color" content="#000000">
@@ -143,6 +143,8 @@ body.rit-strip{padding-bottom:calc(92px + env(safe-area-inset-bottom,0px))}
 #paste-universal .up-tile{padding:8px 10px;border-radius:10px;border:1px solid var(--bdr2);background:var(--bg3);font-size:11.5px;font-weight:700;color:var(--txt3);display:flex;align-items:center;gap:6px}
 #paste-universal .up-tile.ok{border-color:rgba(35,201,131,.5);color:var(--txt)}
 #paste-universal .up-tile.ring{border-color:var(--amber);color:var(--amber)}
+#paste-universal button.up-tile{cursor:pointer;font-family:inherit;text-align:left}
+#paste-universal .up-tile.tgt{border-color:var(--accent);color:var(--txt);box-shadow:inset 0 0 0 1px var(--accent)}   /* v60.271: the pill the next paste files into */
 #paste-universal .up-line{font-size:12.5px;color:var(--txt2);margin:6px 0 10px}
 .now-hdr-line{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:8px 12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bdr2);margin-bottom:9px;cursor:pointer;font-size:12.5px;color:var(--txt2)}
 .now-hdr-line b{color:var(--txt);font-weight:800;font-variant-numeric:tabular-nums}
@@ -618,6 +620,11 @@ body.theme-bold .now-attn.urgent:not(.calm) { animation: urgent-pulse 2.4s ease-
 .now-btn { width: 100%; border: none; border-radius: 12px; padding: 13px; font-size: 16px; font-weight: 700; font-family: var(--ff-ui); cursor: pointer; background: var(--exit); color: #04160D; }
 .now-btn.wide-green { background: var(--exit); }
 .now-btn.secondary { background: var(--bg3); color: var(--txt); }
+/* v60.271 (Design Critic): ONE solid button on Now — the top attention card's. Every later card's buttons are outlines. */
+.now-attn.ok .now-btn, .now-attn ~ .now-attn .now-btn, .now-attn ~ .now-attn .solo-btn, .now-attn ~ .now-attn .now-btn.wide-green { background: transparent; border: 1px solid var(--bdr2); color: var(--txt2); }
+.now-attn ~ .now-attn.urgent { background: var(--bg2); border-color: rgba(255,159,10,.42); }   /* a second alarm reads amber, not red */
+.now-attn ~ .now-attn.urgent .now-kicker { color: var(--amber,#FF9F0A); }
+html.daylight .now-btn:not(.secondary) { color: #fff; }   /* 2.94:1 → 7:1 on the daylight green */
 .now-btn2 { width: 100%; border: 1px solid var(--bdr2); border-radius: 12px; padding: 11px; font-size: 14px; font-weight: 600; font-family: var(--ff-ui); cursor: pointer; background: transparent; color: var(--txt2); margin-top: 8px; }
 .now-sec-hd { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--txt3); margin: 16px 0 6px 4px; }
 .now-floor-val { font-variant-numeric: tabular-nums; font-weight: 700; }
@@ -2624,7 +2631,7 @@ button { cursor: pointer; }
 <div id="paste-overall-status" style="font-size:12px;color:var(--txt3)">0 of 4 completed (Brand Totals optional)</div>
     <div class="row">
       <button class="btn btn-gh btn-sm" onclick="confirmDestructive('Clear all pasted Game Plan data?', 'This will wipe all 4 pastes and the Live Board will go blank.', clearPaste)">🗑 Clear Pastes</button>
-      <button class="btn btn-p btn-lg" onclick="calcBoard();showTab('board')">→ View Live Board</button>
+      <!-- v60.271: one door back to the Board (the universal card's button, or ← Back when you came from there) -->
     </div>
   </div>
 </div>
@@ -5142,7 +5149,7 @@ function showEODRecap() {
   // who's in early — grouped by the branch's real arrival waves
   body += `<div class="sod-q">👥 Who's in early</div>` + sodEarlyHtml();
 
-  body += `<button class="now-btn" style="margin-top:16px" onclick="sodToPaste()">Start the day → Paste data</button>`;
+  body += `<button class="now-btn secondary" style="margin-top:16px" onclick="sodToPaste()">Start the day → Paste data</button>`;   // v60.271: not a second solid button
   if (typeof openModal === 'function') openModal('☀️ Good morning', body);
 }
 
@@ -12127,8 +12134,8 @@ function qotdInjectStyle(){
   +'color:var(--accent);margin-bottom:7px}'
   +'.qotd-q{font-size:16.5px;font-weight:600;line-height:1.45;color:var(--txt)}'
   +'.qotd-w{font-size:12px;color:var(--txt3);margin-top:6px}'
-  +'.qotd-go{width:100%;margin-top:13px;padding:12px;border-radius:10px;border:none;'
-  +'background:var(--accent);color:#04160e;font-size:14px;font-weight:800;cursor:pointer}'
+  +'.qotd-go{width:100%;margin-top:13px;padding:12px;border-radius:10px;border:1px solid var(--bdr2);'
+  +'background:transparent;color:var(--txt2);font-size:14px;font-weight:800;cursor:pointer}'
   +'.qotd-quiet{border-top:2px solid var(--bdr);padding-top:9px;margin-top:14px;'
   +'font-size:12px;color:var(--txt3);line-height:1.5}'
   +'.qotd-quiet span{opacity:.75}';
@@ -12302,7 +12309,7 @@ function renderNow() {
   </div>`;
   // the status row (B4): ritual · paste prompt (only while the board is stale before noon) · coming up
   let _pasteCard = '';
-  try{ var _bt=STATE.boardUpdatedAt, _fresh = _bt && _bizDayKey(new Date(_bt))===_bizDayKey(); if(!_fresh && h<12) _pasteCard = `<div class="now-paste" onclick="showTab('paste')"><div class="np-k">Board is stale</div><div class="np-h">Paste this morning's GreenLight exports</div><div class="np-p">The Board shows ${_bt?'yesterday':'nothing'} until the first paste lands.</div></div>`; }catch(e){}
+  try{ var _bt=STATE.boardUpdatedAt, _fresh = _bt && _bizDayKey(new Date(_bt))===_bizDayKey(); if(!_fresh && h<12) _pasteCard = `<div class="now-paste" onclick="showTab('paste')"><div class="np-k">Board is stale</div><div class="np-h">Paste this morning's GreenLight exports</div><div class="np-p">${_bt?'The Board is showing yesterday, marked stale, until the first paste lands.':'The Board stays empty until the first paste lands.'}</div></div>`; }catch(e){}
   let _coming = `<div class="card now-coming" style="padding:12px 14px"><div class="now-sec-hd">Coming up</div>`
     + (typeof weekAheadRow==='function' ? weekAheadRow() : '')
     + `<div style="font-size:12.5px;color:var(--txt2);line-height:1.6">🍽 Next lunch · <b style="color:var(--txt)">${nextLunch?_nowFmtH(nextLunch.at)+' · '+nextLunch.who:'—'}</b>`
@@ -13639,12 +13646,13 @@ function ccSubgroups(codes){
     list.forEach(function(c){ if(!note){ var r=String(c.desc||'').split('—').slice(1).join('—').trim(); if(r && !CC_DROP.test(r) && r.length>28) note=r; } });
     // (Matt): ONE list of cars per card — the note's "X, Y or similar" sentence is a second list, so it is lifted out;
     // it becomes the examples line only when the model index has none for this class
-    if(note){ var keep=[]; note.split(/(?<=\.)\s+/).forEach(function(sent){ if(/or similar|similar\b|^[A-Z][^.]*,[^.]*[A-Z]/.test(sent) && !/class|assignment|availability|demand|supply|stocked|maps to|counts|replaces|kept|group/i.test(sent)){ if(!carSent) carSent=sent.replace(/\s*or similar\.?$/i,'').replace(/\.$/,''); } else keep.push(sent); }); note=keep.join(' ').trim(); }
+    if(note){ var keep=[]; note.split(/(?<=\.)\s+/).forEach(function(sent){ if(/or similar|similar\b|^[A-Z][^.]*,[^.]*[A-Z]/.test(sent) && !/class|assignment|availability|demand|supply|stocked|maps to|counts|replaces|kept|group/i.test(sent)){ if(!carSent) carSent=sent.replace(/\s*or similar\.?$/i,'').replace(/\.$/,''); } else if(!CC_MAINT.test(sent)) keep.push(sent); }); note=keep.join(' ').trim(); }
     if(!ex && carSent) ex=carSent;
     return {cls:cls, ex:ex, note:note, codes:list.map(function(c){ var rest=String(c.desc||'').split('—').slice(1).join('—').trim(); var v=(CC_KEEP.test(rest) && rest.length<=48)?rest.replace(/\.$/,''):''; return {code:c.code, variant:v}; })}; });
 }
 // (Matt): "CDW variant and Debit/alternate rate variant isn't necessary. Hybrid or AWD notes on the codes are good though."
 var CC_DROP=/\b(cdw|debit|alternate (rate|code|vehicle type|billing)|billing rate|rate code|rate variant|rate\.)/i;
+var CC_MAINT=/\b(mis-?mapped|re-?mapped|was mapped|mapped (to|from)|moved (to|from)|corrected|fixed|per sipp master|v\d\d\.\d+)\b/i;   // v60.271: maintenance remarks never print on the reference
 var CC_KEEP=/\b(hybrid|awd|4wd|4x4|electric|ev|plug-in|diesel|open-top|open-air|off-road|crew cab|convertible|\d-seat|seat)\b/i;
 function ccFamilyOf(group){ for(var i=0;i<CC_FAMILIES.length;i++){ if(CC_FAMILIES[i].groups.indexOf(group)>=0) return CC_FAMILIES[i].key; } return 'other'; }
 function ccFilter(){ return window._ccFilter||(window._ccFilter={fam:'all', core:false, stock:false}); }
@@ -15853,7 +15861,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.270'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.271'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -16384,7 +16392,8 @@ function initSync() {
     setSyncStatus('offline', 'Sign in to sync');
     // v60.193: #nosign suppresses the prompt — design screenshots only (a fresh
     // headless profile is never signed in, and the sheet covered every capture).
-    if(!/nosign/.test(location.hash||'')) setTimeout(function(){ if (!sbSignedIn()) sbPrompt(); }, 1500);
+    // v60.271 (Design Critic): the sign-in sheet no longer rises on its own — the demo pill on Now and the dot both open it on a tap.
+    if(!/nosign/.test(location.hash||'')) setTimeout(function(){ try{ if (!sbSignedIn() && typeof toast==='function') toast('Tap the dot (top right) to sign in and load your branch', 5000); }catch(e){} }, 2500);
   } else {
     sbMigrateIfNeeded().then(function(){ _syncPullNow(); sbRealtime(); });
   }
@@ -21565,7 +21574,7 @@ function ptEval(n){
     var ml=ptLunchMissing(exp, ['MT','ABRM','BRM','ARM','AM']);
     var auto='EB1 opener '+(openM||'—')+' · EB1 closer '+(closeM||'—')+' · set by the schedule';
     if(!mg.length && !ml.length) return {status:'done', detail:'No gaps left and every manager has a lunch. '+auto+'.', auto:auto};
-    return {status:st.steps[6]||'open', detail:[mg.length?mg.length+' window'+(mg.length===1?'':'s')+' for managers — no-hurt first, then juniors first (MT → ABRM → BRM → ARM/AM), Exit and Returns before Counter':'', ml.length?ml.length+' manager lunch'+(ml.length===1?'':'es')+' to place':''].filter(Boolean).join(' · ')+'.', gaps:mg, lunches:ml, auto:auto};
+    return {status:st.steps[6]||'open', detail:[mg.length?mg.length+' window'+(mg.length===1?'':'s')+' for managers — moves that hurt nothing first, then juniors first (MT → ABRM → BRM → ARM/AM), Exit and Returns before Counter':'', ml.length?ml.length+' manager lunch'+(ml.length===1?'':'es')+' to place':''].filter(Boolean).join(' · ')+'.', gaps:mg, lunches:ml, auto:auto};
   }
   return {status:'open', detail:''};
 }
@@ -21732,12 +21741,12 @@ function ptRender(){
     +'<div style="flex:1"><div style="font-size:13.5px;font-weight:800;color:var(--txt)">📝 Anything different today?</div><div style="font-size:11.5px;color:'+(_pt?'var(--amber)':'var(--txt3)')+';margin-top:2px">'+(_pt||'call-offs, late / early, fixed or longer lunches, who wants to start where')+'</div></div><span style="color:var(--txt3);font-size:16px">›</span></div>';
   // the beats bar
   var published=st.publishedAt && st.pubHash===_ptHash(), stale=st.publishedAt && st.pubHash!==_ptHash();
-  var beats=[['Particulars', _pt?'done':'open'],['Plan', (sv.decisions.length||sv.left.length)?'open':'done'],['Asks', sv.asks?'open':'done'],['Publish', published?'done':'open']];
+  var beats=[['Different today', _pt?'done':'open'],['Plan', (sv.decisions.length||sv.left.length)?'open':'done'],['Asks', sv.asks?'open':'done'],['Publish', published?'done':'open']];
   b+='<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+beats.map(function(x,i){ var col=x[1]==='done'?'var(--accent)':'var(--txt3)'; return '<span style="font-size:11px;font-weight:800;color:'+col+'"><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;border:1.5px solid '+col+';margin-right:4px;font-size:9.5px">'+(x[1]==='done'?'✓':(i+1))+'</span>'+x[0]+'</span>'; }).join('')+'</div>';
   // beat 2 — the plan for the rest of the day
   b+=card('<div style="font-size:14px;font-weight:800;color:var(--txt);margin-bottom:4px">The rest of the day</div>'
     +'<div style="font-size:12.5px;color:var(--txt2);line-height:1.5">'+biEsc(solveHeadline(sv))+'</div>'
-    +'<div style="font-size:10.5px;color:var(--txt3);margin-top:4px">Solved from now, hardest window first · no-hurt first · staff before managers · juniors first · nobody booked twice at once.</div>'
+    +'<div style="font-size:10.5px;color:var(--txt3);margin-top:4px">From now, hardest window first. Moves that hurt nothing go first; staff before managers, juniors first; nobody in two places at once.</div>'
     +'<div style="margin-top:8px">'+stfButtonsHtml()+'</div>'
     +(sv.improved.length?'<div style="font-size:10.5px;color:var(--txt3);margin-top:3px">Tidied: '+biEsc(sv.improved.slice(0,4).join(' · '))+(sv.improved.length>4?' · +'+(sv.improved.length-4):'')+'</div>':''), (sv.left.length?'var(--amber3)':(sv.decisions.length?'var(--bdr2)':'var(--accent)')));
   // before the plan: the two facts the plan is measured against, plus rotation checks and lunches
@@ -24347,8 +24356,7 @@ function planVerdict(){
       sub.push('Hurts '+(imp.hurts[0]?_impactLine(imp.hurts[0],'hurt'):'nothing'));
       var fr=fairnessRead(best.pid, worst.area); if(fr) sub.push(fr);
     } else sub.push('Nobody on shift is free and cleared for it.');
-    sub.push('Plan: '+solveHeadline(sv));
-    if(others.length) sub.push('Also: '+others.join(' · '));
+    // v60.271 (Design Critic): the subline is ONE consequence line — the plan headline lives on the Plan card, the other windows ride the title
     var btn=null;
     if(best){
       var args="'"+String(best.pid).replace(/'/g,"\\'")+"','"+worst.area+"',"+w.from+","+w.to;
@@ -24356,7 +24364,7 @@ function planVerdict(){
                      : {label:'Ask '+_pidNick(best.pid)+' · '+m.label+' '+_hFmt(w.from)+'–'+_hFmt(w.to)+' ›', js:"openMoveCard("+args+",'"+phase+"')"};
     } else btn = {label:'▶ Guided fix', js:'gfxStart()'};
     return { state:'live', area:worst.area, win:w, phase:phase,
-      title: m.label+' is '+(worst.minHave<=0?'empty':'short')+' '+_hFmt(worst.from)+'–'+_hFmt(worst.to)+(nAreas>1?' · 1 of '+nAreas:''),
+      title: m.label+' is '+(worst.minHave<=0?'empty':'short')+' '+_hFmt(worst.from)+'–'+_hFmt(worst.to)+(nAreas>1?' · +'+(nAreas-1)+' more area'+(nAreas>2?'s':''):''),   // v60.271: was '1 of 3', which read as a head-count
       sub: sub.join(' · '), best: best?{pid:best.pid}:null, button: btn };
   }
   var confirmed=!!(STATE.confirmedCoverage) && !(typeof hasPendingChanges==='function' && hasPendingChanges());
@@ -24384,9 +24392,25 @@ function verdictCardHtml(){
   if(mgr) h+='<div class="v-ghosts vl-mgr"><a onclick="openCallOff()">📞 Someone called off</a>'+(stfTop()?'<a onclick="stfUndo()">↩ Undo · '+biEsc(stfTop())+'</a>':'')+(stfRedoTop()?'<a onclick="stfRedo()">↪ Redo</a>':'')+(v.win?'<a onclick="openMoveOptions(\''+v.area+'\','+v.win.from+','+v.win.to+',\''+v.phase+'\')">Other options</a>':'<a onclick="var d=document.getElementById(\'plan-more\'); if(d){ d.open=true; d.scrollIntoView({block:\'center\'}); }">Other ways to fix</a>')+(v.ritual?'<a onclick="ritualOpen(\''+v.ritual.mode+'\')">'+biEsc(v.ritual.label)+'</a>':'')+'</div>';   /* v60.250 · v60.254: the ladder's next step when nothing is short */
   return {html:h, state:v.state, verdict:v};
 }
+// v60.271 (Design Critic: Exit read 2/4 on Now and 3/4 on Plan): ONE reader for "this hour" — the same zones and rule Now
+// uses. Whole people at their zone right now, against the hour's rule with today's exit-agent count.
+function floorNowCounts(exp, h, dow){
+  var out={exit:{have:0,need:0},counter:{have:0,need:0},returns:{have:0,need:0}}, exitAgents=0;
+  try{
+    Object.keys(exp||{}).forEach(function(pid){ var e=exp[pid]; if(!e||!e.person) return;
+      if(e.person.role==='EXIT' && (STATE.todayOverrides||{})[pid]!=='callout'){ var ov=(STATE.shiftMod||{})[pid]||{}; var ss=ov.start!=null?ov.start:e.person.shiftStart, se=ov.end!=null?ov.end:e.person.shiftEnd; if(ss!=null && h>=ss && h<se) exitAgents++; }
+      var z=(typeof _effectiveNowZone==='function')?_effectiveNowZone(pid,e.person,h):null;
+      if(z==='exit') out.exit.have++; else if(z==='counter'||z==='mgmt') out.counter.have++; else if(z==='returns') out.returns.have++;
+    });
+    var r=(typeof COVERAGE_BY_HOUR==='function')?COVERAGE_BY_HOUR(h,dow,exitAgents):{exitMin:1,counterMin:2};
+    out.closed=!!r.closed; out.exit.need=r.exitMin||0; out.counter.need=r.counterMin||0; out.returns.need=r.returnsMin||0;
+  }catch(e){}
+  return out;
+}
 function stationListHtml(){
   var exp=_planExp(), now=_nowH(), dow=new Date().getDay(), h='';
   var need={}, have={}; try{ need=gfNeedsAt(Math.floor(now),dow)||{}; }catch(e){} try{ have=(typeof gfCountsW==='function')?gfCountsW(exp,Math.floor(now)):{}; }catch(e){}
+  try{ var fn=floorNowCounts(exp, Math.floor(now), dow); ['exit','counter','returns'].forEach(function(a){ need[a]=fn[a].need; have[a]=fn[a].have; }); }catch(e){}   // v60.271: the same numbers Now shows
   ['exit','counter','returns','emerald'].forEach(function(a){
     var m=GF_AREA_META[a], here=stationHereNow(a), nd=need[a]||0, hv=(have[a]!=null)?Math.round(have[a]*10)/10:here.length;
     var short=nd>0 && hv<nd, gap=stationGapWindow(a);
@@ -24505,7 +24529,19 @@ function upCompareHalf(kind, half, newTotal){   // rule 6 — returns 'first' | 
 function _upBaselineSays(kind, half, total){   // rule 5 — 'low' | 'ok' | null (no baseline)
   try{ var b=demandBaseline(new Date().getDay()); if(!b||!b.ok||!b.avg||!b.avg[kind]) return null; var lo=half==='AM'?0:12, base=0; for(var h=lo;h<lo+12;h++) base+=(b.avg[kind][h]||0); if(!base) return null; return total < 0.6*base ? 'low' : 'ok'; }catch(e){ return null; }
 }
-function upOnInput(ta){ var d=upDetect(ta.value); var el=document.getElementById('up-hint'); if(!el) return; el.textContent = d.ok ? (d.kind==='brands' ? 'Looks like the Agent Sales Summary' : 'Looks like '+(d.kind==='res'?'Reservations':'Returns')+' · '+d.half+(d.counter?' · counter-filtered':'')) : (ta.value.trim()? d.why : ''); el.style.color = d.ok?'var(--green)':'var(--amber)'; }
+function upOnInput(ta){ var d=upDetect(ta.value); var el=document.getElementById('up-hint'); if(!el) return;
+  if(d.ok && d.kind!=='brands'){ var tg=upTarget(); el.textContent = tg ? ('Will file as '+tg.label.replace(/ (AM|PM)$/,'')+' '+d.half+(d.counter?' (counter-filtered)':'')+' — tap a different pill to change') : 'All four halves are in — tap the pill to replace'; return; }   // v60.271
+  el.textContent = d.ok ? (d.kind==='brands' ? 'Looks like the Agent Sales Summary' : 'Looks like '+(d.kind==='res'?'Reservations':'Returns')+' · '+d.half+(d.counter?' · counter-filtered':'')) : (ta.value.trim()? d.why : ''); el.style.color = d.ok?'var(--green)':'var(--amber)'; }
+// v60.271 (Matt, 2026-10-06): "the parser can't tell Res from Ret… you should be able to one-click the pill for
+// whichever it is, it should advance in the normal order, and someone can pick a different one if wanted."
+// The four pills (Res AM · Res PM · Ret AM · Ret PM) are the TARGET, not just status: the first one without
+// numbers is pre-selected and advances after every paste; a tap picks another. Res-vs-Ret comes from the pill,
+// never from the paste's header words. AM vs PM is still read from the paste (the 12am/12pm column is reliable)
+// and corrects the pill's half with a toast when they disagree.
+var UP_ORDER=[['res','AM','Res AM'],['res','PM','Res PM'],['ret','AM','Ret AM'],['ret','PM','Ret PM']];
+function upNextTarget(){ for(var i=0;i<UP_ORDER.length;i++){ var t=UP_ORDER[i]; if(!(_upHalfTotal(t[0],t[1])>0)) return {kind:t[0], half:t[1], label:t[2]}; } return null; }
+function upTarget(){ var p=window._upTarget; if(p && p.kind) return p; return upNextTarget(); }
+function upPick(kind, half){ var t=UP_ORDER.filter(function(x){ return x[0]===kind && x[1]===half; })[0]; window._upTarget = t ? {kind:kind, half:half, label:t[2], picked:true} : null; upRender(); try{ var ta=document.getElementById('up-text'); if(ta) upOnInput(ta); }catch(e){} }
 function upRoute(kind, half, counter, text){
   var step = kind==='res' ? (half==='AM'?1:2) : (half=='AM'?3:4);
   var ta=document.getElementById((counter?'pac':'pa')+step); if(!ta){ toast('Classic box '+step+' missing'); return false; }
@@ -24516,6 +24552,8 @@ function upAdd(){
   var ask=document.getElementById('up-ask'); if(ask) ask.innerHTML='';
   if(!d.ok){ if(typeof toast==='function') toast(d.why); upOnInput(ta); return; }
   if(d.kind==='brands'){ var t5=document.getElementById('pa5'); if(t5){ t5.value=text; parseStep(5); } ta.value=''; window._upPending=null; upRender(); return; }
+  var _tg=upTarget(); if(_tg){ d.kind=_tg.kind; if(d.half && _tg.half && d.half!==_tg.half && _tg.picked) toast('That paste has '+d.half+' hours — filed as '+(_tg.kind==='res'?'Res':'Ret')+' '+d.half); }   // v60.271: Res vs Ret comes from the pill; AM/PM from the paste
+  window._upTarget=null;   // the next pill in order lights up after this paste lands
   window._upSnap={pd:JSON.stringify(STATE.pasteData||{}), ph:JSON.stringify(STATE.pasteHourly||{}), at:STATE.boardUpdatedAt||null};
   window._upLast={text:text, kind:d.kind, half:d.half};
   if(d.counter){ upRoute(d.kind,d.half,true,text); ta.value=''; window._upPending=null; toast('Counter-filtered '+(d.kind==='res'?'reservations':'returns')+' · '+d.half+' ✓'); upRender(); return; }
@@ -24546,14 +24584,15 @@ function upFlipToCounter(){
 }
 function upStatusHtml(){
   var ph=STATE.pasteHourly||{}, pd=STATE.pasteData||{}, pend=window._upPending;
-  var tiles=[['res','AM','Res AM'],['res','PM','Res PM'],['ret','AM','Ret AM'],['ret','PM','Ret PM']].map(function(t){ var ok=_upHalfTotal(t[0],t[1])>0; var ring=pend&&pend.kind===t[0]&&pend.half===t[1]; return '<div class="up-tile'+(ok?' ok':'')+(ring?' ring':'')+'">'+(ring?'◌':(ok?'✓':'○'))+' '+t[2]+'</div>'; }).join('');
+  var tg=upTarget();
+  var tiles=UP_ORDER.map(function(t){ var ok=_upHalfTotal(t[0],t[1])>0; var ring=pend&&pend.kind===t[0]&&pend.half===t[1]; var isT=tg&&tg.kind===t[0]&&tg.half===t[1]; return '<button type="button" class="up-tile'+(ok?' ok':'')+(ring?' ring':'')+(isT?' tgt':'')+'" onclick="upPick(\''+t[0]+'\',\''+t[1]+'\')" title="File the next paste as '+t[2]+'">'+(ring?'◌':(ok?'✓':(isT?'▶':'○')))+' '+t[2]+(isT?' <span style="font-weight:600;opacity:.75">next</span>':'')+'</button>'; }).join('')   // v60.271: pills are the target;
   tiles+='<div class="up-tile'+(pd.brands?' ok':'')+'">'+(pd.brands?'✓':'○')+' Sales summary</div>';
   var cr=_upHalfTotal('resCounter','AM')+_upHalfTotal('resCounter','PM'), cRet=_upHalfTotal('retCounter','AM')+_upHalfTotal('retCounter','PM');
   tiles+='<div class="up-tile'+(cr?' ok':'')+'">'+(cr?'✓':'○')+' Counter Res <span style="font-weight:600;opacity:.7">optional</span></div><div class="up-tile'+(cRet?' ok':'')+'">'+(cRet?'✓':'○')+' Counter Ret <span style="font-weight:600;opacity:.7">optional</span></div>';
   var can=[]; var resOk=_upHalfTotal('res','AM')>0&&_upHalfTotal('res','PM')>0, retOk=_upHalfTotal('ret','AM')>0&&_upHalfTotal('ret','PM')>0;
   if(resOk&&retOk) can.push('availability by class'); else if(_upHalfTotal('res','AM')||_upHalfTotal('res','PM')||_upHalfTotal('ret','AM')||_upHalfTotal('ret','PM')) can.push('a half-day board (the other half falls back to yesterday, marked stale)');
   if(pd.brands) can.push('brand totals'); if(cr) can.push('Counter Load');
-  var line = can.length ? 'The Board can show now: '+can.join(' · ')+'.' : 'Nothing pasted yet — the Board shows yesterday, marked stale.';
+  var line = can.length ? 'The Board can show now: '+can.join(' · ')+'.' : 'Nothing pasted yet — the Board stays empty until the first paste lands.';
   if(pend) line += ' Counter Load: waiting — which paste was counter?';
   return {tiles:tiles, line:line};
 }
@@ -27328,7 +27367,7 @@ function ftRenderModal(){
         <div class="ft-step"><button onclick="bumpSolveW('${r[0]}',${-r[2]},${r[3]},${r[4]})" ${W[r[0]]<=r[3]?'disabled':''}>−</button><b>${W[r[0]]}</b><button onclick="bumpSolveW('${r[0]}',${r[2]},${r[3]},${r[4]})" ${W[r[0]]>=r[4]?'disabled':''}>+</button></div></div>`;
     body = `
       ${modeSeg}
-      <div style="font-size:12px;color:var(--txt2);line-height:1.5;margin-bottom:8px"><b>Plan weights.</b> Higher = worse. Plan today never changes its order (no-hurt first, staff before managers, juniors first); these decide how it tidies the plan and what the score means.</div>
+      <div style="font-size:12px;color:var(--txt2);line-height:1.5;margin-bottom:8px"><b>Plan weights.</b> Higher = worse. Plan today never changes its order (moves that hurt nothing first, staff before managers, juniors first); these decide how it tidies the plan and what the score means.</div>
       ${rows.map(step).join('')}
       ${custom?`<button class="ft-copy" onclick="resetSolveW()">↺ Back to the defaults</button>`:''}
       <div style="font-size:11px;color:var(--txt3);line-height:1.5;margin-top:8px">A starting guess (Matt, 2026-09-11) — tune after a real morning. Saved with the floor targets, shared across devices.</div>`;
