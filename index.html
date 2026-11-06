@@ -15881,7 +15881,7 @@ async function sbStatusSheet(){
 // and every 30 minutes, and when they differ shows one chip: "New version —
 // tap to update." Tapping re-fetches with no-store (repopulating the HTTP
 // cache) and reloads. No service worker involved.
-var APP_BUILD = 'v60.274'; // ← bump on EVERY deploy; the updater keys on it
+var APP_BUILD = 'v60.275'; // ← bump on EVERY deploy; the updater keys on it
 function updCheck(){
   try{
     fetch(location.pathname + '?u=' + Date.now(), {cache:'no-store'})
@@ -24496,7 +24496,7 @@ function selfHomeHtml(){
     +'<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--txt3)">Your day</div>'
     +'<button onclick="openWhoPicker()" style="padding:3px 9px;border-radius:999px;border:1px solid var(--bdr2);background:var(--bg2);color:var(--txt3);font-size:10.5px;font-weight:700;cursor:pointer">👤 '+biEsc(nick)+' · you ▾</button></div>'
     +'<div class="pid-chip" data-pid="'+biEsc(pid)+'" role="button" tabindex="0" style="cursor:pointer"><div style="font-size:17px;font-weight:800;color:'+(st.color||'var(--txt)')+'">'+biEsc(st.main)+'</div>'+(st.sub?'<div style="font-size:12px;color:var(--txt2);margin-top:2px">'+biEsc(st.sub)+'</div>':'')+'</div>';
-  var chips=[]; try{ var s1=ppStreak(pid); if(s1>=2) chips.push('🔥 Day '+s1+' in a row'); }catch(e){}
+  var chips=[];   // v60.275: the '🔥 Day N in a row' chip is dropped (Matt, 2026-11-02)
   try{ var d=new Date(tk+'T12:00:00'); for(var i=1;i<=14;i++){ d.setDate(d.getDate()+1); var k=_localDayKey(d); if(_noSchedSaved(k)) break; var c=(getScheduleForDate(k)||{})[pid]; if(c==null || (typeof isOffCode==='function' && isOffCode(c))){ chips.push('Next off · '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]); break; } } }catch(e){}
   try{ if(typeof exitAccommodated==='function' && exitAccommodated(pid)) chips.push('🛡 Accommodated'); }catch(e){}
   if(chips.length) h+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">'+chips.map(function(c){ return '<span style="font-size:11px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--bg2);border:1px solid var(--bdr2);color:var(--txt2)">'+biEsc(c)+'</span>'; }).join('')+'</div>';
@@ -25468,7 +25468,7 @@ function ppHubHtml(pid,p,ss,se,fmtH,entry){
   var st=ppStatusLine(pid, entry, ss, se);
   h+='<div style="padding:10px 12px;border-radius:10px;background:var(--bg3);border:1px solid var(--bdr2);margin-bottom:8px"><div style="font-size:15px;font-weight:800;color:'+(st.color||'var(--txt)')+'">'+biEsc(st.main)+'</div>'+(st.sub?'<div style="font-size:11.5px;color:var(--txt2);margin-top:2px">'+biEsc(st.sub)+'</div>':'')+'</div>';
   // chips: streak · next off · shield · next 1:1
-  var chips=[]; try{ var s1=ppStreak(pid); if(s1>=2 && !mgr) chips.push('🔥 Day '+s1+' in a row'); }catch(e){}   // manager view already carries the streak in the quick-action chips
+  var chips=[];   // v60.275: the '🔥 Day N in a row' chip is dropped (Matt, 2026-11-02)
   try{ var d=new Date(tk+'T12:00:00'); for(var i=1;i<=14;i++){ d.setDate(d.getDate()+1); var k=_localDayKey(d); if(_noSchedSaved(k)) break; var c=(getScheduleForDate(k)||{})[pid]; if(c==null || (typeof isOffCode==='function' && isOffCode(c))){ chips.push('Next off · '+['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]); break; } } }catch(e){}
   try{ var _ps=partList(pid); if(_ps.length) chips.push('📝 today: '+_ps.map(partLabel).join(' · ')); }catch(e){}   // v60.251: today's particulars (edit them in Plan today → Anything different today?)
   try{ var _acc=accomActive(pid); if(_acc.length){ var _ends=_acc.map(function(a){ return a.end; }).filter(Boolean).sort()[0]; chips.push('🛡 Accommodated · '+_acc.map(function(a){ return accomLabel(a.activity).replace(/ Booth| shifts/,''); }).join(', ')+(mgr&&_ends?' · through '+_ends:'')); } }catch(e){}   // v60.244
